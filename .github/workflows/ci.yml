@@ -39,7 +39,7 @@ jobs:
 
       - name: Check frontend files exist
         run: |
-          for f in index.html login.html signup.html account.html script.js styles.css; do
+          for f in index.html login.html signup.html account.html games.html profile.html script.js styles.css; do
             if [ ! -f "$f" ]; then
               echo "ERROR: missing frontend file: $f"
               exit 1

@@ -107,7 +107,7 @@ jobs:
       - name: Copy frontend files to deployment directory
         run: |
           mkdir -p _site
-          cp index.html login.html signup.html account.html script.js styles.css _site/
+          cp index.html login.html signup.html account.html games.html profile.html script.js styles.css _site/
           touch _site/.nojekyll
 
       - name: Configure Pages
