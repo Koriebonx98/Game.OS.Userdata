@@ -20,6 +20,24 @@ const API_BASE_URL = 'https://your-backend-url.com';
 let DEMO_MODE = true;
 
 // ============================================================
+// SECURITY - PASSWORD HASHING FOR DEMO MODE
+// ============================================================
+
+/**
+ * Hash password using Web Crypto API (for demo mode only)
+ * NOTE: This provides basic protection but is NOT suitable for production
+ * Production should use bcrypt or similar server-side hashing
+ */
+async function hashPasswordDemo(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
+// ============================================================
 // INITIALIZATION
 // ============================================================
 
@@ -116,8 +134,8 @@ function saveDemoAccounts(accounts) {
  * Create account in demo mode
  */
 async function createAccountDemo(username, email, password) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
+    return new Promise(async (resolve) => {
+        setTimeout(async () => {
             const accounts = getDemoAccounts();
             
             // Check if username already exists
@@ -138,11 +156,14 @@ async function createAccountDemo(username, email, password) {
                 return;
             }
             
+            // Hash password for basic security
+            const passwordHash = await hashPasswordDemo(password);
+            
             // Create new account
             const newAccount = {
                 username: username,
                 email: email,
-                password: password, // In real app, this would be hashed
+                password_hash: passwordHash, // Hashed password
                 createdAt: new Date().toISOString()
             };
             
@@ -163,8 +184,8 @@ async function createAccountDemo(username, email, password) {
  * Verify account in demo mode
  */
 async function verifyAccountDemo(identifier, password) {
-    return new Promise((resolve) => {
-        setTimeout(() => {
+    return new Promise(async (resolve) => {
+        setTimeout(async () => {
             const accounts = getDemoAccounts();
             
             // Find account by email or username
@@ -181,8 +202,9 @@ async function verifyAccountDemo(identifier, password) {
                 return;
             }
             
-            // Check password
-            if (account.password !== password) {
+            // Hash the input password and compare
+            const passwordHash = await hashPasswordDemo(password);
+            if (account.password_hash !== passwordHash) {
                 resolve({
                     success: false,
                     message: 'Invalid password'
@@ -366,8 +388,20 @@ async function handleLogin(event) {
         
         if (data.success) {
             // Extract user info
-            const username = data.user ? data.user.username : loginIdentifier;
-            const email = data.user ? data.user.email : loginIdentifier;
+            const username = data.user ? data.user.username : '';
+            const email = data.user ? data.user.email : '';
+            
+            // Validate we have user data
+            if (!username || !email) {
+                console.warn('⚠️ Backend response missing user data');
+                showMessage(messageDiv, 
+                    '⚠️ Login successful but user data incomplete. Please try again.', 
+                    'warning'
+                );
+                enableForm('loginForm');
+                return;
+            }
+            
             // Success!
             showMessage(messageDiv, 
                 `✅ Welcome back, ${username}! Login successful.`, 

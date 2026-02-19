@@ -191,7 +191,8 @@ For production use, this system integrates with a private GitHub repository ([Ga
 - ✅ Password confirmation matching
 - ✅ Duplicate username/email detection
 - ✅ Session management with localStorage/sessionStorage
-- ⚠️ **Demo mode stores passwords in plain text** (suitable for testing only)
+- ✅ **Demo mode uses SHA-256 password hashing** (basic client-side protection)
+- ⚠️ **Demo mode is still for testing only** (client-side hashing not production-grade)
 
 ### For Production:
 
@@ -207,7 +208,15 @@ When integrating with the GitHub repository backend:
 
 ### Demo Mode Security Notice:
 
-⚠️ **Important**: Demo mode is for testing and demonstration purposes only. It stores passwords in plain text in localStorage. **Do NOT use demo mode with real passwords or in production environments.**
+⚠️ **Important**: Demo mode is for testing and demonstration purposes only. While it uses SHA-256 hashing for basic password protection, client-side hashing is **NOT production-grade security**. 
+
+**Why Demo Mode is Not Production-Ready:**
+- Hashing happens in browser (visible in dev tools)
+- No salt used (vulnerable to rainbow table attacks)
+- No rate limiting (vulnerable to brute force)
+- Data stored in localStorage (accessible to any script on the page)
+
+**For Production**: Use the GitHub repository backend with server-side bcrypt hashing as documented in GITHUB_INTEGRATION.md.
 
 ## 🛠️ Technical Stack
 
