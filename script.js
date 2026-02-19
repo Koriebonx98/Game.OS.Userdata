@@ -743,8 +743,7 @@ function displayCurrentUser() {
         if (userDisplayElement) {
             userDisplayElement.innerHTML = `
                 <div class="user-info">
-                    <span class="welcome-text">Welcome, <strong>${user.username}</strong>!</span>
-                    <a href="account.html" class="btn btn-secondary" style="text-decoration:none;">My Account</a>
+                    <span class="welcome-text">👋 Welcome back, <strong>${user.username}</strong>!</span>
                 </div>
             `;
         }

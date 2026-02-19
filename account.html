@@ -13,14 +13,14 @@
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
                 <div id="userNav">
-                    <a href="games.html" class="nav-link">Games</a>
-                    <a href="account.html" class="nav-link">My Account</a>
+                    <a href="games.html" class="nav-link">🔍 Games</a>
+                    <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
                     <button onclick="logout()" class="nav-link nav-btn">Logout</button>
                 </div>
             </nav>
         </header>
 
-        <main>
+        <main style="background:#f8fafc;">
             <div class="form-container account-container">
                 <h2>👤 My Account</h2>
                 <p class="form-subtitle">View and update your account information</p>
@@ -47,7 +47,7 @@
                     </div>
                     <div class="account-detail-row">
                         <span class="detail-label">Game Library</span>
-                        <a href="games.html" class="detail-value" style="color:var(--secondary-color);text-decoration:none;font-weight:500;">🎮 View / Add Games →</a>
+                        <a href="games.html?tab=library" class="detail-value" style="color:var(--primary-color);text-decoration:none;font-weight:500;">📚 My Library →</a>
                     </div>
                 </div>
 
