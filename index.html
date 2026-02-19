@@ -12,8 +12,14 @@
             <h1>🎮 Game OS Userdata</h1>
             <p>Secure Account Management System</p>
             <nav>
-                <a href="signup.html" class="nav-link">Sign Up</a>
-                <a href="login.html" class="nav-link">Login</a>
+                <div id="guestNav">
+                    <a href="signup.html" class="nav-link">Sign Up</a>
+                    <a href="login.html" class="nav-link">Login</a>
+                </div>
+                <div id="userNav" class="hidden">
+                    <a href="account.html" class="nav-link">My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
             </nav>
         </header>
         
@@ -31,9 +37,12 @@
                 <h2>Welcome to Game OS</h2>
                 <p>Create your account and join the gaming community. Secure, fast, and powered by modern technology.</p>
                 
-                <div class="cta-buttons">
+                <div class="cta-buttons" id="guestCta">
                     <a href="signup.html" class="btn btn-primary">Get Started</a>
                     <a href="login.html" class="btn btn-secondary">Sign In</a>
+                </div>
+                <div class="cta-buttons hidden" id="userCta">
+                    <a href="account.html" class="btn btn-primary">My Account</a>
                 </div>
             </div>
             

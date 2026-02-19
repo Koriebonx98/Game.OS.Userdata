@@ -12,7 +12,13 @@
             <h1>🎮 Game OS Userdata</h1>
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
-                <a href="signup.html" class="nav-link">Sign Up</a>
+                <div id="guestNav">
+                    <a href="signup.html" class="nav-link">Sign Up</a>
+                </div>
+                <div id="userNav" class="hidden">
+                    <a href="account.html" class="nav-link">My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
             </nav>
         </header>
         

@@ -102,12 +102,24 @@ document.addEventListener('DOMContentLoaded', function() {
     if (signupForm) {
         signupForm.addEventListener('submit', handleSignup);
     }
+
+    // Update Account Form Handler
+    const updateForm = document.getElementById('updateForm');
+    if (updateForm) {
+        updateForm.addEventListener('submit', handleAccountUpdate);
+    }
     
     // Detect and initialise the active mode
     initializeMode();
     
-    // Display current user if logged in (for home page)
+    // Update nav and display current user state
     displayCurrentUser();
+
+    // If on account page, require login and populate details
+    if (document.getElementById('updateForm')) {
+        requireLogin();
+        populateAccountDetails();
+    }
 });
 
 // ============================================================
@@ -618,14 +630,31 @@ async function handleLogin(event) {
 function displayCurrentUser() {
     const user = getCurrentUser();
     const userDisplayElement = document.getElementById('userDisplay');
-    
-    if (user && userDisplayElement) {
-        userDisplayElement.innerHTML = `
-            <div class="user-info">
-                <span class="welcome-text">Welcome, <strong>${user.username}</strong>!</span>
-                <button onclick="logout()" class="btn btn-secondary">Logout</button>
-            </div>
-        `;
+    const guestNav = document.getElementById('guestNav');
+    const userNav  = document.getElementById('userNav');
+
+    if (user) {
+        // Show user info banner (home page only)
+        if (userDisplayElement) {
+            userDisplayElement.innerHTML = `
+                <div class="user-info">
+                    <span class="welcome-text">Welcome, <strong>${user.username}</strong>!</span>
+                    <a href="account.html" class="btn btn-secondary" style="text-decoration:none;">My Account</a>
+                </div>
+            `;
+        }
+        // Toggle nav: hide guest links, show user links
+        if (guestNav) guestNav.classList.add('hidden');
+        if (userNav)  userNav.classList.remove('hidden');
+        // Toggle home-page CTA buttons
+        const guestCta = document.getElementById('guestCta');
+        const userCta  = document.getElementById('userCta');
+        if (guestCta) guestCta.classList.add('hidden');
+        if (userCta)  userCta.classList.remove('hidden');
+    } else {
+        // Ensure guest state is visible
+        if (guestNav) guestNav.classList.remove('hidden');
+        if (userNav)  userNav.classList.add('hidden');
     }
 }
 
@@ -713,6 +742,171 @@ function requireLogin() {
     if (!isLoggedIn()) {
         window.location.href = 'login.html';
     }
+}
+
+// ============================================================
+// MY ACCOUNT PAGE – DISPLAY & UPDATE
+// ============================================================
+
+/**
+ * Populate account detail fields on the My Account page.
+ */
+function populateAccountDetails() {
+    const user = getCurrentUser();
+    if (!user) return;
+    const usernameEl = document.getElementById('displayUsername');
+    const emailEl    = document.getElementById('displayEmail');
+    const joinedEl   = document.getElementById('displayJoined');
+    if (usernameEl) usernameEl.textContent = user.username;
+    if (emailEl)    emailEl.textContent    = user.email;
+    if (joinedEl)   joinedEl.textContent   = user.loginTime
+        ? new Date(user.loginTime).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' })
+        : '—';
+}
+
+/**
+ * Handle the update account form submission.
+ */
+async function handleAccountUpdate(event) {
+    event.preventDefault();
+    const messageDiv       = document.getElementById('updateMessage');
+    const newEmail         = document.getElementById('updateEmail').value.trim();
+    const currentPassword  = document.getElementById('updateCurrentPassword').value;
+    const newPassword      = document.getElementById('updateNewPassword').value;
+    const confirmPassword  = document.getElementById('updateConfirmPassword').value;
+    const user             = getCurrentUser();
+
+    clearMessage(messageDiv);
+
+    if (!currentPassword) {
+        showMessage(messageDiv, 'Please enter your current password to make changes.', 'error');
+        return;
+    }
+    if (newEmail && !validateEmail(newEmail)) {
+        showMessage(messageDiv, 'Please enter a valid email address.', 'error');
+        return;
+    }
+    if (newPassword && newPassword.length < 6) {
+        showMessage(messageDiv, 'New password must be at least 6 characters.', 'error');
+        return;
+    }
+    if (newPassword && newPassword !== confirmPassword) {
+        showMessage(messageDiv, 'New passwords do not match.', 'error');
+        return;
+    }
+    if (!newEmail && !newPassword) {
+        showMessage(messageDiv, 'No changes to save – enter a new email or password.', 'info');
+        return;
+    }
+
+    showMessage(messageDiv, '⏳ Saving changes… Please wait.', 'info');
+    disableForm('updateForm');
+
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await updateAccountDemo(user.username, currentPassword, newEmail || null, newPassword || null);
+        } else {
+            result = await updateAccountGitHub(user.username, currentPassword, newEmail || null, newPassword || null);
+        }
+
+        if (result.success) {
+            // Refresh stored session with updated info
+            const sessionKey = localStorage.getItem('gameOSUser') ? 'localStorage' : 'sessionStorage';
+            const updatedUser = { ...user, email: result.email };
+            if (sessionKey === 'localStorage') {
+                localStorage.setItem('gameOSUser', JSON.stringify(updatedUser));
+            } else {
+                sessionStorage.setItem('gameOSUser', JSON.stringify(updatedUser));
+            }
+            populateAccountDetails();
+            showMessage(messageDiv, '✅ Account updated successfully!', 'success');
+            document.getElementById('updateForm').reset();
+        } else {
+            showMessage(messageDiv, '❌ ' + result.message, 'error');
+        }
+    } catch (err) {
+        console.error('Update error:', err);
+        showMessage(messageDiv, '❌ Failed to update account. Please try again.', 'error');
+    }
+    enableForm('updateForm');
+}
+
+// ============================================================
+// DEMO MODE – ACCOUNT UPDATE
+// ============================================================
+
+async function updateAccountDemo(username, currentPassword, newEmail, newPassword) {
+    const currentHash = await hashPasswordDemo(currentPassword);
+    const accounts = getDemoAccounts();
+    const idx = accounts.findIndex(a => a.username.toLowerCase() === username.toLowerCase());
+    if (idx === -1) return { success: false, message: 'Account not found.' };
+    if (accounts[idx].password_hash !== currentHash) {
+        return { success: false, message: 'Current password is incorrect.' };
+    }
+    if (newEmail) {
+        const emailTaken = accounts.some((a, i) => i !== idx && a.email.toLowerCase() === newEmail.toLowerCase());
+        if (emailTaken) return { success: false, message: 'Email already in use by another account.' };
+        accounts[idx].email = newEmail;
+    }
+    if (newPassword) {
+        accounts[idx].password_hash = await hashPasswordDemo(newPassword);
+    }
+    saveDemoAccounts(accounts);
+    return { success: true, message: 'Account updated.', email: accounts[idx].email };
+}
+
+// ============================================================
+// GITHUB MODE – ACCOUNT UPDATE
+// ============================================================
+
+async function updateAccountGitHub(username, currentPassword, newEmail, newPassword) {
+    const usernameLower = username.toLowerCase();
+    const accountFile   = await githubRead(`accounts/${usernameLower}.json`);
+    if (!accountFile) return { success: false, message: 'Account not found.' };
+    const account = accountFile.content;
+
+    // Verify current password
+    const currentHash = await hashPassword(currentPassword, account.username);
+    if (account.password_hash !== currentHash) {
+        return { success: false, message: 'Current password is incorrect.' };
+    }
+
+    let updated = { ...account };
+
+    // Handle email change
+    if (newEmail && newEmail.toLowerCase() !== account.email.toLowerCase()) {
+        const emailLower   = newEmail.toLowerCase();
+        const indexFile    = await githubRead('accounts/email-index.json');
+        const emailMap     = indexFile ? { ...indexFile.content } : {};
+        if (emailMap[emailLower] && emailMap[emailLower] !== usernameLower) {
+            return { success: false, message: 'Email already in use by another account.' };
+        }
+        // Remove old email, add new
+        delete emailMap[account.email.toLowerCase()];
+        emailMap[emailLower] = usernameLower;
+        await githubWrite(
+            'accounts/email-index.json',
+            emailMap,
+            `Update email index for: ${username}`,
+            indexFile ? indexFile.sha : undefined
+        );
+        updated.email = newEmail;
+    }
+
+    // Handle password change
+    if (newPassword) {
+        updated.password_hash = await hashPassword(newPassword, account.username);
+    }
+
+    await githubWrite(
+        `accounts/${usernameLower}.json`,
+        updated,
+        `Update account: ${username}`,
+        accountFile.sha
+    );
+
+    return { success: true, message: 'Account updated.', email: updated.email };
 }
 
 // Export functions for use in other scripts

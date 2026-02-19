@@ -65,6 +65,13 @@ nav {
     gap: 15px;
 }
 
+#guestNav,
+#userNav {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
 .nav-link {
     color: var(--white);
     text-decoration: none;
@@ -455,8 +462,65 @@ footer {
     to { transform: rotate(360deg); }
 }
 
-/* Utility Classes */
-.text-center {
+/* Nav button (styled like nav-link but as a <button>) */
+.nav-btn {
+    background: none;
+    border: none;
+    font-size: 1em;
+    cursor: pointer;
+    font-family: inherit;
+}
+
+/* Account Page */
+.account-container {
+    max-width: 540px;
+}
+
+.account-details-card {
+    background: #f8f9fa;
+    border-radius: 10px;
+    padding: 25px;
+    margin-bottom: 30px;
+    border: 1px solid var(--border-color);
+}
+
+.account-details-card h3,
+.update-section h3 {
+    color: var(--text-color);
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--primary-color);
+}
+
+.account-detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.account-detail-row:last-child {
+    border-bottom: none;
+}
+
+.detail-label {
+    font-weight: 600;
+    color: #555;
+    font-size: 0.9em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.detail-value {
+    color: var(--text-color);
+    font-size: 1em;
+}
+
+.update-section {
+    margin-top: 10px;
+}
     text-align: center;
 }
 
@@ -469,5 +533,5 @@ footer {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
