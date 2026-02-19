@@ -153,17 +153,21 @@
 
                     <details style="margin-top:16px;">
                         <summary style="cursor:pointer;color:#555;font-size:0.85em;font-weight:600;">C# Quick-Start Example</summary>
-                        <pre style="background:#1e1e2e;color:#cdd6f4;padding:14px;border-radius:8px;font-size:0.78em;overflow-x:auto;margin-top:8px;"><code>// Authenticate and retrieve your token once:
+                        <pre style="background:#1e1e2e;color:#cdd6f4;padding:14px;border-radius:8px;font-size:0.78em;overflow-x:auto;margin-top:8px;"><code>// ── Option A: Per-user token (authenticate as yourself) ──────────────────────
+// A token is generated automatically when you create your account.
+// You can also regenerate it here at any time.
+
+// Get (or regenerate) your token:
 var payload = new { username = "youruser", password = "yourpass" };
 var resp = await httpClient.PostAsJsonAsync("https://your-backend/api/auth/token", payload);
 var result = await resp.Content.ReadFromJsonAsync&lt;TokenResponse&gt;();
-string token = result.Token;  // store this securely
+string userToken = result.Token;  // store this securely
 
-// Then use the token for any API call:
+// Use the token for any API call:
 httpClient.DefaultRequestHeaders.Authorization =
-    new AuthenticationHeaderValue("Bearer", token);
+    new AuthenticationHeaderValue("Bearer", userToken);
 
-// Get your game library:
+// Get YOUR game library:
 var games = await httpClient.GetFromJsonAsync&lt;GamesResponse&gt;(
     "https://your-backend/api/me/games");
 
@@ -174,7 +178,23 @@ await httpClient.PostAsJsonAsync("https://your-backend/api/me/activity", new {
     sessionStart  = DateTime.UtcNow.AddHours(-2).ToString("o"),
     sessionEnd    = DateTime.UtcNow.ToString("o"),
     minutesPlayed = 120
-});</code></pre>
+});
+
+// ── Option B: Public API key (read any user, no per-user login needed) ────────
+// Set PUBLIC_API_KEY in your server .env and use it as a Bearer token.
+// Great for game launchers or server-side apps that query multiple users.
+
+string publicKey = "your_public_api_key_from_env";  // keep this secret!
+httpClient.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", publicKey);
+
+// Read any user's profile, game library, or achievements:
+var profile = await httpClient.GetFromJsonAsync&lt;ProfileResponse&gt;(
+    "https://your-backend/api/users/someuser");
+var library = await httpClient.GetFromJsonAsync&lt;GamesResponse&gt;(
+    "https://your-backend/api/users/someuser/games");
+var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;(
+    "https://your-backend/api/users/someuser/achievements");</code></pre>
                     </details>
                 </div>
 

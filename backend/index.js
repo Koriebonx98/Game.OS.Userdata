@@ -48,6 +48,14 @@ if (!process.env.TOKEN_HMAC_SECRET) {
 }
 const TOKEN_HMAC_SECRET = process.env.TOKEN_HMAC_SECRET || 'change-me-please';
 
+// ── Public API key ────────────────────────────────────────────────────────────
+// A single shared key for C# apps / game launchers that need read access
+// without authenticating as a specific user.  Set PUBLIC_API_KEY in .env.
+const PUBLIC_API_KEY = process.env.PUBLIC_API_KEY || null;
+if (!PUBLIC_API_KEY) {
+    console.warn('⚠️  WARNING: PUBLIC_API_KEY is not set. The /api/public-key endpoint will return null and public-key auth will be disabled.');
+}
+
 /**
  * Generate a new raw API token embedding the username.
  * Format: gos_{username}.{32-byte random hex}
@@ -145,6 +153,59 @@ async function authenticateToken(req, res, next) {
     }
 }
 
+/**
+ * Middleware that accepts EITHER a per-user token OR the shared PUBLIC_API_KEY.
+ * When the public key is used, req.tokenUser is set to { publicKeyAuth: true }
+ * and the route is responsible for reading the target username from the query/body.
+ * When a per-user token is used the behaviour is identical to authenticateToken.
+ */
+async function authenticatePublicOrUserToken(req, res, next) {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_API)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – please slow down.' });
+    }
+
+    const authHeader = req.headers['authorization'];
+    const rawToken   = (authHeader && authHeader.startsWith('Bearer '))
+        ? authHeader.slice(7).trim()
+        : null;
+
+    if (!rawToken) {
+        return res.status(401).json({
+            success: false,
+            message: 'Missing API token. Add an Authorization: Bearer <token> header.'
+        });
+    }
+
+    // Accept the shared public key
+    if (PUBLIC_API_KEY && rawToken === PUBLIC_API_KEY) {
+        req.tokenUser = { publicKeyAuth: true };
+        return next();
+    }
+
+    // Fall back to per-user token validation
+    const usernameLower = parseTokenUsername(rawToken);
+    if (!usernameLower || !sanitiseUsername(usernameLower)) {
+        return res.status(401).json({ success: false, message: 'Invalid API token format.' });
+    }
+
+    try {
+        const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile || accountFile.content.api_token_hash !== hashToken(rawToken)) {
+            return res.status(401).json({ success: false, message: 'Invalid or revoked API token.' });
+        }
+        req.tokenUser = {
+            username:      accountFile.content.username,
+            email:         accountFile.content.email,
+            usernameLower
+        };
+        next();
+    } catch (err) {
+        console.error('Token auth error:', err);
+        res.status(500).json({ success: false, message: 'Server error during token validation.' });
+    }
+}
+
 // ── GitHub helpers ────────────────────────────────────────────────────────────
 
 /**
@@ -204,6 +265,18 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Game.OS backend running' });
 });
 
+// ── GET /api/public-key ───────────────────────────────────────────────────────
+// Returns the shared public API key configured via the PUBLIC_API_KEY env var.
+// C# apps can call this endpoint once to retrieve the key (no auth required),
+// or operators can copy it from the server environment directly.
+app.get('/api/public-key', (req, res) => {
+    res.json({
+        success:    true,
+        publicKey:  PUBLIC_API_KEY || null,
+        configured: PUBLIC_API_KEY !== null
+    });
+});
+
 // ── GET /api/users-count ──────────────────────────────────────────────────────
 app.get('/api/users-count', async (req, res) => {
     try {
@@ -254,12 +327,20 @@ app.post('/api/create-account', async (req, res) => {
         // Hash the password server-side with bcrypt
         const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
+        // Generate an API token for the new account right away
+        const rawToken  = generateRawToken(username.toLowerCase());
+        const tokenHash = hashToken(rawToken);
+        const createdAt = new Date().toISOString();
+        const issuedAt  = new Date().toISOString();
+
         // Write account profile file (one folder per user)
         const accountData = {
             username,
             email,
-            password_hash: passwordHash,
-            created_at: new Date().toISOString()
+            password_hash:       passwordHash,
+            created_at:          createdAt,
+            api_token_hash:      tokenHash,
+            api_token_issued_at: issuedAt
         };
         await putFile(
             `accounts/${username.toLowerCase()}/profile.json`,
@@ -293,7 +374,13 @@ app.post('/api/create-account', async (req, res) => {
             }
         }
 
-        res.json({ success: true, message: 'Account created successfully' });
+        res.json({
+            success:  true,
+            message:  'Account created successfully',
+            token:    rawToken,
+            username,
+            issuedAt
+        });
     } catch (err) {
         console.error('Error creating account:', err);
         res.status(500).json({ success: false, message: 'Failed to create account. Please try again.' });
@@ -1241,6 +1328,58 @@ app.get('/api/me/activity', authenticateToken, async (req, res) => {
         res.json({ success: true, activity: result });
     } catch (err) {
         console.error('GET /api/me/activity error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/users/:username ──────────────────────────────────────────────────
+// Read a user's public profile using either the shared PUBLIC_API_KEY or their
+// own per-user token.  Sensitive fields (password hash, token hash) are stripped.
+app.get('/api/users/:username', authenticatePublicOrUserToken, async (req, res) => {
+    try {
+        const targetUser = req.params.username;
+        if (!targetUser || !sanitiseUsername(targetUser)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const accountFile = await getFile(`accounts/${targetUser.toLowerCase()}/profile.json`);
+        if (!accountFile) return res.status(404).json({ success: false, message: 'User not found.' });
+        // Use an explicit allowlist to avoid accidentally exposing future sensitive fields
+        const { username, created_at } = accountFile.content;
+        res.json({ success: true, profile: { username, created_at } });
+    } catch (err) {
+        console.error('GET /api/users/:username error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/users/:username/games ────────────────────────────────────────────
+// Read any user's game library using either the public key or a per-user token.
+app.get('/api/users/:username/games', authenticatePublicOrUserToken, async (req, res) => {
+    try {
+        const targetUser = req.params.username;
+        if (!targetUser || !sanitiseUsername(targetUser)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const file = await getFile(`accounts/${targetUser.toLowerCase()}/games.json`);
+        res.json({ success: true, games: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/users/:username/games error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/users/:username/achievements ─────────────────────────────────────
+// Read any user's achievements using either the public key or a per-user token.
+app.get('/api/users/:username/achievements', authenticatePublicOrUserToken, async (req, res) => {
+    try {
+        const targetUser = req.params.username;
+        if (!targetUser || !sanitiseUsername(targetUser)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const file = await getFile(`accounts/${targetUser.toLowerCase()}/achievements.json`);
+        res.json({ success: true, achievements: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/users/:username/achievements error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
