@@ -535,3 +535,98 @@ footer {
 .hidden {
     display: none !important;
 }
+
+/* Friends Section */
+.friends-section {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: #f8f9fa;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.friends-section h3 {
+    color: var(--text-color);
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--secondary-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.friends-count {
+    background: var(--secondary-color);
+    color: var(--white);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.friend-search {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 15px;
+}
+
+.friend-search input {
+    flex: 1;
+    padding: 10px 14px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.95em;
+    transition: border-color 0.3s ease;
+}
+
+.friend-search input:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.friends-list {
+    margin-top: 10px;
+}
+
+.friend-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.friend-item:last-child {
+    border-bottom: none;
+}
+
+.friend-name {
+    font-weight: 500;
+    color: var(--text-color);
+}
+
+.btn-remove-friend {
+    background: transparent;
+    border: 1px solid var(--danger-color);
+    color: var(--danger-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-friend:hover {
+    background: var(--danger-color);
+    color: var(--white);
+}
+
+@media (max-width: 480px) {
+    .friend-search {
+        flex-direction: column;
+    }
+}
+
+

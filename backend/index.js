@@ -119,7 +119,7 @@ app.post('/api/create-account', async (req, res) => {
         }
 
         // Check for duplicate username
-        const existingAccount = await getFile(`accounts/${username.toLowerCase()}.json`);
+        const existingAccount = await getFile(`accounts/${username.toLowerCase()}/profile.json`);
         if (existingAccount) {
             return res.status(400).json({ success: false, message: 'Username already exists' });
         }
@@ -134,7 +134,7 @@ app.post('/api/create-account', async (req, res) => {
         // Hash the password server-side with bcrypt
         const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
-        // Write account file
+        // Write account profile file (one folder per user)
         const accountData = {
             username,
             email,
@@ -142,7 +142,7 @@ app.post('/api/create-account', async (req, res) => {
             created_at: new Date().toISOString()
         };
         await putFile(
-            `accounts/${username.toLowerCase()}.json`,
+            `accounts/${username.toLowerCase()}/profile.json`,
             accountData,
             `Create account: ${username}`
         );
@@ -205,7 +205,7 @@ app.post('/api/verify-account', async (req, res) => {
         }
 
         // Fetch account data
-        const accountFile = await getFile(`accounts/${accountKey}.json`);
+        const accountFile = await getFile(`accounts/${accountKey}/profile.json`);
         if (!accountFile) {
             return res.status(401).json({ success: false, message: 'Account not found' });
         }
@@ -227,6 +227,182 @@ app.post('/api/verify-account', async (req, res) => {
     } catch (err) {
         console.error('Error verifying account:', err);
         res.status(500).json({ success: false, message: 'Server error. Please try again.' });
+    }
+});
+
+// ── POST /api/update-account ──────────────────────────────────────────────────
+app.post('/api/update-account', async (req, res) => {
+    try {
+        const { username, currentPassword, newEmail, newPassword } = req.body;
+
+        if (!username || !currentPassword) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const accountFile = await getFile(`accounts/${username.toLowerCase()}/profile.json`);
+        if (!accountFile) {
+            return res.status(404).json({ success: false, message: 'Account not found' });
+        }
+
+        const account = accountFile.content;
+        const valid = await bcrypt.compare(currentPassword, account.password_hash);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Current password is incorrect' });
+        }
+
+        let updated = { ...account };
+
+        if (newEmail && newEmail.toLowerCase() !== account.email.toLowerCase()) {
+            if (!isValidEmail(newEmail)) {
+                return res.status(400).json({ success: false, message: 'Invalid email address' });
+            }
+            const emailLower = newEmail.toLowerCase();
+            const indexFile  = await getFile('accounts/email-index.json');
+            const emailMap   = indexFile ? { ...indexFile.content } : {};
+            if (emailMap[emailLower] && emailMap[emailLower] !== username.toLowerCase()) {
+                return res.status(400).json({ success: false, message: 'Email already in use' });
+            }
+            delete emailMap[account.email.toLowerCase()];
+            emailMap[emailLower] = username.toLowerCase();
+            await putFile(
+                'accounts/email-index.json',
+                emailMap,
+                `Update email index for: ${username}`,
+                indexFile ? indexFile.sha : undefined
+            );
+            updated.email = newEmail;
+        }
+
+        if (newPassword) {
+            if (newPassword.length < 6) {
+                return res.status(400).json({ success: false, message: 'Password must be at least 6 characters' });
+            }
+            updated.password_hash = await bcrypt.hash(newPassword, BCRYPT_ROUNDS);
+        }
+
+        await putFile(
+            `accounts/${username.toLowerCase()}/profile.json`,
+            updated,
+            `Update account: ${username}`,
+            accountFile.sha
+        );
+
+        res.json({ success: true, message: 'Account updated successfully', email: updated.email });
+    } catch (err) {
+        console.error('Error updating account:', err);
+        res.status(500).json({ success: false, message: 'Failed to update account. Please try again.' });
+    }
+});
+
+// ── GET /api/check-user ───────────────────────────────────────────────────────
+app.get('/api/check-user', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const accountFile = await getFile(`accounts/${username.toLowerCase()}/profile.json`);
+        if (!accountFile) {
+            return res.json({ exists: false });
+        }
+        res.json({ exists: true, username: accountFile.content.username });
+    } catch (err) {
+        console.error('Error checking user:', err);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ── POST /api/add-friend ──────────────────────────────────────────────────────
+app.post('/api/add-friend', async (req, res) => {
+    try {
+        const { username, friendUsername } = req.body;
+
+        if (!username || !friendUsername) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+        if (username.toLowerCase() === friendUsername.toLowerCase()) {
+            return res.status(400).json({ success: false, message: 'You cannot add yourself as a friend' });
+        }
+
+        // Verify both users exist
+        const userFile   = await getFile(`accounts/${username.toLowerCase()}/profile.json`);
+        if (!userFile) {
+            return res.status(404).json({ success: false, message: 'Your account was not found' });
+        }
+        const friendFile = await getFile(`accounts/${friendUsername.toLowerCase()}/profile.json`);
+        if (!friendFile) {
+            return res.status(404).json({ success: false, message: 'User not found' });
+        }
+
+        // Read or initialise friends list
+        const friendsPath  = `accounts/${username.toLowerCase()}/friends.json`;
+        const friendsFile  = await getFile(friendsPath);
+        const friends      = friendsFile ? friendsFile.content : [];
+
+        if (friends.some(f => f.toLowerCase() === friendUsername.toLowerCase())) {
+            return res.status(400).json({ success: false, message: 'Already friends with this user' });
+        }
+
+        friends.push(friendFile.content.username);
+        await putFile(
+            friendsPath,
+            friends,
+            `Add friend ${friendUsername} for: ${username}`,
+            friendsFile ? friendsFile.sha : undefined
+        );
+
+        res.json({ success: true, message: `${friendFile.content.username} added as a friend` });
+    } catch (err) {
+        console.error('Error adding friend:', err);
+        res.status(500).json({ success: false, message: 'Failed to add friend. Please try again.' });
+    }
+});
+
+// ── GET /api/get-friends ──────────────────────────────────────────────────────
+app.get('/api/get-friends', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const friendsFile = await getFile(`accounts/${username.toLowerCase()}/friends.json`);
+        res.json({ success: true, friends: friendsFile ? friendsFile.content : [] });
+    } catch (err) {
+        console.error('Error getting friends:', err);
+        res.status(500).json({ success: false, message: 'Failed to get friends list.' });
+    }
+});
+
+// ── POST /api/remove-friend ───────────────────────────────────────────────────
+app.post('/api/remove-friend', async (req, res) => {
+    try {
+        const { username, friendUsername } = req.body;
+
+        if (!username || !friendUsername) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const friendsPath = `accounts/${username.toLowerCase()}/friends.json`;
+        const friendsFile = await getFile(friendsPath);
+        if (!friendsFile) {
+            return res.status(404).json({ success: false, message: 'Friends list not found' });
+        }
+
+        const updated = friendsFile.content.filter(
+            f => f.toLowerCase() !== friendUsername.toLowerCase()
+        );
+
+        await putFile(
+            friendsPath,
+            updated,
+            `Remove friend ${friendUsername} for: ${username}`,
+            friendsFile.sha
+        );
+
+        res.json({ success: true, message: 'Friend removed' });
+    } catch (err) {
+        console.error('Error removing friend:', err);
+        res.status(500).json({ success: false, message: 'Failed to remove friend. Please try again.' });
     }
 });
 

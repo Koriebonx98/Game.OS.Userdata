@@ -119,6 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('updateForm')) {
         requireLogin();
         populateAccountDetails();
+        loadFriendsList();
     }
 });
 
@@ -231,7 +232,7 @@ async function createAccountGitHub(username, email, password) {
     const passwordHash  = await hashPassword(password, username);
 
     // Check for duplicate username
-    const existing = await githubRead(`accounts/${usernameLower}.json`);
+    const existing = await githubRead(`accounts/${usernameLower}/profile.json`);
     if (existing) {
         return { success: false, message: 'Username already exists' };
     }
@@ -243,9 +244,9 @@ async function createAccountGitHub(username, email, password) {
         return { success: false, message: 'Email already registered' };
     }
 
-    // Create account file
+    // Create account profile file (one folder per user)
     await githubWrite(
-        `accounts/${usernameLower}.json`,
+        `accounts/${usernameLower}/profile.json`,
         { username, email, password_hash: passwordHash, created_at: new Date().toISOString() },
         `Create account: ${username}`
     );
@@ -294,7 +295,7 @@ async function verifyAccountGitHub(identifier, password) {
         accountKey = identifier.toLowerCase();
     }
 
-    const accountFile = await githubRead(`accounts/${accountKey}.json`);
+    const accountFile = await githubRead(`accounts/${accountKey}/profile.json`);
     if (!accountFile) return { success: false, message: 'Account not found' };
 
     const account   = accountFile.content;
@@ -862,7 +863,7 @@ async function updateAccountDemo(username, currentPassword, newEmail, newPasswor
 
 async function updateAccountGitHub(username, currentPassword, newEmail, newPassword) {
     const usernameLower = username.toLowerCase();
-    const accountFile   = await githubRead(`accounts/${usernameLower}.json`);
+    const accountFile   = await githubRead(`accounts/${usernameLower}/profile.json`);
     if (!accountFile) return { success: false, message: 'Account not found.' };
     const account = accountFile.content;
 
@@ -900,13 +901,193 @@ async function updateAccountGitHub(username, currentPassword, newEmail, newPassw
     }
 
     await githubWrite(
-        `accounts/${usernameLower}.json`,
+        `accounts/${usernameLower}/profile.json`,
         updated,
         `Update account: ${username}`,
         accountFile.sha
     );
 
     return { success: true, message: 'Account updated.', email: updated.email };
+}
+
+// ============================================================
+// GITHUB MODE – FRIENDS
+// ============================================================
+
+async function addFriendGitHub(username, friendUsername) {
+    const usernameLower = username.toLowerCase();
+    const friendLower   = friendUsername.toLowerCase();
+
+    if (usernameLower === friendLower) {
+        return { success: false, message: 'You cannot add yourself as a friend' };
+    }
+
+    // Check friend exists
+    const friendFile = await githubRead(`accounts/${friendLower}/profile.json`);
+    if (!friendFile) return { success: false, message: 'User not found' };
+
+    const friendsPath = `accounts/${usernameLower}/friends.json`;
+    const friendsFile = await githubRead(friendsPath);
+    const friends     = friendsFile ? [...friendsFile.content] : [];
+
+    if (friends.some(f => f.toLowerCase() === friendLower)) {
+        return { success: false, message: 'Already friends with this user' };
+    }
+
+    friends.push(friendFile.content.username);
+    await githubWrite(
+        friendsPath,
+        friends,
+        `Add friend ${friendUsername} for: ${username}`,
+        friendsFile ? friendsFile.sha : undefined
+    );
+    return { success: true, message: `${friendFile.content.username} added as a friend`, friends };
+}
+
+async function getFriendsGitHub(username) {
+    const friendsFile = await githubRead(`accounts/${username.toLowerCase()}/friends.json`);
+    return friendsFile ? friendsFile.content : [];
+}
+
+async function removeFriendGitHub(username, friendUsername) {
+    const friendsPath = `accounts/${username.toLowerCase()}/friends.json`;
+    const friendsFile = await githubRead(friendsPath);
+    if (!friendsFile) return { success: false, message: 'Friends list not found' };
+
+    const updated = friendsFile.content.filter(f => f.toLowerCase() !== friendUsername.toLowerCase());
+    await githubWrite(
+        friendsPath,
+        updated,
+        `Remove friend ${friendUsername} for: ${username}`,
+        friendsFile.sha
+    );
+    return { success: true, friends: updated };
+}
+
+// ============================================================
+// DEMO MODE – FRIENDS
+// ============================================================
+
+function getDemoFriends(username) {
+    const key = `gameOS_friends_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoFriends(username, friends) {
+    localStorage.setItem(`gameOS_friends_${username.toLowerCase()}`, JSON.stringify(friends));
+}
+
+async function addFriendDemo(username, friendUsername) {
+    if (username.toLowerCase() === friendUsername.toLowerCase()) {
+        return { success: false, message: 'You cannot add yourself as a friend' };
+    }
+    const accounts = getDemoAccounts();
+    const friendAccount = accounts.find(a => a.username.toLowerCase() === friendUsername.toLowerCase());
+    if (!friendAccount) return { success: false, message: 'User not found' };
+
+    const friends = getDemoFriends(username);
+    if (friends.some(f => f.toLowerCase() === friendUsername.toLowerCase())) {
+        return { success: false, message: 'Already friends with this user' };
+    }
+    friends.push(friendAccount.username);
+    saveDemoFriends(username, friends);
+    return { success: true, message: `${friendAccount.username} added as a friend`, friends };
+}
+
+async function removeFriendDemo(username, friendUsername) {
+    const friends = getDemoFriends(username);
+    const updated = friends.filter(f => f.toLowerCase() !== friendUsername.toLowerCase());
+    saveDemoFriends(username, updated);
+    return { success: true, friends: updated };
+}
+
+// ============================================================
+// FRIENDS UI HELPERS
+// ============================================================
+
+async function loadFriendsList() {
+    const user = getCurrentUser();
+    if (!user) return;
+    const listEl    = document.getElementById('friendsList');
+    const countEl   = document.getElementById('friendsCount');
+    if (!listEl) return;
+
+    listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
+    try {
+        let friends;
+        if (MODE === 'demo') {
+            friends = getDemoFriends(user.username);
+        } else {
+            friends = await getFriendsGitHub(user.username);
+        }
+        if (countEl) countEl.textContent = friends.length;
+        if (friends.length === 0) {
+            listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No friends yet. Search above to add someone!</p>';
+            return;
+        }
+        listEl.innerHTML = friends.map(f => `
+            <div class="friend-item">
+                <span class="friend-name">👤 ${f}</span>
+                <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
+            </div>
+        `).join('');
+    } catch (err) {
+        listEl.innerHTML = '<p style="color:#c00;">Failed to load friends.</p>';
+    }
+}
+
+async function handleAddFriend() {
+    const input    = document.getElementById('friendSearch');
+    const msgEl    = document.getElementById('friendMessage');
+    const user     = getCurrentUser();
+    if (!input || !user) return;
+    const target   = input.value.trim();
+    if (!target) {
+        showMessage(msgEl, 'Please enter a username to add.', 'error');
+        return;
+    }
+    clearMessage(msgEl);
+    showMessage(msgEl, '⏳ Adding friend…', 'info');
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await addFriendDemo(user.username, target);
+        } else {
+            result = await addFriendGitHub(user.username, target);
+        }
+        if (result.success) {
+            showMessage(msgEl, `✅ ${result.message}`, 'success');
+            input.value = '';
+            loadFriendsList();
+        } else {
+            showMessage(msgEl, `❌ ${result.message}`, 'error');
+        }
+    } catch (err) {
+        showMessage(msgEl, '❌ Failed to add friend. Please try again.', 'error');
+    }
+}
+
+async function handleRemoveFriend(friendUsername) {
+    const msgEl = document.getElementById('friendMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+    clearMessage(msgEl);
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await removeFriendDemo(user.username, friendUsername);
+        } else {
+            result = await removeFriendGitHub(user.username, friendUsername);
+        }
+        if (result.success) {
+            loadFriendsList();
+        } else {
+            showMessage(msgEl, `❌ ${result.message}`, 'error');
+        }
+    } catch (err) {
+        showMessage(msgEl, '❌ Failed to remove friend. Please try again.', 'error');
+    }
 }
 
 // Export functions for use in other scripts
