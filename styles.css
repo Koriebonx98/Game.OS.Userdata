@@ -623,6 +623,63 @@ footer {
     color: var(--white);
 }
 
+.friend-requests-section {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px dashed var(--secondary-color);
+}
+
+.friend-requests-title {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: var(--secondary-color);
+    margin-bottom: 8px;
+}
+
+.friend-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-accept-friend {
+    background: var(--success-color);
+    border: none;
+    color: var(--white);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-accept-friend:hover {
+    background: var(--primary-dark);
+}
+
+.btn-decline-friend {
+    background: transparent;
+    border: 1px solid var(--danger-color);
+    color: var(--danger-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    font-size: 0.85em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.btn-decline-friend:hover {
+    background: var(--danger-color);
+    color: var(--white);
+}
+
+.friend-pending-badge {
+    font-size: 0.8em;
+    color: var(--warning-color);
+    font-weight: 600;
+    margin-right: auto;
+    margin-left: 8px;
+}
+
 /* ── Danger Zone ──────────────────────────────────────────────────────────── */
 .danger-zone {
     margin-top: 2rem;
