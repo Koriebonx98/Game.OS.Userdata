@@ -623,6 +623,47 @@ footer {
     color: var(--white);
 }
 
+/* ── Danger Zone ──────────────────────────────────────────────────────────── */
+.danger-zone {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    border: 1px solid var(--danger-color);
+    border-radius: 8px;
+    background: rgba(244, 67, 54, 0.05);
+}
+
+.danger-zone h3 {
+    color: var(--danger-color);
+    margin-top: 0;
+    margin-bottom: 0.5rem;
+}
+
+.danger-zone p {
+    color: var(--text-color);
+    font-size: 0.9em;
+    margin-bottom: 1rem;
+}
+
+.btn-danger {
+    background: var(--danger-color);
+    color: var(--white);
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 0.95em;
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.btn-danger:hover {
+    background: #c62828;
+}
+
+.btn-danger:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
 @media (max-width: 480px) {
     .friend-search {
         flex-direction: column;
