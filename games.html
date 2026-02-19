@@ -200,10 +200,14 @@
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
         const coverIcon    = getPlatformIcon(platform);
+        const coverUrl     = getGameCoverUrl(g);
+        const coverHtml    = coverUrl
+            ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${platEsc}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${title}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
+            : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
 
         return `
         <div class="games-browse-item clickable" onclick="openGameModal('${gameJsonAttr}', '${platEsc}')">
-            <div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>
+            ${coverHtml}
             <div class="games-browse-info">
                 <span class="games-browse-title">${title}</span>
                 ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
@@ -358,9 +362,14 @@
             return `
             <div class="owned-platform-group">
                 <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
-                ${games.map(g => `
+                ${games.map(g => {
+                    const coverUrl  = g.coverUrl || null;
+                    const coverHtml = coverUrl
+                        ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
+                        : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
+                    return `
                 <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
-                    <div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>
+                    ${coverHtml}
                     <div class="games-browse-info">
                         <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
                         ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
@@ -369,7 +378,8 @@
                         onclick="event.stopPropagation(); handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
                         🗑️ Remove
                     </button>
-                </div>`).join('')}
+                </div>`;
+                }).join('')}
             </div>`;
         }).join('');
     }

@@ -1992,9 +1992,10 @@ async function addGameGitHub(username, game, platform) {
 
     library.push({
         platform,
-        title:   game.Title || game.game_name || game.title,
-        titleId: game.TitleID || game.title_id || game.id || null,
-        addedAt: new Date().toISOString()
+        title:    game.Title || game.game_name || game.title,
+        titleId:  game.TitleID || game.title_id || game.id || null,
+        coverUrl: getGameCoverUrl(game) || undefined,
+        addedAt:  new Date().toISOString()
     });
 
     await githubWrite(path, library, `Add game: ${game.Title || game.title} (${platform})`, file ? file.sha : undefined);
@@ -2039,8 +2040,9 @@ function addGameDemo(username, game, platform) {
     library.push({
         platform,
         title,
-        titleId: game.TitleID || game.title_id || game.id || null,
-        addedAt: new Date().toISOString()
+        titleId:  game.TitleID || game.title_id || game.id || null,
+        coverUrl: getGameCoverUrl(game) || undefined,
+        addedAt:  new Date().toISOString()
     });
     saveDemoGameLibrary(username, library);
     return { success: true, message: 'Game added to your library!' };
@@ -2072,6 +2074,40 @@ function getPlatformIcon(platform) {
     const p = (platform || '').toLowerCase();
     if (p.includes('switch')) return '🕹️';
     return '🎮';
+}
+
+// ── Game image helpers ─────────────────────────────────────
+function _resolveGameDbUrl(path) {
+    if (!path) return null;
+    if (path.startsWith('http://') || path.startsWith('https://')) return path;
+    return GAMES_DB_RAW_BASE + '/' + path.split('/').map(encodeURIComponent).join('/');
+}
+
+function getGameCoverUrl(game) {
+    return _resolveGameDbUrl(game.image || game.cover_url || '');
+}
+
+function getGameBackgroundUrls(game) {
+    return (game.background_images || []).map(_resolveGameDbUrl).filter(Boolean);
+}
+
+// Fallback handlers called from onerror on cover images
+function _gameCoverFallback(img) {
+    const p = img.parentNode;
+    if (!p) return;
+    const platform = p.dataset.platform || '';
+    p.textContent = getPlatformIcon(platform);
+    p.style.background = getPlatformColor(platform);
+    p.className = 'game-cover-icon';
+}
+
+function _gameModalCoverFallback(img) {
+    const p = img.parentNode;
+    if (!p) return;
+    const platform = p.dataset.platform || '';
+    p.textContent = getPlatformIcon(platform);
+    p.style.background = getPlatformColor(platform);
+    p.className = 'game-modal-cover-large';
 }
 
 // ============================================================
@@ -2110,7 +2146,7 @@ function closeGameModal() {
 }
 
 function _buildGameModalFields(game) {
-    const skipFields = new Set(['Title', 'game_name', 'title']);
+    const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -2130,23 +2166,42 @@ function openGameModal(game, platform) {
     const modal = ensureGameModal();
     const title = game.Title || game.game_name || game.title || 'Unknown Game';
 
-    document.getElementById('gameModalCoverIcon').style.background = getPlatformColor(platform);
-    document.getElementById('gameModalCoverIcon').textContent = getPlatformIcon(platform);
+    const coverEl  = document.getElementById('gameModalCoverIcon');
+    const coverUrl = getGameCoverUrl(game);
+    if (coverUrl) {
+        coverEl.className = 'game-modal-cover-large game-modal-cover-large--img';
+        coverEl.style.background = '';
+        coverEl.dataset.platform = platform || '';
+        coverEl.innerHTML = `<img src="${coverUrl}" class="game-modal-cover-img" alt="${escapeHtml(title)}" onerror="_gameModalCoverFallback(this)">`;
+    } else {
+        coverEl.className = 'game-modal-cover-large';
+        coverEl.style.background = getPlatformColor(platform);
+        coverEl.textContent = getPlatformIcon(platform);
+    }
     document.getElementById('gameModalTitle').textContent = title;
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
+    const bgUrls    = getGameBackgroundUrls(game);
     const fieldRows = _buildGameModalFields(game);
-    document.getElementById('gameModalBody').innerHTML = fieldRows ||
-        '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+    let bodyHtml = '';
+    if (bgUrls.length > 0) {
+        bodyHtml += `<div class="game-modal-bg-gallery">${
+            bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
+        }</div>`;
+    }
+    bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+    document.getElementById('gameModalBody').innerHTML = bodyHtml;
     modal.style.display = 'flex';
 }
 
 async function openGameModalFromLibrary(title, platform, titleId) {
     const modal = ensureGameModal();
 
-    document.getElementById('gameModalCoverIcon').style.background = getPlatformColor(platform);
-    document.getElementById('gameModalCoverIcon').textContent = getPlatformIcon(platform);
-    document.getElementById('gameModalTitle').textContent = title;
+    const coverEl = document.getElementById('gameModalCoverIcon');
+    coverEl.className       = 'game-modal-cover-large';
+    coverEl.style.background = getPlatformColor(platform);
+    coverEl.textContent     = getPlatformIcon(platform);
+    document.getElementById('gameModalTitle').textContent    = title;
     document.getElementById('gameModalPlatform').textContent = platform || '';
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
@@ -2160,10 +2215,27 @@ async function openGameModalFromLibrary(title, platform, titleId) {
             (titleId && String(g.TitleID || g.title_id || g.id || '') === String(titleId))
         );
 
-        const source = game || (titleId ? { TitleID: titleId } : {});
+        if (game) {
+            const coverUrl = getGameCoverUrl(game);
+            if (coverUrl) {
+                coverEl.className = 'game-modal-cover-large game-modal-cover-large--img';
+                coverEl.style.background = '';
+                coverEl.dataset.platform = platform || '';
+                coverEl.innerHTML = `<img src="${coverUrl}" class="game-modal-cover-img" alt="${escapeHtml(title)}" onerror="_gameModalCoverFallback(this)">`;
+            }
+        }
+
+        const source    = game || (titleId ? { TitleID: titleId } : {});
+        const bgUrls    = getGameBackgroundUrls(source);
         const fieldRows = _buildGameModalFields(source);
-        document.getElementById('gameModalBody').innerHTML = fieldRows ||
-            '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+        let bodyHtml = '';
+        if (bgUrls.length > 0) {
+            bodyHtml += `<div class="game-modal-bg-gallery">${
+                bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
+            }</div>`;
+        }
+        bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+        document.getElementById('gameModalBody').innerHTML = bodyHtml;
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =
             '<p style="color:#c00;font-size:0.9em;">Failed to load game details.</p>';
