@@ -10,26 +10,27 @@
     <div class="container">
         <header>
             <h1>🎮 Game OS Userdata</h1>
-            <p>Secure Account Management System</p>
+            <p style="opacity:0.75;font-size:0.9em;margin-bottom:14px;">Your Gaming Hub</p>
             <nav>
                 <div id="guestNav">
                     <a href="signup.html" class="nav-link">Sign Up</a>
                     <a href="login.html" class="nav-link">Login</a>
                 </div>
                 <div id="userNav" class="hidden">
-                    <a href="games.html" class="nav-link">Games</a>
-                    <a href="account.html" class="nav-link">My Account</a>
+                    <a href="games.html" class="nav-link">🔍 Games</a>
+                    <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                    <a href="account.html" class="nav-link">👤 My Account</a>
                     <button onclick="logout()" class="nav-link nav-btn">Logout</button>
                 </div>
             </nav>
         </header>
         
-        <main>
+        <main style="background:#f8fafc;">
             <!-- User Display (shows when logged in) -->
             <div id="userDisplay"></div>
             
             <!-- Connection Status -->
-            <div class="text-center">
+            <div class="text-center" style="padding-top:16px;">
                 <div id="connectionStatus" class="status"></div>
             </div>
             
@@ -43,8 +44,8 @@
                     <a href="login.html" class="btn btn-secondary">Sign In</a>
                 </div>
                 <div class="cta-buttons hidden" id="userCta">
-                    <a href="account.html" class="btn btn-primary">My Account</a>
-                    <a href="games.html" class="btn btn-secondary">🎮 Games Library</a>
+                    <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
+                    <a href="games.html?tab=library" class="btn btn-secondary">📚 My Library</a>
                 </div>
             </div>
             

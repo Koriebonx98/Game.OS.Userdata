@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game OS – Game Library</title>
+    <title>Game OS – Browse Games</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,15 +12,16 @@
             <h1>🎮 Game OS Userdata</h1>
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
-                <a href="games.html" class="nav-link">Games</a>
-                <a href="account.html" class="nav-link">My Account</a>
+                <a href="games.html" class="nav-link">🔍 Games</a>
+                <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="account.html" class="nav-link">👤 My Account</a>
                 <button onclick="logout()" class="nav-link nav-btn">Logout</button>
             </nav>
         </header>
 
-        <main style="padding:30px;">
-            <h2 style="margin-bottom:6px;">🕹️ Game Library</h2>
-            <p style="color:#666;margin-bottom:20px;font-size:0.95em;">Browse games from the database and track what you own.</p>
+        <main style="padding:30px; background:#f8fafc;">
+            <h2 style="margin-bottom:6px;">🕹️ Games</h2>
+            <p style="color:#64748b;margin-bottom:20px;font-size:0.95em;">Browse games from the database and manage your library.</p>
 
             <!-- View Tabs -->
             <div class="games-tab-row">
@@ -79,6 +80,11 @@
         await modeReady;
         displayCurrentUser();
         await initGamesPage();
+        // Check URL param to open the correct tab
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'library') {
+            switchTab('owned');
+        }
     });
 
     async function initGamesPage() {
