@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS Userdata - My Account</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <div id="userNav">
+                    <a href="account.html" class="nav-link">My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <div class="form-container account-container">
+                <h2>👤 My Account</h2>
+                <p class="form-subtitle">View and update your account information</p>
+
+                <!-- Connection Status -->
+                <div class="text-center">
+                    <div id="connectionStatus" class="status"></div>
+                </div>
+
+                <!-- Account Details Card -->
+                <div class="account-details-card">
+                    <h3>Account Details</h3>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Username</span>
+                        <span class="detail-value" id="displayUsername">—</span>
+                    </div>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value" id="displayEmail">—</span>
+                    </div>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Member Since</span>
+                        <span class="detail-value" id="displayJoined">—</span>
+                    </div>
+                </div>
+
+                <!-- Update Info Form -->
+                <div class="update-section">
+                    <h3>Update Information</h3>
+
+                    <form id="updateForm" class="auth-form">
+                        <div class="form-group">
+                            <label for="updateEmail">New Email</label>
+                            <input
+                                type="email"
+                                id="updateEmail"
+                                name="updateEmail"
+                                placeholder="Enter new email address"
+                                autocomplete="email"
+                            >
+                            <small style="color:#666;font-size:0.85em;">Leave blank to keep current email</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateCurrentPassword">Current Password *</label>
+                            <input
+                                type="password"
+                                id="updateCurrentPassword"
+                                name="currentPassword"
+                                placeholder="Enter current password"
+                                required
+                                autocomplete="current-password"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateNewPassword">New Password</label>
+                            <input
+                                type="password"
+                                id="updateNewPassword"
+                                name="newPassword"
+                                placeholder="Enter new password (optional)"
+                                minlength="6"
+                                autocomplete="new-password"
+                            >
+                            <small style="color:#666;font-size:0.85em;">Leave blank to keep current password. Minimum 6 characters.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateConfirmPassword">Confirm New Password</label>
+                            <input
+                                type="password"
+                                id="updateConfirmPassword"
+                                name="confirmPassword"
+                                placeholder="Confirm new password"
+                                minlength="6"
+                                autocomplete="new-password"
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+                    </form>
+
+                    <!-- Message Display -->
+                    <div id="updateMessage" class="message"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions &amp; Node.js</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
