@@ -439,6 +439,11 @@ app.post('/api/create-account', async (req, res) => {
 
 // ── POST /api/verify-account ──────────────────────────────────────────────────
 app.post('/api/verify-account', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
     try {
         const { username: identifier, password } = req.body;
 
@@ -489,6 +494,11 @@ app.post('/api/verify-account', async (req, res) => {
 
 // ── POST /api/update-account ──────────────────────────────────────────────────
 app.post('/api/update-account', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
     try {
         const { username, currentPassword, newEmail, newPassword } = req.body;
 
@@ -1128,6 +1138,11 @@ app.post('/api/auth/token', async (req, res) => {
 // ── POST /api/auth/revoke-token ───────────────────────────────────────────────
 // Revoke the caller's API token (requires password confirmation).
 app.post('/api/auth/revoke-token', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
     try {
         const { username: identifier, password } = req.body;
         if (!identifier || !password) {
