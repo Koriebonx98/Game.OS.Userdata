@@ -1,0 +1,12 @@
+{
+  "name": "game-os-userdata",
+  "version": "1.0.0",
+  "description": "Game.OS Userdata – frontend and automated tests",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/demo.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
