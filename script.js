@@ -139,9 +139,13 @@ async function initializeMode() {
 
     // Demo mode notice
     console.warn('🎮 Demo Mode – accounts stored in browser localStorage only');
-    console.warn('To enable real accounts, follow the setup guide in README.md');
+    console.warn('To enable real accounts: set DATA_REPO_TOKEN secret and run the deploy workflow (see README.md)');
     if (statusEl) {
-        statusEl.textContent = '🎮 Demo Mode – accounts stored locally only';
+        statusEl.innerHTML =
+            '🎮 Demo Mode – accounts stored locally only. ' +
+            'To enable live accounts: add <code>DATA_REPO_TOKEN</code> secret and run ' +
+            '<a href="https://github.com/Koriebonx98/Game.OS.Userdata/actions/workflows/init-data-repo.yml" ' +
+            'target="_blank" rel="noopener">Initialize Data Repository &amp; Deploy Live</a>.';
         statusEl.className = 'status disconnected';
     }
 }

@@ -1,0 +1,117 @@
+# Initialize the private data repository and re-deploy in live mode.
+#
+# Run this workflow AFTER:
+#   1. Creating the private repository: Koriebonx98/Game.OS.Private.Data
+#   2. Adding DATA_REPO_TOKEN as a repository secret (Settings → Secrets and variables → Actions)
+#      The token needs Contents: read+write on Game.OS.Private.Data
+#
+# The workflow will:
+#   - Verify DATA_REPO_TOKEN can reach Game.OS.Private.Data
+#   - Create the accounts/ folder with a README if it is empty
+#   - Trigger the deploy workflow so the live token is injected into the site
+
+name: Initialize Data Repository & Deploy Live
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  init-and-deploy:
+    runs-on: ubuntu-latest
+    env:
+      DATA_REPO_OWNER: ${{ github.repository_owner }}
+      DATA_REPO_NAME: Game.OS.Private.Data
+
+    steps:
+      - name: Verify DATA_REPO_TOKEN is set
+        run: |
+          if [ -z "$DATA_REPO_TOKEN" ]; then
+            echo "::error::DATA_REPO_TOKEN secret is not set."
+            echo "Add it at: Settings → Secrets and variables → Actions → New repository secret"
+            echo "Name: DATA_REPO_TOKEN"
+            echo "Value: a fine-grained PAT with Contents read+write on ${DATA_REPO_OWNER}/${DATA_REPO_NAME}"
+            exit 1
+          fi
+          echo "✅ DATA_REPO_TOKEN is set."
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+
+      - name: Verify access to private data repository
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $DATA_REPO_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}")
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Cannot access ${DATA_REPO_OWNER}/${DATA_REPO_NAME} (HTTP $HTTP_STATUS)."
+            echo "Make sure the repository exists and DATA_REPO_TOKEN has Contents read+write access to it."
+            exit 1
+          fi
+          echo "✅ ${DATA_REPO_OWNER}/${DATA_REPO_NAME} is accessible."
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+
+      - name: Initialize accounts/ folder if empty
+        run: |
+          # Check if accounts/README.md already exists
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer $DATA_REPO_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/accounts/README.md")
+
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "ℹ️  accounts/ folder already initialized — skipping."
+          else
+            echo "Creating accounts/README.md to initialize the folder..."
+            README_CONTENT=$(printf '# Game.OS Account Data\n\nThis folder contains user account files managed by Game.OS.Userdata.\nDo not edit these files manually.' | base64 | tr -d '\n')
+            RESPONSE=$(curl -s -w "\n%{http_code}" -X PUT \
+              -H "Authorization: Bearer $DATA_REPO_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              "https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/accounts/README.md" \
+              -d "{\"message\":\"Initialize accounts folder\",\"content\":\"$README_CONTENT\",\"committer\":{\"name\":\"Game.OS Bot\",\"email\":\"game-os-bot@users.noreply.github.com\"}}")
+            HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+            if [ "$HTTP_CODE" = "201" ]; then
+              echo "✅ accounts/ folder initialized."
+            else
+              echo "::error::Failed to initialize accounts/ folder (HTTP $HTTP_CODE)."
+              echo "$RESPONSE"
+              exit 1
+            fi
+          fi
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+
+      - name: Trigger deploy workflow to go live
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST \
+            -H "Authorization: Bearer $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/workflows/deploy.yml/dispatches" \
+            -d '{"ref":"main"}')
+          if [ "$HTTP_STATUS" = "204" ]; then
+            echo "✅ Deploy workflow triggered. The site will be live in a few minutes."
+            echo "   URL: https://${DATA_REPO_OWNER}.github.io/Game.OS.Userdata/"
+          else
+            echo "::warning::Could not auto-trigger deploy workflow (HTTP $HTTP_STATUS)."
+            echo "Run the 'Deploy to GitHub Pages' workflow manually to go live."
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Summary
+        run: |
+          echo "### ✅ Setup Complete" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- DATA_REPO_TOKEN is valid" >> $GITHUB_STEP_SUMMARY
+          echo "- ${DATA_REPO_OWNER}/${DATA_REPO_NAME} is accessible" >> $GITHUB_STEP_SUMMARY
+          echo "- accounts/ folder is ready" >> $GITHUB_STEP_SUMMARY
+          echo "- Deploy workflow triggered" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The site will switch from demo mode to **live mode** once the deploy finishes." >> $GITHUB_STEP_SUMMARY
+          echo "Live URL: https://${DATA_REPO_OWNER}.github.io/Game.OS.Userdata/" >> $GITHUB_STEP_SUMMARY
