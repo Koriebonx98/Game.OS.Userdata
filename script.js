@@ -2055,6 +2055,121 @@ function removeGameDemo(username, platform, title) {
     return { success: true, library: updated };
 }
 
+// ============================================================
+// PLATFORM HELPERS
+// ============================================================
+
+function getPlatformColor(platform) {
+    const p = (platform || '').toLowerCase();
+    if (p.includes('ps3')) return 'linear-gradient(135deg, #00439c 0%, #0070d1 100%)';
+    if (p.includes('ps4') || p.includes('ps5')) return 'linear-gradient(135deg, #003087 0%, #0050a0 100%)';
+    if (p.includes('switch')) return 'linear-gradient(135deg, #e60012 0%, #b90010 100%)';
+    if (p.includes('xbox')) return 'linear-gradient(135deg, #107c10 0%, #52b043 100%)';
+    return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+}
+
+function getPlatformIcon(platform) {
+    const p = (platform || '').toLowerCase();
+    if (p.includes('switch')) return '🕹️';
+    return '🎮';
+}
+
+// ============================================================
+// GAME DETAIL MODAL
+// ============================================================
+
+function ensureGameModal() {
+    let modal = document.getElementById('gameDetailModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'gameDetailModal';
+        modal.className = 'game-modal-overlay';
+        modal.style.display = 'none';
+        modal.innerHTML = `
+            <div class="game-modal">
+                <div class="game-modal-header">
+                    <div class="game-modal-cover-large" id="gameModalCoverIcon">🎮</div>
+                    <div style="flex:1;min-width:0;">
+                        <h3 class="game-modal-title" id="gameModalTitle"></h3>
+                        <p class="game-modal-platform" id="gameModalPlatform"></p>
+                    </div>
+                    <button class="game-modal-close" onclick="closeGameModal()">✕</button>
+                </div>
+                <div class="game-modal-body" id="gameModalBody"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeGameModal(); });
+    }
+    return modal;
+}
+
+function closeGameModal() {
+    const modal = document.getElementById('gameDetailModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function _buildGameModalFields(game) {
+    const skipFields = new Set(['Title', 'game_name', 'title']);
+    return Object.entries(game)
+        .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
+        .map(([k, v]) => {
+            const label = k.replace(/([A-Z])/g, ' $1').replace(/_/g, ' ').trim();
+            const value = Array.isArray(v) ? v.join(', ') : String(v);
+            return `<div class="game-modal-field">
+                <span class="game-modal-field-label">${escapeHtml(label)}</span>
+                <span class="game-modal-field-value">${escapeHtml(value)}</span>
+            </div>`;
+        }).join('');
+}
+
+function openGameModal(game, platform) {
+    if (typeof game === 'string') {
+        try { game = JSON.parse(game); } catch (_) { return; }
+    }
+    const modal = ensureGameModal();
+    const title = game.Title || game.game_name || game.title || 'Unknown Game';
+
+    document.getElementById('gameModalCoverIcon').style.background = getPlatformColor(platform);
+    document.getElementById('gameModalCoverIcon').textContent = getPlatformIcon(platform);
+    document.getElementById('gameModalTitle').textContent = title;
+    document.getElementById('gameModalPlatform').textContent = platform || '';
+
+    const fieldRows = _buildGameModalFields(game);
+    document.getElementById('gameModalBody').innerHTML = fieldRows ||
+        '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+    modal.style.display = 'flex';
+}
+
+async function openGameModalFromLibrary(title, platform, titleId) {
+    const modal = ensureGameModal();
+
+    document.getElementById('gameModalCoverIcon').style.background = getPlatformColor(platform);
+    document.getElementById('gameModalCoverIcon').textContent = getPlatformIcon(platform);
+    document.getElementById('gameModalTitle').textContent = title;
+    document.getElementById('gameModalPlatform').textContent = platform || '';
+    document.getElementById('gameModalBody').innerHTML =
+        '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
+    modal.style.display = 'flex';
+
+    try {
+        const games = await fetchGamesDbPlatform(platform);
+        const titleLower = title.toLowerCase();
+        const game = games.find(g =>
+            (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower ||
+            (titleId && String(g.TitleID || g.title_id || g.id || '') === String(titleId))
+        );
+
+        const source = game || (titleId ? { TitleID: titleId } : {});
+        const fieldRows = _buildGameModalFields(source);
+        document.getElementById('gameModalBody').innerHTML = fieldRows ||
+            '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
+    } catch (_) {
+        document.getElementById('gameModalBody').innerHTML =
+            '<p style="color:#c00;font-size:0.9em;">Failed to load game details.</p>';
+    }
+}
+
 // Export functions for use in other scripts
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {

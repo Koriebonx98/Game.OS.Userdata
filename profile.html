@@ -89,11 +89,14 @@
                 </div>
                 ${platformList.map(plat => {
                     const games = byPlatform[plat];
+                    const coverColor = getPlatformColor(plat);
+                    const coverIcon  = getPlatformIcon(plat);
                     return `
                     <div class="owned-platform-group">
                         <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
                         ${games.map(g => `
-                        <div class="games-browse-item">
+                        <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
+                            <div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>
                             <div class="games-browse-info">
                                 <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
                                 ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}

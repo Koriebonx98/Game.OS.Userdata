@@ -67,8 +67,9 @@
     <script src="script.js"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
-    let _allBrowseGames = [];
-    let _myLibrary      = [];
+    let _allBrowseGames  = [];
+    let _allPlatformGames = {}; // { platform: [...games] } used in ALL mode
+    let _myLibrary       = [];
     let _currentPlatform = '';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -85,7 +86,9 @@
         msg.textContent = 'Loading platforms…';
         try {
             const platforms = await fetchGamesDbPlatforms();
-            select.innerHTML = '<option value="">— select a platform —</option>' +
+            select.innerHTML =
+                '<option value="">— select a platform —</option>' +
+                '<option value="ALL">🌐 All Platforms (Universal Search)</option>' +
                 platforms.map(p => `<option value="${p}">${p}</option>`).join('');
             msg.textContent = '';
         } catch (e) {
@@ -102,21 +105,26 @@
 
     // ── Platform loading ───────────────────────────────────────
     async function loadBrowsePlatform(platform) {
-        const listEl  = document.getElementById('browseGamesList');
-        const countEl = document.getElementById('browseCount');
+        const listEl    = document.getElementById('browseGamesList');
+        const countEl   = document.getElementById('browseCount');
         const searchRow = document.getElementById('browseSearchRow');
-        const msg     = document.getElementById('browseLoadingMsg');
+        const msg       = document.getElementById('browseLoadingMsg');
         document.getElementById('browseSearch').value = '';
 
         if (!platform) {
-            listEl.innerHTML = '';
+            listEl.innerHTML    = '';
             countEl.textContent = '';
             searchRow.style.display = 'none';
             return;
         }
 
+        if (platform === 'ALL') {
+            await loadAllPlatforms();
+            return;
+        }
+
         _currentPlatform = platform;
-        listEl.innerHTML  = '<p style="color:#666;">Loading games…</p>';
+        listEl.innerHTML    = '<p style="color:#666;">Loading games…</p>';
         countEl.textContent = '';
         searchRow.style.display = 'none';
         msg.textContent = '';
@@ -135,7 +143,80 @@
         }
     }
 
-    // ── Render browse list ─────────────────────────────────────
+    // ── All-platforms loading ──────────────────────────────────
+    async function loadAllPlatforms() {
+        const listEl    = document.getElementById('browseGamesList');
+        const countEl   = document.getElementById('browseCount');
+        const searchRow = document.getElementById('browseSearchRow');
+        const msg       = document.getElementById('browseLoadingMsg');
+
+        _currentPlatform = 'ALL';
+        listEl.innerHTML    = '<p style="color:#666;">Loading all platforms…</p>';
+        countEl.textContent = '';
+        searchRow.style.display = 'none';
+        msg.textContent = 'Loading all platforms…';
+
+        try {
+            const platforms = await fetchGamesDbPlatforms();
+            const results   = await Promise.all(
+                platforms.map(async p => {
+                    try {
+                        const games = await fetchGamesDbPlatform(p);
+                        return { platform: p, games };
+                    } catch (_) {
+                        return { platform: p, games: [] };
+                    }
+                })
+            );
+
+            _allPlatformGames = {};
+            results.forEach(({ platform, games }) => {
+                _allPlatformGames[platform] = [...games].sort((a, b) => {
+                    const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+                    const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+                    return na.localeCompare(nb);
+                });
+            });
+            _allBrowseGames = Object.values(_allPlatformGames).flat();
+
+            msg.textContent = '';
+            searchRow.style.display = 'flex';
+            renderBrowseGamesGrouped(_allPlatformGames);
+        } catch (e) {
+            listEl.innerHTML = `<p style="color:#c00;">Failed to load games: ${e.message}</p>`;
+            msg.textContent = '';
+        }
+    }
+
+    // ── Render a single game item (used by both single-platform and grouped views) ──
+    function renderGameItem(g, platform) {
+        const title    = escapeHtml(g.Title || g.game_name || g.title || '');
+        const titleId  = g.TitleID || g.title_id || g.id || '';
+        const owned    = _myLibrary.some(
+            o => o.platform === platform &&
+                 (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
+        );
+        const gameJsonAttr = escapeHtml(JSON.stringify(g).replace(/'/g, '&#39;'));
+        const platEsc      = escapeHtml(platform);
+        const coverColor   = getPlatformColor(platform);
+        const coverIcon    = getPlatformIcon(platform);
+
+        return `
+        <div class="games-browse-item clickable" onclick="openGameModal('${gameJsonAttr}', '${platEsc}')">
+            <div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>
+            <div class="games-browse-info">
+                <span class="games-browse-title">${title}</span>
+                ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
+            </div>
+            <button class="btn-add-game ${owned ? 'btn-owned' : ''}"
+                onclick="event.stopPropagation(); handleAddGame(this, '${gameJsonAttr}', '${platEsc}')"
+                ${owned ? 'disabled' : ''}>
+                ${owned ? '✅ Owned' : '+ Add'}
+            </button>
+        </div>`;
+    }
+
+    // ── Render browse list (single platform) ──────────────────
     function renderBrowseGames(games) {
         const listEl  = document.getElementById('browseGamesList');
         const countEl = document.getElementById('browseCount');
@@ -145,26 +226,44 @@
             listEl.innerHTML = '<p style="color:#666;">No games found.</p>';
             return;
         }
+        listEl.innerHTML = games.map(g => renderGameItem(g, _currentPlatform)).join('');
+    }
 
-        listEl.innerHTML = games.map(g => {
-            const title   = escapeHtml(g.Title || g.game_name || g.title || '');
-            const titleId = g.TitleID || g.title_id || g.id || '';
-            const owned   = _myLibrary.some(
-                o => o.platform === _currentPlatform && (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
-            );
-            return `
-            <div class="games-browse-item">
-                <div class="games-browse-info">
-                    <span class="games-browse-title">${title}</span>
-                    ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
-                </div>
-                <button class="btn-add-game ${owned ? 'btn-owned' : ''}"
-                    onclick="handleAddGame(this, '${escapeHtml(JSON.stringify(g).replace(/'/g,"&#39;"))}')"
-                    ${owned ? 'disabled' : ''}>
-                    ${owned ? '✅ Owned' : '+ Add'}
-                </button>
+    // ── Render browse list (all platforms, grouped) ────────────
+    function renderBrowseGamesGrouped(platformGames, searchTerm) {
+        const listEl  = document.getElementById('browseGamesList');
+        const countEl = document.getElementById('browseCount');
+        const term    = (searchTerm || '').toLowerCase().trim();
+
+        let total = 0;
+        const html = Object.keys(platformGames).sort()
+            .map(platform => {
+                let games = platformGames[platform];
+                if (term) {
+                    games = games.filter(g => {
+                        const name = (g.Title || g.game_name || g.title || '').toLowerCase();
+                        const tid  = String(g.TitleID || g.title_id || g.id || '').toLowerCase();
+                        const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
+                        return name.includes(term) || tid.includes(term) || alts.includes(term);
+                    });
+                }
+                return { platform, games };
+            })
+            .filter(({ games }) => games.length > 0)
+            .map(({ platform, games }) => {
+                total += games.length;
+                return `
+            <div class="owned-platform-group">
+                <h4 class="owned-platform-header">${escapeHtml(platform)} <span class="games-count-badge">${games.length}</span></h4>
+                ${games.map(g => renderGameItem(g, platform)).join('')}
             </div>`;
-        }).join('');
+            }).join('');
+
+        countEl.textContent = term
+            ? `Found ${total} game${total !== 1 ? 's' : ''} across all platforms`
+            : `Showing ${total} game${total !== 1 ? 's' : ''} across all platforms`;
+
+        listEl.innerHTML = total > 0 ? html : '<p style="color:#666;">No games found.</p>';
     }
 
     // ── Search ─────────────────────────────────────────────────
@@ -173,6 +272,10 @@
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => {
             const term = document.getElementById('browseSearch').value.toLowerCase().trim();
+            if (_currentPlatform === 'ALL') {
+                renderBrowseGamesGrouped(_allPlatformGames, term);
+                return;
+            }
             if (!term) { renderBrowseGames(_allBrowseGames); return; }
             const filtered = _allBrowseGames.filter(g => {
                 const name = (g.Title || g.game_name || g.title || '').toLowerCase();
@@ -185,28 +288,31 @@
     }
 
     // ── Add game ───────────────────────────────────────────────
-    async function handleAddGame(btn, gameJson) {
+    async function handleAddGame(btn, gameJson, platform) {
         const user = getCurrentUser();
         if (!user) return;
         let game;
         try { game = JSON.parse(gameJson); } catch (_) { return; }
 
-        btn.disabled   = true;
+        const gamePlatform = platform || _currentPlatform;
+        btn.disabled    = true;
         btn.textContent = '⏳';
         try {
             let result;
             if (MODE === 'demo') {
-                result = addGameDemo(user.username, game, _currentPlatform);
+                result = addGameDemo(user.username, game, gamePlatform);
             } else {
-                result = await addGameGitHub(user.username, game, _currentPlatform);
+                result = await addGameGitHub(user.username, game, gamePlatform);
             }
-            if (result.success) {
-                btn.textContent = '✅ Owned';
-                btn.classList.add('btn-owned');
-                await refreshOwnedGames();
-            } else {
-                btn.textContent = '✅ Owned';
-                btn.classList.add('btn-owned');
+            btn.textContent = '✅ Owned';
+            btn.classList.add('btn-owned');
+            await refreshOwnedGames();
+            // Refresh browse so ownership badges update
+            if (_currentPlatform === 'ALL') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    document.getElementById('browseSearch').value);
+            } else if (_allBrowseGames.length) {
+                renderBrowseGames(_allBrowseGames);
             }
         } catch (e) {
             btn.disabled    = false;
@@ -247,17 +353,20 @@
 
         listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
             const games = byPlatform[plat];
+            const coverColor = getPlatformColor(plat);
+            const coverIcon  = getPlatformIcon(plat);
             return `
             <div class="owned-platform-group">
                 <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
                 ${games.map(g => `
-                <div class="games-browse-item">
+                <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
+                    <div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>
                     <div class="games-browse-info">
                         <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
                         ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
                     </div>
                     <button class="btn-remove-game"
-                        onclick="handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
+                        onclick="event.stopPropagation(); handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
                         🗑️ Remove
                     </button>
                 </div>`).join('')}
@@ -278,8 +387,11 @@
             }
             if (result.success) {
                 await refreshOwnedGames();
-                // If browse tab is open for this platform, re-render so ownership badges update
-                if (_currentPlatform === platform && _allBrowseGames.length) {
+                // Re-render browse so ownership badges update
+                if (_currentPlatform === 'ALL') {
+                    renderBrowseGamesGrouped(_allPlatformGames,
+                        document.getElementById('browseSearch').value);
+                } else if (_currentPlatform === platform && _allBrowseGames.length) {
                     renderBrowseGames(_allBrowseGames);
                 }
             }
