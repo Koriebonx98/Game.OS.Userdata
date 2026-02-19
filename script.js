@@ -207,7 +207,7 @@ async function handleLogin(event) {
     }
     
     // Send the email/username as-is; backend will handle the lookup
-    const username = email;
+    const loginIdentifier = email;
     
     // Show loading state
     showMessage(messageDiv, '⏳ Verifying credentials... Please wait.', 'info');
@@ -221,7 +221,7 @@ async function handleLogin(event) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                username: username,
+                username: loginIdentifier,
                 password: password
             })
         });
