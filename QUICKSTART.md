@@ -87,11 +87,16 @@ Game.OS.Userdata/
 
 ## Key Configuration
 
-Current settings in `script.js`:
+The mode is detected automatically in `script.js`:
 ```javascript
-const API_BASE_URL = 'https://your-backend-url.com';
-let DEMO_MODE = true;  // Currently using demo mode
+// Fine-grained PAT injected by the deploy workflow at build time.
+const GITHUB_TOKEN = '';  // ← empty = demo mode; set DATA_REPO_TOKEN secret to go live
+
+// 'github' when a token is present, 'demo' when not
+let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
 ```
+
+To switch from demo mode to live mode, set the `DATA_REPO_TOKEN` secret (see README.md → Going Live).
 
 ## Security Notes
 
@@ -116,10 +121,11 @@ let DEMO_MODE = true;  // Currently using demo mode
 ## Next Steps
 
 1. ✅ Test the demo mode (works now!)
-2. 📖 Read GITHUB_INTEGRATION.md for production
-3. 🚀 Deploy backend when ready
-4. 🔒 Update API_BASE_URL in script.js
-5. ✨ Launch with real users!
+2. 📖 Read README.md → Going Live to enable real persistent accounts
+3. 🔑 Create `Game.OS.Private.Data` private repo and a fine-grained PAT
+4. 🔒 Add `DATA_REPO_TOKEN` secret in this repo's Settings → Secrets → Actions
+5. 🚀 Run **Initialize Data Repository & Deploy Live** workflow
+6. ✨ Launch with real users at https://koriebonx98.github.io/Game.OS.Userdata/
 
 ---
 
