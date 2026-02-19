@@ -127,6 +127,32 @@ document.addEventListener('DOMContentLoaded', function() {
         populateAccountDetails();
         loadFriendsList();
         loadInbox();
+
+        // Poll every 30 seconds so friend requests appear without a manual refresh.
+        // Polling is paused while the tab is hidden to avoid unnecessary API calls.
+        const POLL_INTERVAL_MS = 30000;
+        const pollTimer = setInterval(() => {
+            if (!document.hidden) {
+                loadFriendsList();
+                loadInbox();
+            }
+        }, POLL_INTERVAL_MS);
+
+        // When the tab becomes visible again, refresh immediately then let the
+        // regular interval continue.
+        function onVisibilityChange() {
+            if (!document.hidden) {
+                loadFriendsList();
+                loadInbox();
+            }
+        }
+        document.addEventListener('visibilitychange', onVisibilityChange);
+
+        // Clean up when the page is unloaded to avoid memory leaks.
+        window.addEventListener('pagehide', () => {
+            clearInterval(pollTimer);
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+        }, { once: true });
     }
 });
 
