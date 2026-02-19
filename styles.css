@@ -1105,3 +1105,138 @@ footer {
         margin-left: 0;
     }
 }
+
+/* ── Game cover icon ──────────────────────────────────────── */
+.game-cover-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35em;
+    color: #fff;
+    margin-right: 10px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.games-browse-item.clickable {
+    cursor: pointer;
+}
+
+.games-browse-item.clickable:hover {
+    background: #eef3ff;
+}
+
+/* ── Game detail modal ────────────────────────────────────── */
+.game-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 9998;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.game-modal {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.25);
+    max-width: 520px;
+    width: 100%;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.game-modal-header {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+}
+
+.game-modal-cover-large {
+    width: 72px;
+    height: 72px;
+    border-radius: 10px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.2em;
+    background: rgba(255,255,255,0.2);
+}
+
+.game-modal-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    margin: 0 0 4px;
+    line-height: 1.3;
+}
+
+.game-modal-platform {
+    font-size: 0.82em;
+    opacity: 0.85;
+    margin: 0;
+}
+
+.game-modal-close {
+    margin-left: auto;
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 1.2em;
+    cursor: pointer;
+    padding: 0 4px;
+    opacity: 0.8;
+    flex-shrink: 0;
+    align-self: flex-start;
+}
+
+.game-modal-close:hover { opacity: 1; }
+
+.game-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+}
+
+.game-modal-field {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 0.9em;
+}
+
+.game-modal-field:last-child { border-bottom: none; }
+
+.game-modal-field-label {
+    font-weight: 600;
+    color: #555;
+    flex-shrink: 0;
+    min-width: 110px;
+}
+
+.game-modal-field-value {
+    color: #333;
+    text-align: right;
+    word-break: break-word;
+}
+
+@media (max-width: 480px) {
+    .game-modal-field {
+        flex-direction: column;
+        gap: 2px;
+    }
+    .game-modal-field-value {
+        text-align: left;
+    }
+}
