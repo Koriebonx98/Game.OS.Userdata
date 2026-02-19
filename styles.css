@@ -537,6 +537,39 @@ footer {
 }
 
 /* Friends Section */
+/* ── Inbox Section ────────────────────────────────────────────────────────── */
+.inbox-section {
+    margin-bottom: 30px;
+    padding: 25px;
+    background: #f0f7ff;
+    border-radius: 10px;
+    border: 1px solid #b3d1f0;
+}
+
+.inbox-section h3 {
+    color: var(--text-color);
+    font-size: 1.2em;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--secondary-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.inbox-badge {
+    background: var(--danger-color);
+    color: var(--white);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.85em;
+    font-weight: 600;
+}
+
+.inbox-list {
+    margin-top: 5px;
+}
+
 .friends-section {
     margin-bottom: 30px;
     padding: 25px;
