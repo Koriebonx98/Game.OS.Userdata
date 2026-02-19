@@ -9,40 +9,59 @@
 <body>
     <div class="container">
         <header>
-            <h1>Game OS Userdata</h1>
-            <p>Welcome to the Game OS User Database</p>
+            <h1>🎮 Game OS Userdata</h1>
+            <p>Secure Account Management System</p>
+            <nav>
+                <a href="signup.html" class="nav-link">Sign Up</a>
+                <a href="login.html" class="nav-link">Login</a>
+            </nav>
         </header>
         
         <main>
-            <div class="welcome-section">
-                <h2>Get Started</h2>
-                <p>Manage your game data and user profile</p>
+            <!-- User Display (shows when logged in) -->
+            <div id="userDisplay"></div>
+            
+            <!-- Connection Status -->
+            <div class="text-center">
+                <div id="connectionStatus" class="status"></div>
+            </div>
+            
+            <!-- Hero Section -->
+            <div class="hero-section">
+                <h2>Welcome to Game OS</h2>
+                <p>Create your account and join the gaming community. Secure, fast, and powered by modern technology.</p>
                 
-                <div class="button-group">
-                    <a href="login.html" class="btn btn-primary">Login</a>
-                    <a href="signup.html" class="btn btn-secondary">Sign Up</a>
+                <div class="cta-buttons">
+                    <a href="signup.html" class="btn btn-primary">Get Started</a>
+                    <a href="login.html" class="btn btn-secondary">Sign In</a>
                 </div>
             </div>
             
-            <div class="features">
-                <div class="feature-card">
-                    <h3>🎮 Game Data</h3>
-                    <p>Store and manage your game progress</p>
-                </div>
-                <div class="feature-card">
-                    <h3>👤 User Profile</h3>
-                    <p>Customize your gaming profile</p>
-                </div>
+            <!-- Features -->
+            <div class="feature-grid">
                 <div class="feature-card">
                     <h3>🔒 Secure</h3>
-                    <p>Your data is safe with us</p>
+                    <p>Your account data is stored securely with industry-standard encryption and security practices.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>⚡ Fast</h3>
+                    <p>Quick account creation and login processes powered by GitHub Actions automation.</p>
+                </div>
+                
+                <div class="feature-card">
+                    <h3>🌐 Modern</h3>
+                    <p>Built with modern web technologies for the best user experience across all devices.</p>
                 </div>
             </div>
         </main>
         
         <footer>
             <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions & Node.js</p>
         </footer>
     </div>
+    
+    <script src="script.js"></script>
 </body>
 </html>
