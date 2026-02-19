@@ -2015,6 +2015,46 @@ async function removeGameGitHub(username, platform, title) {
 }
 
 // ============================================================
+// FRIENDS WHO OWN A GAME
+// ============================================================
+
+async function loadFriendLibraries(myUsername) {
+    let friends = [];
+    try {
+        if (MODE === 'demo') {
+            friends = getDemoFriends(myUsername);
+        } else {
+            friends = await getFriendsGitHub(myUsername);
+        }
+    } catch (_) {
+        return {};
+    }
+    const entries = await Promise.all(
+        friends.map(async friendName => {
+            try {
+                const lib = MODE === 'demo'
+                    ? getDemoGameLibrary(friendName)
+                    : await getGameLibraryGitHub(friendName);
+                return [friendName, lib];
+            } catch (_) {
+                return [friendName, []];
+            }
+        })
+    );
+    return Object.fromEntries(entries);
+}
+
+function countFriendsWithGame(friendLibraries, platform, title) {
+    const titleLower = (title || '').toLowerCase();
+    return Object.values(friendLibraries).filter(lib =>
+        lib.some(g =>
+            g.platform === platform &&
+            (g.title || '').toLowerCase() === titleLower
+        )
+    ).length;
+}
+
+// ============================================================
 // GAME LIBRARY – DEMO MODE
 // ============================================================
 
@@ -2229,6 +2269,15 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         const bgUrls    = getGameBackgroundUrls(source);
         const fieldRows = _buildGameModalFields(source);
         let bodyHtml = '';
+        // Show how many friends also own this game (available on the My Library page)
+        const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
+        const fc = countFriendsWithGame(libs, platform, title);
+        if (fc > 0) {
+            bodyHtml += `<div class="game-modal-field">
+                <span class="game-modal-field-label">Friends who own this</span>
+                <span class="game-modal-field-value"><span class="game-friends-badge">👥 ${fc} friend${fc !== 1 ? 's' : ''}</span></span>
+            </div>`;
+        }
         if (bgUrls.length > 0) {
             bodyHtml += `<div class="game-modal-bg-gallery">${
                 bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')

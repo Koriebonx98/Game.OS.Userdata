@@ -70,6 +70,7 @@
     let _allBrowseGames  = [];
     let _allPlatformGames = {}; // { platform: [...games] } used in ALL mode
     let _myLibrary       = [];
+    let _friendLibraries = {}; // { friendName: [...games] } for "friends also own" counts
     let _currentPlatform = '';
 
     document.addEventListener('DOMContentLoaded', async () => {
@@ -338,6 +339,8 @@
         } catch (_) {
             _myLibrary = [];
         }
+        // Load friend libraries for "also owned by friends" counts
+        _friendLibraries = await loadFriendLibraries(user.username).catch(() => ({}));
         renderOwnedGames();
     }
 
@@ -347,6 +350,15 @@
             listEl.innerHTML = '<p style="color:#666;font-size:0.95em;">Your library is empty. Browse games above and click "+ Add" to track what you own!</p>';
             return;
         }
+
+        // Pre-compute friend counts for each owned game (platform + title key)
+        const friendCountMap = {};
+        _myLibrary.forEach(g => {
+            const key = `${g.platform}||${(g.title || '').toLowerCase()}`;
+            if (!(key in friendCountMap)) {
+                friendCountMap[key] = countFriendsWithGame(_friendLibraries, g.platform, g.title || '');
+            }
+        });
 
         // Group by platform
         const byPlatform = {};
@@ -367,12 +379,17 @@
                     const coverHtml = coverUrl
                         ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
                         : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
+                    const fc = friendCountMap[`${plat}||${(g.title || '').toLowerCase()}`] || 0;
+                    const friendBadge = fc > 0
+                        ? `<span class="game-friends-badge">👥 ${fc} friend${fc !== 1 ? 's' : ''}</span>`
+                        : '';
                     return `
                 <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
                     ${coverHtml}
                     <div class="games-browse-info">
                         <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
                         ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
+                        ${friendBadge}
                     </div>
                     <button class="btn-remove-game"
                         onclick="event.stopPropagation(); handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
