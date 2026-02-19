@@ -40,26 +40,69 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Inject DATA_REPO_TOKEN into script.js
+      - name: Inject configuration into script.js
         run: |
           python3 << 'PYEOF'
-          import os, json, re
-          token = os.environ.get('DATA_REPO_TOKEN', '')
-          with open('script.js', 'r') as f:
+          import os, json, re, sys
+
+          token      = os.environ.get('DATA_REPO_TOKEN', '')
+          owner      = os.environ.get('REPO_OWNER', '')
+          data_repo  = os.environ.get('DATA_REPO_NAME', '')
+
+          with open('script.js', 'r', encoding='utf-8') as f:
               content = f.read()
+
+          # ── Inject GITHUB_TOKEN ──────────────────────────────────────────────
           # json.dumps produces a valid JS string literal and handles all special chars.
-          # Replace the placeholder line regardless of any trailing comment text.
-          new_line = f"const GITHUB_TOKEN = {json.dumps(token)};"
-          updated = re.sub(r"const GITHUB_TOKEN\s*=\s*'';.*", new_line, content, count=1)
+          # The regex matches any single-quoted value so it works even if the file was
+          # previously processed (e.g. re-run without a clean checkout).
+          new_token_line = f"const GITHUB_TOKEN = {json.dumps(token)};"
+          updated = re.sub(
+              r"const GITHUB_TOKEN\s*=\s*'[^']*';[^\n]*",
+              new_token_line,
+              content,
+              count=1
+          )
           if updated == content:
-              print('WARNING: GITHUB_TOKEN placeholder not found in script.js — no replacement made')
-          with open('script.js', 'w') as f:
-              f.write(updated)
-          status = 'injected (GitHub mode active)' if token else 'not set — site will use demo mode'
-          print(f'DATA_REPO_TOKEN: {status}')
+              print('ERROR: GITHUB_TOKEN placeholder not found in script.js — aborting')
+              sys.exit(1)
+          content = updated
+
+          # ── Inject DATA_REPO_OWNER ───────────────────────────────────────────
+          if owner:
+              new_owner_line = f"const DATA_REPO_OWNER = {json.dumps(owner)};"
+              content = re.sub(
+                  r"const DATA_REPO_OWNER\s*=\s*'[^']*';[^\n]*",
+                  new_owner_line,
+                  content,
+                  count=1
+              )
+
+          # ── Inject DATA_REPO_NAME ────────────────────────────────────────────
+          if data_repo:
+              new_repo_line = f"const DATA_REPO_NAME  = {json.dumps(data_repo)};"
+              content = re.sub(
+                  r"const DATA_REPO_NAME\s*=\s*'[^']*';[^\n]*",
+                  new_repo_line,
+                  content,
+                  count=1
+              )
+
+          with open('script.js', 'w', encoding='utf-8') as f:
+              f.write(content)
+
+          # ── Diagnostics ──────────────────────────────────────────────────────
+          status = 'injected — GitHub mode will be active' if token else 'not set — site will use demo mode'
+          print(f'DATA_REPO_TOKEN : {status}')
+          if owner:
+              print(f'DATA_REPO_OWNER : set to {owner!r}')
+          if data_repo:
+              print(f'DATA_REPO_NAME  : set to {data_repo!r}')
           PYEOF
         env:
           DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          DATA_REPO_NAME: ${{ vars.DATA_REPO_NAME }}
 
       - name: Copy frontend files to deployment directory
         run: |
