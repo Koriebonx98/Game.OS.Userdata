@@ -580,16 +580,17 @@ app.post('/api/remove-friend', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Missing required fields' });
         }
 
-        const friendsPath = `accounts/${username.toLowerCase()}/friends.json`;
+        const userLower   = username.toLowerCase();
+        const friendLower = friendUsername.toLowerCase();
+
+        // Remove friend from the requesting user's list
+        const friendsPath = `accounts/${userLower}/friends.json`;
         const friendsFile = await getFile(friendsPath);
         if (!friendsFile) {
             return res.status(404).json({ success: false, message: 'Friends list not found' });
         }
 
-        const updated = friendsFile.content.filter(
-            f => f.toLowerCase() !== friendUsername.toLowerCase()
-        );
-
+        const updated = friendsFile.content.filter(f => f.toLowerCase() !== friendLower);
         await putFile(
             friendsPath,
             updated,
@@ -597,10 +598,107 @@ app.post('/api/remove-friend', async (req, res) => {
             friendsFile.sha
         );
 
+        // Also remove the requesting user from the friend's list
+        const theirFriendsPath = `accounts/${friendLower}/friends.json`;
+        const theirFriendsFile = await getFile(theirFriendsPath);
+        if (theirFriendsFile) {
+            const theirUpdated = theirFriendsFile.content.filter(f => f.toLowerCase() !== userLower);
+            await putFile(
+                theirFriendsPath,
+                theirUpdated,
+                `Remove friend ${username} for: ${friendUsername}`,
+                theirFriendsFile.sha
+            );
+        }
+
         res.json({ success: true, message: 'Friend removed' });
     } catch (err) {
         console.error('Error removing friend:', err);
         res.status(500).json({ success: false, message: 'Failed to remove friend. Please try again.' });
+    }
+});
+
+// ── Messaging helpers ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the canonical conversation path for two users.
+ * Usernames are sorted alphabetically so both orderings resolve to the same file.
+ */
+function conversationPath(userA, userB) {
+    const [a, b] = [userA.toLowerCase(), userB.toLowerCase()].sort();
+    return `accounts/messages/${a}_${b}.json`;
+}
+
+/** Returns true when userA and userB are mutual friends. */
+async function areFriends(userLower, friendLower) {
+    const friendsFile = await getFile(`accounts/${userLower}/friends.json`);
+    const friends = friendsFile ? friendsFile.content : [];
+    return friends.some(f => f.toLowerCase() === friendLower);
+}
+
+// ── POST /api/send-message ────────────────────────────────────────────────────
+app.post('/api/send-message', async (req, res) => {
+    try {
+        const { username, toUsername, text } = req.body;
+
+        if (!username || !toUsername || !text || !text.trim()) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const msgText = text.trim();
+        if (msgText.length > 1000) {
+            return res.status(400).json({ success: false, message: 'Message too long (max 1000 characters)' });
+        }
+
+        const userLower   = username.toLowerCase();
+        const toLower     = toUsername.toLowerCase();
+
+        if (userLower === toLower) {
+            return res.status(400).json({ success: false, message: 'Cannot message yourself' });
+        }
+
+        // Verify both users exist and are friends
+        const userFile = await getFile(`accounts/${userLower}/profile.json`);
+        if (!userFile) return res.status(404).json({ success: false, message: 'Your account was not found' });
+
+        if (!(await areFriends(userLower, toLower))) {
+            return res.status(403).json({ success: false, message: 'You can only message friends' });
+        }
+
+        // Append message to the shared conversation file
+        const convPath = conversationPath(userLower, toLower);
+        const convFile = await getFile(convPath);
+        const messages = convFile ? [...convFile.content] : [];
+        messages.push({ from: userFile.content.username, text: msgText, sentAt: new Date().toISOString() });
+
+        await putFile(convPath, messages, `Message from ${username} to ${toUsername}`, convFile ? convFile.sha : undefined);
+
+        res.json({ success: true, message: 'Message sent' });
+    } catch (err) {
+        console.error('Error sending message:', err);
+        res.status(500).json({ success: false, message: 'Failed to send message. Please try again.' });
+    }
+});
+
+// ── GET /api/get-messages ─────────────────────────────────────────────────────
+app.get('/api/get-messages', async (req, res) => {
+    try {
+        const { username, withUsername } = req.query;
+
+        if (!username || !sanitiseUsername(username) || !withUsername || !sanitiseUsername(withUsername)) {
+            return res.status(400).json({ success: false, message: 'Invalid parameters' });
+        }
+
+        if (!(await areFriends(username.toLowerCase(), withUsername.toLowerCase()))) {
+            return res.status(403).json({ success: false, message: 'You can only read messages with friends' });
+        }
+
+        const convPath = conversationPath(username, withUsername);
+        const convFile = await getFile(convPath);
+        res.json({ success: true, messages: convFile ? convFile.content : [] });
+    } catch (err) {
+        console.error('Error getting messages:', err);
+        res.status(500).json({ success: false, message: 'Failed to get messages.' });
     }
 });
 
