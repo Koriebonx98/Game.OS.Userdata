@@ -164,6 +164,23 @@ document.addEventListener('DOMContentLoaded', function() {
             document.removeEventListener('visibilitychange', onInboxVC);
         }, { once: true });
     }
+
+    // Presence heartbeat: keep logged-in user's presence fresh (every 2 minutes)
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+        modeReady.then(() => {
+            updatePresence(currentUser.username).catch(() => {});
+            const presenceTimer = setInterval(() => {
+                if (!document.hidden) updatePresence(currentUser.username).catch(() => {});
+            }, 2 * 60 * 1000);
+            window.addEventListener('pagehide', () => clearInterval(presenceTimer), { once: true });
+        });
+    }
+
+    // Display total user count if element exists on the page
+    if (document.getElementById('totalUsersCount')) {
+        modeReady.then(() => displayTotalUsersCount());
+    }
 });
 
 // ============================================================
@@ -689,6 +706,9 @@ async function handleLogin(event) {
             } else {
                 sessionStorage.setItem('gameOSUser', JSON.stringify(userSession));
             }
+
+            // Record presence (best-effort)
+            updatePresence(username).catch(() => {});
             
             // Redirect after 2 seconds
             setTimeout(() => {
@@ -1225,6 +1245,56 @@ async function removeFriendGitHub(username, friendUsername) {
 }
 
 // ============================================================
+// ONLINE / OFFLINE PRESENCE
+// ============================================================
+
+// A user is considered "online" if their lastSeen is within the last 5 minutes.
+const PRESENCE_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
+
+/**
+ * Update the current user's presence timestamp.
+ * GitHub mode: writes accounts/{username}/presence.json
+ * Demo mode: stores in localStorage
+ */
+async function updatePresence(username) {
+    if (!username) return;
+    const now = new Date().toISOString();
+    if (MODE === 'demo') {
+        localStorage.setItem(`gameOS_presence_${username.toLowerCase()}`, now);
+        return;
+    }
+    try {
+        const path     = `accounts/${username.toLowerCase()}/presence.json`;
+        const existing = await githubRead(path);
+        await githubWrite(path, { lastSeen: now, username }, `Presence: ${username}`, existing ? existing.sha : undefined);
+    } catch (_) { /* best-effort */ }
+}
+
+/**
+ * Get a friend's last-seen timestamp.
+ * Returns an ISO string or null.
+ */
+async function getFriendPresence(friendUsername) {
+    if (MODE === 'demo') {
+        return localStorage.getItem(`gameOS_presence_${friendUsername.toLowerCase()}`) || null;
+    }
+    try {
+        const file = await githubRead(`accounts/${friendUsername.toLowerCase()}/presence.json`);
+        return file ? file.content.lastSeen : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * Returns true if the given lastSeen ISO string is within the online threshold.
+ */
+function isOnline(lastSeen) {
+    if (!lastSeen) return false;
+    return (Date.now() - new Date(lastSeen).getTime()) < PRESENCE_ONLINE_THRESHOLD_MS;
+}
+
+// ============================================================
 // DEMO MODE – FRIENDS
 // ============================================================
 
@@ -1395,17 +1465,31 @@ async function loadFriendsList() {
 
         let html = '';
 
+        // Fetch presence for all friends in parallel
+        const presenceMap = {};
+        await Promise.all(friends.map(async f => {
+            try {
+                presenceMap[f] = await getFriendPresence(f);
+            } catch (_) {
+                presenceMap[f] = null;
+            }
+        }));
+
         // Accepted friends
-        html += friends.map(f => `
+        html += friends.map(f => {
+            const online     = isOnline(presenceMap[f]);
+            const statusDot  = `<span class="online-badge ${online ? 'online' : 'offline'}" title="${online ? 'Online' : 'Offline'}"></span>`;
+            const statusText = `<span class="friend-status-label ${online ? 'online' : ''}">${online ? 'Online' : 'Offline'}</span>`;
+            return `
             <div class="friend-item">
-                <span class="friend-name">👤 ${f}</span>
+                <span class="friend-name">${statusDot}${escapeHtml(f)}${statusText}</span>
                 <div class="friend-actions">
                     <a class="btn-message-friend" href="profile.html?user=${encodeURIComponent(f)}" style="text-decoration:none;">🎮 Games</a>
-                    <button class="btn-message-friend" onclick="openChat('${f}')">💬 Message</button>
-                    <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
+                    <button class="btn-message-friend" onclick="openChat('${escapeHtml(f)}')">💬 Message</button>
+                    <button class="btn-remove-friend" onclick="handleRemoveFriend('${escapeHtml(f)}')">Remove</button>
                 </div>
-            </div>
-        `).join('');
+            </div>`;
+        }).join('');
 
         // Outgoing pending requests
         if (sentRequests.length > 0) {
@@ -1944,6 +2028,42 @@ async function handleResetAllAccounts() {
         if (msgEl) showMessage(msgEl, '❌ Failed to remove accounts. Please try again.', 'error');
         if (btn)   btn.disabled = false;
     }
+}
+
+// ============================================================
+// TOTAL USER COUNT
+// ============================================================
+
+/**
+ * Get total number of registered users.
+ * GitHub mode: count keys in accounts/email-index.json.
+ * Demo mode: count unique demo accounts in localStorage.
+ */
+async function getTotalUsersCount() {
+    if (MODE === 'demo') {
+        // Count usernames stored in demo mode
+        const keys = Object.keys(localStorage).filter(k => k.startsWith('gameOS_user_'));
+        return keys.length;
+    }
+    try {
+        const file = await githubRead('accounts/email-index.json');
+        if (!file) return 0;
+        return Object.keys(file.content).length;
+    } catch (_) {
+        return null;
+    }
+}
+
+/**
+ * Display the total user count in an element with id="totalUsersCount".
+ */
+async function displayTotalUsersCount() {
+    const el = document.getElementById('totalUsersCount');
+    if (!el) return;
+    await modeReady;
+    const count = await getTotalUsersCount();
+    if (count === null) { if (el.parentElement) el.parentElement.style.display = 'none'; return; }
+    el.textContent = count.toLocaleString();
 }
 
 // ============================================================
