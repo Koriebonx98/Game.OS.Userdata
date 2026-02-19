@@ -49,6 +49,11 @@ let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
 // while initializeMode() is still checking whether GitHub is reachable.
 let modeReady = null;
 
+// ── Admin account constants ───────────────────────────────────────────────────
+const ADMIN_USERNAME       = 'Admin.GameOS';
+const ADMIN_USERNAME_LOWER = ADMIN_USERNAME.toLowerCase(); // 'admin.gameos'
+const ADMIN_EMAIL          = 'admin@gameos.local';
+
 // ============================================================
 // SECURITY - PASSWORD HASHING FOR DEMO MODE
 // ============================================================
@@ -91,9 +96,16 @@ async function hashPassword(password, username) {
         .join('');
 }
 
-// ============================================================
-// INITIALIZATION
-// ============================================================
+/**
+ * Compute a plain SHA-256 hex digest of a string.
+ * Used to store API token hashes when no backend HMAC secret is available (GitHub mode).
+ */
+async function sha256Hex(str) {
+    const encoder = new TextEncoder();
+    const hash    = await crypto.subtle.digest('SHA-256', encoder.encode(str));
+    return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 
 document.addEventListener('DOMContentLoaded', function() {
     // Login Form Handler
@@ -205,6 +217,8 @@ async function initializeMode() {
                     statusEl.textContent = '✅ Real accounts active';
                     statusEl.className = 'status connected';
                 }
+                // Initialize the admin account in the background (runs once per session)
+                initAdminAccountGitHub();
                 return;
             }
             throw new Error(`GitHub API ${resp.status}`);
@@ -227,6 +241,50 @@ async function initializeMode() {
 // ============================================================
 // GITHUB API HELPERS
 // ============================================================
+
+/**
+ * Creates the Admin.GameOS account in the GitHub data repo on first launch.
+ * Runs silently in the background once per browser session.
+ * Initial password: "GameOS2026" – change via Account Settings after first login.
+ */
+async function initAdminAccountGitHub() {
+    if (sessionStorage.getItem('adminInitChecked')) return;
+    sessionStorage.setItem('adminInitChecked', '1');
+    try {
+        const existing = await githubRead(`accounts/${ADMIN_USERNAME_LOWER}/profile.json`);
+        if (existing) return; // already exists
+
+        const passwordHash = await hashPassword('GameOS2026', ADMIN_USERNAME);
+        await githubWrite(
+            `accounts/${ADMIN_USERNAME_LOWER}/profile.json`,
+            {
+                username:      ADMIN_USERNAME,
+                email:         ADMIN_EMAIL,
+                password_hash: passwordHash,
+                created_at:    new Date().toISOString(),
+                is_admin:      true
+            },
+            `Initialize admin account: ${ADMIN_USERNAME}`
+        );
+
+        // Update email index
+        const indexFile = await githubRead('accounts/email-index.json');
+        const emailMap  = indexFile ? { ...indexFile.content } : {};
+        if (!emailMap[ADMIN_EMAIL]) {
+            emailMap[ADMIN_EMAIL] = ADMIN_USERNAME_LOWER;
+            await githubWrite(
+                'accounts/email-index.json',
+                emailMap,
+                `Add email index for admin: ${ADMIN_USERNAME}`,
+                indexFile ? indexFile.sha : undefined
+            );
+        }
+        console.log(`✅ Admin account "${ADMIN_USERNAME}" initialized in GitHub mode.`);
+    } catch (err) {
+        // Best-effort – silently ignore failures (e.g. concurrent init race)
+        console.warn('Admin account init skipped:', err.message);
+    }
+}
 
 function githubHeaders() {
     return {
@@ -886,6 +944,7 @@ function requireLogin() {
 
 /**
  * Populate account detail fields on the My Account page.
+ * Also shows the Danger Zone section only for the Admin.GameOS account.
  */
 function populateAccountDetails() {
     const user = getCurrentUser();
@@ -898,6 +957,13 @@ function populateAccountDetails() {
     if (joinedEl)   joinedEl.textContent   = user.loginTime
         ? new Date(user.loginTime).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' })
         : '—';
+
+    // Show the Danger Zone only for the admin account
+    const dangerZone = document.getElementById('dangerZone');
+    if (dangerZone) {
+        dangerZone.style.display =
+            user.username.toLowerCase() === ADMIN_USERNAME_LOWER ? '' : 'none';
+    }
 }
 
 /**
@@ -1166,20 +1232,45 @@ async function handleGenerateToken() {
             token = `gos_${user.username.toLowerCase()}.${randomHex}`;
             localStorage.setItem(`gameOS_apiToken_${user.username.toLowerCase()}`, token);
         } else {
-            // Call the backend to issue a signed token
             const base = getBackendBase();
-            const resp = await fetch(`${base}/api/auth/token`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ username: user.username, password })
-            });
-            const data = await resp.json();
-            if (!data.success) {
-                showMessage(msgEl, `❌ ${data.message || 'Failed to generate token.'}`, 'error');
-                if (btn) btn.disabled = false;
-                return;
+            if (base) {
+                // Backend is configured – call it to issue a signed HMAC token
+                const resp = await fetch(`${base}/api/auth/token`, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ username: user.username, password })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showMessage(msgEl, `❌ ${data.message || 'Failed to generate token.'}`, 'error');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                token = data.token;
+            } else {
+                // No backend configured – verify password locally and write the token hash to GitHub
+                const result = await verifyAccountGitHub(user.username, password);
+                if (!result.success) {
+                    showMessage(msgEl, '❌ Incorrect password.', 'error');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                    .map(b => b.toString(16).padStart(2, '0')).join('');
+                token = `gos_${user.username.toLowerCase()}.${randomHex}`;
+                // Store a SHA-256 hash of the token in the user's GitHub profile
+                const tokenHash   = await sha256Hex(token);
+                const profilePath = `accounts/${user.username.toLowerCase()}/profile.json`;
+                const profileFile = await githubRead(profilePath);
+                if (profileFile) {
+                    await githubWrite(
+                        profilePath,
+                        { ...profileFile.content, api_token_hash: tokenHash, api_token_issued_at: new Date().toISOString() },
+                        `Issue API token for: ${user.username}`,
+                        profileFile.sha
+                    );
+                }
             }
-            token = data.token;
         }
 
         // Cache the token so the page can display it once
@@ -1233,16 +1324,35 @@ async function handleRevokeToken() {
             localStorage.removeItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
         } else {
             const base = getBackendBase();
-            const resp = await fetch(`${base}/api/auth/revoke-token`, {
-                method:  'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body:    JSON.stringify({ username: user.username, password })
-            });
-            const data = await resp.json();
-            if (!data.success) {
-                showMessage(msgEl, `❌ ${data.message || 'Failed to revoke token.'}`, 'error');
-                if (btn) btn.disabled = false;
-                return;
+            if (base) {
+                // Backend is configured – call it to revoke the token
+                const resp = await fetch(`${base}/api/auth/revoke-token`, {
+                    method:  'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body:    JSON.stringify({ username: user.username, password })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    showMessage(msgEl, `❌ ${data.message || 'Failed to revoke token.'}`, 'error');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+            } else {
+                // No backend – verify password locally and clear the token hash from GitHub profile
+                const result = await verifyAccountGitHub(user.username, password);
+                if (!result.success) {
+                    showMessage(msgEl, '❌ Incorrect password.', 'error');
+                    if (btn) btn.disabled = false;
+                    return;
+                }
+                const profilePath = `accounts/${user.username.toLowerCase()}/profile.json`;
+                const profileFile = await githubRead(profilePath);
+                if (profileFile) {
+                    const updated = { ...profileFile.content };
+                    delete updated.api_token_hash;
+                    delete updated.api_token_issued_at;
+                    await githubWrite(profilePath, updated, `Revoke API token for: ${user.username}`, profileFile.sha);
+                }
             }
         }
 
@@ -2183,6 +2293,8 @@ async function resetAllAccountsGitHub() {
     const items = await resp.json();
 
     for (const item of items) {
+        // Preserve the Admin.GameOS account directory
+        if (item.name && item.name.toLowerCase() === ADMIN_USERNAME_LOWER) continue;
         if (item.type === 'dir') {
             // List files inside the user sub-folder and delete each one
             const folderResp = await fetch(item.url, { headers: githubHeaders() });
@@ -2217,13 +2329,21 @@ function resetAllAccountsDemo() {
 
 /**
  * UI handler – asks for confirmation then wipes all accounts in the active mode.
+ * Only the Admin.GameOS account may perform this action.
  */
 async function handleResetAllAccounts() {
     const msgEl = document.getElementById('resetMessage');
     const btn   = document.getElementById('resetAllBtn');
 
+    // Access check – only Admin.GameOS can reset all accounts
+    const currentUser = getCurrentUser();
+    if (!currentUser || currentUser.username.toLowerCase() !== ADMIN_USERNAME_LOWER) {
+        if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can reset all accounts.', 'error');
+        return;
+    }
+
     if (!confirm(
-        '⚠️ WARNING: This will permanently delete ALL accounts and cannot be undone.\n\n' +
+        '⚠️ WARNING: This will permanently delete ALL accounts (except Admin.GameOS) and cannot be undone.\n\n' +
         'Are you absolutely sure you want to continue?'
     )) return;
 

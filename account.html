@@ -199,9 +199,9 @@ var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;
                 </div>
 
                 <!-- Danger Zone -->
-                <div class="danger-zone">
+                <div id="dangerZone" class="danger-zone" style="display:none;">
                     <h3>⚠️ Danger Zone</h3>
-                    <p>Permanently delete <strong>all</strong> accounts and start fresh. This action cannot be undone.</p>
+                    <p>Permanently delete <strong>all</strong> accounts (except Admin.GameOS) and start fresh. This action cannot be undone.</p>
                     <button id="resetAllBtn" class="btn btn-danger" onclick="handleResetAllAccounts()">
                         🗑️ Remove All Accounts
                     </button>
