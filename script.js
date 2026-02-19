@@ -126,6 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         requireLogin();
         populateAccountDetails();
         loadFriendsList();
+        loadInbox();
     }
 });
 
@@ -1319,36 +1320,19 @@ async function loadFriendsList() {
 
     listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
-        let friends, incomingRequests, sentRequests;
+        let friends, sentRequests;
         if (MODE === 'demo') {
-            friends          = getDemoFriends(user.username);
-            incomingRequests = getDemoFriendRequests(user.username);
-            sentRequests     = getDemoSentRequests(user.username);
+            friends      = getDemoFriends(user.username);
+            sentRequests = getDemoSentRequests(user.username);
         } else {
-            [friends, incomingRequests, sentRequests] = await Promise.all([
+            [friends, sentRequests] = await Promise.all([
                 getFriendsGitHub(user.username),
-                getFriendRequestsGitHub(user.username),
                 getSentRequestsGitHub(user.username)
             ]);
         }
         if (countEl) countEl.textContent = friends.length;
 
         let html = '';
-
-        // Incoming pending requests
-        if (incomingRequests.length > 0) {
-            html += '<div class="friend-requests-section"><p class="friend-requests-title">📨 Pending Requests</p>';
-            html += incomingRequests.map(r => `
-                <div class="friend-item">
-                    <span class="friend-name">👤 ${r.from}</span>
-                    <div class="friend-actions">
-                        <button class="btn-accept-friend" onclick="handleAcceptFriendRequest('${r.from}')">✅ Accept</button>
-                        <button class="btn-decline-friend" onclick="handleDeclineFriendRequest('${r.from}')">❌ Decline</button>
-                    </div>
-                </div>
-            `).join('');
-            html += '</div>';
-        }
 
         // Accepted friends
         html += friends.map(f => `
@@ -1359,13 +1343,17 @@ async function loadFriendsList() {
         `).join('');
 
         // Outgoing pending requests
-        html += sentRequests.map(s => `
-            <div class="friend-item">
-                <span class="friend-name">👤 ${s}</span>
-                <span class="friend-pending-badge">⏳ Pending</span>
-                <button class="btn-remove-friend" onclick="handleCancelFriendRequest('${s}')">Cancel</button>
-            </div>
-        `).join('');
+        if (sentRequests.length > 0) {
+            html += '<div class="friend-requests-section" style="margin-top:12px;"><p class="friend-requests-title">⏳ Sent Requests</p>';
+            html += sentRequests.map(s => `
+                <div class="friend-item">
+                    <span class="friend-name">👤 ${s}</span>
+                    <span class="friend-pending-badge">⏳ Pending</span>
+                    <button class="btn-remove-friend" onclick="handleCancelFriendRequest('${s}')">Cancel</button>
+                </div>
+            `).join('');
+            html += '</div>';
+        }
 
         if (!html) {
             html = '<p style="color:#666;font-size:0.9em;">No friends yet. Search above to add someone!</p>';
@@ -1373,6 +1361,51 @@ async function loadFriendsList() {
         listEl.innerHTML = html;
     } catch (err) {
         listEl.innerHTML = '<p style="color:#c00;">Failed to load friends.</p>';
+    }
+}
+
+async function loadInbox() {
+    const user = getCurrentUser();
+    if (!user) return;
+    const inboxEl = document.getElementById('inboxList');
+    const badgeEl = document.getElementById('inboxCount');
+    if (!inboxEl) return;
+
+    inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
+    try {
+        let incomingRequests;
+        if (MODE === 'demo') {
+            incomingRequests = getDemoFriendRequests(user.username);
+        } else {
+            incomingRequests = await getFriendRequestsGitHub(user.username);
+        }
+
+        if (badgeEl) {
+            if (incomingRequests.length > 0) {
+                badgeEl.textContent = incomingRequests.length;
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
+        }
+
+        if (incomingRequests.length === 0) {
+            inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No pending requests.</p>';
+            return;
+        }
+
+        let html = incomingRequests.map(r => `
+            <div class="friend-item">
+                <span class="friend-name">👤 ${r.from} <span style="color:#666;font-size:0.8em;font-weight:400;">wants to be friends</span></span>
+                <div class="friend-actions">
+                    <button class="btn-accept-friend" onclick="handleAcceptFriendRequest('${r.from}')">✅ Accept</button>
+                    <button class="btn-decline-friend" onclick="handleDeclineFriendRequest('${r.from}')">❌ Decline</button>
+                </div>
+            </div>
+        `).join('');
+        inboxEl.innerHTML = html;
+    } catch (err) {
+        inboxEl.innerHTML = '<p style="color:#c00;">Failed to load inbox.</p>';
     }
 }
 
@@ -1423,6 +1456,7 @@ async function handleAcceptFriendRequest(fromUsername) {
         if (result.success) {
             showMessage(msgEl, `✅ ${result.message}`, 'success');
             loadFriendsList();
+            loadInbox();
         } else {
             showMessage(msgEl, `❌ ${result.message}`, 'error');
         }
@@ -1445,6 +1479,7 @@ async function handleDeclineFriendRequest(fromUsername) {
         }
         if (result.success) {
             loadFriendsList();
+            loadInbox();
         } else {
             showMessage(msgEl, `❌ ${result.message}`, 'error');
         }
