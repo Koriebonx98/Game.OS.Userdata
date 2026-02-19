@@ -134,8 +134,11 @@ function saveDemoAccounts(accounts) {
  * Create account in demo mode
  */
 async function createAccountDemo(username, email, password) {
-    return new Promise(async (resolve) => {
-        setTimeout(async () => {
+    // Hash password first (outside Promise)
+    const passwordHash = await hashPasswordDemo(password);
+    
+    return new Promise((resolve) => {
+        setTimeout(() => {
             const accounts = getDemoAccounts();
             
             // Check if username already exists
@@ -155,9 +158,6 @@ async function createAccountDemo(username, email, password) {
                 });
                 return;
             }
-            
-            // Hash password for basic security
-            const passwordHash = await hashPasswordDemo(password);
             
             // Create new account
             const newAccount = {
@@ -184,8 +184,11 @@ async function createAccountDemo(username, email, password) {
  * Verify account in demo mode
  */
 async function verifyAccountDemo(identifier, password) {
-    return new Promise(async (resolve) => {
-        setTimeout(async () => {
+    // Hash password first (outside Promise)
+    const passwordHash = await hashPasswordDemo(password);
+    
+    return new Promise((resolve) => {
+        setTimeout(() => {
             const accounts = getDemoAccounts();
             
             // Find account by email or username
@@ -202,8 +205,7 @@ async function verifyAccountDemo(identifier, password) {
                 return;
             }
             
-            // Hash the input password and compare
-            const passwordHash = await hashPasswordDemo(password);
+            // Compare hashed passwords
             if (account.password_hash !== passwordHash) {
                 resolve({
                     success: false,
