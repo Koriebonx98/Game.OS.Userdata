@@ -46,6 +46,27 @@
                     </div>
                 </div>
 
+                <!-- Friends Section -->
+                <div class="friends-section">
+                    <h3>👥 Friends <span id="friendsCount" class="friends-count">0</span></h3>
+
+                    <div class="friend-search">
+                        <input
+                            type="text"
+                            id="friendSearch"
+                            placeholder="Enter a username to add as friend"
+                            autocomplete="off"
+                        >
+                        <button class="btn btn-secondary" onclick="handleAddFriend()">Add Friend</button>
+                    </div>
+
+                    <div id="friendMessage" class="message"></div>
+
+                    <div id="friendsList" class="friends-list">
+                        <p style="color:#666;font-size:0.9em;">Loading…</p>
+                    </div>
+                </div>
+
                 <!-- Update Info Form -->
                 <div class="update-section">
                     <h3>Update Information</h3>
