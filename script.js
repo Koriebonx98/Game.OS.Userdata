@@ -117,10 +117,12 @@ function handleSignup(event) {
     }
     
     // Create new user (In production, this would be an API call)
+    // WARNING: This is for DEMONSTRATION ONLY!
+    // NEVER store plain text passwords in production - always hash passwords server-side
     const newUser = {
         username,
         email,
-        password, // In production, NEVER store plain passwords!
+        password, // SECURITY WARNING: Plain text password - for demo only!
         createdAt: new Date().toISOString()
     };
     
@@ -147,28 +149,4 @@ function validateEmail(email) {
 function showMessage(element, message, type) {
     element.textContent = message;
     element.className = 'message ' + type;
-}
-
-// Password Strength Indicator (Optional Enhancement)
-function checkPasswordStrength(password) {
-    let strength = 0;
-    
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[^a-zA-Z0-9]/.test(password)) strength++;
-    
-    if (strength <= 2) return 'weak';
-    if (strength <= 4) return 'medium';
-    return 'strong';
-}
-
-// Clear form on successful submission
-function clearForm(formId) {
-    const form = document.getElementById(formId);
-    if (form) {
-        form.reset();
-    }
 }
