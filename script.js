@@ -34,9 +34,12 @@
 // you can revoke and regenerate it at https://github.com/settings/tokens.
 const GITHUB_TOKEN = ''; // ← injected at deploy time by .github/workflows/deploy.yml
 
-// Private repository that stores account JSON files
-const DATA_REPO_OWNER = 'Koriebonx98';
-const DATA_REPO_NAME  = 'Game.OS.Private.Data';
+// Private repository that stores account JSON files.
+// These values are injected at deploy time by .github/workflows/deploy.yml
+// (DATA_REPO_OWNER from ${{ github.repository_owner }}, DATA_REPO_NAME from vars.DATA_REPO_NAME).
+// The defaults below are used only when running locally.
+const DATA_REPO_OWNER = 'Koriebonx98'; // ← injected at deploy time
+const DATA_REPO_NAME  = 'Game.OS.Private.Data'; // ← injected at deploy time
 
 // Mode is detected automatically – 'github' when a token is present, else 'demo'
 let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
