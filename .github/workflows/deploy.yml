@@ -40,6 +40,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run demo-mode tests
+        run: node --test tests/demo.test.js
+
       - name: Inject DATA_REPO_TOKEN into script.js
         run: |
           python3 << 'PYEOF'
