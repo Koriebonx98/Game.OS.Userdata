@@ -86,12 +86,14 @@
     let _myLibrary       = [];
     let _friendLibraries = {}; // { friendName: [...games] } for "friends also own" counts
     let _currentPlatform = '';
+    let _isLoggedIn      = false; // cached after init, avoids per-item calls
 
     document.addEventListener('DOMContentLoaded', async () => {
         modeReady = initializeMode();
         await modeReady;
         displayCurrentUser();
         const loggedIn = isLoggedIn();
+        _isLoggedIn    = loggedIn;
         // Update nav visibility for guests vs logged-in users
         const guestNav = document.getElementById('guestNav');
         const userNav  = document.getElementById('userNav');
@@ -232,8 +234,7 @@
     function renderGameItem(g, platform) {
         const title    = escapeHtml(g.Title || g.game_name || g.title || '');
         const titleId  = g.TitleID || g.title_id || g.id || '';
-        const loggedIn = isLoggedIn();
-        const owned    = loggedIn && _myLibrary.some(
+        const owned    = _isLoggedIn && _myLibrary.some(
             o => o.platform === platform &&
                  (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
         );
@@ -246,7 +247,7 @@
             ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${platEsc}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${title}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
             : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
 
-        const addBtnHtml = loggedIn
+        const addBtnHtml = _isLoggedIn
             ? `<button class="btn-add-game ${owned ? 'btn-owned' : ''}"
                 onclick="event.stopPropagation(); handleAddGame(this, '${gameJsonAttr}', '${platEsc}')"
                 ${owned ? 'disabled' : ''}>

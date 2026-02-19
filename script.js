@@ -2062,7 +2062,7 @@ async function displayTotalUsersCount() {
     if (!el) return;
     await modeReady;
     const count = await getTotalUsersCount();
-    if (count === null) { el.parentElement && (el.parentElement.style.display = 'none'); return; }
+    if (count === null) { if (el.parentElement) el.parentElement.style.display = 'none'; return; }
     el.textContent = count.toLocaleString();
 }
 
