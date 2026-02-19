@@ -1183,17 +1183,35 @@ async function getSentRequestsGitHub(username) {
 }
 
 async function removeFriendGitHub(username, friendUsername) {
-    const friendsPath = `accounts/${username.toLowerCase()}/friends.json`;
+    const usernameLower = username.toLowerCase();
+    const friendLower   = friendUsername.toLowerCase();
+
+    // Remove friend from requesting user's list
+    const friendsPath = `accounts/${usernameLower}/friends.json`;
     const friendsFile = await githubRead(friendsPath);
     if (!friendsFile) return { success: false, message: 'Friends list not found' };
 
-    const updated = friendsFile.content.filter(f => f.toLowerCase() !== friendUsername.toLowerCase());
+    const updated = friendsFile.content.filter(f => f.toLowerCase() !== friendLower);
     await githubWrite(
         friendsPath,
         updated,
         `Remove friend ${friendUsername} for: ${username}`,
         friendsFile.sha
     );
+
+    // Also remove requesting user from the friend's list
+    const theirFriendsPath = `accounts/${friendLower}/friends.json`;
+    const theirFriendsFile = await githubRead(theirFriendsPath);
+    if (theirFriendsFile) {
+        const theirUpdated = theirFriendsFile.content.filter(f => f.toLowerCase() !== usernameLower);
+        await githubWrite(
+            theirFriendsPath,
+            theirUpdated,
+            `Remove friend ${username} for: ${friendUsername}`,
+            theirFriendsFile.sha
+        );
+    }
+
     return { success: true, friends: updated };
 }
 
@@ -1327,9 +1345,16 @@ async function cancelFriendRequestDemo(username, toUsername) {
 }
 
 async function removeFriendDemo(username, friendUsername) {
+    // Remove friend from requesting user's list
     const friends = getDemoFriends(username);
     const updated = friends.filter(f => f.toLowerCase() !== friendUsername.toLowerCase());
     saveDemoFriends(username, updated);
+
+    // Also remove requesting user from the friend's list
+    const theirFriends = getDemoFriends(friendUsername);
+    const theirUpdated = theirFriends.filter(f => f.toLowerCase() !== username.toLowerCase());
+    saveDemoFriends(friendUsername, theirUpdated);
+
     return { success: true, friends: updated };
 }
 
@@ -1365,7 +1390,10 @@ async function loadFriendsList() {
         html += friends.map(f => `
             <div class="friend-item">
                 <span class="friend-name">👤 ${f}</span>
-                <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
+                <div class="friend-actions">
+                    <button class="btn-message-friend" onclick="openChat('${f}')">💬 Message</button>
+                    <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
+                </div>
             </div>
         `).join('');
 
@@ -1561,6 +1589,204 @@ async function handleRemoveFriend(friendUsername) {
 }
 
 // ============================================================
+// GITHUB MODE – MESSAGING
+// ============================================================
+
+/**
+ * Returns the canonical conversation key for two users (sorted alphabetically).
+ */
+function conversationKey(userA, userB) {
+    const [a, b] = [userA.toLowerCase(), userB.toLowerCase()].sort();
+    return `accounts/messages/${a}_${b}.json`;
+}
+
+async function sendMessageGitHub(username, toUsername, text) {
+    const profileFile = await githubRead(`accounts/${username.toLowerCase()}/profile.json`);
+    if (!profileFile) return { success: false, message: 'Your account was not found' };
+
+    const convPath = conversationKey(username, toUsername);
+    const convFile = await githubRead(convPath);
+    const messages = convFile ? [...convFile.content] : [];
+    messages.push({ from: profileFile.content.username, text, sentAt: new Date().toISOString() });
+
+    await githubWrite(convPath, messages, `Message from ${username} to ${toUsername}`, convFile ? convFile.sha : undefined);
+    return { success: true };
+}
+
+async function getMessagesGitHub(username, withUsername) {
+    const convPath = conversationKey(username, withUsername);
+    const convFile = await githubRead(convPath);
+    return { success: true, messages: convFile ? convFile.content : [] };
+}
+
+// ============================================================
+// DEMO MODE – MESSAGING
+// ============================================================
+
+function demoConversationKey(userA, userB) {
+    const [a, b] = [userA.toLowerCase(), userB.toLowerCase()].sort();
+    return `gameOS_messages_${a}_${b}`;
+}
+
+function getDemoMessages(userA, userB) {
+    const key  = demoConversationKey(userA, userB);
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoMessages(userA, userB, messages) {
+    localStorage.setItem(demoConversationKey(userA, userB), JSON.stringify(messages));
+}
+
+async function sendMessageDemo(username, toUsername, text) {
+    const messages = getDemoMessages(username, toUsername);
+    messages.push({ from: username, text, sentAt: new Date().toISOString() });
+    saveDemoMessages(username, toUsername, messages);
+    return { success: true };
+}
+
+async function getMessagesDemo(username, withUsername) {
+    return { success: true, messages: getDemoMessages(username, withUsername) };
+}
+
+// ============================================================
+// MESSAGING UI
+// ============================================================
+
+let _chatPollId = null;
+
+/** Close the chat panel and clear its polling interval. */
+function closeChatPanel() {
+    if (_chatPollId !== null) {
+        clearInterval(_chatPollId);
+        _chatPollId = null;
+    }
+    const panel = document.getElementById('chatPanel');
+    if (panel) panel.remove();
+}
+
+/** Open (or focus) the chat panel for a given friend. */
+function openChat(friendUsername) {
+    // Remove any existing chat panel for a different user first
+    closeChatPanel();
+
+    const user = getCurrentUser();
+    if (!user) return;
+
+    const panel = document.createElement('div');
+    panel.id        = 'chatPanel';
+    panel.className = 'chat-panel';
+    panel.innerHTML = `
+        <div class="chat-header">
+            <span>💬 Chat with ${friendUsername}</span>
+            <button class="chat-close-btn" id="chatCloseBtn">✕</button>
+        </div>
+        <div class="chat-messages" id="chatMessages">
+            <p style="color:#666;font-size:0.9em;text-align:center;">Loading…</p>
+        </div>
+        <div class="chat-input-row">
+            <input type="text" id="chatInput" class="chat-input" placeholder="Type a message…" maxlength="1000" autocomplete="off">
+            <button class="chat-send-btn" id="chatSendBtn">Send</button>
+        </div>
+    `;
+    document.body.appendChild(panel);
+
+    panel.querySelector('#chatCloseBtn').addEventListener('click', closeChatPanel);
+    panel.querySelector('#chatSendBtn').addEventListener('click', () => handleSendMessage(friendUsername));
+    panel.querySelector('#chatInput').addEventListener('keydown', e => {
+        if (e.key === 'Enter') handleSendMessage(friendUsername);
+    });
+
+    refreshChatMessages(friendUsername);
+
+    // Poll for new messages while this chat is open
+    _chatPollId = setInterval(() => {
+        if (!document.getElementById('chatPanel')) {
+            clearInterval(_chatPollId);
+            _chatPollId = null;
+            return;
+        }
+        refreshChatMessages(friendUsername);
+    }, 5000);
+}
+
+async function refreshChatMessages(friendUsername) {
+    const panel = document.getElementById('chatPanel');
+    if (!panel) return;
+    const messagesEl = document.getElementById('chatMessages');
+    const user = getCurrentUser();
+    if (!messagesEl || !user) return;
+
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await getMessagesDemo(user.username, friendUsername);
+        } else {
+            result = await getMessagesGitHub(user.username, friendUsername);
+        }
+
+        if (!result.success) return;
+        const msgs = result.messages;
+
+        if (msgs.length === 0) {
+            messagesEl.innerHTML = '<p style="color:#666;font-size:0.9em;text-align:center;">No messages yet. Say hello! 👋</p>';
+            return;
+        }
+
+        const wasAtBottom = messagesEl.scrollHeight - messagesEl.scrollTop <= messagesEl.clientHeight + 5;
+        messagesEl.innerHTML = msgs.map(m => {
+            const isMe = m.from.toLowerCase() === user.username.toLowerCase();
+            const time = new Date(m.sentAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+            return `<div class="chat-message ${isMe ? 'chat-message-me' : 'chat-message-them'}">
+                <span class="chat-bubble">${escapeHtml(m.text)}</span>
+                <span class="chat-time">${time}</span>
+            </div>`;
+        }).join('');
+
+        // Auto-scroll to bottom only when already at bottom or just opened
+        if (wasAtBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+    } catch (err) {
+        // Silently ignore polling errors
+    }
+}
+
+async function handleSendMessage(friendUsername) {
+    const input = document.getElementById('chatInput');
+    const user  = getCurrentUser();
+    if (!input || !user) return;
+    const text = input.value.trim();
+    if (!text) return;
+
+    input.disabled = true;
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await sendMessageDemo(user.username, friendUsername, text);
+        } else {
+            result = await sendMessageGitHub(user.username, friendUsername, text);
+        }
+        if (result.success) {
+            input.value = '';
+            await refreshChatMessages(friendUsername);
+        }
+    } catch (err) {
+        console.error('Send message error:', err);
+    }
+    input.disabled = false;
+    input.focus();
+}
+
+/** Escape HTML to prevent XSS in chat messages */
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+// ============================================================
 // RESET ALL ACCOUNTS
 // ============================================================
 
@@ -1601,7 +1827,7 @@ function resetAllAccountsDemo() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_'))) {
+        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_') || key.startsWith('gameOS_messages_'))) {
             keysToRemove.push(key);
         }
     }
