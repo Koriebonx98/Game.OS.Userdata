@@ -125,6 +125,8 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('updateForm')) {
         requireLogin();
         populateAccountDetails();
+        // Load API token status (shows whether a token has been issued)
+        modeReady.then(() => loadApiTokenStatus());
     }
 
     // If on friends page, require login and load friends list
@@ -1041,6 +1043,223 @@ async function updateAccountGitHub(username, currentPassword, newEmail, newPassw
     );
 
     return { success: true, message: 'Account updated.', email: updated.email };
+}
+
+// ============================================================
+// API TOKEN MANAGEMENT
+// ============================================================
+
+/**
+ * localStorage key where a newly-generated token is temporarily cached
+ * so the account page can display it.  Cleared after the user copies it.
+ */
+const API_TOKEN_CACHE_KEY = 'gameOS_apiToken_pending';
+
+/**
+ * Locate the backend URL (same logic as elsewhere in the codebase).
+ * Falls back to a relative URL so it works when frontend + backend are
+ * served from the same origin.
+ */
+function getBackendBase() {
+    // Allow override via a global set elsewhere in the page
+    if (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) return BACKEND_URL.replace(/\/$/, '');
+    return '';
+}
+
+/**
+ * Populate the API token section on the account page.
+ * Shows a masked placeholder when a token exists, or a "not generated" state.
+ */
+async function loadApiTokenStatus() {
+    const display  = document.getElementById('apiTokenDisplay');
+    const copyBtn  = document.getElementById('copyTokenBtn');
+    if (!display) return;
+
+    // If there's a freshly-generated token in the cache, show it
+    const pending = localStorage.getItem(API_TOKEN_CACHE_KEY);
+    if (pending) {
+        display.value = pending;
+        display.type  = 'text';
+        if (copyBtn) copyBtn.disabled = false;
+        return;
+    }
+
+    const user = getCurrentUser();
+    if (!user) return;
+
+    if (MODE === 'demo') {
+        // In demo mode, look up the locally-stored token
+        const stored = localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
+        display.value    = stored ? stored : '';
+        display.placeholder = stored ? '••••••••••••••••••••' : 'No token generated yet';
+        if (copyBtn) copyBtn.disabled = !stored;
+    } else {
+        // In github mode, check whether the profile has a token hash (without exposing the hash)
+        try {
+            const profileFile = await githubRead(`accounts/${user.username.toLowerCase()}/profile.json`);
+            const hasToken = profileFile && profileFile.content.api_token_hash;
+            display.value       = '';
+            display.placeholder = hasToken
+                ? '✅ Token issued – generate again to reveal'
+                : 'No token generated yet';
+            if (copyBtn) copyBtn.disabled = true;
+        } catch (err) {
+            console.error('Could not load API token status:', err);
+        }
+    }
+}
+
+/** Toggle the token input between masked and visible. */
+function toggleTokenVisibility() {
+    const display = document.getElementById('apiTokenDisplay');
+    if (!display) return;
+    display.type = display.type === 'password' ? 'text' : 'password';
+}
+
+/** Copy the currently-displayed token to the clipboard. */
+async function copyApiToken() {
+    const display = document.getElementById('apiTokenDisplay');
+    const msgEl   = document.getElementById('tokenMessage');
+    if (!display || !display.value) return;
+    try {
+        await navigator.clipboard.writeText(display.value);
+        showMessage(msgEl, '✅ Token copied to clipboard!', 'success');
+    } catch (_) {
+        showMessage(msgEl, '⚠️ Could not copy automatically – select and copy the token manually.', 'warning');
+    }
+}
+
+/**
+ * Generate or regenerate the API token.
+ * Requires the user to confirm their password for security.
+ */
+async function handleGenerateToken() {
+    const msgEl = document.getElementById('tokenMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+
+    clearMessage(msgEl);
+
+    const password = prompt('Enter your current password to generate a new API token:');
+    if (!password) return;
+
+    const btn = document.getElementById('generateTokenBtn');
+    if (btn) btn.disabled = true;
+    showMessage(msgEl, '⏳ Generating token…', 'info');
+
+    try {
+        await modeReady;
+        let token;
+
+        if (MODE === 'demo') {
+            // Verify password in demo mode
+            const result = await verifyAccountDemo(user.username, password);
+            if (!result.success) {
+                showMessage(msgEl, '❌ Incorrect password.', 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+            // Generate a simple demo token.
+            // Format mirrors backend generateRawToken(): gos_{username}.{32-byte random hex}
+            const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
+            token = `gos_${user.username.toLowerCase()}.${randomHex}`;
+            localStorage.setItem(`gameOS_apiToken_${user.username.toLowerCase()}`, token);
+        } else {
+            // Call the backend to issue a signed token
+            const base = getBackendBase();
+            const resp = await fetch(`${base}/api/auth/token`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ username: user.username, password })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                showMessage(msgEl, `❌ ${data.message || 'Failed to generate token.'}`, 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+            token = data.token;
+        }
+
+        // Cache the token so the page can display it once
+        localStorage.setItem(API_TOKEN_CACHE_KEY, token);
+
+        const display = document.getElementById('apiTokenDisplay');
+        const copyBtn = document.getElementById('copyTokenBtn');
+        if (display) { display.value = token; display.type = 'text'; }
+        if (copyBtn)  copyBtn.disabled = false;
+
+        showMessage(msgEl,
+            '✅ New token generated! Copy it now – it will not be shown in full again after you leave this page.',
+            'success'
+        );
+    } catch (err) {
+        console.error('Token generation error:', err);
+        showMessage(msgEl, '❌ Failed to generate token. Please try again.', 'error');
+    }
+    if (btn) btn.disabled = false;
+}
+
+/**
+ * Revoke the current API token (requires password confirmation).
+ */
+async function handleRevokeToken() {
+    const msgEl = document.getElementById('tokenMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+
+    clearMessage(msgEl);
+
+    if (!confirm('Revoke your API token? Any C# programs using it will stop working until you generate a new one.')) return;
+
+    const password = prompt('Enter your current password to confirm revocation:');
+    if (!password) return;
+
+    const btn = document.getElementById('revokeTokenBtn');
+    if (btn) btn.disabled = true;
+    showMessage(msgEl, '⏳ Revoking token…', 'info');
+
+    try {
+        await modeReady;
+
+        if (MODE === 'demo') {
+            const result = await verifyAccountDemo(user.username, password);
+            if (!result.success) {
+                showMessage(msgEl, '❌ Incorrect password.', 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+            localStorage.removeItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
+        } else {
+            const base = getBackendBase();
+            const resp = await fetch(`${base}/api/auth/revoke-token`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ username: user.username, password })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                showMessage(msgEl, `❌ ${data.message || 'Failed to revoke token.'}`, 'error');
+                if (btn) btn.disabled = false;
+                return;
+            }
+        }
+
+        // Clear cached token
+        localStorage.removeItem(API_TOKEN_CACHE_KEY);
+
+        const display = document.getElementById('apiTokenDisplay');
+        const copyBtn = document.getElementById('copyTokenBtn');
+        if (display) { display.value = ''; display.placeholder = 'No token generated yet'; }
+        if (copyBtn)  copyBtn.disabled = true;
+
+        showMessage(msgEl, '✅ API token revoked successfully.', 'success');
+    } catch (err) {
+        console.error('Token revocation error:', err);
+        showMessage(msgEl, '❌ Failed to revoke token. Please try again.', 'error');
+    }
+    if (btn) btn.disabled = false;
 }
 
 // ============================================================

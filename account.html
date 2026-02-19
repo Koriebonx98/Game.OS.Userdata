@@ -113,6 +113,71 @@
                     <div id="updateMessage" class="message"></div>
                 </div>
 
+                <!-- API Token Section -->
+                <div class="update-section" id="apiTokenSection">
+                    <h3>🔑 API Token</h3>
+                    <p style="color:#555;font-size:0.9em;margin-bottom:12px;">
+                        Use your personal API token to let C# programs (or any app) read and update
+                        your Game OS data in real time — games, achievements, activity &amp; more.
+                        Treat it like a password: keep it secret.
+                    </p>
+
+                    <div class="account-detail-row" style="align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span class="detail-label">Your Token</span>
+                        <input
+                            id="apiTokenDisplay"
+                            type="password"
+                            readonly
+                            value=""
+                            placeholder="No token generated yet"
+                            style="flex:1;min-width:0;font-family:monospace;font-size:0.85em;padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#f8fafc;"
+                        >
+                        <button class="btn btn-secondary" style="padding:6px 12px;font-size:0.85em;" onclick="toggleTokenVisibility()">👁 Show</button>
+                        <button class="btn btn-secondary" style="padding:6px 12px;font-size:0.85em;" id="copyTokenBtn" onclick="copyApiToken()" disabled>📋 Copy</button>
+                    </div>
+
+                    <p style="color:#888;font-size:0.8em;margin:6px 0 12px;">
+                        The token is only shown in full once after generation. Store it safely.
+                    </p>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button class="btn btn-primary" id="generateTokenBtn" onclick="handleGenerateToken()" style="font-size:0.9em;">
+                            🔄 Generate / Regenerate Token
+                        </button>
+                        <button class="btn btn-danger" id="revokeTokenBtn" onclick="handleRevokeToken()" style="font-size:0.9em;">
+                            🗑️ Revoke Token
+                        </button>
+                    </div>
+
+                    <div id="tokenMessage" class="message" style="margin-top:10px;"></div>
+
+                    <details style="margin-top:16px;">
+                        <summary style="cursor:pointer;color:#555;font-size:0.85em;font-weight:600;">C# Quick-Start Example</summary>
+                        <pre style="background:#1e1e2e;color:#cdd6f4;padding:14px;border-radius:8px;font-size:0.78em;overflow-x:auto;margin-top:8px;"><code>// Authenticate and retrieve your token once:
+var payload = new { username = "youruser", password = "yourpass" };
+var resp = await httpClient.PostAsJsonAsync("https://your-backend/api/auth/token", payload);
+var result = await resp.Content.ReadFromJsonAsync&lt;TokenResponse&gt;();
+string token = result.Token;  // store this securely
+
+// Then use the token for any API call:
+httpClient.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", token);
+
+// Get your game library:
+var games = await httpClient.GetFromJsonAsync&lt;GamesResponse&gt;(
+    "https://your-backend/api/me/games");
+
+// Log a gaming session:
+await httpClient.PostAsJsonAsync("https://your-backend/api/me/activity", new {
+    platform      = "PC",
+    gameTitle     = "Halo Infinite",
+    sessionStart  = DateTime.UtcNow.AddHours(-2).ToString("o"),
+    sessionEnd    = DateTime.UtcNow.ToString("o"),
+    minutesPlayed = 120
+});</code></pre>
+                    </details>
+                </div>
+
                 <!-- Danger Zone -->
                 <div class="danger-zone">
                     <h3>⚠️ Danger Zone</h3>

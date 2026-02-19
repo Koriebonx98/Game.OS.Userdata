@@ -5,16 +5,18 @@
  * Deploy this server to Railway, Render, Fly.io, or any Node.js host.
  *
  * Required environment variables (see .env.example):
- *   GITHUB_TOKEN  - Personal access token with "repo" scope
- *   REPO_OWNER    - GitHub username/org that owns the data repo
- *   REPO_NAME     - Name of the private data repository
- *   PORT          - (optional) Port to listen on, default 3000
- *   ALLOWED_ORIGIN - (optional) Frontend URL for CORS, default allows all
+ *   GITHUB_TOKEN       - Personal access token with "repo" scope
+ *   REPO_OWNER         - GitHub username/org that owns the data repo
+ *   REPO_NAME          - Name of the private data repository
+ *   TOKEN_HMAC_SECRET  - Secret key for signing Game OS API tokens
+ *   PORT               - (optional) Port to listen on, default 3000
+ *   ALLOWED_ORIGIN     - (optional) Frontend URL for CORS, default allows all
  */
 
 const express = require('express');
 const { Octokit } = require('@octokit/rest');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const cors = require('cors');
 require('dotenv').config();
 
@@ -23,8 +25,8 @@ const app = express();
 // ── CORS ──────────────────────────────────────────────────────────────────────
 const corsOptions = {
     origin: process.env.ALLOWED_ORIGIN || '*',
-    methods: ['GET', 'POST'],
-    allowedHeaders: ['Content-Type']
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 };
 app.use(cors(corsOptions));
 
@@ -36,6 +38,112 @@ const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const REPO_OWNER = process.env.REPO_OWNER;
 const REPO_NAME  = process.env.REPO_NAME;
 const BCRYPT_ROUNDS = 10;
+
+// ── Game OS API token system ──────────────────────────────────────────────────
+
+const TOKEN_PREFIX = 'gos_';
+
+if (!process.env.TOKEN_HMAC_SECRET) {
+    console.warn('⚠️  WARNING: TOKEN_HMAC_SECRET is not set. API token signing is insecure. Set this environment variable before going to production.');
+}
+const TOKEN_HMAC_SECRET = process.env.TOKEN_HMAC_SECRET || 'change-me-please';
+
+/**
+ * Generate a new raw API token embedding the username.
+ * Format: gos_{username}.{32-byte random hex}
+ */
+function generateRawToken(username) {
+    const randomPart = crypto.randomBytes(32).toString('hex');
+    return `${TOKEN_PREFIX}${username.toLowerCase()}.${randomPart}`;
+}
+
+/**
+ * Parse the username embedded in a raw token.
+ * Returns null when the token format is invalid.
+ */
+function parseTokenUsername(rawToken) {
+    if (!rawToken || !rawToken.startsWith(TOKEN_PREFIX)) return null;
+    const rest     = rawToken.slice(TOKEN_PREFIX.length);
+    const dotIndex = rest.indexOf('.');
+    if (dotIndex === -1) return null;
+    return rest.slice(0, dotIndex);
+}
+
+/**
+ * HMAC-SHA256 hash of a raw token.  This is what gets stored in the data repo.
+ */
+function hashToken(rawToken) {
+    return crypto.createHmac('sha256', TOKEN_HMAC_SECRET).update(rawToken).digest('hex');
+}
+
+// ── Simple in-memory rate limiter ─────────────────────────────────────────────
+
+const _rateLimitMap = new Map(); // ip -> { count, resetAt }
+const RATE_WINDOW_MS = 60 * 1000; // 1 minute window
+const RATE_LIMIT_AUTH = 10;       // token-generation attempts per minute per IP
+const RATE_LIMIT_API  = 120;      // authenticated API calls per minute per IP
+
+function checkRateLimit(ip, limit) {
+    const now   = Date.now();
+    const entry = _rateLimitMap.get(ip);
+    if (!entry || now > entry.resetAt) {
+        _rateLimitMap.set(ip, { count: 1, resetAt: now + RATE_WINDOW_MS });
+        return true;
+    }
+    if (entry.count >= limit) return false;
+    entry.count++;
+    return true;
+}
+
+// Purge stale rate-limit entries every 5 minutes
+setInterval(() => {
+    const now = Date.now();
+    for (const [ip, entry] of _rateLimitMap.entries()) {
+        if (now > entry.resetAt) _rateLimitMap.delete(ip);
+    }
+}, 5 * 60 * 1000);
+
+// ── Token authentication middleware ──────────────────────────────────────────
+
+async function authenticateToken(req, res, next) {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_API)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – please slow down.' });
+    }
+
+    const authHeader = req.headers['authorization'];
+    const rawToken   = (authHeader && authHeader.startsWith('Bearer '))
+        ? authHeader.slice(7).trim()
+        : null;
+
+    if (!rawToken) {
+        return res.status(401).json({
+            success: false,
+            message: 'Missing API token. Add an Authorization: Bearer gos_... header.'
+        });
+    }
+
+    const usernameLower = parseTokenUsername(rawToken);
+    if (!usernameLower || !sanitiseUsername(usernameLower)) {
+        return res.status(401).json({ success: false, message: 'Invalid API token format.' });
+    }
+
+    try {
+        const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile || accountFile.content.api_token_hash !== hashToken(rawToken)) {
+            return res.status(401).json({ success: false, message: 'Invalid or revoked API token.' });
+        }
+        req.tokenUser = {
+            username:      accountFile.content.username,
+            email:         accountFile.content.email,
+            usernameLower
+        };
+        next();
+    } catch (err) {
+        console.error('Token auth error:', err);
+        res.status(500).json({ success: false, message: 'Server error during token validation.' });
+    }
+}
 
 // ── GitHub helpers ────────────────────────────────────────────────────────────
 
@@ -811,6 +919,329 @@ app.post('/api/reset-all-accounts', async (req, res) => {
     } catch (err) {
         console.error('Error resetting accounts:', err);
         res.status(500).json({ success: false, message: 'Failed to reset accounts. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/token ──────────────────────────────────────────────────────
+// Exchange username + password for a Game OS API token.
+// Used by C# programs and other clients that need long-lived programmatic access.
+app.post('/api/auth/token', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many token requests – wait a minute and try again.' });
+    }
+
+    try {
+        const { username: identifier, password } = req.body;
+        if (!identifier || !password) {
+            return res.status(400).json({ success: false, message: 'username and password are required.' });
+        }
+
+        // Resolve identifier (email or username) to account key
+        let accountKey;
+        if (identifier.includes('@')) {
+            const emailIndexFile = await getFile('accounts/email-index.json');
+            if (!emailIndexFile) return res.status(401).json({ success: false, message: 'Account not found.' });
+            accountKey = emailIndexFile.content[identifier.toLowerCase()];
+            if (!accountKey) return res.status(401).json({ success: false, message: 'Account not found.' });
+        } else {
+            accountKey = identifier.toLowerCase();
+        }
+
+        const accountFile = await getFile(`accounts/${accountKey}/profile.json`);
+        if (!accountFile) return res.status(401).json({ success: false, message: 'Account not found.' });
+
+        const valid = await bcrypt.compare(password, accountFile.content.password_hash);
+        if (!valid) return res.status(401).json({ success: false, message: 'Invalid password.' });
+
+        // Generate a fresh token
+        const rawToken   = generateRawToken(accountKey);
+        const tokenHash  = hashToken(rawToken);
+        const issuedAt   = new Date().toISOString();
+
+        // Persist hash in the user's profile
+        const updated = {
+            ...accountFile.content,
+            api_token_hash:       tokenHash,
+            api_token_issued_at:  issuedAt
+        };
+        await putFile(
+            `accounts/${accountKey}/profile.json`,
+            updated,
+            `Issue API token for: ${accountKey}`,
+            accountFile.sha
+        );
+
+        res.json({
+            success:  true,
+            token:    rawToken,
+            username: accountFile.content.username,
+            issuedAt
+        });
+    } catch (err) {
+        console.error('Error issuing token:', err);
+        res.status(500).json({ success: false, message: 'Failed to issue token. Please try again.' });
+    }
+});
+
+// ── POST /api/auth/revoke-token ───────────────────────────────────────────────
+// Revoke the caller's API token (requires password confirmation).
+app.post('/api/auth/revoke-token', async (req, res) => {
+    try {
+        const { username: identifier, password } = req.body;
+        if (!identifier || !password) {
+            return res.status(400).json({ success: false, message: 'username and password are required.' });
+        }
+
+        let accountKey;
+        if (identifier.includes('@')) {
+            const emailIndexFile = await getFile('accounts/email-index.json');
+            if (!emailIndexFile) return res.status(401).json({ success: false, message: 'Account not found.' });
+            accountKey = emailIndexFile.content[identifier.toLowerCase()];
+            if (!accountKey) return res.status(401).json({ success: false, message: 'Account not found.' });
+        } else {
+            accountKey = identifier.toLowerCase();
+        }
+
+        const accountFile = await getFile(`accounts/${accountKey}/profile.json`);
+        if (!accountFile) return res.status(401).json({ success: false, message: 'Account not found.' });
+
+        const valid = await bcrypt.compare(password, accountFile.content.password_hash);
+        if (!valid) return res.status(401).json({ success: false, message: 'Invalid password.' });
+
+        const updated = { ...accountFile.content };
+        delete updated.api_token_hash;
+        delete updated.api_token_issued_at;
+        await putFile(
+            `accounts/${accountKey}/profile.json`,
+            updated,
+            `Revoke API token for: ${accountKey}`,
+            accountFile.sha
+        );
+
+        res.json({ success: true, message: 'API token revoked successfully.' });
+    } catch (err) {
+        console.error('Error revoking token:', err);
+        res.status(500).json({ success: false, message: 'Failed to revoke token. Please try again.' });
+    }
+});
+
+// ── GET /api/me ───────────────────────────────────────────────────────────────
+// Return the authenticated user's public profile.
+app.get('/api/me', authenticateToken, async (req, res) => {
+    try {
+        const { username, email, usernameLower } = req.tokenUser;
+        const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) return res.status(404).json({ success: false, message: 'Account not found.' });
+        const { password_hash, api_token_hash, ...profile } = accountFile.content;
+        res.json({ success: true, profile });
+    } catch (err) {
+        console.error('GET /api/me error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/me/games ─────────────────────────────────────────────────────────
+app.get('/api/me/games', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/games.json`);
+        res.json({ success: true, games: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/me/games error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/games ────────────────────────────────────────────────────────
+// Add a game to the authenticated user's library.
+// Body: { platform, title, titleId? }
+app.post('/api/me/games', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, title, titleId } = req.body;
+        if (!platform || !title) {
+            return res.status(400).json({ success: false, message: 'platform and title are required.' });
+        }
+
+        const path    = `accounts/${usernameLower}/games.json`;
+        const file    = await getFile(path);
+        const library = file ? [...file.content] : [];
+
+        const alreadyOwned = library.some(
+            g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+        );
+        if (alreadyOwned) {
+            return res.status(400).json({ success: false, message: 'Game already in library.' });
+        }
+
+        library.push({
+            platform,
+            title,
+            titleId: titleId || null,
+            addedAt: new Date().toISOString()
+        });
+
+        await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Game added to library.', games: library });
+    } catch (err) {
+        console.error('POST /api/me/games error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── DELETE /api/me/games ──────────────────────────────────────────────────────
+// Remove a game from the authenticated user's library.
+// Body: { platform, title }
+app.delete('/api/me/games', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, title } = req.body;
+        if (!platform || !title) {
+            return res.status(400).json({ success: false, message: 'platform and title are required.' });
+        }
+
+        const path = `accounts/${usernameLower}/games.json`;
+        const file = await getFile(path);
+        if (!file) return res.status(404).json({ success: false, message: 'Game library not found.' });
+
+        const updated = file.content.filter(
+            g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+        );
+        await putFile(path, updated, `Remove game: ${title} (${platform})`, file.sha);
+        res.json({ success: true, message: 'Game removed from library.', games: updated });
+    } catch (err) {
+        console.error('DELETE /api/me/games error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/me/achievements ──────────────────────────────────────────────────
+app.get('/api/me/achievements', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/achievements.json`);
+        res.json({ success: true, achievements: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/me/achievements error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/achievements ─────────────────────────────────────────────────
+// Unlock (or update) an achievement for the authenticated user.
+// Body: { platform, gameTitle, achievementId, name, description?, unlockedAt? }
+app.post('/api/me/achievements', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, gameTitle, achievementId, name, description, unlockedAt } = req.body;
+        if (!platform || !gameTitle || !achievementId || !name) {
+            return res.status(400).json({ success: false, message: 'platform, gameTitle, achievementId, and name are required.' });
+        }
+
+        const path = `accounts/${usernameLower}/achievements.json`;
+        const file = await getFile(path);
+        const list = file ? [...file.content] : [];
+
+        const existing = list.findIndex(
+            a => a.platform === platform &&
+                 (a.gameTitle || '').toLowerCase() === gameTitle.toLowerCase() &&
+                 String(a.achievementId) === String(achievementId)
+        );
+
+        const entry = {
+            platform,
+            gameTitle,
+            achievementId: String(achievementId),
+            name,
+            description: description || '',
+            unlockedAt: unlockedAt || new Date().toISOString()
+        };
+
+        if (existing !== -1) {
+            list[existing] = { ...list[existing], ...entry };
+        } else {
+            list.push(entry);
+        }
+
+        await putFile(path, list, `Achievement: ${name} in ${gameTitle} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Achievement recorded.', achievement: entry });
+    } catch (err) {
+        console.error('POST /api/me/achievements error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/me/friends ───────────────────────────────────────────────────────
+app.get('/api/me/friends', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/friends.json`);
+        res.json({ success: true, friends: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/me/friends error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/activity ─────────────────────────────────────────────────────
+// Log a game-play session for the authenticated user.
+// Body: { platform, gameTitle, titleId?, sessionStart, sessionEnd, minutesPlayed }
+app.post('/api/me/activity', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, gameTitle, titleId, sessionStart, sessionEnd, minutesPlayed } = req.body;
+        if (!platform || !gameTitle || !sessionStart || minutesPlayed === undefined) {
+            return res.status(400).json({ success: false, message: 'platform, gameTitle, sessionStart, and minutesPlayed are required.' });
+        }
+
+        const minutes = parseInt(minutesPlayed, 10);
+        // Max 2880 minutes (48 hours) to support marathon sessions while preventing bad data
+        if (isNaN(minutes) || minutes < 0 || minutes > 2880) {
+            return res.status(400).json({ success: false, message: 'minutesPlayed must be a number between 0 and 2880 (48 hours).' });
+        }
+
+        const path = `accounts/${usernameLower}/activity.json`;
+        const file = await getFile(path);
+        const log  = file ? [...file.content] : [];
+
+        // Keep only the last 500 sessions to prevent unbounded growth
+        const entry = {
+            platform,
+            gameTitle,
+            titleId:      titleId || null,
+            sessionStart,
+            sessionEnd:   sessionEnd || null,
+            minutesPlayed: minutes,
+            loggedAt:     new Date().toISOString()
+        };
+        log.push(entry);
+        if (log.length > 500) log.splice(0, log.length - 500);
+
+        await putFile(path, log, `Activity: ${gameTitle} (${platform}) – ${minutes}min`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Activity logged.', entry });
+    } catch (err) {
+        console.error('POST /api/me/activity error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/me/activity ──────────────────────────────────────────────────────
+app.get('/api/me/activity', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/activity.json`);
+        const log  = file ? file.content : [];
+        // Optional: filter by platform or gameTitle via query params
+        const { platform, gameTitle, limit } = req.query;
+        let result = log;
+        if (platform) result = result.filter(e => e.platform === platform);
+        if (gameTitle) result = result.filter(e => (e.gameTitle || '').toLowerCase() === gameTitle.toLowerCase());
+        if (limit) result = result.slice(-Math.max(1, Math.min(500, parseInt(limit, 10))));
+        res.json({ success: true, activity: result });
+    } catch (err) {
+        console.error('GET /api/me/activity error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
 
