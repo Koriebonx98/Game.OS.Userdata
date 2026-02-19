@@ -128,9 +128,9 @@ document.addEventListener('DOMContentLoaded', function() {
         loadFriendsList();
         loadInbox();
 
-        // Poll every 10 seconds so friend requests appear without a manual refresh.
+        // Poll every 5 seconds so friend requests appear without a manual refresh.
         // Polling is paused while the tab is hidden to avoid unnecessary API calls.
-        const POLL_INTERVAL_MS = 10000;
+        const POLL_INTERVAL_MS = 5000;
         const pollTimer = setInterval(() => {
             if (!document.hidden) {
                 loadFriendsList();
