@@ -14,16 +14,27 @@
                 <a href="index.html" class="nav-link">Home</a>
                 <a href="games.html" class="nav-link">🔍 Games</a>
                 <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
-                <a href="friends.html" class="nav-link">👥 Friends</a>
-                <a href="inbox.html" class="nav-link">📬 Inbox</a>
-                <a href="account.html" class="nav-link">👤 My Account</a>
-                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                <div id="guestNav" style="display:inline;">
+                    <a href="login.html" class="nav-link">Login</a>
+                    <a href="signup.html" class="nav-link">Sign Up</a>
+                </div>
+                <div id="userNav" style="display:none;">
+                    <a href="friends.html" class="nav-link">👥 Friends</a>
+                    <a href="inbox.html" class="nav-link">📬 Inbox</a>
+                    <a href="account.html" class="nav-link">👤 My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
             </nav>
         </header>
 
         <main style="padding:30px; background:#f8fafc;">
             <h2 style="margin-bottom:6px;">🕹️ Games</h2>
             <p style="color:#64748b;margin-bottom:20px;font-size:0.95em;">Browse games from the database and manage your library.</p>
+
+            <!-- Guest Notice (hidden for logged-in users) -->
+            <div id="guestNotice" class="guest-notice" style="display:none;">
+                ℹ️ You are browsing as a guest. <a href="login.html">Log in</a> or <a href="signup.html">Sign up</a> to add games to your library.
+            </div>
 
             <!-- View Tabs -->
             <div class="games-tab-row">
@@ -77,14 +88,32 @@
     let _currentPlatform = '';
 
     document.addEventListener('DOMContentLoaded', async () => {
-        requireLogin();
         modeReady = initializeMode();
         await modeReady;
         displayCurrentUser();
+        const loggedIn = isLoggedIn();
+        // Update nav visibility for guests vs logged-in users
+        const guestNav = document.getElementById('guestNav');
+        const userNav  = document.getElementById('userNav');
+        if (loggedIn) {
+            if (guestNav) guestNav.style.display = 'none';
+            if (userNav)  userNav.style.display  = 'inline';
+        } else {
+            if (guestNav) guestNav.style.display = 'inline';
+            if (userNav)  userNav.style.display  = 'none';
+        }
+        // Hide the My Library tab and nav link for guests
+        if (!loggedIn) {
+            document.getElementById('tabOwned').style.display = 'none';
+            document.querySelectorAll('a[href="games.html?tab=library"]').forEach(el => el.style.display = 'none');
+            // Show guest notice
+            const notice = document.getElementById('guestNotice');
+            if (notice) notice.style.display = 'flex';
+        }
         await initGamesPage();
-        // Check URL param to open the correct tab
+        // Check URL param to open the correct tab (only for logged-in users)
         const params = new URLSearchParams(window.location.search);
-        if (params.get('tab') === 'library') {
+        if (loggedIn && params.get('tab') === 'library') {
             switchTab('owned');
         }
     });
@@ -108,8 +137,10 @@
 
         document.getElementById('browseSearch').addEventListener('input', debounceSearch);
 
-        // Load library for "My Library" tab
-        await refreshOwnedGames();
+        // Load library for "My Library" tab (only for logged-in users)
+        if (isLoggedIn()) {
+            await refreshOwnedGames();
+        }
     }
 
     // ── Platform loading ───────────────────────────────────────
@@ -201,7 +232,8 @@
     function renderGameItem(g, platform) {
         const title    = escapeHtml(g.Title || g.game_name || g.title || '');
         const titleId  = g.TitleID || g.title_id || g.id || '';
-        const owned    = _myLibrary.some(
+        const loggedIn = isLoggedIn();
+        const owned    = loggedIn && _myLibrary.some(
             o => o.platform === platform &&
                  (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
         );
@@ -214,6 +246,14 @@
             ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${platEsc}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${title}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
             : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
 
+        const addBtnHtml = loggedIn
+            ? `<button class="btn-add-game ${owned ? 'btn-owned' : ''}"
+                onclick="event.stopPropagation(); handleAddGame(this, '${gameJsonAttr}', '${platEsc}')"
+                ${owned ? 'disabled' : ''}>
+                ${owned ? '✅ Owned' : '+ Add'}
+            </button>`
+            : `<a href="login.html" class="btn-add-game" onclick="event.stopPropagation();" style="text-decoration:none;text-align:center;">🔒 Log in</a>`;
+
         return `
         <div class="games-browse-item clickable" onclick="openGameModal('${gameJsonAttr}', '${platEsc}')">
             ${coverHtml}
@@ -221,11 +261,7 @@
                 <span class="games-browse-title">${title}</span>
                 ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
             </div>
-            <button class="btn-add-game ${owned ? 'btn-owned' : ''}"
-                onclick="event.stopPropagation(); handleAddGame(this, '${gameJsonAttr}', '${platEsc}')"
-                ${owned ? 'disabled' : ''}>
-                ${owned ? '✅ Owned' : '+ Add'}
-            </button>
+            ${addBtnHtml}
         </div>`;
     }
 
@@ -303,7 +339,10 @@
     // ── Add game ───────────────────────────────────────────────
     async function handleAddGame(btn, gameJson, platform) {
         const user = getCurrentUser();
-        if (!user) return;
+        if (!user) {
+            window.location.href = 'login.html';
+            return;
+        }
         let game;
         try { game = JSON.parse(gameJson); } catch (_) { return; }
 

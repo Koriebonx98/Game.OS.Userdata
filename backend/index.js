@@ -96,6 +96,18 @@ app.get('/health', (req, res) => {
     res.json({ status: 'ok', message: 'Game.OS backend running' });
 });
 
+// ── GET /api/users-count ──────────────────────────────────────────────────────
+app.get('/api/users-count', async (req, res) => {
+    try {
+        const emailIndexFile = await getFile('accounts/email-index.json');
+        const count = emailIndexFile ? Object.keys(emailIndexFile.content).length : 0;
+        res.json({ success: true, count });
+    } catch (err) {
+        console.error('Error getting user count:', err);
+        res.status(500).json({ success: false, message: 'Failed to get user count.' });
+    }
+});
+
 // ── POST /api/create-account ──────────────────────────────────────────────────
 app.post('/api/create-account', async (req, res) => {
     try {
@@ -309,6 +321,39 @@ app.get('/api/check-user', async (req, res) => {
     } catch (err) {
         console.error('Error checking user:', err);
         res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// ── POST /api/update-presence ─────────────────────────────────────────────────
+app.post('/api/update-presence', async (req, res) => {
+    try {
+        const { username } = req.body;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const path = `accounts/${username.toLowerCase()}/presence.json`;
+        const existing = await getFile(path);
+        const data = { lastSeen: new Date().toISOString(), username };
+        await putFile(path, data, `Presence: ${username}`, existing ? existing.sha : undefined);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error updating presence:', err);
+        res.status(500).json({ success: false, message: 'Failed to update presence.' });
+    }
+});
+
+// ── GET /api/get-presence ─────────────────────────────────────────────────────
+app.get('/api/get-presence', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const file = await getFile(`accounts/${username.toLowerCase()}/presence.json`);
+        res.json({ success: true, lastSeen: file ? file.content.lastSeen : null });
+    } catch (err) {
+        console.error('Error getting presence:', err);
+        res.status(500).json({ success: false, message: 'Failed to get presence.' });
     }
 });
 
