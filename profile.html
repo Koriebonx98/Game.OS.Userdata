@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS – User Profile</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container" style="max-width:900px;">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="games.html" class="nav-link">Games</a>
+                <a href="account.html" class="nav-link">My Account</a>
+                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+            </nav>
+        </header>
+
+        <main style="padding:30px;">
+            <div id="profileContent">
+                <p style="color:#666;">Loading profile…</p>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions &amp; Node.js</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        requireLogin();
+        modeReady = initializeMode();
+        await modeReady;
+        displayCurrentUser();
+        await loadProfile();
+    });
+
+    async function loadProfile() {
+        const params   = new URLSearchParams(window.location.search);
+        const username = (params.get('user') || '').trim();
+        const content  = document.getElementById('profileContent');
+
+        if (!username) {
+            content.innerHTML = '<p style="color:#c00;">No user specified. <a href="account.html">Go back</a></p>';
+            return;
+        }
+
+        document.title = `Game OS – ${username}'s Profile`;
+        content.innerHTML = `<h2>🎮 ${escapeHtml(username)}'s Game Library</h2><p style="color:#666;">Loading…</p>`;
+
+        try {
+            let library = [];
+            if (MODE === 'demo') {
+                library = getDemoGameLibrary(username);
+            } else {
+                library = await getGameLibraryGitHub(username);
+            }
+
+            if (library.length === 0) {
+                content.innerHTML = `
+                    <h2>🎮 ${escapeHtml(username)}'s Game Library</h2>
+                    <p style="color:#666;">This user hasn't added any games to their library yet.</p>
+                    <a href="account.html" class="btn btn-secondary" style="display:inline-block;margin-top:16px;text-decoration:none;">← Back</a>`;
+                return;
+            }
+
+            // Group by platform
+            const byPlatform = {};
+            library.forEach(g => {
+                if (!byPlatform[g.platform]) byPlatform[g.platform] = [];
+                byPlatform[g.platform].push(g);
+            });
+
+            const totalGames = library.length;
+            const platformList = Object.keys(byPlatform).sort();
+
+            content.innerHTML = `
+                <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+                    <div>
+                        <h2 style="margin-bottom:4px;">🎮 ${escapeHtml(username)}'s Game Library</h2>
+                        <p style="color:#666;font-size:0.9em;">${totalGames} game${totalGames !== 1 ? 's' : ''} across ${platformList.length} platform${platformList.length !== 1 ? 's' : ''}</p>
+                    </div>
+                    <a href="account.html" class="btn btn-secondary" style="margin-left:auto;text-decoration:none;padding:8px 18px;">← Back</a>
+                </div>
+                ${platformList.map(plat => {
+                    const games = byPlatform[plat];
+                    return `
+                    <div class="owned-platform-group">
+                        <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
+                        ${games.map(g => `
+                        <div class="games-browse-item">
+                            <div class="games-browse-info">
+                                <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
+                                ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
+                            </div>
+                        </div>`).join('')}
+                    </div>`;
+                }).join('')}`;
+        } catch (e) {
+            content.innerHTML = `
+                <h2>🎮 ${escapeHtml(username)}'s Game Library</h2>
+                <p style="color:#c00;">Failed to load library: ${escapeHtml(e.message)}</p>
+                <a href="account.html" class="btn btn-secondary" style="display:inline-block;margin-top:16px;text-decoration:none;">← Back</a>`;
+        }
+    }
+    </script>
+</body>
+</html>

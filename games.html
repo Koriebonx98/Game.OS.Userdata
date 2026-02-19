@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS – Game Library</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container" style="max-width:1000px;">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="games.html" class="nav-link">Games</a>
+                <a href="account.html" class="nav-link">My Account</a>
+                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+            </nav>
+        </header>
+
+        <main style="padding:30px;">
+            <h2 style="margin-bottom:6px;">🕹️ Game Library</h2>
+            <p style="color:#666;margin-bottom:20px;font-size:0.95em;">Browse games from the database and track what you own.</p>
+
+            <!-- View Tabs -->
+            <div class="games-tab-row">
+                <button class="games-tab active" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
+                <button class="games-tab" id="tabOwned" onclick="switchTab('owned')">📚 My Library</button>
+            </div>
+
+            <!-- BROWSE TAB -->
+            <div id="browsePanelWrap">
+                <!-- Platform Selector -->
+                <div id="platformSelectorWrap" style="margin-bottom:20px;">
+                    <label for="platformSelect" style="font-weight:600;margin-right:10px;">Platform:</label>
+                    <select id="platformSelect" class="games-select">
+                        <option value="">Loading platforms…</option>
+                    </select>
+                    <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;margin-left:12px;"></span>
+                </div>
+
+                <!-- Search -->
+                <div class="games-search-row" id="browseSearchRow" style="display:none;">
+                    <input type="text" id="browseSearch" class="games-search-input" placeholder="Search by title or ID…" autocomplete="off">
+                </div>
+
+                <!-- Games Count -->
+                <div id="browseCount" style="color:#666;font-size:0.9em;margin-bottom:10px;"></div>
+
+                <!-- Games List -->
+                <div id="browseGamesList" class="games-browse-list"></div>
+            </div>
+
+            <!-- OWNED / MY LIBRARY TAB -->
+            <div id="ownedPanelWrap" style="display:none;">
+                <div id="ownedMessage" class="message"></div>
+                <div id="ownedGamesList"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions &amp; Node.js</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+    // ── Page init ──────────────────────────────────────────────
+    let _allBrowseGames = [];
+    let _myLibrary      = [];
+    let _currentPlatform = '';
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        requireLogin();
+        modeReady = initializeMode();
+        await modeReady;
+        displayCurrentUser();
+        await initGamesPage();
+    });
+
+    async function initGamesPage() {
+        const select = document.getElementById('platformSelect');
+        const msg    = document.getElementById('browseLoadingMsg');
+        msg.textContent = 'Loading platforms…';
+        try {
+            const platforms = await fetchGamesDbPlatforms();
+            select.innerHTML = '<option value="">— select a platform —</option>' +
+                platforms.map(p => `<option value="${p}">${p}</option>`).join('');
+            msg.textContent = '';
+        } catch (e) {
+            msg.textContent = 'Failed to load platforms.';
+        }
+
+        select.addEventListener('change', () => loadBrowsePlatform(select.value));
+
+        document.getElementById('browseSearch').addEventListener('input', debounceSearch);
+
+        // Load library for "My Library" tab
+        await refreshOwnedGames();
+    }
+
+    // ── Platform loading ───────────────────────────────────────
+    async function loadBrowsePlatform(platform) {
+        const listEl  = document.getElementById('browseGamesList');
+        const countEl = document.getElementById('browseCount');
+        const searchRow = document.getElementById('browseSearchRow');
+        const msg     = document.getElementById('browseLoadingMsg');
+        document.getElementById('browseSearch').value = '';
+
+        if (!platform) {
+            listEl.innerHTML = '';
+            countEl.textContent = '';
+            searchRow.style.display = 'none';
+            return;
+        }
+
+        _currentPlatform = platform;
+        listEl.innerHTML  = '<p style="color:#666;">Loading games…</p>';
+        countEl.textContent = '';
+        searchRow.style.display = 'none';
+        msg.textContent = '';
+
+        try {
+            _allBrowseGames = await fetchGamesDbPlatform(platform);
+            _allBrowseGames.sort((a, b) => {
+                const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+                const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+                return na.localeCompare(nb);
+            });
+            searchRow.style.display = 'flex';
+            renderBrowseGames(_allBrowseGames);
+        } catch (e) {
+            listEl.innerHTML = `<p style="color:#c00;">Failed to load games: ${e.message}</p>`;
+        }
+    }
+
+    // ── Render browse list ─────────────────────────────────────
+    function renderBrowseGames(games) {
+        const listEl  = document.getElementById('browseGamesList');
+        const countEl = document.getElementById('browseCount');
+        countEl.textContent = `Showing ${games.length} game${games.length !== 1 ? 's' : ''}`;
+
+        if (games.length === 0) {
+            listEl.innerHTML = '<p style="color:#666;">No games found.</p>';
+            return;
+        }
+
+        listEl.innerHTML = games.map(g => {
+            const title   = escapeHtml(g.Title || g.game_name || g.title || '');
+            const titleId = g.TitleID || g.title_id || g.id || '';
+            const owned   = _myLibrary.some(
+                o => o.platform === _currentPlatform && (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
+            );
+            return `
+            <div class="games-browse-item">
+                <div class="games-browse-info">
+                    <span class="games-browse-title">${title}</span>
+                    ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
+                </div>
+                <button class="btn-add-game ${owned ? 'btn-owned' : ''}"
+                    onclick="handleAddGame(this, '${escapeHtml(JSON.stringify(g).replace(/'/g,"&#39;"))}')"
+                    ${owned ? 'disabled' : ''}>
+                    ${owned ? '✅ Owned' : '+ Add'}
+                </button>
+            </div>`;
+        }).join('');
+    }
+
+    // ── Search ─────────────────────────────────────────────────
+    let _searchTimer = null;
+    function debounceSearch() {
+        clearTimeout(_searchTimer);
+        _searchTimer = setTimeout(() => {
+            const term = document.getElementById('browseSearch').value.toLowerCase().trim();
+            if (!term) { renderBrowseGames(_allBrowseGames); return; }
+            const filtered = _allBrowseGames.filter(g => {
+                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
+                const tid  = String(g.TitleID || g.title_id || g.id || '').toLowerCase();
+                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
+                return name.includes(term) || tid.includes(term) || alts.includes(term);
+            });
+            renderBrowseGames(filtered);
+        }, 300);
+    }
+
+    // ── Add game ───────────────────────────────────────────────
+    async function handleAddGame(btn, gameJson) {
+        const user = getCurrentUser();
+        if (!user) return;
+        let game;
+        try { game = JSON.parse(gameJson); } catch (_) { return; }
+
+        btn.disabled   = true;
+        btn.textContent = '⏳';
+        try {
+            let result;
+            if (MODE === 'demo') {
+                result = addGameDemo(user.username, game, _currentPlatform);
+            } else {
+                result = await addGameGitHub(user.username, game, _currentPlatform);
+            }
+            if (result.success) {
+                btn.textContent = '✅ Owned';
+                btn.classList.add('btn-owned');
+                await refreshOwnedGames();
+            } else {
+                btn.textContent = '✅ Owned';
+                btn.classList.add('btn-owned');
+            }
+        } catch (e) {
+            btn.disabled    = false;
+            btn.textContent = '+ Add';
+            alert('Failed to add game: ' + e.message);
+        }
+    }
+
+    // ── My Library Tab ─────────────────────────────────────────
+    async function refreshOwnedGames() {
+        const user = getCurrentUser();
+        if (!user) return;
+        try {
+            if (MODE === 'demo') {
+                _myLibrary = getDemoGameLibrary(user.username);
+            } else {
+                _myLibrary = await getGameLibraryGitHub(user.username);
+            }
+        } catch (_) {
+            _myLibrary = [];
+        }
+        renderOwnedGames();
+    }
+
+    function renderOwnedGames() {
+        const listEl = document.getElementById('ownedGamesList');
+        if (_myLibrary.length === 0) {
+            listEl.innerHTML = '<p style="color:#666;font-size:0.95em;">Your library is empty. Browse games above and click "+ Add" to track what you own!</p>';
+            return;
+        }
+
+        // Group by platform
+        const byPlatform = {};
+        _myLibrary.forEach(g => {
+            if (!byPlatform[g.platform]) byPlatform[g.platform] = [];
+            byPlatform[g.platform].push(g);
+        });
+
+        listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
+            const games = byPlatform[plat];
+            return `
+            <div class="owned-platform-group">
+                <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
+                ${games.map(g => `
+                <div class="games-browse-item">
+                    <div class="games-browse-info">
+                        <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
+                        ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
+                    </div>
+                    <button class="btn-remove-game"
+                        onclick="handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
+                        🗑️ Remove
+                    </button>
+                </div>`).join('')}
+            </div>`;
+        }).join('');
+    }
+
+    async function handleRemoveGame(platform, title, btn) {
+        const user = getCurrentUser();
+        if (!user) return;
+        btn.disabled = true;
+        try {
+            let result;
+            if (MODE === 'demo') {
+                result = removeGameDemo(user.username, platform, title);
+            } else {
+                result = await removeGameGitHub(user.username, platform, title);
+            }
+            if (result.success) {
+                await refreshOwnedGames();
+                // If browse tab is open for this platform, re-render so ownership badges update
+                if (_currentPlatform === platform && _allBrowseGames.length) {
+                    renderBrowseGames(_allBrowseGames);
+                }
+            }
+        } catch (e) {
+            btn.disabled = false;
+            alert('Failed to remove game: ' + e.message);
+        }
+    }
+
+    // ── Tab switching ──────────────────────────────────────────
+    function switchTab(tab) {
+        document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse');
+        document.getElementById('tabOwned').classList.toggle('active', tab === 'owned');
+        document.getElementById('browsePanelWrap').style.display = tab === 'browse' ? '' : 'none';
+        document.getElementById('ownedPanelWrap').style.display  = tab === 'owned'  ? '' : 'none';
+        if (tab === 'owned') refreshOwnedGames();
+    }
+    </script>
+</body>
+</html>

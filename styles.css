@@ -915,3 +915,193 @@ footer {
     }
 }
 
+/* ── Games Library / Browse ───────────────────────────────── */
+.games-tab-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0;
+}
+
+.games-tab {
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    padding: 10px 20px;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #666;
+    cursor: pointer;
+    margin-bottom: -2px;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.games-tab.active {
+    color: var(--secondary-color);
+    border-bottom-color: var(--secondary-color);
+}
+
+.games-tab:hover {
+    color: var(--secondary-color);
+}
+
+.games-select {
+    padding: 8px 12px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.95em;
+    background: var(--white);
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+}
+
+.games-select:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+}
+
+.games-search-row {
+    margin-bottom: 14px;
+}
+
+.games-search-input {
+    width: 100%;
+    padding: 10px 14px;
+    border: 2px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 0.95em;
+    transition: border-color 0.2s ease;
+}
+
+.games-search-input:focus {
+    outline: none;
+    border-color: var(--secondary-color);
+    box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+}
+
+.games-browse-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.games-browse-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: #f8f9fa;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    transition: background 0.15s ease;
+}
+
+.games-browse-item:hover {
+    background: #eef3ff;
+}
+
+.games-browse-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.games-browse-title {
+    font-weight: 500;
+    color: var(--text-color);
+    font-size: 0.95em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.games-browse-id {
+    font-size: 0.78em;
+    color: #888;
+    font-family: monospace;
+}
+
+.btn-add-game {
+    background: var(--secondary-color);
+    color: var(--white);
+    border: none;
+    border-radius: 6px;
+    padding: 5px 14px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 10px;
+    transition: background 0.2s ease;
+}
+
+.btn-add-game:hover:not(:disabled) {
+    background: #1565c0;
+}
+
+.btn-add-game.btn-owned {
+    background: var(--success-color);
+    cursor: default;
+}
+
+.btn-add-game:disabled {
+    opacity: 0.7;
+}
+
+.btn-remove-game {
+    background: transparent;
+    border: 1px solid var(--danger-color);
+    color: var(--danger-color);
+    border-radius: 6px;
+    padding: 4px 10px;
+    font-size: 0.82em;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 10px;
+    transition: all 0.2s ease;
+}
+
+.btn-remove-game:hover {
+    background: var(--danger-color);
+    color: var(--white);
+}
+
+.owned-platform-group {
+    margin-bottom: 20px;
+}
+
+.owned-platform-header {
+    color: var(--text-color);
+    font-size: 1em;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--secondary-color);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.games-count-badge {
+    background: var(--secondary-color);
+    color: var(--white);
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 0.8em;
+    font-weight: 600;
+}
+
+@media (max-width: 600px) {
+    .games-browse-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+    .btn-add-game,
+    .btn-remove-game {
+        margin-left: 0;
+    }
+}

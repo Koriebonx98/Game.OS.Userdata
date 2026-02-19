@@ -1391,6 +1391,7 @@ async function loadFriendsList() {
             <div class="friend-item">
                 <span class="friend-name">👤 ${f}</span>
                 <div class="friend-actions">
+                    <a class="btn-message-friend" href="profile.html?user=${encodeURIComponent(f)}" style="text-decoration:none;">🎮 Games</a>
                     <button class="btn-message-friend" onclick="openChat('${f}')">💬 Message</button>
                     <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
                 </div>
@@ -1892,7 +1893,7 @@ function resetAllAccountsDemo() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_') || key.startsWith('gameOS_messages_') || key.startsWith('gameOS_lastRead_'))) {
+        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_') || key.startsWith('gameOS_messages_') || key.startsWith('gameOS_lastRead_') || key.startsWith('gameOS_games_'))) {
             keysToRemove.push(key);
         }
     }
@@ -1934,6 +1935,124 @@ async function handleResetAllAccounts() {
         if (msgEl) showMessage(msgEl, '❌ Failed to remove accounts. Please try again.', 'error');
         if (btn)   btn.disabled = false;
     }
+}
+
+// ============================================================
+// GAMES DATABASE – FETCH FROM GITHUB RAW
+// ============================================================
+
+const GAMES_DB_RAW_BASE = 'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main';
+
+const GAMES_DB_PLATFORMS = [
+    'PS3', 'PS4', 'Switch', 'Xbox 360'
+];
+
+async function fetchGamesDbPlatforms() {
+    const available = [];
+    await Promise.all(GAMES_DB_PLATFORMS.map(async platform => {
+        try {
+            const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json`);
+            if (resp.ok) available.push(platform);
+        } catch (_) {}
+    }));
+    // Return in the original order
+    return GAMES_DB_PLATFORMS.filter(p => available.includes(p));
+}
+
+async function fetchGamesDbPlatform(platform) {
+    const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json`);
+    if (!resp.ok) throw new Error(`Failed to load ${platform} games`);
+    const data = await resp.json();
+    if (data.Games && Array.isArray(data.Games)) return data.Games;
+    if (Array.isArray(data.games)) return data.games;
+    if (Array.isArray(data)) return data;
+    throw new Error('Invalid games JSON format');
+}
+
+// ============================================================
+// GAME LIBRARY – GITHUB MODE
+// ============================================================
+
+async function getGameLibraryGitHub(username) {
+    const file = await githubRead(`accounts/${username.toLowerCase()}/games.json`);
+    return file ? file.content : [];
+}
+
+async function addGameGitHub(username, game, platform) {
+    const path = `accounts/${username.toLowerCase()}/games.json`;
+    const file = await githubRead(path);
+    const library = file ? [...file.content] : [];
+
+    // Deduplicate by platform + title (case-insensitive)
+    const alreadyOwned = library.some(
+        g => g.platform === platform &&
+             (g.title || '').toLowerCase() === (game.Title || game.game_name || game.title || '').toLowerCase()
+    );
+    if (alreadyOwned) return { success: false, message: 'Game already in your library' };
+
+    library.push({
+        platform,
+        title:   game.Title || game.game_name || game.title,
+        titleId: game.TitleID || game.title_id || game.id || null,
+        addedAt: new Date().toISOString()
+    });
+
+    await githubWrite(path, library, `Add game: ${game.Title || game.title} (${platform})`, file ? file.sha : undefined);
+    return { success: true, message: 'Game added to your library!' };
+}
+
+async function removeGameGitHub(username, platform, title) {
+    const path = `accounts/${username.toLowerCase()}/games.json`;
+    const file = await githubRead(path);
+    if (!file) return { success: false, message: 'Library not found' };
+
+    const updated = file.content.filter(
+        g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+    );
+    await githubWrite(path, updated, `Remove game: ${title} (${platform})`, file.sha);
+    return { success: true, library: updated };
+}
+
+// ============================================================
+// GAME LIBRARY – DEMO MODE
+// ============================================================
+
+function getDemoGameLibrary(username) {
+    const key  = `gameOS_games_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoGameLibrary(username, library) {
+    localStorage.setItem(`gameOS_games_${username.toLowerCase()}`, JSON.stringify(library));
+}
+
+function addGameDemo(username, game, platform) {
+    const library = getDemoGameLibrary(username);
+    const title   = game.Title || game.game_name || game.title || '';
+
+    const alreadyOwned = library.some(
+        g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+    );
+    if (alreadyOwned) return { success: false, message: 'Game already in your library' };
+
+    library.push({
+        platform,
+        title,
+        titleId: game.TitleID || game.title_id || game.id || null,
+        addedAt: new Date().toISOString()
+    });
+    saveDemoGameLibrary(username, library);
+    return { success: true, message: 'Game added to your library!' };
+}
+
+function removeGameDemo(username, platform, title) {
+    const library = getDemoGameLibrary(username);
+    const updated = library.filter(
+        g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+    );
+    saveDemoGameLibrary(username, updated);
+    return { success: true, library: updated };
 }
 
 // Export functions for use in other scripts
