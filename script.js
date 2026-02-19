@@ -1,23 +1,45 @@
 /**
- * Game.OS Userdata - Account Management Script
- * 
- * This script connects to the Game.OS.Private.Data backend server
- * for real account creation and authentication.
+ * Game.OS Userdata – Account Management Script
+ *
+ * Modes
+ * ─────
+ *   'github' – Real persistent accounts stored in a private GitHub repository.
+ *              Free, GitHub-only, no external server required.
+ *   'demo'   – Accounts stored in browser localStorage (local testing only).
+ *
+ * Enabling real accounts (GitHub mode)
+ * ──────────────────────────────────────
+ * 1. Create a private GitHub repository for data (e.g. Koriebonx98/Game.OS.Private.Data)
+ * 2. Create a fine-grained Personal Access Token:
+ *    https://github.com/settings/tokens → "Fine-grained tokens" → "Generate new token"
+ *    • Repository access: Only select repositories → your private data repo
+ *    • Permissions → Repository permissions → Contents: Read and write
+ * 3. Add the token as a secret named DATA_REPO_TOKEN in THIS repo
+ *    (Settings → Secrets and variables → Actions → New repository secret)
+ * 4. In THIS repo's Pages settings, set Source to "GitHub Actions"
+ * 5. Push to main — the deploy workflow (.github/workflows/deploy.yml) injects
+ *    the token at build time so it is never committed to the public repository.
  */
 
 // ============================================================
-// CONFIGURATION - UPDATE THIS AFTER DEPLOYING BACKEND
+// CONFIGURATION
 // ============================================================
 
-// TODO: Replace with your deployed backend URL
-// Examples:
-//   - Railway: 'https://game-os-backend.railway.app'
-//   - Render: 'https://game-os-backend.onrender.com'
-//   - Vercel: 'https://game-os-backend.vercel.app'
-const API_BASE_URL = 'https://your-backend-url.com';
+// Fine-grained PAT injected by the deploy workflow (see .github/workflows/deploy.yml).
+// Do NOT paste a real token here – it would be visible in the public repository.
+//
+// Security note: the deployed JS will contain the token and is readable by anyone
+// who inspects the page source. Mitigate by using a fine-grained PAT scoped ONLY
+// to your private data repository (contents: read+write). If the token is compromised
+// you can revoke and regenerate it at https://github.com/settings/tokens.
+const GITHUB_TOKEN = ''; // ← injected at deploy time by .github/workflows/deploy.yml
 
-// Demo mode - uses localStorage when backend is not available
-let DEMO_MODE = true;
+// Private repository that stores account JSON files
+const DATA_REPO_OWNER = 'Koriebonx98';
+const DATA_REPO_NAME  = 'Game.OS.Private.Data';
+
+// Mode is detected automatically – 'github' when a token is present, else 'demo'
+let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
 
 // ============================================================
 // SECURITY - PASSWORD HASHING FOR DEMO MODE
@@ -25,8 +47,7 @@ let DEMO_MODE = true;
 
 /**
  * Hash password using Web Crypto API (for demo mode only)
- * NOTE: This provides basic protection but is NOT suitable for production
- * Production should use bcrypt or similar server-side hashing
+ * NOTE: This provides basic protection but is NOT suitable for production.
  */
 async function hashPasswordDemo(password) {
     const encoder = new TextEncoder();
@@ -35,6 +56,31 @@ async function hashPasswordDemo(password) {
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
     return hashHex;
+}
+
+/**
+ * Hash a password for GitHub mode using PBKDF2 with 100,000 iterations.
+ * Much more resistant to brute-force attacks than plain SHA-256.
+ * The username acts as the PBKDF2 salt (per-user).
+ */
+async function hashPassword(password, username) {
+    const encoder  = new TextEncoder();
+    const keyMat   = await crypto.subtle.importKey(
+        'raw', encoder.encode(password), 'PBKDF2', false, ['deriveBits']
+    );
+    const bits = await crypto.subtle.deriveBits(
+        {
+            name:       'PBKDF2',
+            salt:       encoder.encode(`${username.toLowerCase()}:gameos`),
+            iterations: 100000,
+            hash:       'SHA-256'
+        },
+        keyMat,
+        256  // 256 bits = 32 bytes
+    );
+    return Array.from(new Uint8Array(bits))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
 }
 
 // ============================================================
@@ -54,61 +100,199 @@ document.addEventListener('DOMContentLoaded', function() {
         signupForm.addEventListener('submit', handleSignup);
     }
     
-    // Check backend connectivity
-    checkBackendHealth();
+    // Detect and initialise the active mode
+    initializeMode();
     
     // Display current user if logged in (for home page)
     displayCurrentUser();
 });
 
 // ============================================================
-// BACKEND HEALTH CHECK
+// MODE INITIALISATION
 // ============================================================
 
-async function checkBackendHealth() {
-    try {
-        const response = await fetch(`${API_BASE_URL}/health`, {
-            method: 'GET'
-        });
-        
-        if (response.ok) {
-            const data = await response.json();
-            console.log('✅ Backend Status:', data.status);
-            console.log('📡 Backend Message:', data.message);
-            DEMO_MODE = false;
-            
-            // Show connection status if there's a status element
-            const statusElement = document.getElementById('connectionStatus');
-            if (statusElement) {
-                statusElement.textContent = '✅ Connected to backend';
-                statusElement.className = 'status connected';
+async function initializeMode() {
+    const statusEl = document.getElementById('connectionStatus');
+
+    if (MODE === 'github') {
+        try {
+            // Verify the token and data repo are reachable
+            const resp = await fetch(
+                `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
+                { headers: githubHeaders() }
+            );
+            if (resp.ok) {
+                console.log('✅ GitHub mode active – real accounts enabled');
+                if (statusEl) {
+                    statusEl.textContent = '✅ Real accounts active';
+                    statusEl.className = 'status connected';
+                }
+                return;
             }
-        } else {
-            throw new Error('Backend returned error status');
-        }
-    } catch (error) {
-        console.warn('⚠️ Backend server not reachable - Using demo mode');
-        console.warn('Error:', error.message);
-        console.warn('');
-        console.warn('Demo Mode Active:');
-        console.warn('✓ Accounts stored in browser localStorage');
-        console.warn('✓ Full registration and login functionality');
-        console.warn('✓ Password validation and security checks');
-        console.warn('');
-        console.warn('To connect to real backend:');
-        console.warn('1. Deploy the backend server from Game.OS.Private.Data/backend-server');
-        console.warn('2. Update API_BASE_URL in script.js with your backend URL');
-        console.warn('3. Refresh this page');
-        
-        DEMO_MODE = true;
-        
-        // Show warning if there's a status element
-        const statusElement = document.getElementById('connectionStatus');
-        if (statusElement) {
-            statusElement.textContent = '🎮 Demo Mode - Accounts stored locally';
-            statusElement.className = 'status disconnected';
+            throw new Error(`GitHub API ${resp.status}`);
+        } catch (err) {
+            console.warn('⚠️ GitHub token invalid or data repo unreachable – falling back to demo mode');
+            console.warn(err.message);
+            MODE = 'demo';
         }
     }
+
+    // Demo mode notice
+    console.warn('🎮 Demo Mode – accounts stored in browser localStorage only');
+    console.warn('To enable real accounts, follow the setup guide in README.md');
+    if (statusEl) {
+        statusEl.textContent = '🎮 Demo Mode – accounts stored locally only';
+        statusEl.className = 'status disconnected';
+    }
+}
+
+// ============================================================
+// GITHUB API HELPERS
+// ============================================================
+
+function githubHeaders() {
+    return {
+        'Authorization': `Bearer ${GITHUB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type': 'application/json'
+    };
+}
+
+/**
+ * Read and parse a JSON file from the private data repository.
+ * Returns { content, sha } or null when the file does not exist.
+ */
+async function githubRead(path) {
+    const resp = await fetch(
+        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
+        { headers: githubHeaders() }
+    );
+    if (resp.status === 404) return null;
+    if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
+    const file = await resp.json();
+    const json = new TextDecoder().decode(
+        Uint8Array.from(atob(file.content.replace(/\n/g, '')), c => c.charCodeAt(0))
+    );
+    return { content: JSON.parse(json), sha: file.sha };
+}
+
+/**
+ * Create or update a JSON file in the private data repository.
+ * Pass `sha` when overwriting an existing file.
+ */
+async function githubWrite(path, content, message, sha) {
+    const json   = JSON.stringify(content, null, 2);
+    const bytes  = new TextEncoder().encode(json);
+    let binary   = '';
+    bytes.forEach(b => (binary += String.fromCharCode(b)));
+    const base64 = btoa(binary);
+
+    const body = {
+        message,
+        content: base64,
+        committer: { name: 'Game.OS Bot', email: 'game-os-bot@users.noreply.github.com' }
+    };
+    if (sha) body.sha = sha;
+
+    const resp = await fetch(
+        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
+        { method: 'PUT', headers: githubHeaders(), body: JSON.stringify(body) }
+    );
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub API error ${resp.status}`);
+    }
+    return resp.json();
+}
+
+// ============================================================
+// GITHUB MODE – ACCOUNT CREATION
+// ============================================================
+
+async function createAccountGitHub(username, email, password) {
+    const usernameLower = username.toLowerCase();
+    const emailLower    = email.toLowerCase();
+    const passwordHash  = await hashPassword(password, username);
+
+    // Check for duplicate username
+    const existing = await githubRead(`accounts/${usernameLower}.json`);
+    if (existing) {
+        return { success: false, message: 'Username already exists' };
+    }
+
+    // Check for duplicate email via index
+    const indexFile = await githubRead('accounts/email-index.json');
+    const emailMap  = indexFile ? indexFile.content : {};
+    if (emailMap[emailLower]) {
+        return { success: false, message: 'Email already registered' };
+    }
+
+    // Create account file
+    await githubWrite(
+        `accounts/${usernameLower}.json`,
+        { username, email, password_hash: passwordHash, created_at: new Date().toISOString() },
+        `Create account: ${username}`
+    );
+
+    // Update email index (up to 3 attempts to handle concurrent write conflicts)
+    emailMap[emailLower] = usernameLower;
+    let indexRef = indexFile;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const map = indexRef ? { ...indexRef.content } : {};
+            map[emailLower] = usernameLower;
+            await githubWrite(
+                'accounts/email-index.json',
+                map,
+                `Add email index for: ${username}`,
+                indexRef ? indexRef.sha : undefined
+            );
+            break; // success – exit loop
+        } catch (err) {
+            if (attempt < 2) {
+                // Re-read for updated SHA, then retry with brief backoff
+                indexRef = await githubRead('accounts/email-index.json');
+                await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
+            } else {
+                throw err;
+            }
+        }
+    }
+
+    return { success: true, message: 'Account created successfully' };
+}
+
+// ============================================================
+// GITHUB MODE – LOGIN VERIFICATION
+// ============================================================
+
+async function verifyAccountGitHub(identifier, password) {
+    let accountKey;
+    if (identifier.includes('@')) {
+        // Email login: look up username via email index
+        const indexFile = await githubRead('accounts/email-index.json');
+        if (!indexFile) return { success: false, message: 'Account not found' };
+        accountKey = indexFile.content[identifier.toLowerCase()];
+        if (!accountKey) return { success: false, message: 'Account not found' };
+    } else {
+        accountKey = identifier.toLowerCase();
+    }
+
+    const accountFile = await githubRead(`accounts/${accountKey}.json`);
+    if (!accountFile) return { success: false, message: 'Account not found' };
+
+    const account   = accountFile.content;
+    const inputHash = await hashPassword(password, account.username);
+    if (account.password_hash !== inputHash) {
+        return { success: false, message: 'Invalid password' };
+    }
+
+    return {
+        success: true,
+        message: 'Login successful',
+        user: { username: account.username, email: account.email }
+    };
 }
 
 // ============================================================
@@ -278,24 +462,12 @@ async function handleSignup(event) {
     try {
         let data;
         
-        if (DEMO_MODE) {
+        if (MODE === 'demo') {
             // Use demo mode (localStorage)
             data = await createAccountDemo(username, email, password);
         } else {
-            // Call backend API to create account
-            const response = await fetch(`${API_BASE_URL}/api/create-account`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    username: username,
-                    email: email,
-                    password: password
-                })
-            });
-            
-            data = await response.json();
+            // GitHub mode – write directly to the private data repository
+            data = await createAccountGitHub(username, email, password);
         }
         
         if (data.success) {
@@ -369,23 +541,12 @@ async function handleLogin(event) {
     try {
         let data;
         
-        if (DEMO_MODE) {
+        if (MODE === 'demo') {
             // Use demo mode (localStorage)
             data = await verifyAccountDemo(loginIdentifier, password);
         } else {
-            // Call backend API to verify account
-            const response = await fetch(`${API_BASE_URL}/api/verify-account`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    username: loginIdentifier,
-                    password: password
-                })
-            });
-            
-            data = await response.json();
+            // GitHub mode – read from the private data repository
+            data = await verifyAccountGitHub(loginIdentifier, password);
         }
         
         if (data.success) {

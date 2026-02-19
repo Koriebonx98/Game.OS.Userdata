@@ -111,27 +111,83 @@ For production use, this system integrates with a private GitHub repository ([Ga
 ![Error Message](https://github.com/user-attachments/assets/8158e6dd-d029-41c5-8547-a9647ea58bb3)
 *Error message displayed for invalid credentials*
 
-## 🚀 Going Live (Real Accounts)
+## 🚀 Going Live (Real Accounts – GitHub Only, Free)
 
-To move from demo mode to **real persistent accounts** that work across all browsers and devices:
+Two repositories work together to form the complete account system:
 
-1. **Deploy the backend server** (one-time setup):
-   - Follow the step-by-step guide in [`backend/README.md`](backend/README.md)
-   - Recommended free host: [Railway](https://railway.app) — deploy in ~5 minutes
-   - You will need a GitHub Personal Access Token and a private data repository
+| Repository | Role |
+|---|---|
+| `Game.OS.Userdata` (this repo, public) | Frontend – HTML/CSS/JS served via GitHub Pages |
+| `Game.OS.Private.Data` (your private repo) | Data store – one JSON file per user account |
 
-2. **Update the frontend URL** in `script.js`:
-   ```js
-   // Replace the placeholder:
-   const API_BASE_URL = 'https://your-backend-url.com';
+No external server or hosting service is needed. Everything runs on GitHub's free infrastructure.
 
-   // With your deployed backend URL:
-   const API_BASE_URL = 'https://gameos-backend.up.railway.app';
-   ```
+### One-time Setup
 
-3. Commit and push. The site will automatically detect the backend and exit demo mode. ✅
+**Step 1 – Create the private data repository**
 
-> **No changes are needed to the HTML files** — the frontend already supports both modes.
+1. Go to [github.com/new](https://github.com/new)
+2. Name it `Game.OS.Private.Data` (or any name you like)
+3. Set it to **Private**
+4. Click **Create repository**
+
+**Step 2 – Create a Personal Access Token**
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Set a name (e.g. `Game.OS Data Access`) and an expiry
+4. Under **Repository access** → *Only select repositories* → choose your private data repo
+5. Under **Permissions → Repository permissions** → **Contents** → select **Read and write**
+6. Click **Generate token** and **copy it immediately** (you only see it once)
+
+**Step 3 – Add the token as a repository secret**
+
+In the `Game.OS.Userdata` repository (this repo):
+
+1. Go to **Settings → Secrets and variables → Actions**
+2. Click **New repository secret**
+3. Name: `DATA_REPO_TOKEN`
+4. Value: paste the token you just copied
+5. Click **Add secret**
+
+**Step 4 – Enable GitHub Actions deployment for Pages**
+
+In the `Game.OS.Userdata` repository:
+
+1. Go to **Settings → Pages**
+2. Under **Source** select **GitHub Actions**
+3. Save
+
+**Step 5 – Trigger the deploy**
+
+Push any commit to `main` (or go to **Actions → Deploy to GitHub Pages → Run workflow**).  
+The deploy workflow will:
+- Inject your token into `script.js` at build time (never stored in git)
+- Deploy the frontend to GitHub Pages
+
+Your site is now live at `https://koriebonx98.github.io/Game.OS.Userdata/` with real accounts! ✅
+
+### How it works (architecture)
+
+```
+User's Browser
+    │
+    ├── Signup:  PUT  https://api.github.com/repos/…/Game.OS.Private.Data/contents/accounts/{user}.json
+    │                 (creates a new account file in the private repo)
+    │
+    └── Login:   GET  https://api.github.com/repos/…/Game.OS.Private.Data/contents/accounts/{user}.json
+                      (reads the account file, compares SHA-256 password hash)
+```
+
+All communication is between the browser and the GitHub API directly.  
+No intermediate server. No external service. 100% free.
+
+### Security notes
+
+- The PAT is stored as a GitHub Secret — never committed to the repository
+- The deploy workflow injects it into the built JS (not the source)
+- The PAT is scoped only to `Game.OS.Private.Data` — it cannot access any other repository
+- Passwords are hashed with SHA-256 (username-salted) before being stored or compared
 
 ---
 

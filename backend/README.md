@@ -1,3 +1,11 @@
+# Game.OS Backend – Optional Alternative Deployment
+
+> **Note:** The primary method for running Game.OS with real accounts is **GitHub-only** (no external server).  
+> See the main [README.md](../README.md) for the recommended GitHub Pages + GitHub API setup.  
+> The server in this folder is an **optional alternative** for those who prefer a traditional hosted backend (e.g. Railway, Render).
+
+---
+
 # Game.OS Backend – Deployment Guide 🚀
 
 The backend is a small Node.js/Express server that stores user accounts as JSON
