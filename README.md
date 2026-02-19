@@ -111,6 +111,30 @@ For production use, this system integrates with a private GitHub repository ([Ga
 ![Error Message](https://github.com/user-attachments/assets/8158e6dd-d029-41c5-8547-a9647ea58bb3)
 *Error message displayed for invalid credentials*
 
+## 🚀 Going Live (Real Accounts)
+
+To move from demo mode to **real persistent accounts** that work across all browsers and devices:
+
+1. **Deploy the backend server** (one-time setup):
+   - Follow the step-by-step guide in [`backend/README.md`](backend/README.md)
+   - Recommended free host: [Railway](https://railway.app) — deploy in ~5 minutes
+   - You will need a GitHub Personal Access Token and a private data repository
+
+2. **Update the frontend URL** in `script.js`:
+   ```js
+   // Replace the placeholder:
+   const API_BASE_URL = 'https://your-backend-url.com';
+
+   // With your deployed backend URL:
+   const API_BASE_URL = 'https://gameos-backend.up.railway.app';
+   ```
+
+3. Commit and push. The site will automatically detect the backend and exit demo mode. ✅
+
+> **No changes are needed to the HTML files** — the frontend already supports both modes.
+
+---
+
 ## 🚀 Setup Instructions
 
 ### Local Development:
