@@ -125,33 +125,43 @@ document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('updateForm')) {
         requireLogin();
         populateAccountDetails();
+    }
+
+    // If on friends page, require login and load friends list
+    if (document.getElementById('friendsList')) {
+        requireLogin();
         loadFriendsList();
+
+        const POLL_INTERVAL_MS = 5000;
+        const friendsPollTimer = setInterval(() => {
+            if (!document.hidden) loadFriendsList();
+        }, POLL_INTERVAL_MS);
+        function onFriendsVC() {
+            if (!document.hidden) loadFriendsList();
+        }
+        document.addEventListener('visibilitychange', onFriendsVC);
+        window.addEventListener('pagehide', () => {
+            clearInterval(friendsPollTimer);
+            document.removeEventListener('visibilitychange', onFriendsVC);
+        }, { once: true });
+    }
+
+    // If on inbox page, require login and load inbox
+    if (document.getElementById('inboxList')) {
+        requireLogin();
         loadInbox();
 
-        // Poll every 5 seconds so friend requests appear without a manual refresh.
-        // Polling is paused while the tab is hidden to avoid unnecessary API calls.
         const POLL_INTERVAL_MS = 5000;
-        const pollTimer = setInterval(() => {
-            if (!document.hidden) {
-                loadFriendsList();
-                loadInbox();
-            }
+        const inboxPollTimer = setInterval(() => {
+            if (!document.hidden) loadInbox();
         }, POLL_INTERVAL_MS);
-
-        // When the tab becomes visible again, refresh immediately then let the
-        // regular interval continue.
-        function onVisibilityChange() {
-            if (!document.hidden) {
-                loadFriendsList();
-                loadInbox();
-            }
+        function onInboxVC() {
+            if (!document.hidden) loadInbox();
         }
-        document.addEventListener('visibilitychange', onVisibilityChange);
-
-        // Clean up when the page is unloaded to avoid memory leaks.
+        document.addEventListener('visibilitychange', onInboxVC);
         window.addEventListener('pagehide', () => {
-            clearInterval(pollTimer);
-            document.removeEventListener('visibilitychange', onVisibilityChange);
+            clearInterval(inboxPollTimer);
+            document.removeEventListener('visibilitychange', onInboxVC);
         }, { once: true });
     }
 });

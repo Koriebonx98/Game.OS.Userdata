@@ -12,11 +12,12 @@
             <h1>🎮 Game OS Userdata</h1>
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
-                <div id="userNav">
-                    <a href="games.html" class="nav-link">🔍 Games</a>
-                    <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
-                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
-                </div>
+                <a href="games.html" class="nav-link">🔍 Games</a>
+                <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="friends.html" class="nav-link">👥 Friends</a>
+                <a href="inbox.html" class="nav-link">📬 Inbox</a>
+                <a href="account.html" class="nav-link">👤 My Account</a>
+                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
             </nav>
         </header>
 
@@ -48,35 +49,6 @@
                     <div class="account-detail-row">
                         <span class="detail-label">Game Library</span>
                         <a href="games.html?tab=library" class="detail-value" style="color:var(--primary-color);text-decoration:none;font-weight:500;">📚 My Library →</a>
-                    </div>
-                </div>
-
-                <!-- Inbox Section -->
-                <div class="inbox-section">
-                    <h3>📬 Inbox <span id="inboxCount" class="inbox-badge" style="display:none;">0</span></h3>
-                    <div id="inboxList" class="inbox-list">
-                        <p style="color:#666;font-size:0.9em;">Loading…</p>
-                    </div>
-                </div>
-
-                <!-- Friends Section -->
-                <div class="friends-section">
-                    <h3>👥 Friends <span id="friendsCount" class="friends-count">0</span></h3>
-
-                    <div class="friend-search">
-                        <input
-                            type="text"
-                            id="friendSearch"
-                            placeholder="Enter a username to add as friend"
-                            autocomplete="off"
-                        >
-                        <button class="btn btn-secondary" onclick="handleAddFriend()">Add Friend</button>
-                    </div>
-
-                    <div id="friendMessage" class="message"></div>
-
-                    <div id="friendsList" class="friends-list">
-                        <p style="color:#666;font-size:0.9em;">Loading…</p>
                     </div>
                 </div>
 
