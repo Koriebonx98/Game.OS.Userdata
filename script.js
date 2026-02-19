@@ -1429,28 +1429,19 @@ async function loadInbox() {
     await modeReady;
     inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
-        let incomingRequests;
+        let incomingRequests, friends;
         if (MODE === 'demo') {
             incomingRequests = getDemoFriendRequests(user.username);
+            friends = getDemoFriends(user.username);
         } else {
-            incomingRequests = await getFriendRequestsGitHub(user.username);
+            [incomingRequests, friends] = await Promise.all([
+                getFriendRequestsGitHub(user.username),
+                getFriendsGitHub(user.username)
+            ]);
         }
 
-        if (badgeEl) {
-            if (incomingRequests.length > 0) {
-                badgeEl.textContent = incomingRequests.length;
-                badgeEl.style.display = 'inline-block';
-            } else {
-                badgeEl.style.display = 'none';
-            }
-        }
-
-        if (incomingRequests.length === 0) {
-            inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No pending requests.</p>';
-            return;
-        }
-
-        let html = incomingRequests.map(r => `
+        // Build friend request items
+        const requestItems = incomingRequests.map(r => `
             <div class="friend-item">
                 <span class="friend-name">👤 ${r.from} <span style="color:#666;font-size:0.8em;font-weight:400;">wants to be friends</span></span>
                 <div class="friend-actions">
@@ -1458,8 +1449,58 @@ async function loadInbox() {
                     <button class="btn-decline-friend" onclick="handleDeclineFriendRequest('${r.from}')">❌ Decline</button>
                 </div>
             </div>
-        `).join('');
-        inboxEl.innerHTML = html;
+        `);
+
+        // Fetch unread messages from each friend (in parallel)
+        const messageResults = await Promise.all(
+            friends.map(friendName => {
+                if (MODE === 'demo') {
+                    return getMessagesDemo(user.username, friendName)
+                        .then(result => ({ friendName, result }));
+                } else {
+                    return getMessagesGitHub(user.username, friendName)
+                        .then(result => ({ friendName, result }));
+                }
+            })
+        );
+        const unreadItems = [];
+        for (const { friendName, result } of messageResults) {
+            if (!result.success) continue;
+            const lastRead = getLastRead(user.username, friendName);
+            const unread = result.messages.filter(m =>
+                m.from.toLowerCase() !== user.username.toLowerCase() &&
+                (!lastRead || m.sentAt > lastRead)
+            );
+            if (unread.length > 0) {
+                const latest = unread[unread.length - 1];
+                const label = unread.length > 1 ? `${unread.length} new messages` : 'sent a message';
+                unreadItems.push(`
+            <div class="friend-item">
+                <span class="friend-name">💬 ${latest.from} <span style="color:#666;font-size:0.8em;font-weight:400;">${label}</span></span>
+                <div class="friend-actions">
+                    <button class="btn-message-friend" onclick="openChat('${latest.from}')">💬 Open Chat</button>
+                </div>
+            </div>
+        `);
+            }
+        }
+
+        const total = incomingRequests.length + unreadItems.length;
+        if (badgeEl) {
+            if (total > 0) {
+                badgeEl.textContent = total;
+                badgeEl.style.display = 'inline-block';
+            } else {
+                badgeEl.style.display = 'none';
+            }
+        }
+
+        const allItems = [...requestItems, ...unreadItems];
+        if (allItems.length === 0) {
+            inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No pending requests or new messages.</p>';
+            return;
+        }
+        inboxEl.innerHTML = allItems.join('');
     } catch (err) {
         inboxEl.innerHTML = '<p style="color:#c00;">Failed to load inbox.</p>';
     }
@@ -1650,6 +1691,23 @@ async function getMessagesDemo(username, withUsername) {
 }
 
 // ============================================================
+// UNREAD MESSAGE TRACKING
+// ============================================================
+
+function lastReadKey(userA, userB) {
+    const [a, b] = [userA.toLowerCase(), userB.toLowerCase()].sort();
+    return `gameOS_lastRead_${a}_${b}`;
+}
+
+function getLastRead(userA, userB) {
+    return localStorage.getItem(lastReadKey(userA, userB)) || null;
+}
+
+function markConversationRead(userA, userB) {
+    localStorage.setItem(lastReadKey(userA, userB), new Date().toISOString());
+}
+
+// ============================================================
 // MESSAGING UI
 // ============================================================
 
@@ -1672,6 +1730,10 @@ function openChat(friendUsername) {
 
     const user = getCurrentUser();
     if (!user) return;
+
+    // Mark conversation as read when chat is opened
+    markConversationRead(user.username, friendUsername);
+    loadInbox();
 
     const panel = document.createElement('div');
     panel.id        = 'chatPanel';
@@ -1745,6 +1807,9 @@ async function refreshChatMessages(friendUsername) {
 
         // Auto-scroll to bottom only when already at bottom or just opened
         if (wasAtBottom) messagesEl.scrollTop = messagesEl.scrollHeight;
+
+        // Mark conversation as read since messages are now visible
+        markConversationRead(user.username, friendUsername);
     } catch (err) {
         // Silently ignore polling errors
     }
@@ -1827,7 +1892,7 @@ function resetAllAccountsDemo() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_') || key.startsWith('gameOS_messages_'))) {
+        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_') || key.startsWith('gameOS_messages_') || key.startsWith('gameOS_lastRead_'))) {
             keysToRemove.push(key);
         }
     }
