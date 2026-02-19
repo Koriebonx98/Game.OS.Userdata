@@ -406,6 +406,73 @@ app.post('/api/remove-friend', async (req, res) => {
     }
 });
 
+// ── POST /api/reset-all-accounts ─────────────────────────────────────────────
+app.post('/api/reset-all-accounts', async (req, res) => {
+    try {
+        const { adminKey } = req.body;
+        if (!adminKey || !process.env.ADMIN_KEY || adminKey !== process.env.ADMIN_KEY) {
+            return res.status(403).json({ success: false, message: 'Unauthorized' });
+        }
+
+        // List all items in the accounts directory
+        let items;
+        try {
+            const { data } = await octokit.repos.getContent({
+                owner: REPO_OWNER,
+                repo:  REPO_NAME,
+                path:  'accounts'
+            });
+            items = Array.isArray(data) ? data : [data];
+        } catch (err) {
+            if (err.status === 404) {
+                return res.json({ success: true, message: 'No accounts to remove' });
+            }
+            throw err;
+        }
+
+        const committer = { name: 'Game OS Bot', email: 'bot@gameos.com' };
+
+        // Delete every file; recurse one level into user sub-folders
+        for (const item of items) {
+            if (item.type === 'dir') {
+                try {
+                    const { data: files } = await octokit.repos.getContent({
+                        owner: REPO_OWNER,
+                        repo:  REPO_NAME,
+                        path:  item.path
+                    });
+                    for (const file of (Array.isArray(files) ? files : [files])) {
+                        await octokit.repos.deleteFile({
+                            owner: REPO_OWNER,
+                            repo:  REPO_NAME,
+                            path:  file.path,
+                            message: `Reset: delete ${file.path}`,
+                            sha:   file.sha,
+                            committer
+                        });
+                    }
+                } catch (e) {
+                    if (e.status !== 404) throw e;
+                }
+            } else {
+                await octokit.repos.deleteFile({
+                    owner: REPO_OWNER,
+                    repo:  REPO_NAME,
+                    path:  item.path,
+                    message: `Reset: delete ${item.path}`,
+                    sha:   item.sha,
+                    committer
+                });
+            }
+        }
+
+        res.json({ success: true, message: 'All accounts removed successfully' });
+    } catch (err) {
+        console.error('Error resetting accounts:', err);
+        res.status(500).json({ success: false, message: 'Failed to reset accounts. Please try again.' });
+    }
+});
+
 // ── Start server ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

@@ -203,6 +203,28 @@ async function githubRead(path) {
  * Create or update a JSON file in the private data repository.
  * Pass `sha` when overwriting an existing file.
  */
+/**
+ * Delete a file from the private data repository.
+ */
+async function githubDelete(path, sha, message) {
+    const resp = await fetch(
+        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
+        {
+            method: 'DELETE',
+            headers: githubHeaders(),
+            body: JSON.stringify({
+                message,
+                sha,
+                committer: { name: 'Game.OS Bot', email: 'game-os-bot@users.noreply.github.com' }
+            })
+        }
+    );
+    if (!resp.ok) {
+        const err = await resp.json().catch(() => ({}));
+        throw new Error(err.message || `GitHub API error ${resp.status}`);
+    }
+}
+
 async function githubWrite(path, content, message, sha) {
     const json   = JSON.stringify(content, null, 2);
     const bytes  = new TextEncoder().encode(json);
@@ -1142,6 +1164,91 @@ async function handleRemoveFriend(friendUsername) {
         }
     } catch (err) {
         showMessage(msgEl, '❌ Failed to remove friend. Please try again.', 'error');
+    }
+}
+
+// ============================================================
+// RESET ALL ACCOUNTS
+// ============================================================
+
+/**
+ * Delete all account data from the private GitHub data repository.
+ * Lists every item inside accounts/, deletes files in user sub-folders,
+ * then deletes email-index.json and any other top-level files.
+ */
+async function resetAllAccountsGitHub() {
+    const resp = await fetch(
+        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/accounts`,
+        { headers: githubHeaders() }
+    );
+    if (resp.status === 404) return; // Nothing to delete
+    if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
+    const items = await resp.json();
+
+    for (const item of items) {
+        if (item.type === 'dir') {
+            // List files inside the user sub-folder and delete each one
+            const folderResp = await fetch(item.url, { headers: githubHeaders() });
+            if (folderResp.ok) {
+                const files = await folderResp.json();
+                for (const file of files) {
+                    await githubDelete(file.path, file.sha, `Reset: delete ${file.path}`);
+                }
+            }
+        } else {
+            await githubDelete(item.path, item.sha, `Reset: delete ${item.path}`);
+        }
+    }
+}
+
+/**
+ * Remove all demo-mode account data from localStorage.
+ */
+function resetAllAccountsDemo() {
+    const keysToRemove = [];
+    for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_'))) {
+            keysToRemove.push(key);
+        }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+    // Also clear the active session
+    localStorage.removeItem('gameOSUser');
+    sessionStorage.removeItem('gameOSUser');
+}
+
+/**
+ * UI handler – asks for confirmation then wipes all accounts in the active mode.
+ */
+async function handleResetAllAccounts() {
+    const msgEl = document.getElementById('resetMessage');
+    const btn   = document.getElementById('resetAllBtn');
+
+    if (!confirm(
+        '⚠️ WARNING: This will permanently delete ALL accounts and cannot be undone.\n\n' +
+        'Are you absolutely sure you want to continue?'
+    )) return;
+
+    if (msgEl) showMessage(msgEl, '⏳ Removing all accounts… Please wait.', 'info');
+    if (btn)   btn.disabled = true;
+
+    try {
+        await modeReady;
+        if (MODE === 'demo') {
+            resetAllAccountsDemo();
+        } else {
+            await resetAllAccountsGitHub();
+            // Clear local session too
+            localStorage.removeItem('gameOSUser');
+            sessionStorage.removeItem('gameOSUser');
+        }
+        if (msgEl) showMessage(msgEl, '✅ All accounts have been removed. Redirecting to login…', 'success');
+        setTimeout(() => { window.location.href = 'login.html'; }, 2500);
+    } catch (err) {
+        console.error('Reset error:', err);
+        if (msgEl) showMessage(msgEl, '❌ Failed to remove accounts. Please try again.', 'error');
+        if (btn)   btn.disabled = false;
     }
 }
 
