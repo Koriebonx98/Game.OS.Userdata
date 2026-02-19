@@ -1,0 +1,14 @@
+# Node.js dependencies
+node_modules/
+npm-debug.log*
+
+# Environment secrets – never commit these
+backend/.env
+.env
+
+# macOS
+.DS_Store
+
+# Editor directories
+.vscode/
+.idea/

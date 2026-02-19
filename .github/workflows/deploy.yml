@@ -1,0 +1,83 @@
+# Deploy to GitHub Pages with token injection
+#
+# This workflow:
+#   1. Checks out the source code
+#   2. Injects the DATA_REPO_TOKEN secret into script.js at build time
+#      (the token is NEVER committed to the repository)
+#   3. Deploys the frontend to GitHub Pages
+#
+# Required setup (one-time):
+#   1. Add a secret named DATA_REPO_TOKEN in this repository:
+#      Settings → Secrets and variables → Actions → New repository secret
+#      Value: your fine-grained PAT (contents: read+write on Game.OS.Private.Data)
+#   2. Set GitHub Pages source to "GitHub Actions":
+#      Settings → Pages → Source → GitHub Actions
+
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject DATA_REPO_TOKEN into script.js
+        run: |
+          python3 << 'PYEOF'
+          import os, json
+          token = os.environ.get('DATA_REPO_TOKEN', '')
+          with open('script.js', 'r') as f:
+              content = f.read()
+          # json.dumps produces a valid JS string literal and handles all special chars.
+          # Match up to the end-of-line comment so the full placeholder line is replaced.
+          import re
+          old = "const GITHUB_TOKEN = ''; # \u2190 injected at deploy time by .github/workflows/deploy.yml"
+          new = f"const GITHUB_TOKEN = {json.dumps(token)};"
+          updated = content.replace(old, new, 1)
+          # Fallback: plain placeholder without comment (in case of whitespace differences)
+          if old not in content:
+              updated = re.sub(r"const GITHUB_TOKEN = '';.*", new, content, count=1)
+          with open('script.js', 'w') as f:
+              f.write(updated)
+          status = 'injected (GitHub mode active)' if token else 'not set — site will use demo mode'
+          print(f'DATA_REPO_TOKEN: {status}')
+          PYEOF
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+
+      - name: Copy frontend files to deployment directory
+        run: |
+          mkdir -p _site
+          cp index.html login.html signup.html script.js styles.css _site/
+          touch _site/.nojekyll
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '_site'
+
+      - name: Deploy to GitHub Pages
+        id: deploy
+        uses: actions/deploy-pages@v4
