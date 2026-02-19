@@ -138,6 +138,7 @@ async function handleSignup(event) {
             },
             body: JSON.stringify({
                 username: username,
+                email: email,
                 password: password
             })
         });
@@ -205,8 +206,8 @@ async function handleLogin(event) {
         return;
     }
     
-    // Extract username from email (part before @)
-    const username = email.includes('@') ? email.split('@')[0] : email;
+    // Send the email/username as-is; backend will handle the lookup
+    const username = email;
     
     // Show loading state
     showMessage(messageDiv, '⏳ Verifying credentials... Please wait.', 'info');
