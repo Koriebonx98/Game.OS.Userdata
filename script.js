@@ -44,6 +44,11 @@ const DATA_REPO_NAME  = 'Game.OS.Private.Data'; // ← injected at deploy time
 // Mode is detected automatically – 'github' when a token is present, else 'demo'
 let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
 
+// Promise that resolves when initializeMode() has finished detecting the active mode.
+// Form handlers await this to avoid a race condition where MODE is still 'github'
+// while initializeMode() is still checking whether GitHub is reachable.
+let modeReady = null;
+
 // ============================================================
 // SECURITY - PASSWORD HASHING FOR DEMO MODE
 // ============================================================
@@ -109,8 +114,9 @@ document.addEventListener('DOMContentLoaded', function() {
         updateForm.addEventListener('submit', handleAccountUpdate);
     }
     
-    // Detect and initialise the active mode
-    initializeMode();
+    // Detect and initialise the active mode.
+    // Store the promise so form handlers can await it before proceeding.
+    modeReady = initializeMode();
     
     // Update nav and display current user state
     displayCurrentUser();
@@ -476,6 +482,8 @@ async function handleSignup(event) {
     disableForm('signupForm');
     
     try {
+        // Wait for mode detection to complete before proceeding (fixes race condition)
+        await modeReady;
         let data;
         
         if (MODE === 'demo') {
@@ -511,12 +519,32 @@ async function handleSignup(event) {
             enableForm('signupForm');
         }
     } catch (error) {
-        // Network or other error
+        // GitHub API failed – switch to demo mode and retry
         console.error('Signup error:', error);
-        showMessage(messageDiv, 
-            '❌ Cannot connect to server. Please check your connection and try again.', 
-            'error'
-        );
+        if (MODE === 'github') {
+            MODE = 'demo';
+            console.warn('GitHub unavailable – retrying in demo (localStorage) mode');
+            try {
+                const fallback = await createAccountDemo(username, email, password);
+                if (fallback.success) {
+                    showMessage(messageDiv,
+                        '✅ Account created (GitHub unavailable – saved locally). You can now login. Redirecting...',
+                        'success'
+                    );
+                    localStorage.setItem('lastUsername', username);
+                    localStorage.setItem('lastEmail', email);
+                    document.getElementById('signupForm').reset();
+                    setTimeout(() => { window.location.href = 'login.html'; }, 3000);
+                } else {
+                    showMessage(messageDiv, '❌ ' + (fallback.message || 'Failed to create account. Please try again.'), 'error');
+                    enableForm('signupForm');
+                }
+                return;
+            } catch (demoErr) {
+                console.error('Demo fallback error:', demoErr);
+            }
+        }
+        showMessage(messageDiv, '❌ Failed to create account. Please check your details and try again.', 'error');
         enableForm('signupForm');
     }
 }
@@ -555,6 +583,8 @@ async function handleLogin(event) {
     disableForm('loginForm');
     
     try {
+        // Wait for mode detection to complete before proceeding (fixes race condition)
+        await modeReady;
         let data;
         
         if (MODE === 'demo') {
@@ -614,12 +644,37 @@ async function handleLogin(event) {
             enableForm('loginForm');
         }
     } catch (error) {
-        // Network or other error
+        // GitHub API failed – switch to demo mode and retry
         console.error('Login error:', error);
-        showMessage(messageDiv, 
-            '❌ Cannot connect to server. Please check your connection and try again.', 
-            'error'
-        );
+        if (MODE === 'github') {
+            MODE = 'demo';
+            console.warn('GitHub unavailable – retrying in demo (localStorage) mode');
+            try {
+                const fallback = await verifyAccountDemo(loginIdentifier, password);
+                if (fallback.success) {
+                    const username = fallback.user ? fallback.user.username : '';
+                    const userEmail = fallback.user ? fallback.user.email : '';
+                    if (username && userEmail) {
+                        showMessage(messageDiv, `✅ Welcome back, ${username}! Login successful.`, 'success');
+                        const userSession = { username, email: userEmail, loginTime: new Date().toISOString() };
+                        if (rememberMe) {
+                            localStorage.setItem('gameOSUser', JSON.stringify(userSession));
+                        } else {
+                            sessionStorage.setItem('gameOSUser', JSON.stringify(userSession));
+                        }
+                        setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+                        return;
+                    }
+                } else {
+                    showMessage(messageDiv, '❌ Invalid email or password. Please try again.', 'error');
+                    enableForm('loginForm');
+                    return;
+                }
+            } catch (demoErr) {
+                console.error('Demo fallback error:', demoErr);
+            }
+        }
+        showMessage(messageDiv, '❌ Failed to login. Please check your credentials and try again.', 'error');
         enableForm('loginForm');
     }
 }
