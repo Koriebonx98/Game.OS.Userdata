@@ -111,17 +111,21 @@ npm run dev                 # starts with nodemon (auto-reload)
 
 ## Data structure
 
-Each user gets one file in the data repo:
+Each user gets their own **folder** in the data repo, allowing future per-user files to be added easily:
 
 ```
 accounts/
-├── email-index.json          ← email → username mapping
-├── alice.json
-├── bob.json
+├── email-index.json              ← email → username mapping
+├── alice/
+│   ├── profile.json              ← account details & password hash
+│   └── friends.json              ← friend list (array of usernames)
+├── bob/
+│   ├── profile.json
+│   └── friends.json
 └── ...
 ```
 
-`accounts/alice.json` example:
+`accounts/alice/profile.json` example:
 
 ```json
 {
@@ -132,4 +136,25 @@ accounts/
 }
 ```
 
+`accounts/alice/friends.json` example:
+
+```json
+["bob", "charlie"]
+```
+
 Passwords are hashed with **bcrypt** (10 rounds) on the server — plain-text passwords never reach the database.
+
+---
+
+## API endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET`  | `/health` | Server health check |
+| `POST` | `/api/create-account` | Register a new user |
+| `POST` | `/api/verify-account` | Login (email or username + password) |
+| `POST` | `/api/update-account` | Update email and/or password |
+| `GET`  | `/api/check-user?username=` | Check whether a username exists |
+| `POST` | `/api/add-friend` | Add a user to your friends list |
+| `GET`  | `/api/get-friends?username=` | Retrieve a user's friends list |
+| `POST` | `/api/remove-friend` | Remove a user from your friends list |
