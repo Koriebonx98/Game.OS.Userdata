@@ -43,19 +43,16 @@ jobs:
       - name: Inject DATA_REPO_TOKEN into script.js
         run: |
           python3 << 'PYEOF'
-          import os, json
+          import os, json, re
           token = os.environ.get('DATA_REPO_TOKEN', '')
           with open('script.js', 'r') as f:
               content = f.read()
           # json.dumps produces a valid JS string literal and handles all special chars.
-          # Match up to the end-of-line comment so the full placeholder line is replaced.
-          import re
-          old = "const GITHUB_TOKEN = ''; # \u2190 injected at deploy time by .github/workflows/deploy.yml"
-          new = f"const GITHUB_TOKEN = {json.dumps(token)};"
-          updated = content.replace(old, new, 1)
-          # Fallback: plain placeholder without comment (in case of whitespace differences)
-          if old not in content:
-              updated = re.sub(r"const GITHUB_TOKEN = '';.*", new, content, count=1)
+          # Replace the placeholder line regardless of any trailing comment text.
+          new_line = f"const GITHUB_TOKEN = {json.dumps(token)};"
+          updated = re.sub(r"const GITHUB_TOKEN\s*=\s*'';.*", new_line, content, count=1)
+          if updated == content:
+              print('WARNING: GITHUB_TOKEN placeholder not found in script.js — no replacement made')
           with open('script.js', 'w') as f:
               f.write(updated)
           status = 'injected (GitHub mode active)' if token else 'not set — site will use demo mode'
