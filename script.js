@@ -215,7 +215,7 @@ function githubHeaders() {
 async function githubRead(path) {
     const resp = await fetch(
         `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
-        { headers: githubHeaders() }
+        { headers: githubHeaders(), cache: 'no-store' }
     );
     if (resp.status === 404) return null;
     if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
@@ -1344,6 +1344,7 @@ async function loadFriendsList() {
     const countEl   = document.getElementById('friendsCount');
     if (!listEl) return;
 
+    await modeReady;
     listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
         let friends, sentRequests;
@@ -1397,6 +1398,7 @@ async function loadInbox() {
     const badgeEl = document.getElementById('inboxCount');
     if (!inboxEl) return;
 
+    await modeReady;
     inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
         let incomingRequests;
