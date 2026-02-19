@@ -2186,7 +2186,7 @@ function closeGameModal() {
 }
 
 function _buildGameModalFields(game) {
-    const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images']);
+    const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -2197,6 +2197,51 @@ function _buildGameModalFields(game) {
                 <span class="game-modal-field-value">${escapeHtml(value)}</span>
             </div>`;
         }).join('');
+}
+
+function _getYouTubeId(urlOrId) {
+    if (!urlOrId) return null;
+    const s = String(urlOrId).trim();
+    if (/^[a-zA-Z0-9_-]{11}$/.test(s)) return s;
+    const m = s.match(/(?:youtube\.com\/(?:watch\?v=|embed\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
+    return m ? m[1] : null;
+}
+
+function _buildTrailerSection(game) {
+    const trailers = game.trailers;
+    if (!Array.isArray(trailers) || !trailers.length) return '';
+    const ytId = _getYouTubeId(trailers[0]);
+    if (!ytId) return '';
+    return `<div class="game-modal-trailer">
+        <div class="game-modal-trailer-label">🎬 Trailer</div>
+        <div class="game-modal-trailer-wrap">
+            <iframe src="https://www.youtube-nocookie.com/embed/${escapeHtml(ytId)}?rel=0"
+                class="game-modal-trailer-iframe"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen></iframe>
+        </div>
+    </div>`;
+}
+
+function _buildFriendsSection(friendLibraries, platform, title) {
+    const titleLower = (title || '').toLowerCase();
+    const friends = Object.keys(friendLibraries).filter(name =>
+        (friendLibraries[name] || []).some(g =>
+            g.platform === platform &&
+            (g.title || '').toLowerCase() === titleLower
+        )
+    );
+    if (!friends.length) return '';
+    const items = friends.map(name =>
+        `<a href="profile.html?user=${encodeURIComponent(name)}" class="game-friends-list-item" onclick="closeGameModal()">👤 ${escapeHtml(name)}</a>`
+    ).join('');
+    return `<div class="game-modal-field game-modal-friends-field">
+        <span class="game-modal-field-label">Friends who own this</span>
+        <span class="game-modal-field-value">
+            <span class="game-friends-badge">👥 ${friends.length} friend${friends.length !== 1 ? 's' : ''}</span>
+            <div class="game-friends-list">${items}</div>
+        </span>
+    </div>`;
 }
 
 function openGameModal(game, platform) {
@@ -2223,7 +2268,10 @@ function openGameModal(game, platform) {
 
     const bgUrls    = getGameBackgroundUrls(game);
     const fieldRows = _buildGameModalFields(game);
+    const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
     let bodyHtml = '';
+    bodyHtml += _buildTrailerSection(game);
+    bodyHtml += _buildFriendsSection(libs, platform, title);
     if (bgUrls.length > 0) {
         bodyHtml += `<div class="game-modal-bg-gallery">${
             bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
@@ -2268,16 +2316,10 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         const source    = game || (titleId ? { TitleID: titleId } : {});
         const bgUrls    = getGameBackgroundUrls(source);
         const fieldRows = _buildGameModalFields(source);
-        let bodyHtml = '';
-        // Show how many friends also own this game (available on the My Library page)
         const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
-        const fc = countFriendsWithGame(libs, platform, title);
-        if (fc > 0) {
-            bodyHtml += `<div class="game-modal-field">
-                <span class="game-modal-field-label">Friends who own this</span>
-                <span class="game-modal-field-value"><span class="game-friends-badge">👥 ${fc} friend${fc !== 1 ? 's' : ''}</span></span>
-            </div>`;
-        }
+        let bodyHtml = '';
+        bodyHtml += _buildTrailerSection(source);
+        bodyHtml += _buildFriendsSection(libs, platform, title);
         if (bgUrls.length > 0) {
             bodyHtml += `<div class="game-modal-bg-gallery">${
                 bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
