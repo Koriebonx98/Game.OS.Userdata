@@ -1003,27 +1003,156 @@ async function addFriendGitHub(username, friendUsername) {
     const friendFile = await githubRead(`accounts/${friendLower}/profile.json`);
     if (!friendFile) return { success: false, message: 'User not found' };
 
+    // Check if already accepted friends
     const friendsPath = `accounts/${usernameLower}/friends.json`;
     const friendsFile = await githubRead(friendsPath);
     const friends     = friendsFile ? [...friendsFile.content] : [];
-
     if (friends.some(f => f.toLowerCase() === friendLower)) {
         return { success: false, message: 'Already friends with this user' };
     }
 
-    friends.push(friendFile.content.username);
+    // Check if they already sent us a request → auto-accept
+    const myRequestsPath = `accounts/${usernameLower}/friend_requests.json`;
+    const myRequestsFile = await githubRead(myRequestsPath);
+    const myRequests     = myRequestsFile ? myRequestsFile.content : [];
+    if (myRequests.some(r => r.from.toLowerCase() === friendLower)) {
+        return await acceptFriendRequestGitHub(username, friendFile.content.username);
+    }
+
+    // Check if we already sent them a request
+    const sentPath = `accounts/${usernameLower}/sent_requests.json`;
+    const sentFile = await githubRead(sentPath);
+    const sent     = sentFile ? [...sentFile.content] : [];
+    if (sent.some(s => s.toLowerCase() === friendLower)) {
+        return { success: false, message: 'Friend request already pending' };
+    }
+
+    // Add to recipient's incoming requests
+    const theirRequestsPath = `accounts/${friendLower}/friend_requests.json`;
+    const theirRequestsFile = await githubRead(theirRequestsPath);
+    const theirRequests     = theirRequestsFile ? [...theirRequestsFile.content] : [];
+    theirRequests.push({ from: username, sentAt: new Date().toISOString() });
     await githubWrite(
-        friendsPath,
-        friends,
-        `Add friend ${friendUsername} for: ${username}`,
-        friendsFile ? friendsFile.sha : undefined
+        theirRequestsPath,
+        theirRequests,
+        `Friend request from ${username} to ${friendUsername}`,
+        theirRequestsFile ? theirRequestsFile.sha : undefined
     );
-    return { success: true, message: `${friendFile.content.username} added as a friend`, friends };
+
+    // Add to sender's outgoing requests
+    sent.push(friendFile.content.username);
+    await githubWrite(
+        sentPath,
+        sent,
+        `Sent friend request to ${friendUsername} for: ${username}`,
+        sentFile ? sentFile.sha : undefined
+    );
+
+    return { success: true, message: `Friend request sent to ${friendFile.content.username}! Waiting for them to accept.` };
+}
+
+async function acceptFriendRequestGitHub(username, fromUsername) {
+    const usernameLower = username.toLowerCase();
+    const fromLower     = fromUsername.toLowerCase();
+
+    // Remove from recipient's incoming requests
+    const requestsPath = `accounts/${usernameLower}/friend_requests.json`;
+    const requestsFile = await githubRead(requestsPath);
+    if (!requestsFile) return { success: false, message: 'Friend request not found' };
+    const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
+    if (updatedRequests.length === requestsFile.content.length) {
+        return { success: false, message: 'Friend request not found' };
+    }
+    await githubWrite(requestsPath, updatedRequests, `Accept friend request from ${fromUsername}`, requestsFile.sha);
+
+    // Remove from sender's outgoing requests
+    const sentPath = `accounts/${fromLower}/sent_requests.json`;
+    const sentFile = await githubRead(sentPath);
+    if (sentFile) {
+        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== usernameLower);
+        await githubWrite(sentPath, updatedSent, `Friend request accepted by ${username}`, sentFile.sha);
+    }
+
+    // Add sender to recipient's friends
+    const myFriendsPath = `accounts/${usernameLower}/friends.json`;
+    const myFriendsFile = await githubRead(myFriendsPath);
+    const myFriends     = myFriendsFile ? [...myFriendsFile.content] : [];
+    if (!myFriends.some(f => f.toLowerCase() === fromLower)) {
+        const fromFile = await githubRead(`accounts/${fromLower}/profile.json`);
+        myFriends.push(fromFile ? fromFile.content.username : fromUsername);
+        await githubWrite(myFriendsPath, myFriends, `Add friend ${fromUsername} for: ${username}`, myFriendsFile ? myFriendsFile.sha : undefined);
+    }
+
+    // Add recipient to sender's friends
+    const theirFriendsPath = `accounts/${fromLower}/friends.json`;
+    const theirFriendsFile = await githubRead(theirFriendsPath);
+    const theirFriends     = theirFriendsFile ? [...theirFriendsFile.content] : [];
+    if (!theirFriends.some(f => f.toLowerCase() === usernameLower)) {
+        const userFile = await githubRead(`accounts/${usernameLower}/profile.json`);
+        theirFriends.push(userFile ? userFile.content.username : username);
+        await githubWrite(theirFriendsPath, theirFriends, `Add friend ${username} for: ${fromUsername}`, theirFriendsFile ? theirFriendsFile.sha : undefined);
+    }
+
+    return { success: true, message: `You are now friends with ${fromUsername}!` };
+}
+
+async function declineFriendRequestGitHub(username, fromUsername) {
+    const usernameLower = username.toLowerCase();
+    const fromLower     = fromUsername.toLowerCase();
+
+    // Remove from recipient's incoming requests
+    const requestsPath = `accounts/${usernameLower}/friend_requests.json`;
+    const requestsFile = await githubRead(requestsPath);
+    if (!requestsFile) return { success: false, message: 'Friend request not found' };
+    const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
+    await githubWrite(requestsPath, updatedRequests, `Decline friend request from ${fromUsername}`, requestsFile.sha);
+
+    // Remove from sender's outgoing requests
+    const sentPath = `accounts/${fromLower}/sent_requests.json`;
+    const sentFile = await githubRead(sentPath);
+    if (sentFile) {
+        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== usernameLower);
+        await githubWrite(sentPath, updatedSent, `Friend request declined by ${username}`, sentFile.sha);
+    }
+
+    return { success: true, message: 'Friend request declined.' };
+}
+
+async function cancelFriendRequestGitHub(username, toUsername) {
+    const usernameLower = username.toLowerCase();
+    const toLower       = toUsername.toLowerCase();
+
+    // Remove from sender's outgoing requests
+    const sentPath = `accounts/${usernameLower}/sent_requests.json`;
+    const sentFile = await githubRead(sentPath);
+    if (!sentFile) return { success: false, message: 'No sent requests found' };
+    const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== toLower);
+    await githubWrite(sentPath, updatedSent, `Cancel friend request to ${toUsername}`, sentFile.sha);
+
+    // Remove from recipient's incoming requests
+    const theirRequestsPath = `accounts/${toLower}/friend_requests.json`;
+    const theirRequestsFile = await githubRead(theirRequestsPath);
+    if (theirRequestsFile) {
+        const updatedRequests = theirRequestsFile.content.filter(r => r.from.toLowerCase() !== usernameLower);
+        await githubWrite(theirRequestsPath, updatedRequests, `Friend request cancelled by ${username}`, theirRequestsFile.sha);
+    }
+
+    return { success: true };
 }
 
 async function getFriendsGitHub(username) {
     const friendsFile = await githubRead(`accounts/${username.toLowerCase()}/friends.json`);
     return friendsFile ? friendsFile.content : [];
+}
+
+async function getFriendRequestsGitHub(username) {
+    const requestsFile = await githubRead(`accounts/${username.toLowerCase()}/friend_requests.json`);
+    return requestsFile ? requestsFile.content : [];
+}
+
+async function getSentRequestsGitHub(username) {
+    const sentFile = await githubRead(`accounts/${username.toLowerCase()}/sent_requests.json`);
+    return sentFile ? sentFile.content : [];
 }
 
 async function removeFriendGitHub(username, friendUsername) {
@@ -1055,6 +1184,26 @@ function saveDemoFriends(username, friends) {
     localStorage.setItem(`gameOS_friends_${username.toLowerCase()}`, JSON.stringify(friends));
 }
 
+function getDemoFriendRequests(username) {
+    const key = `gameOS_friend_requests_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoFriendRequests(username, requests) {
+    localStorage.setItem(`gameOS_friend_requests_${username.toLowerCase()}`, JSON.stringify(requests));
+}
+
+function getDemoSentRequests(username) {
+    const key = `gameOS_sent_requests_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoSentRequests(username, sent) {
+    localStorage.setItem(`gameOS_sent_requests_${username.toLowerCase()}`, JSON.stringify(sent));
+}
+
 async function addFriendDemo(username, friendUsername) {
     if (username.toLowerCase() === friendUsername.toLowerCase()) {
         return { success: false, message: 'You cannot add yourself as a friend' };
@@ -1063,13 +1212,91 @@ async function addFriendDemo(username, friendUsername) {
     const friendAccount = accounts.find(a => a.username.toLowerCase() === friendUsername.toLowerCase());
     if (!friendAccount) return { success: false, message: 'User not found' };
 
+    // Check already accepted friends
     const friends = getDemoFriends(username);
     if (friends.some(f => f.toLowerCase() === friendUsername.toLowerCase())) {
         return { success: false, message: 'Already friends with this user' };
     }
-    friends.push(friendAccount.username);
-    saveDemoFriends(username, friends);
-    return { success: true, message: `${friendAccount.username} added as a friend`, friends };
+
+    // Check if they already sent us a request → auto-accept
+    const myRequests = getDemoFriendRequests(username);
+    if (myRequests.some(r => r.from.toLowerCase() === friendUsername.toLowerCase())) {
+        return await acceptFriendRequestDemo(username, friendAccount.username);
+    }
+
+    // Check if we already sent them a request
+    const sent = getDemoSentRequests(username);
+    if (sent.some(s => s.toLowerCase() === friendUsername.toLowerCase())) {
+        return { success: false, message: 'Friend request already pending' };
+    }
+
+    // Add to recipient's incoming requests
+    const theirRequests = getDemoFriendRequests(friendUsername);
+    theirRequests.push({ from: username, sentAt: new Date().toISOString() });
+    saveDemoFriendRequests(friendUsername, theirRequests);
+
+    // Add to sender's outgoing requests
+    sent.push(friendAccount.username);
+    saveDemoSentRequests(username, sent);
+
+    return { success: true, message: `Friend request sent to ${friendAccount.username}! Waiting for them to accept.` };
+}
+
+async function acceptFriendRequestDemo(username, fromUsername) {
+    // Remove from recipient's incoming requests
+    const myRequests = getDemoFriendRequests(username);
+    const updatedRequests = myRequests.filter(r => r.from.toLowerCase() !== fromUsername.toLowerCase());
+    saveDemoFriendRequests(username, updatedRequests);
+
+    // Remove from sender's outgoing requests
+    const theirSent = getDemoSentRequests(fromUsername);
+    const updatedSent = theirSent.filter(s => s.toLowerCase() !== username.toLowerCase());
+    saveDemoSentRequests(fromUsername, updatedSent);
+
+    // Add both as accepted friends
+    const accounts = getDemoAccounts();
+    const myFriends = getDemoFriends(username);
+    if (!myFriends.some(f => f.toLowerCase() === fromUsername.toLowerCase())) {
+        const fromAccount = accounts.find(a => a.username.toLowerCase() === fromUsername.toLowerCase());
+        myFriends.push(fromAccount ? fromAccount.username : fromUsername);
+        saveDemoFriends(username, myFriends);
+    }
+    const theirFriends = getDemoFriends(fromUsername);
+    if (!theirFriends.some(f => f.toLowerCase() === username.toLowerCase())) {
+        const userAccount = accounts.find(a => a.username.toLowerCase() === username.toLowerCase());
+        theirFriends.push(userAccount ? userAccount.username : username);
+        saveDemoFriends(fromUsername, theirFriends);
+    }
+
+    return { success: true, message: `You are now friends with ${fromUsername}!` };
+}
+
+async function declineFriendRequestDemo(username, fromUsername) {
+    // Remove from recipient's incoming requests
+    const myRequests = getDemoFriendRequests(username);
+    const updatedRequests = myRequests.filter(r => r.from.toLowerCase() !== fromUsername.toLowerCase());
+    saveDemoFriendRequests(username, updatedRequests);
+
+    // Remove from sender's outgoing requests
+    const theirSent = getDemoSentRequests(fromUsername);
+    const updatedSent = theirSent.filter(s => s.toLowerCase() !== username.toLowerCase());
+    saveDemoSentRequests(fromUsername, updatedSent);
+
+    return { success: true, message: 'Friend request declined.' };
+}
+
+async function cancelFriendRequestDemo(username, toUsername) {
+    // Remove from sender's outgoing requests
+    const sent = getDemoSentRequests(username);
+    const updatedSent = sent.filter(s => s.toLowerCase() !== toUsername.toLowerCase());
+    saveDemoSentRequests(username, updatedSent);
+
+    // Remove from recipient's incoming requests
+    const theirRequests = getDemoFriendRequests(toUsername);
+    const updatedRequests = theirRequests.filter(r => r.from.toLowerCase() !== username.toLowerCase());
+    saveDemoFriendRequests(toUsername, updatedRequests);
+
+    return { success: true };
 }
 
 async function removeFriendDemo(username, friendUsername) {
@@ -1092,23 +1319,58 @@ async function loadFriendsList() {
 
     listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
-        let friends;
+        let friends, incomingRequests, sentRequests;
         if (MODE === 'demo') {
-            friends = getDemoFriends(user.username);
+            friends          = getDemoFriends(user.username);
+            incomingRequests = getDemoFriendRequests(user.username);
+            sentRequests     = getDemoSentRequests(user.username);
         } else {
-            friends = await getFriendsGitHub(user.username);
+            [friends, incomingRequests, sentRequests] = await Promise.all([
+                getFriendsGitHub(user.username),
+                getFriendRequestsGitHub(user.username),
+                getSentRequestsGitHub(user.username)
+            ]);
         }
         if (countEl) countEl.textContent = friends.length;
-        if (friends.length === 0) {
-            listEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No friends yet. Search above to add someone!</p>';
-            return;
+
+        let html = '';
+
+        // Incoming pending requests
+        if (incomingRequests.length > 0) {
+            html += '<div class="friend-requests-section"><p class="friend-requests-title">📨 Pending Requests</p>';
+            html += incomingRequests.map(r => `
+                <div class="friend-item">
+                    <span class="friend-name">👤 ${r.from}</span>
+                    <div class="friend-actions">
+                        <button class="btn-accept-friend" onclick="handleAcceptFriendRequest('${r.from}')">✅ Accept</button>
+                        <button class="btn-decline-friend" onclick="handleDeclineFriendRequest('${r.from}')">❌ Decline</button>
+                    </div>
+                </div>
+            `).join('');
+            html += '</div>';
         }
-        listEl.innerHTML = friends.map(f => `
+
+        // Accepted friends
+        html += friends.map(f => `
             <div class="friend-item">
                 <span class="friend-name">👤 ${f}</span>
                 <button class="btn-remove-friend" onclick="handleRemoveFriend('${f}')">Remove</button>
             </div>
         `).join('');
+
+        // Outgoing pending requests
+        html += sentRequests.map(s => `
+            <div class="friend-item">
+                <span class="friend-name">👤 ${s}</span>
+                <span class="friend-pending-badge">⏳ Pending</span>
+                <button class="btn-remove-friend" onclick="handleCancelFriendRequest('${s}')">Cancel</button>
+            </div>
+        `).join('');
+
+        if (!html) {
+            html = '<p style="color:#666;font-size:0.9em;">No friends yet. Search above to add someone!</p>';
+        }
+        listEl.innerHTML = html;
     } catch (err) {
         listEl.innerHTML = '<p style="color:#c00;">Failed to load friends.</p>';
     }
@@ -1125,7 +1387,7 @@ async function handleAddFriend() {
         return;
     }
     clearMessage(msgEl);
-    showMessage(msgEl, '⏳ Adding friend…', 'info');
+    showMessage(msgEl, '⏳ Sending friend request…', 'info');
     try {
         let result;
         if (MODE === 'demo') {
@@ -1141,7 +1403,75 @@ async function handleAddFriend() {
             showMessage(msgEl, `❌ ${result.message}`, 'error');
         }
     } catch (err) {
-        showMessage(msgEl, '❌ Failed to add friend. Please try again.', 'error');
+        showMessage(msgEl, '❌ Failed to send friend request. Please try again.', 'error');
+    }
+}
+
+async function handleAcceptFriendRequest(fromUsername) {
+    const msgEl = document.getElementById('friendMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+    clearMessage(msgEl);
+    showMessage(msgEl, '⏳ Accepting request…', 'info');
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await acceptFriendRequestDemo(user.username, fromUsername);
+        } else {
+            result = await acceptFriendRequestGitHub(user.username, fromUsername);
+        }
+        if (result.success) {
+            showMessage(msgEl, `✅ ${result.message}`, 'success');
+            loadFriendsList();
+        } else {
+            showMessage(msgEl, `❌ ${result.message}`, 'error');
+        }
+    } catch (err) {
+        showMessage(msgEl, '❌ Failed to accept request. Please try again.', 'error');
+    }
+}
+
+async function handleDeclineFriendRequest(fromUsername) {
+    const msgEl = document.getElementById('friendMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+    clearMessage(msgEl);
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await declineFriendRequestDemo(user.username, fromUsername);
+        } else {
+            result = await declineFriendRequestGitHub(user.username, fromUsername);
+        }
+        if (result.success) {
+            loadFriendsList();
+        } else {
+            showMessage(msgEl, `❌ ${result.message}`, 'error');
+        }
+    } catch (err) {
+        showMessage(msgEl, '❌ Failed to decline request. Please try again.', 'error');
+    }
+}
+
+async function handleCancelFriendRequest(toUsername) {
+    const msgEl = document.getElementById('friendMessage');
+    const user  = getCurrentUser();
+    if (!user) return;
+    clearMessage(msgEl);
+    try {
+        let result;
+        if (MODE === 'demo') {
+            result = await cancelFriendRequestDemo(user.username, toUsername);
+        } else {
+            result = await cancelFriendRequestGitHub(user.username, toUsername);
+        }
+        if (result.success) {
+            loadFriendsList();
+        } else {
+            showMessage(msgEl, `❌ ${result.message}`, 'error');
+        }
+    } catch (err) {
+        showMessage(msgEl, '❌ Failed to cancel request. Please try again.', 'error');
     }
 }
 
@@ -1208,7 +1538,7 @@ function resetAllAccountsDemo() {
     const keysToRemove = [];
     for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_'))) {
+        if (key && (key === 'gameOS_accounts' || key.startsWith('gameOS_friends_') || key.startsWith('gameOS_friend_requests_') || key.startsWith('gameOS_sent_requests_'))) {
             keysToRemove.push(key);
         }
     }

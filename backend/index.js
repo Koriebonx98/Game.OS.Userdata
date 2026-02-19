@@ -312,8 +312,8 @@ app.get('/api/check-user', async (req, res) => {
     }
 });
 
-// ── POST /api/add-friend ──────────────────────────────────────────────────────
-app.post('/api/add-friend', async (req, res) => {
+// ── POST /api/send-friend-request (also handles legacy /api/add-friend) ───────
+async function handleSendFriendRequest(req, res) {
     try {
         const { username, friendUsername } = req.body;
 
@@ -334,27 +334,225 @@ app.post('/api/add-friend', async (req, res) => {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Read or initialise friends list
-        const friendsPath  = `accounts/${username.toLowerCase()}/friends.json`;
-        const friendsFile  = await getFile(friendsPath);
-        const friends      = friendsFile ? friendsFile.content : [];
+        const userLower   = username.toLowerCase();
+        const friendLower = friendUsername.toLowerCase();
 
-        if (friends.some(f => f.toLowerCase() === friendUsername.toLowerCase())) {
+        // Check if already accepted friends
+        const friendsFile = await getFile(`accounts/${userLower}/friends.json`);
+        const friends     = friendsFile ? friendsFile.content : [];
+        if (friends.some(f => f.toLowerCase() === friendLower)) {
             return res.status(400).json({ success: false, message: 'Already friends with this user' });
         }
 
-        friends.push(friendFile.content.username);
+        // Check if they already sent us a request → auto-accept
+        const myRequestsFile = await getFile(`accounts/${userLower}/friend_requests.json`);
+        const myRequests     = myRequestsFile ? myRequestsFile.content : [];
+        if (myRequests.some(r => r.from.toLowerCase() === friendLower)) {
+            const result = await acceptFriendRequest(userLower, friendLower);
+            if (!result.success) return res.status(400).json(result);
+            return res.json({ success: true, message: `You are now friends with ${friendFile.content.username}!` });
+        }
+
+        // Check if we already sent them a request
+        const sentFile = await getFile(`accounts/${userLower}/sent_requests.json`);
+        const sent     = sentFile ? sentFile.content : [];
+        if (sent.some(s => s.toLowerCase() === friendLower)) {
+            return res.status(400).json({ success: false, message: 'Friend request already pending' });
+        }
+
+        // Add to recipient's incoming requests
+        const theirRequestsPath = `accounts/${friendLower}/friend_requests.json`;
+        const theirRequestsFile = await getFile(theirRequestsPath);
+        const theirRequests     = theirRequestsFile ? [...theirRequestsFile.content] : [];
+        theirRequests.push({ from: userFile.content.username, sentAt: new Date().toISOString() });
         await putFile(
-            friendsPath,
-            friends,
-            `Add friend ${friendUsername} for: ${username}`,
-            friendsFile ? friendsFile.sha : undefined
+            theirRequestsPath,
+            theirRequests,
+            `Friend request from ${username} to ${friendUsername}`,
+            theirRequestsFile ? theirRequestsFile.sha : undefined
         );
 
-        res.json({ success: true, message: `${friendFile.content.username} added as a friend` });
+        // Add to sender's outgoing requests
+        sent.push(friendFile.content.username);
+        await putFile(
+            `accounts/${userLower}/sent_requests.json`,
+            sent,
+            `Sent friend request to ${friendUsername} for: ${username}`,
+            sentFile ? sentFile.sha : undefined
+        );
+
+        res.json({ success: true, message: `Friend request sent to ${friendFile.content.username}! Waiting for them to accept.` });
     } catch (err) {
-        console.error('Error adding friend:', err);
-        res.status(500).json({ success: false, message: 'Failed to add friend. Please try again.' });
+        console.error('Error sending friend request:', err);
+        res.status(500).json({ success: false, message: 'Failed to send friend request. Please try again.' });
+    }
+}
+
+app.post('/api/send-friend-request', handleSendFriendRequest);
+
+// ── POST /api/add-friend (legacy alias for send-friend-request) ───────────────
+app.post('/api/add-friend', handleSendFriendRequest);
+
+// ── Helper: accept a friend request ──────────────────────────────────────────
+async function acceptFriendRequest(userLower, fromLower) {
+    // Remove from recipient's incoming requests
+    const requestsPath = `accounts/${userLower}/friend_requests.json`;
+    const requestsFile = await getFile(requestsPath);
+    if (!requestsFile) return { success: false, message: 'Friend request not found' };
+    const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
+    if (updatedRequests.length === requestsFile.content.length) {
+        return { success: false, message: 'Friend request not found' };
+    }
+    await putFile(requestsPath, updatedRequests, `Accept friend request from ${fromLower}`, requestsFile.sha);
+
+    // Remove from sender's outgoing requests
+    const sentPath = `accounts/${fromLower}/sent_requests.json`;
+    const sentFile = await getFile(sentPath);
+    if (sentFile) {
+        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== userLower);
+        await putFile(sentPath, updatedSent, `Friend request accepted by ${userLower}`, sentFile.sha);
+    }
+
+    // Add sender to recipient's friends
+    const myFriendsPath = `accounts/${userLower}/friends.json`;
+    const myFriendsFile = await getFile(myFriendsPath);
+    const myFriends     = myFriendsFile ? [...myFriendsFile.content] : [];
+    if (!myFriends.some(f => f.toLowerCase() === fromLower)) {
+        const fromFile = await getFile(`accounts/${fromLower}/profile.json`);
+        myFriends.push(fromFile ? fromFile.content.username : fromLower);
+        await putFile(myFriendsPath, myFriends, `Add friend ${fromLower} for: ${userLower}`, myFriendsFile ? myFriendsFile.sha : undefined);
+    }
+
+    // Add recipient to sender's friends
+    const theirFriendsPath = `accounts/${fromLower}/friends.json`;
+    const theirFriendsFile = await getFile(theirFriendsPath);
+    const theirFriends     = theirFriendsFile ? [...theirFriendsFile.content] : [];
+    if (!theirFriends.some(f => f.toLowerCase() === userLower)) {
+        const userFile = await getFile(`accounts/${userLower}/profile.json`);
+        theirFriends.push(userFile ? userFile.content.username : userLower);
+        await putFile(theirFriendsPath, theirFriends, `Add friend ${userLower} for: ${fromLower}`, theirFriendsFile ? theirFriendsFile.sha : undefined);
+    }
+
+    return { success: true };
+}
+
+// ── POST /api/accept-friend-request ──────────────────────────────────────────
+app.post('/api/accept-friend-request', async (req, res) => {
+    try {
+        const { username, fromUsername } = req.body;
+        if (!username || !fromUsername) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const fromFile = await getFile(`accounts/${fromUsername.toLowerCase()}/profile.json`);
+        if (!fromFile) return res.status(404).json({ success: false, message: 'User not found' });
+
+        const result = await acceptFriendRequest(username.toLowerCase(), fromUsername.toLowerCase());
+        if (!result.success) return res.status(400).json(result);
+        res.json({ success: true, message: `You are now friends with ${fromFile.content.username}!` });
+    } catch (err) {
+        console.error('Error accepting friend request:', err);
+        res.status(500).json({ success: false, message: 'Failed to accept friend request. Please try again.' });
+    }
+});
+
+// ── POST /api/decline-friend-request ─────────────────────────────────────────
+app.post('/api/decline-friend-request', async (req, res) => {
+    try {
+        const { username, fromUsername } = req.body;
+        if (!username || !fromUsername) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const userLower = username.toLowerCase();
+        const fromLower = fromUsername.toLowerCase();
+
+        // Remove from recipient's incoming requests
+        const requestsPath = `accounts/${userLower}/friend_requests.json`;
+        const requestsFile = await getFile(requestsPath);
+        if (!requestsFile) {
+            return res.status(404).json({ success: false, message: 'Friend request not found' });
+        }
+        const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
+        await putFile(requestsPath, updatedRequests, `Decline friend request from ${fromUsername}`, requestsFile.sha);
+
+        // Remove from sender's outgoing requests
+        const sentPath = `accounts/${fromLower}/sent_requests.json`;
+        const sentFile = await getFile(sentPath);
+        if (sentFile) {
+            const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== userLower);
+            await putFile(sentPath, updatedSent, `Friend request declined by ${username}`, sentFile.sha);
+        }
+
+        res.json({ success: true, message: 'Friend request declined.' });
+    } catch (err) {
+        console.error('Error declining friend request:', err);
+        res.status(500).json({ success: false, message: 'Failed to decline friend request. Please try again.' });
+    }
+});
+
+// ── POST /api/cancel-friend-request ──────────────────────────────────────────
+app.post('/api/cancel-friend-request', async (req, res) => {
+    try {
+        const { username, toUsername } = req.body;
+        if (!username || !toUsername) {
+            return res.status(400).json({ success: false, message: 'Missing required fields' });
+        }
+
+        const userLower = username.toLowerCase();
+        const toLower   = toUsername.toLowerCase();
+
+        // Remove from sender's outgoing requests
+        const sentPath = `accounts/${userLower}/sent_requests.json`;
+        const sentFile = await getFile(sentPath);
+        if (!sentFile) {
+            return res.status(404).json({ success: false, message: 'No sent requests found' });
+        }
+        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== toLower);
+        await putFile(sentPath, updatedSent, `Cancel friend request to ${toUsername}`, sentFile.sha);
+
+        // Remove from recipient's incoming requests
+        const theirRequestsPath = `accounts/${toLower}/friend_requests.json`;
+        const theirRequestsFile = await getFile(theirRequestsPath);
+        if (theirRequestsFile) {
+            const updatedRequests = theirRequestsFile.content.filter(r => r.from.toLowerCase() !== userLower);
+            await putFile(theirRequestsPath, updatedRequests, `Friend request cancelled by ${username}`, theirRequestsFile.sha);
+        }
+
+        res.json({ success: true, message: 'Friend request cancelled.' });
+    } catch (err) {
+        console.error('Error cancelling friend request:', err);
+        res.status(500).json({ success: false, message: 'Failed to cancel friend request. Please try again.' });
+    }
+});
+
+// ── GET /api/get-friend-requests ──────────────────────────────────────────────
+app.get('/api/get-friend-requests', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const requestsFile = await getFile(`accounts/${username.toLowerCase()}/friend_requests.json`);
+        res.json({ success: true, requests: requestsFile ? requestsFile.content : [] });
+    } catch (err) {
+        console.error('Error getting friend requests:', err);
+        res.status(500).json({ success: false, message: 'Failed to get friend requests.' });
+    }
+});
+
+// ── GET /api/get-sent-requests ────────────────────────────────────────────────
+app.get('/api/get-sent-requests', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+        const sentFile = await getFile(`accounts/${username.toLowerCase()}/sent_requests.json`);
+        res.json({ success: true, sent: sentFile ? sentFile.content : [] });
+    } catch (err) {
+        console.error('Error getting sent requests:', err);
+        res.status(500).json({ success: false, message: 'Failed to get sent requests.' });
     }
 });
 
