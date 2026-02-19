@@ -9,7 +9,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>Game OS Userdata</h1>
+            <h1>🎮 Game OS Userdata</h1>
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
                 <a href="signup.html" class="nav-link">Sign Up</a>
@@ -18,29 +18,37 @@
         
         <main>
             <div class="form-container">
-                <h2>Login</h2>
-                <p class="form-subtitle">Welcome back! Please login to your account</p>
+                <h2>Welcome Back</h2>
+                <p class="form-subtitle">Sign in to your Game OS account</p>
+                
+                <!-- Connection Status -->
+                <div class="text-center">
+                    <div id="connectionStatus" class="status"></div>
+                </div>
                 
                 <form id="loginForm" class="auth-form">
                     <div class="form-group">
-                        <label for="loginEmail">Email</label>
+                        <label for="loginEmail">Email or Username *</label>
                         <input 
-                            type="email" 
+                            type="text" 
                             id="loginEmail" 
                             name="email" 
-                            placeholder="Enter your email"
+                            placeholder="your.email@example.com"
                             required
+                            autocomplete="email"
                         >
+                        <small style="color: #666; font-size: 0.85em;">Enter your email or username</small>
                     </div>
                     
                     <div class="form-group">
-                        <label for="loginPassword">Password</label>
+                        <label for="loginPassword">Password *</label>
                         <input 
                             type="password" 
                             id="loginPassword" 
                             name="password" 
                             placeholder="Enter your password"
                             required
+                            autocomplete="current-password"
                         >
                     </div>
                     
@@ -59,6 +67,7 @@
                     </div>
                 </form>
                 
+                <!-- Message Display -->
                 <div id="loginMessage" class="message"></div>
             </div>
         </main>

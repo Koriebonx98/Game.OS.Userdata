@@ -1,8 +1,26 @@
-// Form Handling and Validation
+/**
+ * Game.OS Userdata - Account Management Script
+ * 
+ * This script connects to the Game.OS.Private.Data backend server
+ * for real account creation and authentication.
+ */
 
-// Wait for DOM to be fully loaded
+// ============================================================
+// CONFIGURATION - UPDATE THIS AFTER DEPLOYING BACKEND
+// ============================================================
+
+// TODO: Replace with your deployed backend URL
+// Examples:
+//   - Railway: 'https://game-os-backend.railway.app'
+//   - Render: 'https://game-os-backend.onrender.com'
+//   - Vercel: 'https://game-os-backend.vercel.app'
+const API_BASE_URL = 'https://your-backend-url.com';
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+
 document.addEventListener('DOMContentLoaded', function() {
-    
     // Login Form Handler
     const loginForm = document.getElementById('loginForm');
     if (loginForm) {
@@ -14,72 +32,72 @@ document.addEventListener('DOMContentLoaded', function() {
     if (signupForm) {
         signupForm.addEventListener('submit', handleSignup);
     }
+    
+    // Check backend connectivity
+    checkBackendHealth();
+    
+    // Display current user if logged in (for home page)
+    displayCurrentUser();
 });
 
-// Handle Login Form Submission
-function handleLogin(event) {
-    event.preventDefault();
-    
-    const messageDiv = document.getElementById('loginMessage');
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    const rememberMe = document.getElementById('rememberMe').checked;
-    
-    // Clear previous messages
-    messageDiv.className = 'message';
-    messageDiv.textContent = '';
-    
-    // Basic validation
-    if (!validateEmail(email)) {
-        showMessage(messageDiv, 'Please enter a valid email address', 'error');
-        return;
-    }
-    
-    if (password.length < 6) {
-        showMessage(messageDiv, 'Password must be at least 6 characters long', 'error');
-        return;
-    }
-    
-    // Simulate login (In production, this would be an API call)
-    console.log('Login attempt:', { email, rememberMe });
-    
-    // Check if user exists in localStorage (for demo purposes)
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const user = users.find(u => u.email === email && u.password === password);
-    
-    if (user) {
-        showMessage(messageDiv, 'Login successful! Redirecting...', 'success');
+// ============================================================
+// BACKEND HEALTH CHECK
+// ============================================================
+
+async function checkBackendHealth() {
+    try {
+        const response = await fetch(`${API_BASE_URL}/health`, {
+            method: 'GET'
+        });
         
-        // Store session
-        if (rememberMe) {
-            localStorage.setItem('currentUser', JSON.stringify(user));
+        if (response.ok) {
+            const data = await response.json();
+            console.log('✅ Backend Status:', data.status);
+            console.log('📡 Backend Message:', data.message);
+            
+            // Show connection status if there's a status element
+            const statusElement = document.getElementById('connectionStatus');
+            if (statusElement) {
+                statusElement.textContent = '✅ Connected to backend';
+                statusElement.className = 'status connected';
+            }
         } else {
-            sessionStorage.setItem('currentUser', JSON.stringify(user));
+            throw new Error('Backend returned error status');
         }
+    } catch (error) {
+        console.warn('⚠️ Backend server not reachable');
+        console.warn('Error:', error.message);
+        console.warn('');
+        console.warn('Setup Instructions:');
+        console.warn('1. Deploy the backend server from Game.OS.Private.Data/backend-server');
+        console.warn('2. Update API_BASE_URL in script.js with your backend URL');
+        console.warn('3. Refresh this page');
         
-        // Redirect after 1.5 seconds (in production, redirect to dashboard)
-        setTimeout(() => {
-            showMessage(messageDiv, 'Welcome back, ' + user.username + '!', 'success');
-        }, 1500);
-    } else {
-        showMessage(messageDiv, 'Invalid email or password. Please try again.', 'error');
+        // Show warning if there's a status element
+        const statusElement = document.getElementById('connectionStatus');
+        if (statusElement) {
+            statusElement.textContent = '⚠️ Backend not connected - Using demo mode';
+            statusElement.className = 'status disconnected';
+        }
     }
 }
 
-// Handle Signup Form Submission
-function handleSignup(event) {
+// ============================================================
+// SIGNUP HANDLER
+// ============================================================
+
+async function handleSignup(event) {
     event.preventDefault();
     
     const messageDiv = document.getElementById('signupMessage');
-    const username = document.getElementById('signupUsername').value;
-    const email = document.getElementById('signupEmail').value;
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('signupConfirmPassword').value;
     const agreeTerms = document.getElementById('agreeTerms').checked;
     
     // Clear previous messages
-    messageDiv.className = 'message';
-    messageDiv.textContent = '';
+    clearMessage(messageDiv);
     
     // Validation
     if (username.length < 3) {
@@ -107,46 +125,263 @@ function handleSignup(event) {
         return;
     }
     
-    // Check if user already exists
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const existingUser = users.find(u => u.email === email);
+    // Show loading state
+    showMessage(messageDiv, '⏳ Creating your account... Please wait.', 'info');
+    disableForm('signupForm');
     
-    if (existingUser) {
-        showMessage(messageDiv, 'An account with this email already exists', 'error');
+    try {
+        // Call backend API to create account
+        const response = await fetch(`${API_BASE_URL}/api/create-account`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: username,
+                email: email,
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Success!
+            showMessage(messageDiv, 
+                '✅ Account created successfully! You can now login. Redirecting...', 
+                'success'
+            );
+            
+            // Store username/email for convenience
+            localStorage.setItem('lastUsername', username);
+            localStorage.setItem('lastEmail', email);
+            
+            // Clear form
+            document.getElementById('signupForm').reset();
+            
+            // Redirect to login page after 3 seconds
+            setTimeout(() => {
+                window.location.href = 'login.html';
+            }, 3000);
+        } else {
+            // Handle error from backend
+            const errorMessage = data.message || 'Failed to create account. Please try again.';
+            showMessage(messageDiv, '❌ ' + errorMessage, 'error');
+            enableForm('signupForm');
+        }
+    } catch (error) {
+        // Network or other error
+        console.error('Signup error:', error);
+        showMessage(messageDiv, 
+            '❌ Cannot connect to server. Please check your connection and try again.', 
+            'error'
+        );
+        enableForm('signupForm');
+    }
+}
+
+// ============================================================
+// LOGIN HANDLER
+// ============================================================
+
+async function handleLogin(event) {
+    event.preventDefault();
+    
+    const messageDiv = document.getElementById('loginMessage');
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const rememberMe = document.getElementById('rememberMe').checked;
+    
+    // Clear previous messages
+    clearMessage(messageDiv);
+    
+    // Basic validation
+    if (!email) {
+        showMessage(messageDiv, 'Please enter your email', 'error');
         return;
     }
     
-    // Create new user (In production, this would be an API call)
-    // WARNING: This is for DEMONSTRATION ONLY!
-    // NEVER store plain text passwords in production - always hash passwords server-side
-    const newUser = {
-        username,
-        email,
-        password, // SECURITY WARNING: Plain text password - for demo only!
-        createdAt: new Date().toISOString()
-    };
+    if (!password) {
+        showMessage(messageDiv, 'Please enter your password', 'error');
+        return;
+    }
     
-    users.push(newUser);
-    localStorage.setItem('users', JSON.stringify(users));
+    // Send the email/username as-is; backend will handle the lookup
+    const loginIdentifier = email;
     
-    console.log('Signup successful:', { username, email });
+    // Show loading state
+    showMessage(messageDiv, '⏳ Verifying credentials... Please wait.', 'info');
+    disableForm('loginForm');
     
-    showMessage(messageDiv, 'Account created successfully! Redirecting to login...', 'success');
-    
-    // Redirect to login page after 2 seconds
-    setTimeout(() => {
-        window.location.href = 'login.html';
-    }, 2000);
+    try {
+        // Call backend API to verify account
+        const response = await fetch(`${API_BASE_URL}/api/verify-account`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                username: loginIdentifier,
+                password: password
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            // Success!
+            showMessage(messageDiv, 
+                `✅ Welcome back, ${username}! Login successful.`, 
+                'success'
+            );
+            
+            // Create user session
+            const userSession = {
+                username: username,
+                email: email,
+                loginTime: new Date().toISOString()
+            };
+            
+            // Store session
+            if (rememberMe) {
+                localStorage.setItem('gameOSUser', JSON.stringify(userSession));
+            } else {
+                sessionStorage.setItem('gameOSUser', JSON.stringify(userSession));
+            }
+            
+            // Redirect after 2 seconds
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 2000);
+        } else {
+            // Handle error from backend
+            showMessage(messageDiv, 
+                '❌ Invalid email or password. Please try again.', 
+                'error'
+            );
+            enableForm('loginForm');
+        }
+    } catch (error) {
+        // Network or other error
+        console.error('Login error:', error);
+        showMessage(messageDiv, 
+            '❌ Cannot connect to server. Please check your connection and try again.', 
+            'error'
+        );
+        enableForm('loginForm');
+    }
 }
 
-// Email Validation Helper
+// ============================================================
+// USER SESSION DISPLAY
+// ============================================================
+
+function displayCurrentUser() {
+    const user = getCurrentUser();
+    const userDisplayElement = document.getElementById('userDisplay');
+    
+    if (user && userDisplayElement) {
+        userDisplayElement.innerHTML = `
+            <div class="user-info">
+                <span class="welcome-text">Welcome, <strong>${user.username}</strong>!</span>
+                <button onclick="logout()" class="btn btn-secondary">Logout</button>
+            </div>
+        `;
+    }
+}
+
+// ============================================================
+// HELPER FUNCTIONS
+// ============================================================
+
 function validateEmail(email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
 }
 
-// Show Message Helper
 function showMessage(element, message, type) {
-    element.textContent = message;
-    element.className = 'message ' + type;
+    if (element) {
+        element.textContent = message;
+        element.className = 'message ' + type;
+        element.style.display = 'block';
+    }
+}
+
+function clearMessage(element) {
+    if (element) {
+        element.textContent = '';
+        element.className = 'message';
+        element.style.display = 'none';
+    }
+}
+
+function disableForm(formId) {
+    const form = document.getElementById(formId);
+    if (form) {
+        const inputs = form.querySelectorAll('input, button');
+        inputs.forEach(input => {
+            input.disabled = true;
+            input.style.opacity = '0.6';
+        });
+    }
+}
+
+function enableForm(formId) {
+    const form = document.getElementById(formId);
+    if (form) {
+        const inputs = form.querySelectorAll('input, button');
+        inputs.forEach(input => {
+            input.disabled = false;
+            input.style.opacity = '1';
+        });
+    }
+}
+
+// ============================================================
+// SESSION MANAGEMENT
+// ============================================================
+
+/**
+ * Check if user is logged in
+ */
+function isLoggedIn() {
+    const user = localStorage.getItem('gameOSUser') || sessionStorage.getItem('gameOSUser');
+    return user !== null;
+}
+
+/**
+ * Get current user information
+ */
+function getCurrentUser() {
+    const userStr = localStorage.getItem('gameOSUser') || sessionStorage.getItem('gameOSUser');
+    return userStr ? JSON.parse(userStr) : null;
+}
+
+/**
+ * Logout user
+ */
+function logout() {
+    localStorage.removeItem('gameOSUser');
+    sessionStorage.removeItem('gameOSUser');
+    window.location.href = 'login.html';
+}
+
+/**
+ * Require login for protected pages
+ * Call this at the top of pages that require authentication
+ */
+function requireLogin() {
+    if (!isLoggedIn()) {
+        window.location.href = 'login.html';
+    }
+}
+
+// Export functions for use in other scripts
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = {
+        isLoggedIn,
+        getCurrentUser,
+        logout,
+        requireLogin
+    };
 }
