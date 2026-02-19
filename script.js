@@ -16,6 +16,27 @@
 //   - Vercel: 'https://game-os-backend.vercel.app'
 const API_BASE_URL = 'https://your-backend-url.com';
 
+// Demo mode - uses localStorage when backend is not available
+let DEMO_MODE = true;
+
+// ============================================================
+// SECURITY - PASSWORD HASHING FOR DEMO MODE
+// ============================================================
+
+/**
+ * Hash password using Web Crypto API (for demo mode only)
+ * NOTE: This provides basic protection but is NOT suitable for production
+ * Production should use bcrypt or similar server-side hashing
+ */
+async function hashPasswordDemo(password) {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return hashHex;
+}
+
 // ============================================================
 // INITIALIZATION
 // ============================================================
@@ -54,6 +75,7 @@ async function checkBackendHealth() {
             const data = await response.json();
             console.log('✅ Backend Status:', data.status);
             console.log('📡 Backend Message:', data.message);
+            DEMO_MODE = false;
             
             // Show connection status if there's a status element
             const statusElement = document.getElementById('connectionStatus');
@@ -65,21 +87,145 @@ async function checkBackendHealth() {
             throw new Error('Backend returned error status');
         }
     } catch (error) {
-        console.warn('⚠️ Backend server not reachable');
+        console.warn('⚠️ Backend server not reachable - Using demo mode');
         console.warn('Error:', error.message);
         console.warn('');
-        console.warn('Setup Instructions:');
+        console.warn('Demo Mode Active:');
+        console.warn('✓ Accounts stored in browser localStorage');
+        console.warn('✓ Full registration and login functionality');
+        console.warn('✓ Password validation and security checks');
+        console.warn('');
+        console.warn('To connect to real backend:');
         console.warn('1. Deploy the backend server from Game.OS.Private.Data/backend-server');
         console.warn('2. Update API_BASE_URL in script.js with your backend URL');
         console.warn('3. Refresh this page');
         
+        DEMO_MODE = true;
+        
         // Show warning if there's a status element
         const statusElement = document.getElementById('connectionStatus');
         if (statusElement) {
-            statusElement.textContent = '⚠️ Backend not connected - Using demo mode';
+            statusElement.textContent = '🎮 Demo Mode - Accounts stored locally';
             statusElement.className = 'status disconnected';
         }
     }
+}
+
+// ============================================================
+// DEMO MODE FUNCTIONS (localStorage-based account system)
+// ============================================================
+
+/**
+ * Get all accounts from localStorage
+ */
+function getDemoAccounts() {
+    const accounts = localStorage.getItem('gameOS_accounts');
+    return accounts ? JSON.parse(accounts) : [];
+}
+
+/**
+ * Save accounts to localStorage
+ */
+function saveDemoAccounts(accounts) {
+    localStorage.setItem('gameOS_accounts', JSON.stringify(accounts));
+}
+
+/**
+ * Create account in demo mode
+ */
+async function createAccountDemo(username, email, password) {
+    // Hash password first (outside Promise)
+    const passwordHash = await hashPasswordDemo(password);
+    
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const accounts = getDemoAccounts();
+            
+            // Check if username already exists
+            if (accounts.find(acc => acc.username.toLowerCase() === username.toLowerCase())) {
+                resolve({
+                    success: false,
+                    message: 'Username already exists'
+                });
+                return;
+            }
+            
+            // Check if email already exists
+            if (accounts.find(acc => acc.email.toLowerCase() === email.toLowerCase())) {
+                resolve({
+                    success: false,
+                    message: 'Email already registered'
+                });
+                return;
+            }
+            
+            // Create new account
+            const newAccount = {
+                username: username,
+                email: email,
+                password_hash: passwordHash, // Hashed password
+                createdAt: new Date().toISOString()
+            };
+            
+            accounts.push(newAccount);
+            saveDemoAccounts(accounts);
+            
+            console.log('✅ Demo account created:', { username, email });
+            
+            resolve({
+                success: true,
+                message: 'Account created successfully'
+            });
+        }, 500); // Simulate network delay
+    });
+}
+
+/**
+ * Verify account in demo mode
+ */
+async function verifyAccountDemo(identifier, password) {
+    // Hash password first (outside Promise)
+    const passwordHash = await hashPasswordDemo(password);
+    
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            const accounts = getDemoAccounts();
+            
+            // Find account by email or username
+            const account = accounts.find(acc => 
+                acc.email.toLowerCase() === identifier.toLowerCase() || 
+                acc.username.toLowerCase() === identifier.toLowerCase()
+            );
+            
+            if (!account) {
+                resolve({
+                    success: false,
+                    message: 'Account not found'
+                });
+                return;
+            }
+            
+            // Compare hashed passwords
+            if (account.password_hash !== passwordHash) {
+                resolve({
+                    success: false,
+                    message: 'Invalid password'
+                });
+                return;
+            }
+            
+            console.log('✅ Demo login successful:', account.username);
+            
+            resolve({
+                success: true,
+                message: 'Login successful',
+                user: {
+                    username: account.username,
+                    email: account.email
+                }
+            });
+        }, 500); // Simulate network delay
+    });
 }
 
 // ============================================================
@@ -130,22 +276,29 @@ async function handleSignup(event) {
     disableForm('signupForm');
     
     try {
-        // Call backend API to create account
-        const response = await fetch(`${API_BASE_URL}/api/create-account`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                username: username,
-                email: email,
-                password: password
-            })
-        });
+        let data;
         
-        const data = await response.json();
+        if (DEMO_MODE) {
+            // Use demo mode (localStorage)
+            data = await createAccountDemo(username, email, password);
+        } else {
+            // Call backend API to create account
+            const response = await fetch(`${API_BASE_URL}/api/create-account`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: username,
+                    email: email,
+                    password: password
+                })
+            });
+            
+            data = await response.json();
+        }
         
-        if (response.ok && data.success) {
+        if (data.success) {
             // Success!
             showMessage(messageDiv, 
                 '✅ Account created successfully! You can now login. Redirecting...', 
@@ -214,21 +367,43 @@ async function handleLogin(event) {
     disableForm('loginForm');
     
     try {
-        // Call backend API to verify account
-        const response = await fetch(`${API_BASE_URL}/api/verify-account`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                username: loginIdentifier,
-                password: password
-            })
-        });
+        let data;
         
-        const data = await response.json();
+        if (DEMO_MODE) {
+            // Use demo mode (localStorage)
+            data = await verifyAccountDemo(loginIdentifier, password);
+        } else {
+            // Call backend API to verify account
+            const response = await fetch(`${API_BASE_URL}/api/verify-account`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    username: loginIdentifier,
+                    password: password
+                })
+            });
+            
+            data = await response.json();
+        }
         
-        if (response.ok && data.success) {
+        if (data.success) {
+            // Extract user info
+            const username = data.user ? data.user.username : '';
+            const email = data.user ? data.user.email : '';
+            
+            // Validate we have user data
+            if (!username || !email) {
+                console.warn('⚠️ Backend response missing user data');
+                showMessage(messageDiv, 
+                    '⚠️ Login successful but user data incomplete. Please try again.', 
+                    'warning'
+                );
+                enableForm('loginForm');
+                return;
+            }
+            
             // Success!
             showMessage(messageDiv, 
                 `✅ Welcome back, ${username}! Login successful.`, 
