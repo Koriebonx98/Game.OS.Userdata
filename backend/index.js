@@ -56,6 +56,18 @@ if (!PUBLIC_API_KEY) {
     console.warn('⚠️  WARNING: PUBLIC_API_KEY is not set. The /api/public-key endpoint will return null and public-key auth will be disabled.');
 }
 
+// Display name used for system/public-key-issued invites
+const PUBLIC_INVITE_SENDER = process.env.PUBLIC_INVITE_SENDER || 'GameOS';
+
+/** Generate a UUID-like identifier using crypto.randomBytes. */
+function generateInviteId() {
+    const b = crypto.randomBytes(16);
+    b[6] = (b[6] & 0x0f) | 0x40; // version 4
+    b[8] = (b[8] & 0x3f) | 0x80; // variant
+    const h = b.toString('hex');
+    return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20)}`;
+}
+
 /**
  * Generate a new raw API token embedding the username.
  * Format: gos_{username}.{32-byte random hex}
@@ -1137,6 +1149,89 @@ app.get('/api/get-messages', async (req, res) => {
     } catch (err) {
         console.error('Error getting messages:', err);
         res.status(500).json({ success: false, message: 'Failed to get messages.' });
+    }
+});
+
+// ── POST /api/send-invite ─────────────────────────────────────────────────────
+// Allows a C# app (via the shared PUBLIC_API_KEY) or an authenticated user
+// to send a game invite to any registered user.
+app.post('/api/send-invite', authenticatePublicOrUserToken, async (req, res) => {
+    try {
+        const { toUsername, gameName, inviteId } = req.body;
+        if (!toUsername || !gameName || !gameName.trim()) {
+            return res.status(400).json({ success: false, message: 'toUsername and gameName are required' });
+        }
+        const toLower = toUsername.toLowerCase();
+        if (!sanitiseUsername(toLower)) {
+            return res.status(400).json({ success: false, message: 'Invalid username' });
+        }
+
+        const accountFile = await getFile(`accounts/${toLower}/profile.json`);
+        if (!accountFile) return res.status(404).json({ success: false, message: 'User not found' });
+
+        const fromName = req.tokenUser.publicKeyAuth ? PUBLIC_INVITE_SENDER : req.tokenUser.username;
+        const id = (inviteId && typeof inviteId === 'string' && /^[\w-]{1,64}$/.test(inviteId))
+            ? inviteId
+            : generateInviteId();
+
+        const invitesPath = `accounts/${toLower}/invites.json`;
+        const invitesFile = await getFile(invitesPath);
+        const invites     = invitesFile ? [...invitesFile.content] : [];
+        invites.push({
+            inviteId: id,
+            from:     fromName,
+            gameName: gameName.trim(),
+            sentAt:   new Date().toISOString(),
+            status:   'pending'
+        });
+        await putFile(invitesPath, invites,
+            `Invite from ${fromName} to ${toUsername} for ${gameName}`,
+            invitesFile ? invitesFile.sha : undefined);
+
+        res.json({ success: true, inviteId: id, message: 'Invite sent' });
+    } catch (err) {
+        console.error('Error sending invite:', err);
+        res.status(500).json({ success: false, message: 'Failed to send invite. Please try again.' });
+    }
+});
+
+// ── GET /api/get-invites ──────────────────────────────────────────────────────
+app.get('/api/get-invites', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file    = await getFile(`accounts/${usernameLower}/invites.json`);
+        const invites = file ? file.content : [];
+        res.json({ success: true, invites });
+    } catch (err) {
+        console.error('Error getting invites:', err);
+        res.status(500).json({ success: false, message: 'Failed to get invites.' });
+    }
+});
+
+// ── POST /api/respond-invite ──────────────────────────────────────────────────
+app.post('/api/respond-invite', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { inviteId, response } = req.body;
+        if (!inviteId || !['accepted', 'declined'].includes(response)) {
+            return res.status(400).json({ success: false, message: 'inviteId and response (accepted|declined) are required' });
+        }
+
+        const path = `accounts/${usernameLower}/invites.json`;
+        const file = await getFile(path);
+        if (!file) return res.status(404).json({ success: false, message: 'Invite not found' });
+
+        const idx = file.content.findIndex(i => i.inviteId === inviteId);
+        if (idx === -1) return res.status(404).json({ success: false, message: 'Invite not found' });
+
+        const invites   = [...file.content];
+        invites[idx]    = { ...invites[idx], status: response, respondedAt: new Date().toISOString() };
+        await putFile(path, invites, `Invite ${response}: ${inviteId}`, file.sha);
+
+        res.json({ success: true, message: `Invite ${response}` });
+    } catch (err) {
+        console.error('Error responding to invite:', err);
+        res.status(500).json({ success: false, message: 'Failed to respond to invite. Please try again.' });
     }
 });
 
