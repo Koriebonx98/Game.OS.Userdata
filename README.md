@@ -1,12 +1,13 @@
 # Game.OS.Userdata 🎮
 
-**Secure Account Management System for Game OS**
+**A full-featured Gaming Hub for Game OS**
 
-A modern, secure web-based account registration and login system that supports both demo mode (localStorage) and GitHub repository-based storage for user accounts.
+A modern, secure web application with account registration, login, a multi-platform game library, a friends system, inbox, user profiles, and API token support. Works in demo mode (browser localStorage) right out of the box, with optional GitHub repository-based storage for production use.
 
 ## 📋 Table of Contents
 
 - [Features](#features)
+- [Pages](#pages)
 - [Demo Mode](#demo-mode)
 - [GitHub Repository Integration](#github-repository-integration)
 - [Screenshots](#screenshots)
@@ -24,6 +25,26 @@ A modern, secure web-based account registration and login system that supports b
 - **⚡ Real-time Feedback**: Instant validation and user-friendly error messages
 - **📱 Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
 - **🌐 Session Management**: Remember me functionality and logout support
+- **🕹️ Game Library**: Browse multi-platform game databases and track your owned games
+- **👥 Friends System**: Send friend requests, manage friends, and see shared games
+- **📬 Inbox**: Receive and respond to friend requests and notifications
+- **👤 Account Management**: Update email and password from a dedicated account page
+- **🔑 API Token**: Generate personal API tokens for use with C# or other external apps
+- **🧑‍🤝‍🧑 User Profiles**: View any user's public game library
+
+## 🗂️ Pages
+
+| Page | File | Description |
+|---|---|---|
+| Home | `index.html` | Welcome page, hero section, feature cards, live user count |
+| Browse Games | `games.html` | Browse multi-platform game database; add/remove games from your library |
+| My Library | `games.html?tab=library` | View your owned games grouped by platform |
+| Friends | `friends.html` | Search for users, send/accept/decline friend requests, view friends list |
+| Inbox | `inbox.html` | Pending friend requests and unread notifications |
+| My Account | `account.html` | Update email/password, manage API token, admin danger zone |
+| User Profile | `profile.html?user=<username>` | Public view of any user's game library |
+| Sign Up | `signup.html` | Account registration form |
+| Login | `login.html` | Sign-in form |
 
 ## 🎮 Demo Mode
 
@@ -313,8 +334,20 @@ Game.OS.Userdata/
 ├── index.html          # Homepage
 ├── signup.html         # Registration page
 ├── login.html          # Login page
+├── games.html          # Browse games & My Library
+├── friends.html        # Friends list & friend requests
+├── inbox.html          # Inbox (friend requests / notifications)
+├── account.html        # Account settings & API token management
+├── profile.html        # Public user profile / game library view
 ├── script.js           # Main JavaScript logic
 ├── styles.css          # Styling and responsive design
+├── backend/            # Optional Node.js backend server
+│   ├── index.js
+│   ├── package.json
+│   └── .env.example
+├── Design/             # UI design assets
+├── GITHUB_INTEGRATION.md  # Production GitHub integration guide
+├── QUICKSTART.md       # Quick-start guide
 └── README.md           # This file
 ```
 
