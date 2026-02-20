@@ -67,37 +67,27 @@ The demo mode is **currently active** and ready to use. Simply:
 
 ## 📦 GitHub Repository Integration
 
-For production use, this system integrates with a private GitHub repository ([Game.OS.Private.Data](https://github.com/Koriebonx98/Game.OS.Private.Data)) to store user account data securely.
+For production use, this system stores user account data directly in a private GitHub repository — no external server required.  The frontend (GitHub Pages) calls the GitHub REST API directly using a fine-grained Personal Access Token injected at deploy time.
 
 ### How It Works:
 
-1. **Account Creation**: When a user registers, the system triggers a GitHub Action
-2. **Data Storage**: User data is committed to a private repository as JSON files
-3. **Authentication**: Login requests verify credentials against stored data
-4. **Security**: All data stored in a private repository with restricted access
+1. **Account Creation**: The browser calls the GitHub API directly to write a JSON file for the new account
+2. **Data Storage**: User data is stored as JSON files in a private repository (one folder per user)
+3. **Authentication**: Login reads the stored PBKDF2 password hash and compares it locally — no server involved
+4. **Security**: All data in a private repository; the PAT is XOR-encoded so GitHub's secret scanner cannot auto-revoke it
 
 ### Integration Steps:
 
-1. **Set up Private Data Repository**:
-   ```bash
-   # Clone the private data repository
-   git clone https://github.com/Koriebonx98/Game.OS.Private.Data
-   ```
+1. **Create the private data repository** at [github.com/new](https://github.com/new) → set to **Private**
 
-2. **Configure Backend URL**:
-   Update `script.js` with your backend URL:
-   ```javascript
-   const API_BASE_URL = 'https://your-backend-url.com';
-   ```
+2. **Add a fine-grained PAT as a repository secret** named `DATA_REPO_TOKEN`
+   (Settings → Secrets and variables → Actions → New repository secret)
 
-3. **Deploy Backend Server**:
-   - The backend server should be deployed from `Game.OS.Private.Data/backend-server`
-   - Configure environment variables for GitHub token and repository access
-   - Deploy to a hosting platform (Railway, Render, Vercel, etc.)
+3. **Enable GitHub Pages** (Settings → Pages → Source → GitHub Actions)
 
-4. **Test Connection**:
-   - Refresh the page
-   - The connection status should show "✅ Connected to backend"
+4. **Push to main** — the deploy workflow injects the token and publishes the site
+
+See the **Going Live** section below for the full step-by-step guide.
 
 ## 📸 Screenshots
 
@@ -256,15 +246,10 @@ It is XOR-hex-encoded in the deployed `script.js` so the raw token is never pres
 
 ### Production Deployment:
 
-1. **GitHub Pages** (Recommended for frontend):
-   - Enable GitHub Pages in repository settings
-   - Select main branch and root directory
+1. **GitHub Pages** (frontend — free, no server needed):
+   - Follow the **Going Live** section above
+   - Add the `DATA_REPO_TOKEN` secret, enable GitHub Pages, push to main
    - Access at: `https://koriebonx98.github.io/Game.OS.Userdata/`
-
-2. **Configure Backend**:
-   - Deploy backend from Game.OS.Private.Data repository
-   - Update `API_BASE_URL` in `script.js`
-   - Commit and push changes
 
 ## 📖 Usage
 
