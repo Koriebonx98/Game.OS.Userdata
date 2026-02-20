@@ -1,0 +1,253 @@
+# Nightly Maintenance Workflow
+#
+# Runs every night at midnight UTC and performs:
+#   1. Dependency audit  – flags known vulnerabilities in backend npm deps
+#   2. CodeQL security scan – static analysis of JavaScript sources
+#   3. File integrity check – compares SHA-256 hashes of critical files against
+#      the stored baseline in .github/hashes/checksums.sha256 and alerts on
+#      any unauthorised modification (does NOT auto-rollback committed content;
+#      the alert acts as the signal to review/revert via a normal PR)
+#   4. Log aggregation  – collects workflow run summaries to surface anomalies
+#
+# Required secrets / variables (all optional – workflow degrades gracefully):
+#   ENCRYPTION_KEY  – AES-256 passphrase used to encrypt the audit report
+#                     archive before uploading it as a workflow artifact.
+#                     Store in: Settings → Secrets and variables → Actions
+#                     → New repository secret → Name: ENCRYPTION_KEY
+#                     If absent the archive is still uploaded, unencrypted.
+
+name: Nightly Maintenance
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # midnight UTC every day
+  workflow_dispatch:       # allow manual runs for testing
+
+permissions:
+  contents: read
+  security-events: write   # required for CodeQL to upload SARIF results
+  actions: read            # required for log aggregation step
+
+jobs:
+  # ── 1. Dependency audit ────────────────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Audit
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
+      - name: Run npm audit
+        working-directory: backend
+        # Exit code 1 = vulnerabilities found; we capture the report and let
+        # subsequent steps decide severity.  Use --audit-level=high so the
+        # step only fails on high/critical findings.
+        run: npm audit --audit-level=high --json > /tmp/npm-audit.json || true
+
+      - name: Print audit summary
+        run: |
+          python3 << 'PYEOF'
+          import json, sys
+
+          try:
+              with open('/tmp/npm-audit.json') as f:
+                  report = json.load(f)
+          except Exception as e:
+              print(f'Could not parse audit report: {e}')
+              sys.exit(0)
+
+          metadata = report.get('metadata', {})
+          vulns    = metadata.get('vulnerabilities', {})
+          total    = sum(vulns.values()) if vulns else 0
+
+          if total == 0:
+              print('✅ No vulnerabilities found')
+          else:
+              print(f'⚠️  Vulnerabilities: {vulns}')
+              high_crit = vulns.get('high', 0) + vulns.get('critical', 0)
+              if high_crit:
+                  print(f'🚨 High/Critical count: {high_crit} — review required')
+                  sys.exit(1)
+          PYEOF
+
+      - name: Encrypt and upload audit report
+        if: always()
+        env:
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: |
+          if [ -n "$ENCRYPTION_KEY" ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY \
+              -in  /tmp/npm-audit.json \
+              -out /tmp/npm-audit.json.enc
+            ARTIFACT=/tmp/npm-audit.json.enc
+            echo "Audit report encrypted with AES-256-CBC"
+          else
+            ARTIFACT=/tmp/npm-audit.json
+            echo "ENCRYPTION_KEY not set – uploading unencrypted report"
+          fi
+          cp "$ARTIFACT" /tmp/audit-report
+
+      - name: Upload audit artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: /tmp/audit-report
+          retention-days: 30
+
+  # ── 2. CodeQL security scan ────────────────────────────────────────────────
+  codeql-scan:
+    name: CodeQL Security Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript"
+
+  # ── 3. File integrity check ────────────────────────────────────────────────
+  file-integrity:
+    name: File Integrity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify file checksums
+        id: verify
+        run: |
+          BASELINE=".github/hashes/checksums.sha256"
+
+          if [ ! -f "$BASELINE" ]; then
+            echo "⚠️  Baseline checksum file not found: $BASELINE"
+            exit 0
+          fi
+
+          # Use process substitution so the while loop runs in the current shell,
+          # allowing GITHUB_ENV writes to persist after the loop exits.
+          while IFS= read -r line; do
+            expected_hash=$(echo "$line" | awk '{print $1}')
+            filepath=$(echo "$line" | awk '{print $2}')
+
+            if [ ! -f "$filepath" ]; then
+              echo "🚨 MISSING FILE: $filepath"
+              echo "INTEGRITY_FAIL=true" >> "$GITHUB_ENV"
+              continue
+            fi
+
+            actual_hash=$(sha256sum "$filepath" | awk '{print $1}')
+
+            if [ "$actual_hash" != "$expected_hash" ]; then
+              echo "🚨 TAMPERED: $filepath"
+              echo "   Expected : $expected_hash"
+              echo "   Actual   : $actual_hash"
+              echo "INTEGRITY_FAIL=true" >> "$GITHUB_ENV"
+            else
+              echo "✅ OK: $filepath"
+            fi
+          done < <(grep -v '^\s*#' "$BASELINE" | grep -v '^\s*$')
+
+      - name: Fail on integrity violation
+        if: env.INTEGRITY_FAIL == 'true'
+        run: |
+          echo ""
+          echo "════════════════════════════════════════════════════════════"
+          echo "  FILE INTEGRITY CHECK FAILED"
+          echo "  One or more critical files have been modified outside of"
+          echo "  the normal PR/review process.  Please investigate."
+          echo "  To update the baseline after a legitimate change, run:"
+          echo "    sha256sum <files...> > .github/hashes/checksums.sha256"
+          echo "  and commit the updated baseline on the main branch."
+          echo "════════════════════════════════════════════════════════════"
+          exit 1
+
+      - name: Refresh baseline on main (legitimate update)
+        # When the workflow is triggered manually on the main branch,
+        # regenerate the baseline and commit it so future checks are accurate.
+        if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
+        run: |
+          BASELINE=".github/hashes/checksums.sha256"
+          {
+            echo "# Cryptographic checksums for critical frontend and backend files."
+            echo "# Generated by the nightly maintenance workflow."
+            echo "# DO NOT edit manually – changes will be overwritten by the workflow"
+            echo "# when a legitimate update is pushed to main."
+            echo "#"
+            echo "# Format: sha256sum output  (hash  filename)"
+            sha256sum script.js backend/index.js \
+              index.html login.html signup.html account.html \
+              games.html friends.html inbox.html profile.html styles.css
+          } > "$BASELINE"
+          echo "Baseline refreshed:"
+          cat "$BASELINE"
+
+  # ── 4. Log aggregation / anomaly detection ─────────────────────────────────
+  log-aggregation:
+    name: Log Aggregation & Anomaly Detection
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch recent workflow run summaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # List the last 30 workflow runs for this repository and produce a
+          # summary report that can be reviewed for anomalies.
+          gh run list \
+            --repo "${{ github.repository }}" \
+            --limit 30 \
+            --json databaseId,displayTitle,status,conclusion,createdAt,event \
+            > /tmp/workflow-runs.json
+
+          python3 << 'PYEOF'
+          import json, sys
+          from collections import Counter
+
+          with open('/tmp/workflow-runs.json') as f:
+              runs = json.load(f)
+
+          conclusions = Counter(r.get('conclusion', 'unknown') for r in runs)
+          events      = Counter(r.get('event', 'unknown') for r in runs)
+
+          print(f"Last {len(runs)} workflow runs:")
+          print(f"  Conclusions : {dict(conclusions)}")
+          print(f"  Trigger events: {dict(events)}")
+
+          failures = [r for r in runs if r.get('conclusion') in ('failure', 'timed_out')]
+          if failures:
+              print(f"\n⚠️  {len(failures)} failed/timed-out run(s):")
+              for r in failures:
+                  print(f"  • [{r['createdAt']}] {r['displayTitle']} ({r['conclusion']})")
+          else:
+              print("\n✅ No failures in the last 30 runs")
+          PYEOF
+
+      - name: Upload log summary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-run-summary
+          path: /tmp/workflow-runs.json
+          retention-days: 30

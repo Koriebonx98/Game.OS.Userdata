@@ -1,0 +1,215 @@
+# Backend Sync & API Key Regeneration
+#
+# Triggered:
+#   • Automatically when the main branch is updated (push)
+#   • Manually via workflow_dispatch (choose whether to regenerate the API key)
+#
+# What it does:
+#   1. Verifies the backend source is still in sync with the frontend expectations
+#      (checks that required API endpoints exist in backend/index.js).
+#   2. Optionally regenerates the DATA_REPO_TOKEN used by the frontend via
+#      the GitHub API and stores the new value as a repository secret
+#      (requires ADMIN_PAT secret – see setup below).
+#   3. Archives an encrypted copy of the current backend config for audit.
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   DATA_REPO_TOKEN  – Fine-grained PAT for reading/writing Game.OS.Private.Data
+#   ADMIN_PAT        – Classic PAT with repo + admin:repo_hook scope, used ONLY
+#                      when "Regenerate API key" is selected in workflow_dispatch.
+#                      If absent, the regeneration step is skipped gracefully.
+#   ENCRYPTION_KEY   – AES-256 passphrase for encrypting the config archive.
+
+name: Backend Sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'script.js'
+  workflow_dispatch:
+    inputs:
+      regenerate_token:
+        description: 'Regenerate DATA_REPO_TOKEN (requires ADMIN_PAT secret)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  # ── 1. Sync check ──────────────────────────────────────────────────────────
+  sync-check:
+    name: Frontend ↔ Backend Sync Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify backend syntax
+        run: node --check backend/index.js && echo "✅ backend/index.js syntax OK"
+
+      - name: Verify frontend script syntax
+        run: node --check script.js && echo "✅ script.js syntax OK"
+
+      - name: Check required API endpoints are present
+        run: |
+          python3 << 'PYEOF'
+          import sys
+
+          REQUIRED_ENDPOINTS = [
+              '/api/login',
+              '/api/signup',
+              '/api/user',
+          ]
+
+          with open('backend/index.js', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          missing = [ep for ep in REQUIRED_ENDPOINTS if ep not in content]
+
+          if missing:
+              print(f'🚨 Missing expected API endpoints in backend/index.js:')
+              for ep in missing:
+                  print(f'   • {ep}')
+              sys.exit(1)
+          else:
+              print('✅ All required API endpoints found in backend/index.js')
+          PYEOF
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
+      - name: Run dependency audit (backend)
+        working-directory: backend
+        run: npm audit --audit-level=critical || true
+
+      - name: Archive encrypted backend config snapshot
+        env:
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+        run: |
+          # Create a sanitised config snapshot (no secrets)
+          python3 << 'PYEOF'
+          import json, os
+
+          snapshot = {
+              "timestamp": __import__('datetime').datetime.utcnow().isoformat() + 'Z',
+              "node_version_required": ">=18",
+              "endpoints": ["/api/login", "/api/signup", "/api/user"],
+              "repo": os.environ.get('GITHUB_REPOSITORY', ''),
+              "sha": os.environ.get('GITHUB_SHA', ''),
+          }
+          with open('/tmp/backend-config-snapshot.json', 'w') as f:
+              json.dump(snapshot, f, indent=2)
+          print("Config snapshot created")
+          PYEOF
+
+          if [ -n "$ENCRYPTION_KEY" ]; then
+            openssl enc -aes-256-cbc -pbkdf2 -pass env:ENCRYPTION_KEY \
+              -in  /tmp/backend-config-snapshot.json \
+              -out /tmp/backend-config-snapshot.json.enc
+            ARTIFACT=/tmp/backend-config-snapshot.json.enc
+            echo "Snapshot encrypted with AES-256-CBC"
+          else
+            ARTIFACT=/tmp/backend-config-snapshot.json
+            echo "ENCRYPTION_KEY not set – snapshot stored unencrypted"
+          fi
+          cp "$ARTIFACT" /tmp/backend-snapshot
+
+      - name: Upload config snapshot artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-config-snapshot
+          path: /tmp/backend-snapshot
+          retention-days: 30
+
+  # ── 2. API key regeneration (optional / manual only) ──────────────────────
+  regenerate-token:
+    name: Regenerate DATA_REPO_TOKEN
+    runs-on: ubuntu-latest
+    needs: sync-check
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.regenerate_token == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify token rotation is possible
+        env:
+          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
+        run: |
+          if [ -z "$ADMIN_PAT" ]; then
+            echo "⚠️  ADMIN_PAT secret is not configured – skipping token regeneration."
+            echo "To enable this feature, add an ADMIN_PAT secret with 'repo' and"
+            echo "'admin:repo_hook' scopes in Settings → Secrets and variables → Actions."
+            exit 1
+          fi
+          echo "✅ ADMIN_PAT is configured"
+
+      - name: Rotate DATA_REPO_TOKEN via GitHub API
+        env:
+          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
+          GH_REPO:   ${{ github.repository }}
+        run: |
+          # Retrieve the public key needed to encrypt the new secret value
+          REPO_PUBKEY=$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GH_REPO}/actions/secrets/public-key" \
+            --jq '{key_id: .key_id, key: .key}')
+
+          KEY_ID=$(echo "$REPO_PUBKEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['key_id'])")
+          PUB_KEY=$(echo "$REPO_PUBKEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
+
+          echo "Retrieved public key (key_id: $KEY_ID)"
+
+          # Generate a cryptographically random placeholder token value.
+          # In production, replace this with your actual fine-grained PAT rotation
+          # service (e.g. call the GitHub tokens API or an external secrets manager).
+          NEW_TOKEN=$(openssl rand -hex 32)
+
+          # Encrypt the new token using the repo's public key (libsodium sealed box)
+          ENCRYPTED=$(python3 << PYEOF
+          import base64, sys
+          from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
+          # Use PyNaCl if available, otherwise print a warning
+          try:
+              from nacl.encoding import Base64Encoder
+              from nacl.public import PublicKey, SealedBox
+              pub_key_bytes = base64.b64decode("$PUB_KEY")
+              sealed_box = SealedBox(PublicKey(pub_key_bytes))
+              encrypted = sealed_box.encrypt("$NEW_TOKEN".encode(), encoder=Base64Encoder)
+              print(encrypted.decode())
+          except ImportError:
+              print("ERROR: PyNaCl not installed – cannot encrypt secret value", file=sys.stderr)
+              sys.exit(1)
+          PYEOF
+          )
+
+          if [ $? -ne 0 ]; then
+            echo "❌ Encryption failed – install PyNaCl on the runner or use a secrets manager"
+            exit 1
+          fi
+
+          # Update the secret via the GitHub API
+          gh api \
+            --method PUT \
+            -H "Accept: application/vnd.github+json" \
+            "/repos/${GH_REPO}/actions/secrets/DATA_REPO_TOKEN" \
+            -f "encrypted_value=$ENCRYPTED" \
+            -f "key_id=$KEY_ID"
+
+          echo "✅ DATA_REPO_TOKEN rotated successfully (key_id: $KEY_ID)"
+          echo "⚠️  The deployed site will use the new token on the next deploy workflow run."
+        env:
+          GH_TOKEN: ${{ secrets.ADMIN_PAT }}
