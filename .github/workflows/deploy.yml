@@ -6,7 +6,8 @@
 #      frontend can call the GitHub API directly – no external backend server needed.
 #      The token is XOR-hex-encoded to prevent GitHub secret scanning from auto-revoking it.
 #   3. Validates that the GitHub data repository is accessible.
-#   4. Deploys the frontend to GitHub Pages via peaceiris/actions-gh-pages
+#   4. Deploys the frontend to GitHub Pages via the GitHub Actions Pages deployment API
+#      (actions/upload-pages-artifact + actions/deploy-pages).
 #
 # Required setup (one-time):
 #   1. Create a private GitHub repository for data (e.g. Game.OS.Private.Data)
@@ -18,8 +19,8 @@
 #      Settings → Secrets and variables → Actions → New repository secret
 #   4. (Optional) Add a repository VARIABLE named DATA_REPO_NAME with the name of your
 #      private data repository (defaults to Game.OS.Private.Data).
-#   5. Set GitHub Pages source to "Deploy from a branch":
-#      Settings → Pages → Source → Deploy from a branch → Branch: gh-pages / (root)
+#   5. Set GitHub Pages source to "GitHub Actions":
+#      Settings → Pages → Source → GitHub Actions
 
 name: Deploy to GitHub Pages
 
@@ -29,7 +30,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write   # peaceiris/actions-gh-pages pushes to the gh-pages branch
+  contents: read    # to checkout the repository
+  pages: write      # to deploy to GitHub Pages
+  id-token: write   # to verify the deployment originates from an appropriate source
 
 concurrency:
   group: pages
@@ -38,6 +41,9 @@ concurrency:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - name: Checkout
@@ -183,10 +189,11 @@ jobs:
                   print('ℹ️  GITHUB_TOKEN_ENCODED is empty – site will use demo mode (DATA_REPO_TOKEN secret not set)')
           PYEOF
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./_site
-          publish_branch: gh-pages
-          force_orphan: true
+          path: ./_site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
