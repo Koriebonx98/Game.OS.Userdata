@@ -1880,14 +1880,16 @@ async function loadInbox() {
     await modeReady;
     inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">Loading…</p>';
     try {
-        let incomingRequests, friends;
+        let incomingRequests, friends, invites;
         if (MODE === 'demo') {
             incomingRequests = getDemoFriendRequests(user.username);
             friends = getDemoFriends(user.username);
+            invites = getInvitesDemo(user.username);
         } else {
-            [incomingRequests, friends] = await Promise.all([
+            [incomingRequests, friends, invites] = await Promise.all([
                 getFriendRequestsGitHub(user.username),
-                getFriendsGitHub(user.username)
+                getFriendsGitHub(user.username),
+                getInvitesGitHub(user.username)
             ]);
         }
 
@@ -1898,6 +1900,17 @@ async function loadInbox() {
                 <div class="friend-actions">
                     <button class="btn-accept-friend" onclick="handleAcceptFriendRequest('${r.from}')">✅ Accept</button>
                     <button class="btn-decline-friend" onclick="handleDeclineFriendRequest('${r.from}')">❌ Decline</button>
+                </div>
+            </div>
+        `);
+
+        // Build invite items
+        const inviteItems = invites.map(inv => `
+            <div class="friend-item">
+                <span class="friend-name">🎮 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong></span></span>
+                <div class="friend-actions">
+                    <button class="btn-accept-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'accepted')">✅ Accept</button>
+                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined')">❌ Decline</button>
                 </div>
             </div>
         `);
@@ -1930,13 +1943,14 @@ async function loadInbox() {
                 <span class="friend-name">💬 ${latest.from} <span style="color:#666;font-size:0.8em;font-weight:400;">${label}</span></span>
                 <div class="friend-actions">
                     <button class="btn-message-friend" onclick="openChat('${latest.from}')">💬 Open Chat</button>
+                    <button class="btn-decline-friend" onclick="dismissMessage('${latest.from}')">✓ Dismiss</button>
                 </div>
             </div>
         `);
             }
         }
 
-        const total = incomingRequests.length + unreadItems.length;
+        const total = incomingRequests.length + inviteItems.length + unreadItems.length;
         if (badgeEl) {
             if (total > 0) {
                 badgeEl.textContent = total;
@@ -1946,7 +1960,7 @@ async function loadInbox() {
             }
         }
 
-        const allItems = [...requestItems, ...unreadItems];
+        const allItems = [...requestItems, ...inviteItems, ...unreadItems];
         if (allItems.length === 0) {
             inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No pending requests or new messages.</p>';
             return;
@@ -2080,6 +2094,14 @@ async function handleRemoveFriend(friendUsername) {
     }
 }
 
+/** Dismiss an unread-message notification without opening the chat. */
+function dismissMessage(friendUsername) {
+    const user = getCurrentUser();
+    if (!user) return;
+    markConversationRead(user.username, friendUsername);
+    loadInbox();
+}
+
 // ============================================================
 // GITHUB MODE – MESSAGING
 // ============================================================
@@ -2156,6 +2178,72 @@ function getLastRead(userA, userB) {
 
 function markConversationRead(userA, userB) {
     localStorage.setItem(lastReadKey(userA, userB), new Date().toISOString());
+}
+
+// ============================================================
+// INVITES – GITHUB MODE
+// ============================================================
+
+async function getInvitesGitHub(username) {
+    const file = await githubRead(`accounts/${username.toLowerCase()}/invites.json`);
+    const all = file ? file.content : [];
+    return all.filter(i => i.status === 'pending');
+}
+
+async function respondInviteGitHub(username, inviteId, response) {
+    const path = `accounts/${username.toLowerCase()}/invites.json`;
+    const file = await githubRead(path);
+    if (!file) return { success: false, message: 'Invite not found' };
+    const invites = file.content.map(i =>
+        i.inviteId === inviteId
+            ? { ...i, status: response, respondedAt: new Date().toISOString() }
+            : i
+    );
+    await githubWrite(path, invites, `Invite ${response}: ${inviteId}`, file.sha);
+    return { success: true };
+}
+
+// ============================================================
+// INVITES – DEMO MODE
+// ============================================================
+
+function getInvitesDemo(username) {
+    const key  = `gameOS_invites_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    const all  = data ? JSON.parse(data) : [];
+    return all.filter(i => i.status === 'pending');
+}
+
+function respondInviteDemo(username, inviteId, response) {
+    const key     = `gameOS_invites_${username.toLowerCase()}`;
+    const data    = localStorage.getItem(key);
+    const invites = data ? JSON.parse(data) : [];
+    const updated = invites.map(i =>
+        i.inviteId === inviteId
+            ? { ...i, status: response, respondedAt: new Date().toISOString() }
+            : i
+    );
+    localStorage.setItem(key, JSON.stringify(updated));
+    return { success: true };
+}
+
+// ============================================================
+// INVITES – UI HANDLER
+// ============================================================
+
+async function handleRespondInvite(inviteId, response) {
+    const user = getCurrentUser();
+    if (!user) return;
+    try {
+        if (MODE === 'demo') {
+            respondInviteDemo(user.username, inviteId, response);
+        } else {
+            await respondInviteGitHub(user.username, inviteId, response);
+        }
+        loadInbox();
+    } catch (err) {
+        console.error('Failed to respond to invite:', err);
+    }
 }
 
 // ============================================================
