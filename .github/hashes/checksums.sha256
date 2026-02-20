@@ -4,8 +4,8 @@
 # when a legitimate update is pushed to main.
 #
 # Format: sha256sum output  (hash  filename)
-74e4942e1d345e4eb9ba7a6dd78055ea3ca7909bfd74d3a8de2a9141756f4373  script.js
-e963f3370aac8d5e3fa23a643ae9d8593916a7771c8551aece0bd025ec6812ec  backend/index.js
+bbabdaabd4099a1df89e3330a7a14ad9b5996fdbb621c71d9a088ea308d3a639  script.js
+73e00ddc2e0720057778cc1d9bbc636ac292c865fe121fa6f6e8b263bbc3ced6  backend/index.js
 0dd8f527c88391aed5d0e0e8bd82eb135e734dfdd208e4baf4f28ba215d6d81a  index.html
 7d3331d38fe497e225decbaa34eb2d51c8abb075f686b250cd4fda2c3df01778  login.html
 129ba100a1143873193dd12ca2093c24e84965c390e7c2fe1c74801956432316  signup.html

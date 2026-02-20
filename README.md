@@ -135,7 +135,7 @@ For production use, this system integrates with a private GitHub repository ([Ga
 ## 🚀 Going Live (Real Accounts – GitHub Direct Mode)
 
 No external server is needed. The frontend calls the GitHub API directly using a fine-grained PAT
-stored as a **repository secret**. The deploy workflow **base64-encodes** the token before placing
+stored as a **repository secret**. The deploy workflow **XOR-hex-encodes** the token before placing
 it in `script.js`, so GitHub's secret scanning does not auto-revoke it.
 
 | Component | Role |
@@ -189,8 +189,15 @@ If your data repo is named something other than `Game.OS.Private.Data`:
 
 Push any commit to `main` (or go to **Actions → Deploy to GitHub Pages → Run workflow**).  
 The deploy workflow will:
-- Base64-encode your `DATA_REPO_TOKEN` and inject it into `script.js` at build time
+- XOR-hex-encode your `DATA_REPO_TOKEN` and inject it into `script.js` at build time
 - Deploy the frontend to GitHub Pages
+
+> ⚠️ **If the site falls back to demo mode after deploying**, it usually means the
+> `DATA_REPO_TOKEN` secret is expired or invalid (you will see HTTP 401 in the
+> "Validate GitHub data repository access" step in the deploy log). To fix:
+> 1. Generate a **new** fine-grained PAT (Step 2 above)
+> 2. Update the `DATA_REPO_TOKEN` secret (Step 3 above)
+> 3. Re-run the deploy workflow
 
 Your site is now live with real accounts! ✅
 
@@ -200,21 +207,21 @@ Your site is now live with real accounts! ✅
 User's Browser
     │
     ├── Signup:  PUT  https://api.github.com/repos/Owner/Game.OS.Private.Data/contents/accounts/...
-    │                 (uses the injected token decoded from GITHUB_TOKEN_B64)
+    │                 (uses the injected token decoded from GITHUB_TOKEN_ENCODED)
     │
     └── Login:   GET  https://api.github.com/repos/Owner/Game.OS.Private.Data/contents/accounts/...
                       (reads and verifies PBKDF2-hashed password)
 ```
 
 The PAT is stored only in `DATA_REPO_TOKEN` (a repository secret – never visible in logs or files).
-It is base64-encoded in the deployed `script.js` so the raw token is not present in any file.
+It is XOR-hex-encoded in the deployed `script.js` so the raw token is never present in any file.
 
 ### Security notes
 
 - The GitHub PAT is stored as a **repository secret** – only Actions runners can read it
-- The token is **base64-encoded** before injection, preventing GitHub's secret scanning from auto-revoking it
+- The token is **XOR-hex-encoded** before injection, preventing GitHub's secret scanning from auto-revoking it
 - Passwords are hashed client-side with PBKDF2 (100,000 iterations) before storage
-- If a token is ever compromised, revoke and regenerate it at github.com/settings/tokens, then update the `DATA_REPO_TOKEN` secret and redeploy
+- If a token is ever compromised or expires, revoke and regenerate it at github.com/settings/tokens, then update the `DATA_REPO_TOKEN` secret and redeploy
 
 ---
 

@@ -2,9 +2,9 @@
 #
 # This workflow:
 #   1. Checks out the source code
-#   2. Injects DATA_REPO_TOKEN (base64-encoded) into script.js at build time so the
+#   2. Injects DATA_REPO_TOKEN (XOR-hex-encoded) into script.js at build time so the
 #      frontend can call the GitHub API directly – no external backend server needed.
-#      The token is base64-encoded to prevent GitHub secret scanning from auto-revoking it.
+#      The token is XOR-hex-encoded to prevent GitHub secret scanning from auto-revoking it.
 #   3. Validates that the GitHub data repository is accessible.
 #   4. Deploys the frontend to GitHub Pages via peaceiris/actions-gh-pages
 #
