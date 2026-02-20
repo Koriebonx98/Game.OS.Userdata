@@ -51,11 +51,11 @@ jobs:
 
           # ── Inject BACKEND_URL ───────────────────────────────────────────────
           # json.dumps produces a valid JS string literal and handles all special chars.
-          # The regex matches any single-quoted value so it works even if the file was
-          # previously processed (e.g. re-run without a clean checkout).
+          # The regex matches both single- and double-quoted values so it works even if
+          # the file was previously processed (e.g. re-run without a clean checkout).
           new_url_line = f"const BACKEND_URL = {json.dumps(backend_url)};"
           updated = re.sub(
-              r"const BACKEND_URL\s*=\s*'[^']*';[^\n]*",
+              r"""const BACKEND_URL\s*=\s*(?:'[^']*'|"[^"]*");[^\n]*""",
               new_url_line,
               content,
               count=1
