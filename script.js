@@ -28,8 +28,20 @@
 // Leave empty to use demo mode (localStorage only).
 const BACKEND_URL = ''; // ← injected at deploy time by .github/workflows/deploy.yml
 
-// Mode is detected automatically – 'github' (backend) when BACKEND_URL is set, else 'demo'
-let MODE = (BACKEND_URL && BACKEND_URL.length > 0) ? 'github' : 'demo';
+// Runtime override: when BACKEND_URL is not injected by the deploy workflow (e.g. the
+// BACKEND_URL repository variable is not yet configured), the site admin can set the
+// backend URL directly in the browser – it is stored in localStorage under the key
+// 'gameOS_backendUrl' and takes effect immediately on the next page load.
+// The deploy-time injected BACKEND_URL always takes priority over the localStorage value.
+const _runtimeBackendUrl = (function () {
+    try { return localStorage.getItem('gameOS_backendUrl') || ''; }
+    catch (e) { return ''; }
+})();
+const _effectiveBackendUrl = (BACKEND_URL && BACKEND_URL.length > 0)
+    ? BACKEND_URL : _runtimeBackendUrl;
+
+// Mode is detected automatically – 'github' (backend) when a backend URL is configured, else 'demo'
+let MODE = (_effectiveBackendUrl && _effectiveBackendUrl.length > 0) ? 'github' : 'demo';
 
 // Promise that resolves when initializeMode() has finished detecting the active mode.
 // Form handlers await this to avoid a race condition where MODE is still 'github'
@@ -227,9 +239,18 @@ async function initializeMode() {
     // Demo mode notice
     console.warn('🎮 Demo Mode – accounts stored in browser localStorage only');
     console.warn('To enable real accounts, deploy the backend server and set BACKEND_URL (see README.md)');
+    console.warn('Or configure the backend URL at runtime: localStorage.setItem(\'gameOS_backendUrl\', \'https://your-backend.example.com\') then reload.');
     if (statusEl) {
         statusEl.textContent = '🎮 Demo Mode – accounts stored locally only';
         statusEl.className = 'status disconnected';
+        if (!BACKEND_URL) {
+            const cfgLink = document.createElement('a');
+            cfgLink.href = '#';
+            cfgLink.textContent = '[Configure backend]';
+            cfgLink.style.cssText = 'font-size:0.85em;color:inherit;opacity:0.8;margin-left:6px;';
+            cfgLink.addEventListener('click', configureBackendUrl);
+            statusEl.appendChild(cfgLink);
+        }
     }
 }
 
@@ -242,7 +263,40 @@ async function initializeMode() {
  * All backend API calls use this to build request URLs.
  */
 function getBackendBase() {
-    return (BACKEND_URL || '').replace(/\/$/, '');
+    return _effectiveBackendUrl.replace(/\/$/, '');
+}
+
+/**
+ * Prompt the site admin to enter the backend server URL and persist it in
+ * localStorage so the site works in github (real-accounts) mode without
+ * requiring a redeployment.
+ *
+ * Called from the "[Configure backend]" link shown in the demo-mode status
+ * banner when BACKEND_URL was not injected by the deploy workflow.
+ */
+function configureBackendUrl(event) {
+    if (event) event.preventDefault();
+    const current = _runtimeBackendUrl || '';
+    const entered = prompt(
+        'Enter your backend server URL (e.g. https://my-gameos-backend.railway.app):\n\n' +
+        'Leave blank and click OK to clear the configured URL (reverts to Demo Mode).',
+        current
+    );
+    if (entered === null) return; // cancelled
+    const trimmed = entered.trim().replace(/\/$/, '');
+    if (trimmed) {
+        try { new URL(trimmed); } catch (err) {
+            void err;
+            alert('Invalid URL – please enter a full URL including https://');
+            return;
+        }
+        localStorage.setItem('gameOS_backendUrl', trimmed);
+        alert('Backend URL saved. The page will now reload to connect to your backend server.');
+    } else {
+        localStorage.removeItem('gameOS_backendUrl');
+        alert('Backend URL cleared. The page will now reload in Demo Mode.');
+    }
+    location.reload();
 }
 
 // ============================================================

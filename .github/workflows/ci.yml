@@ -30,7 +30,7 @@ jobs:
           with open('script.js', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          if not re.search(r"const BACKEND_URL\s*=\s*'[^']*';", content):
+          if not re.search(r"""const BACKEND_URL\s*=\s*(?:'[^']*'|"[^"]*");""", content):
               print('ERROR: BACKEND_URL placeholder missing or malformed in script.js')
               sys.exit(1)
 
