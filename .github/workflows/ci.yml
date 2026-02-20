@@ -1,7 +1,7 @@
 # CI – runs on every pull request targeting main
 #
 # Validates:
-#   1. The deploy.yml GITHUB_TOKEN_B64-injection step would succeed on this branch's script.js
+#   1. The deploy.yml GITHUB_TOKEN_ENCODED-injection step would succeed on this branch's script.js
 #   2. The frontend HTML files are present and syntactically well-formed
 #   3. The backend Node.js code is syntactically valid
 

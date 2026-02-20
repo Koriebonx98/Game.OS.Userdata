@@ -216,11 +216,18 @@ async function initializeMode() {
 
     if (MODE === 'github') {
         try {
-            // Verify the token and data repo are reachable
-            const resp = await fetch(
-                `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
-                { headers: githubHeaders() }
-            );
+            // Verify the token and data repo are reachable (10-second timeout)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+            let resp;
+            try {
+                resp = await fetch(
+                    `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
+                    { headers: githubHeaders(), signal: controller.signal }
+                );
+            } finally {
+                clearTimeout(timeoutId);
+            }
             if (resp.ok) {
                 console.log('✅ GitHub mode active – real accounts enabled');
                 if (statusEl) {
