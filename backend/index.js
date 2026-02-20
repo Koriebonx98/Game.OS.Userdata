@@ -373,13 +373,19 @@ app.get('/api/game-library', async (req, res) => {
 });
 
 // ── POST /api/game-library/add ────────────────────────────────────────────────
-// Add a game to a user's library (username-based, no API token required).
+// Add a game to a user's library.
+// Security: the caller must supply the account password to prove ownership.
 app.post('/api/game-library/add', async (req, res) => {
-    try {
-        const { username, platform, title, titleId, coverUrl } = req.body;
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
 
-        if (!username || !platform || !title) {
-            return res.status(400).json({ success: false, message: 'username, platform, and title are required.' });
+    try {
+        const { username, password, platform, title, titleId, coverUrl } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
         }
         if (!sanitiseUsername(username)) {
             return res.status(400).json({ success: false, message: 'Invalid username.' });
@@ -389,6 +395,12 @@ app.post('/api/game-library/add', async (req, res) => {
         const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
         if (!accountFile) {
             return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        // Verify password to prevent unauthorised writes
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
         }
 
         const path    = `accounts/${usernameLower}/games.json`;
@@ -419,13 +431,19 @@ app.post('/api/game-library/add', async (req, res) => {
 });
 
 // ── POST /api/game-library/remove ─────────────────────────────────────────────
-// Remove a game from a user's library (username-based, no API token required).
+// Remove a game from a user's library.
+// Security: the caller must supply the account password to prove ownership.
 app.post('/api/game-library/remove', async (req, res) => {
-    try {
-        const { username, platform, title } = req.body;
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
 
-        if (!username || !platform || !title) {
-            return res.status(400).json({ success: false, message: 'username, platform, and title are required.' });
+    try {
+        const { username, password, platform, title } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
         }
         if (!sanitiseUsername(username)) {
             return res.status(400).json({ success: false, message: 'Invalid username.' });
@@ -435,6 +453,12 @@ app.post('/api/game-library/remove', async (req, res) => {
         const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
         if (!accountFile) {
             return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        // Verify password to prevent unauthorised deletions
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
         }
 
         const path = `accounts/${usernameLower}/games.json`;

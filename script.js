@@ -242,7 +242,7 @@ async function initializeMode() {
  * All backend API calls use this to build request URLs.
  */
 function getBackendBase() {
-    return BACKEND_URL.replace(/\/$/, '');
+    return (BACKEND_URL || '').replace(/\/$/, '');
 }
 
 // ============================================================
@@ -906,14 +906,6 @@ async function updateAccountGitHub(username, currentPassword, newEmail, newPassw
  * so the account page can display it.  Cleared after the user copies it.
  */
 const API_TOKEN_CACHE_KEY = 'gameOS_apiToken_pending';
-
-/**
- * Returns the backend base URL (trailing slash stripped).
- * All backend API calls use this to build request URLs.
- */
-function getBackendBase() {
-    return BACKEND_URL.replace(/\/$/, '');
-}
 
 /**
  * Populate the API token section on the account page.
@@ -2057,22 +2049,46 @@ async function addGameGitHub(username, game, platform) {
     const title   = game.Title || game.game_name || game.title || '';
     const titleId = game.TitleID || game.title_id || game.id || null;
     const coverUrl = getGameCoverUrl(game) || undefined;
+    // Request password once per session for game library writes
+    let password = sessionStorage.getItem('gameOS_sessionPwd');
+    if (!password) {
+        password = prompt('Enter your password to manage your game library:');
+        if (!password) return { success: false, message: 'Password required to modify your game library.' };
+        sessionStorage.setItem('gameOS_sessionPwd', password);
+    }
     const resp = await fetch(`${base}/api/game-library/add`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ username, platform, title, titleId, coverUrl })
+        body:    JSON.stringify({ username, password, platform, title, titleId, coverUrl })
     });
-    return resp.json();
+    const data = await resp.json();
+    if (!data.success && resp.status === 401) {
+        // Wrong password – clear session cache so next attempt prompts again
+        sessionStorage.removeItem('gameOS_sessionPwd');
+    }
+    return data;
 }
 
 async function removeGameGitHub(username, platform, title) {
     const base = getBackendBase();
+    // Request password once per session for game library writes
+    let password = sessionStorage.getItem('gameOS_sessionPwd');
+    if (!password) {
+        password = prompt('Enter your password to manage your game library:');
+        if (!password) return { success: false, message: 'Password required to modify your game library.' };
+        sessionStorage.setItem('gameOS_sessionPwd', password);
+    }
     const resp = await fetch(`${base}/api/game-library/remove`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ username, platform, title })
+        body:    JSON.stringify({ username, password, platform, title })
     });
-    return resp.json();
+    const data = await resp.json();
+    if (!data.success && resp.status === 401) {
+        // Wrong password – clear session cache so next attempt prompts again
+        sessionStorage.removeItem('gameOS_sessionPwd');
+    }
+    return data;
 }
 
 // ============================================================
