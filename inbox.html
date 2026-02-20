@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS Userdata - Inbox</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="games.html" class="nav-link">🔍 Games</a>
+                <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="friends.html" class="nav-link">👥 Friends</a>
+                <a href="inbox.html" class="nav-link">📬 Inbox</a>
+                <a href="account.html" class="nav-link">👤 My Account</a>
+                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+            </nav>
+        </header>
+
+        <main style="background:#f8fafc;">
+            <div class="form-container account-container">
+                <h2>📬 Inbox</h2>
+                <p class="form-subtitle">Friend requests and unread messages</p>
+
+                <!-- Inbox Section -->
+                <div class="inbox-section">
+                    <h3>📬 Inbox <span id="inboxCount" class="inbox-badge" style="display:none;">0</span></h3>
+                    <div id="inboxList" class="inbox-list">
+                        <p style="color:#666;font-size:0.9em;">Loading…</p>
+                    </div>
+                </div>
+
+                <div id="friendMessage" class="message"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions &amp; Node.js</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS Userdata - Login</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <div id="guestNav">
+                    <a href="signup.html" class="nav-link">Sign Up</a>
+                </div>
+                <div id="userNav" class="hidden">
+                    <a href="account.html" class="nav-link">My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
+            </nav>
+        </header>
+        
+        <main>
+            <div class="form-container">
+                <h2>Welcome Back</h2>
+                <p class="form-subtitle">Sign in to your Game OS account</p>
+                
+                <!-- Connection Status -->
+                <div class="text-center">
+                    <div id="connectionStatus" class="status"></div>
+                </div>
+                
+                <form id="loginForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="loginEmail">Email or Username *</label>
+                        <input 
+                            type="text" 
+                            id="loginEmail" 
+                            name="email" 
+                            placeholder="your.email@example.com"
+                            required
+                            autocomplete="email"
+                        >
+                        <small style="color: #666; font-size: 0.85em;">Enter your email or username</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="loginPassword">Password *</label>
+                        <input 
+                            type="password" 
+                            id="loginPassword" 
+                            name="password" 
+                            placeholder="Enter your password"
+                            required
+                            autocomplete="current-password"
+                        >
+                    </div>
+                    
+                    <div class="form-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="rememberMe" name="rememberMe">
+                            <span>Remember me</span>
+                        </label>
+                        <a href="#" class="link">Forgot password?</a>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    
+                    <div class="form-footer">
+                        <p>Don't have an account? <a href="signup.html" class="link">Sign up here</a></p>
+                    </div>
+                </form>
+                
+                <!-- Message Display -->
+                <div id="loginMessage" class="message"></div>
+            </div>
+        </main>
+        
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+        </footer>
+    </div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

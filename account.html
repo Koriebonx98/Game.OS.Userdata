@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS Userdata - My Account</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🎮 Game OS Userdata</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="games.html" class="nav-link">🔍 Games</a>
+                <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="friends.html" class="nav-link">👥 Friends</a>
+                <a href="inbox.html" class="nav-link">📬 Inbox</a>
+                <a href="account.html" class="nav-link">👤 My Account</a>
+                <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+            </nav>
+        </header>
+
+        <main style="background:#f8fafc;">
+            <div class="form-container account-container">
+                <h2>👤 My Account</h2>
+                <p class="form-subtitle">View and update your account information</p>
+
+                <!-- Connection Status -->
+                <div class="text-center">
+                    <div id="connectionStatus" class="status"></div>
+                </div>
+
+                <!-- Account Details Card -->
+                <div class="account-details-card">
+                    <h3>Account Details</h3>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Username</span>
+                        <span class="detail-value" id="displayUsername">—</span>
+                    </div>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Email</span>
+                        <span class="detail-value" id="displayEmail">—</span>
+                    </div>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Member Since</span>
+                        <span class="detail-value" id="displayJoined">—</span>
+                    </div>
+                    <div class="account-detail-row">
+                        <span class="detail-label">Game Library</span>
+                        <a href="games.html?tab=library" class="detail-value" style="color:var(--primary-color);text-decoration:none;font-weight:500;">📚 My Library →</a>
+                    </div>
+                </div>
+
+                <!-- Update Info Form -->
+                <div class="update-section">
+                    <h3>Update Information</h3>
+
+                    <form id="updateForm" class="auth-form">
+                        <div class="form-group">
+                            <label for="updateEmail">New Email</label>
+                            <input
+                                type="email"
+                                id="updateEmail"
+                                name="updateEmail"
+                                placeholder="Enter new email address"
+                                autocomplete="email"
+                            >
+                            <small style="color:#666;font-size:0.85em;">Leave blank to keep current email</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateCurrentPassword">Current Password *</label>
+                            <input
+                                type="password"
+                                id="updateCurrentPassword"
+                                name="currentPassword"
+                                placeholder="Enter current password"
+                                required
+                                autocomplete="current-password"
+                            >
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateNewPassword">New Password</label>
+                            <input
+                                type="password"
+                                id="updateNewPassword"
+                                name="newPassword"
+                                placeholder="Enter new password (optional)"
+                                minlength="6"
+                                autocomplete="new-password"
+                            >
+                            <small style="color:#666;font-size:0.85em;">Leave blank to keep current password. Minimum 6 characters.</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="updateConfirmPassword">Confirm New Password</label>
+                            <input
+                                type="password"
+                                id="updateConfirmPassword"
+                                name="confirmPassword"
+                                placeholder="Confirm new password"
+                                minlength="6"
+                                autocomplete="new-password"
+                            >
+                        </div>
+
+                        <button type="submit" class="btn btn-primary btn-block">Save Changes</button>
+                    </form>
+
+                    <!-- Message Display -->
+                    <div id="updateMessage" class="message"></div>
+                </div>
+
+                <!-- API Token Section -->
+                <div class="update-section" id="apiTokenSection">
+                    <h3>🔑 API Token</h3>
+                    <p style="color:#555;font-size:0.9em;margin-bottom:12px;">
+                        Use your personal API token to let C# programs (or any app) read and update
+                        your Game OS data in real time — games, achievements, activity &amp; more.
+                        Treat it like a password: keep it secret.
+                    </p>
+
+                    <div class="account-detail-row" style="align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span class="detail-label">Your Token</span>
+                        <input
+                            id="apiTokenDisplay"
+                            type="password"
+                            readonly
+                            value=""
+                            placeholder="No token generated yet"
+                            style="flex:1;min-width:0;font-family:monospace;font-size:0.85em;padding:6px 10px;border:1px solid #ddd;border-radius:6px;background:#f8fafc;"
+                        >
+                        <button class="btn btn-secondary" style="padding:6px 12px;font-size:0.85em;" onclick="toggleTokenVisibility()">👁 Show</button>
+                        <button class="btn btn-secondary" style="padding:6px 12px;font-size:0.85em;" id="copyTokenBtn" onclick="copyApiToken()" disabled>📋 Copy</button>
+                    </div>
+
+                    <p style="color:#888;font-size:0.8em;margin:6px 0 12px;">
+                        The token is only shown in full once after generation. Store it safely.
+                    </p>
+
+                    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                        <button class="btn btn-primary" id="generateTokenBtn" onclick="handleGenerateToken()" style="font-size:0.9em;">
+                            🔄 Generate / Regenerate Token
+                        </button>
+                        <button class="btn btn-danger" id="revokeTokenBtn" onclick="handleRevokeToken()" style="font-size:0.9em;">
+                            🗑️ Revoke Token
+                        </button>
+                    </div>
+
+                    <div id="tokenMessage" class="message" style="margin-top:10px;"></div>
+
+                    <details style="margin-top:16px;">
+                        <summary style="cursor:pointer;color:#555;font-size:0.85em;font-weight:600;">C# Quick-Start Example</summary>
+                        <pre style="background:#1e1e2e;color:#cdd6f4;padding:14px;border-radius:8px;font-size:0.78em;overflow-x:auto;margin-top:8px;"><code>// ── Option A: Per-user token (authenticate as yourself) ──────────────────────
+// A token is generated automatically when you create your account.
+// You can also regenerate it here at any time.
+
+// Get (or regenerate) your token:
+var payload = new { username = "youruser", password = "yourpass" };
+var resp = await httpClient.PostAsJsonAsync("https://your-backend/api/auth/token", payload);
+var result = await resp.Content.ReadFromJsonAsync&lt;TokenResponse&gt;();
+string userToken = result.Token;  // store this securely
+
+// Use the token for any API call:
+httpClient.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", userToken);
+
+// Get YOUR game library:
+var games = await httpClient.GetFromJsonAsync&lt;GamesResponse&gt;(
+    "https://your-backend/api/me/games");
+
+// Log a gaming session:
+await httpClient.PostAsJsonAsync("https://your-backend/api/me/activity", new {
+    platform      = "PC",
+    gameTitle     = "Halo Infinite",
+    sessionStart  = DateTime.UtcNow.AddHours(-2).ToString("o"),
+    sessionEnd    = DateTime.UtcNow.ToString("o"),
+    minutesPlayed = 120
+});
+
+// ── Option B: Public API key (read any user, no per-user login needed) ────────
+// Set PUBLIC_API_KEY in your server .env and use it as a Bearer token.
+// Great for game launchers or server-side apps that query multiple users.
+
+string publicKey = "your_public_api_key_from_env";  // keep this secret!
+httpClient.DefaultRequestHeaders.Authorization =
+    new AuthenticationHeaderValue("Bearer", publicKey);
+
+// Read any user's profile, game library, or achievements:
+var profile = await httpClient.GetFromJsonAsync&lt;ProfileResponse&gt;(
+    "https://your-backend/api/users/someuser");
+var library = await httpClient.GetFromJsonAsync&lt;GamesResponse&gt;(
+    "https://your-backend/api/users/someuser/games");
+var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;(
+    "https://your-backend/api/users/someuser/achievements");</code></pre>
+                    </details>
+                </div>
+
+                <!-- Danger Zone -->
+                <div id="dangerZone" class="danger-zone" style="display:none;">
+                    <h3>⚠️ Danger Zone</h3>
+                    <p>Permanently delete <strong>all</strong> accounts (except Admin.GameOS) and start fresh. This action cannot be undone.</p>
+                    <button id="resetAllBtn" class="btn btn-danger" onclick="handleResetAllAccounts()">
+                        🗑️ Remove All Accounts
+                    </button>
+                    <div id="resetMessage" class="message"></div>
+                </div>
+            </div>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 Game OS Userdata. All rights reserved.</p>
+            <p>Powered by GitHub Actions &amp; Node.js</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
