@@ -158,6 +158,31 @@ jobs:
           cp index.html login.html signup.html account.html games.html friends.html inbox.html profile.html script.js styles.css _site/
           touch _site/.nojekyll
 
+      - name: Verify token injection in deployment bundle
+        run: |
+          python3 << 'PYEOF'
+          import re, sys
+
+          with open('_site/script.js', 'r', encoding='utf-8') as f:
+              content = f.read()
+
+          match = re.search(r'const GITHUB_TOKEN_ENCODED\s*=\s*"([^"]*)"', content)
+          if not match:
+              # Also accept single-quoted empty string (no token set)
+              empty = re.search(r"const GITHUB_TOKEN_ENCODED\s*=\s*''", content)
+              if empty:
+                  print('ℹ️  GITHUB_TOKEN_ENCODED is empty – site will use demo mode (DATA_REPO_TOKEN secret not set)')
+              else:
+                  print('ERROR: GITHUB_TOKEN_ENCODED not found in deployment bundle')
+                  sys.exit(1)
+          else:
+              token_encoded = match.group(1)
+              if token_encoded:
+                  print(f'✅ GITHUB_TOKEN_ENCODED injected ({len(token_encoded)} hex chars) – live mode will be active')
+              else:
+                  print('ℹ️  GITHUB_TOKEN_ENCODED is empty – site will use demo mode (DATA_REPO_TOKEN secret not set)')
+          PYEOF
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:

@@ -12,8 +12,8 @@
 # Required secrets (Settings → Secrets and variables → Actions):
 #   ENCRYPTION_KEY   – AES-256 passphrase for encrypting the config archive.
 #
-# Note: DATA_REPO_TOKEN is stored ONLY in the backend server's environment variables.
-# It is never injected into frontend files or stored in repository secrets.
+# Note: DATA_REPO_TOKEN is stored as a repository secret and XOR-hex-encoded into
+# the frontend by the deploy workflow. See deploy.yml for details.
 
 name: Backend Sync
 
