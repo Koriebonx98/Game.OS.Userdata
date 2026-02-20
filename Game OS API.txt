@@ -1,0 +1,1078 @@
+================================================================================
+  GAME OS API – COMPLETE REFERENCE & C# GAME LAUNCHER SETUP GUIDE
+================================================================================
+Version: 1.0  |  Last updated: 2026
+Base URL: https://<your-backend-host>   (e.g. https://my-gameos-backend.railway.app)
+
+This API powers the Game OS multiplayer service – similar to Xbox Live or PSN.
+It handles user accounts, game libraries, achievements, friends, messaging, and
+online presence so your C# game launcher can give every player a rich, connected
+experience.
+
+────────────────────────────────────────────────────────────────────────────────
+TABLE OF CONTENTS
+────────────────────────────────────────────────────────────────────────────────
+  1.  Overview
+  2.  Backend setup (Node.js server)
+  3.  Authentication
+        3a. Per-user API tokens (recommended for the launcher)
+        3b. Shared public API key (read-only, no login required)
+  4.  API endpoint reference
+        4a.  Health
+        4b.  Account management
+        4c.  Authentication / tokens
+        4d.  Authenticated user endpoints  (/api/me/…)
+        4e.  Public user lookup endpoints  (/api/users/…)
+        4f.  Friends & social
+        4g.  Messaging
+        4h.  Online presence
+        4i.  Game library (legacy password-based routes)
+        4j.  Admin / utility
+  5.  C# integration guide
+        5a.  NuGet packages
+        5b.  GameOsApiClient class
+        5c.  Login and token storage
+        5d.  Loading the user's profile, games, and achievements
+        5e.  Friends and presence
+        5f.  Logging game activity / play sessions
+        5g.  Error handling and rate limits
+  6.  Data structures (JSON schemas)
+  7.  Security notes
+
+================================================================================
+1.  OVERVIEW
+================================================================================
+
+The Game OS backend is a Node.js/Express server that stores all user data as
+JSON files inside a private GitHub repository.  No SQL database is required.
+
+Key capabilities exposed to your C# launcher:
+  • Create / verify player accounts
+  • Issue long-lived API tokens so the launcher never stores passwords
+  • Retrieve and update a player's game library
+  • Unlock achievements and read achievement progress
+  • Friends list, friend requests, and mutual-friend detection
+  • Online presence ("last seen" timestamps)
+  • Direct messages between friends
+  • Public read access to any player's profile, games, and achievements
+
+================================================================================
+2.  BACKEND SETUP (NODE.JS SERVER)
+================================================================================
+
+Prerequisites
+  • Node.js 18 or later
+  • A private GitHub repository for data storage (e.g. "Game.OS.Private.Data")
+  • A GitHub Personal Access Token with "repo" (full) scope
+
+Step 1 – Clone and install
+  cd backend/
+  npm install
+
+Step 2 – Configure environment variables
+  Copy backend/.env.example to backend/.env and fill in every value:
+
+  GITHUB_TOKEN           GitHub PAT with repo scope (read/write to private repo)
+  REPO_OWNER             GitHub username / org that owns the private data repo
+  REPO_NAME              Name of the private data repo (e.g. Game.OS.Private.Data)
+  TOKEN_HMAC_SECRET      Long random string used to sign user API tokens
+                         Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  PUBLIC_API_KEY         Long random string for read-only public access
+                         Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+  PORT                   (optional) Port to listen on, default 3000
+  ALLOWED_ORIGIN         (optional) Your frontend URL for CORS, e.g. https://koriebonx98.github.io
+  ADMIN_KEY              Long random string that protects the reset-all-accounts endpoint
+  ADMIN_GAMEOS_PASSWORD  Initial password for the built-in Admin.GameOS account (default: GameOS2026)
+
+Step 3 – Start the server
+  npm start                  # production
+  npm run dev                # development (auto-restarts on file changes)
+
+Step 4 – Deploy to a hosting platform
+  The backend can be deployed to Railway, Render, Fly.io, or any Node.js host.
+  Set all .env values as environment variables on your chosen platform.
+  The server will be reachable at https://<your-project>.railway.app (or similar).
+
+Step 5 – Point your C# launcher at the deployed URL
+  Store the base URL and your PUBLIC_API_KEY in your launcher's config / app.config.
+  Per-user tokens are obtained at runtime via /api/auth/token (see §3a).
+
+================================================================================
+3.  AUTHENTICATION
+================================================================================
+
+3a.  PER-USER API TOKENS  (recommended for the launcher)
+─────────────────────────────────────────────────────────
+The launcher authenticates as a specific player by exchanging their username +
+password for a long-lived API token (POST /api/auth/token).  The token looks
+like:
+
+  gos_<username>.<64-hex-chars>
+
+Send it in every protected request via the Authorization header:
+
+  Authorization: Bearer gos_alice.a1b2c3...
+
+Tokens are stored server-side (hashed with HMAC-SHA256).  They persist until
+the user revokes them from the account page or the launcher calls
+POST /api/auth/revoke-token.
+
+IMPORTANT: Never store the raw password in the launcher.  Store only the token.
+
+3b.  SHARED PUBLIC API KEY  (read-only, no login)
+──────────────────────────────────────────────────
+Set PUBLIC_API_KEY in the server's .env.  C# apps can call GET /api/public-key
+once to retrieve it, or it can be bundled directly in the launcher config.
+
+Use it like a per-user token in the Authorization header:
+
+  Authorization: Bearer <PUBLIC_API_KEY>
+
+Endpoints that accept the public key:
+  GET /api/users/:username              – profile (username + created_at)
+  GET /api/users/:username/games        – game library
+  GET /api/users/:username/achievements – achievements
+
+All write operations and /api/me/… routes require a real per-user token.
+
+================================================================================
+4.  API ENDPOINT REFERENCE
+================================================================================
+
+All request bodies are JSON (Content-Type: application/json).
+All responses are JSON.  Successful responses include  "success": true.
+Failed responses include  "success": false  and  "message": "<reason>".
+
+────────────────────────────────────────────────────────────────────────────────
+4a.  HEALTH
+────────────────────────────────────────────────────────────────────────────────
+
+GET /health
+  No authentication required.
+  Response:
+    { "status": "ok", "message": "Game.OS backend running" }
+
+────────────────────────────────────────────────────────────────────────────────
+4b.  ACCOUNT MANAGEMENT
+────────────────────────────────────────────────────────────────────────────────
+
+POST /api/create-account
+  Create a new player account.
+  Body:
+    {
+      "username": "Alice",      // 3+ chars, letters / numbers / _ - .
+      "email":    "alice@example.com",
+      "password": "s3curePass"  // 6+ chars
+    }
+  Response (201):
+    {
+      "success":  true,
+      "message":  "Account created successfully",
+      "token":    "gos_alice.<hex>",    // save this – it's the player's API token
+      "username": "Alice",
+      "issuedAt": "2026-01-01T00:00:00.000Z"
+    }
+
+POST /api/verify-account
+  Verify a username/email + password combination (login check).
+  Rate limited: 10 attempts per minute per IP.
+  Body:
+    {
+      "username": "Alice",        // or use email address
+      "password": "s3curePass"
+    }
+  Response:
+    {
+      "success":  true,
+      "message":  "Account verified",
+      "username": "Alice",
+      "email":    "alice@example.com"
+    }
+
+POST /api/update-account
+  Change the player's email and / or password.
+  Rate limited: 10 attempts per minute per IP.
+  Body:
+    {
+      "username":        "Alice",
+      "currentPassword": "s3curePass",
+      "newEmail":        "newalice@example.com",  // optional
+      "newPassword":     "newPass123"             // optional, 6+ chars
+    }
+  Response:
+    { "success": true, "message": "Account updated successfully", "email": "newalice@example.com" }
+
+GET /api/check-user?username=Alice
+  Check whether a username exists (useful before sending a friend request).
+  Response (exists):    { "exists": true,  "username": "Alice" }
+  Response (not found): { "exists": false }
+
+GET /api/users-count
+  Returns the total number of registered accounts.
+  Response: { "success": true, "count": 42 }
+
+────────────────────────────────────────────────────────────────────────────────
+4c.  AUTHENTICATION / TOKENS
+────────────────────────────────────────────────────────────────────────────────
+
+GET /api/public-key
+  Returns the server's shared PUBLIC_API_KEY value (no authentication required).
+  Response:
+    { "success": true, "publicKey": "<key>", "configured": true }
+
+POST /api/auth/token
+  Exchange username (or email) + password for a per-user API token.
+  Rate limited: 10 attempts per minute per IP.
+  Body:
+    { "username": "Alice", "password": "s3curePass" }
+    // or: { "username": "alice@example.com", "password": "s3curePass" }
+  Response:
+    {
+      "success":  true,
+      "token":    "gos_alice.<hex>",
+      "username": "Alice",
+      "issuedAt": "2026-01-01T00:00:00.000Z"
+    }
+
+GET /api/auth/token-status?username=Alice
+  Check whether a user currently has an active API token.
+  Response: { "success": true, "hasToken": true }
+
+POST /api/auth/revoke-token
+  Invalidate the player's current API token (password confirmation required).
+  Body:
+    { "username": "Alice", "password": "s3curePass" }
+  Response: { "success": true, "message": "API token revoked successfully." }
+
+────────────────────────────────────────────────────────────────────────────────
+4d.  AUTHENTICATED USER ENDPOINTS  /api/me/…
+    Require:  Authorization: Bearer gos_<username>.<hex>
+────────────────────────────────────────────────────────────────────────────────
+
+GET /api/me
+  Returns the authenticated player's full profile (password and token hashes
+  are stripped).
+  Response:
+    {
+      "success": true,
+      "profile": {
+        "username":            "Alice",
+        "email":               "alice@example.com",
+        "created_at":          "2026-01-01T00:00:00.000Z",
+        "api_token_issued_at": "2026-02-01T00:00:00.000Z"
+      }
+    }
+
+GET /api/me/games
+  Returns the authenticated player's game library.
+  Response:
+    {
+      "success": true,
+      "games": [
+        {
+          "platform":  "PC",
+          "title":     "Some Game",
+          "titleId":   "12345",
+          "coverUrl":  "https://…",
+          "addedAt":   "2026-01-15T10:00:00.000Z"
+        }
+      ]
+    }
+
+POST /api/me/games
+  Add a game to the authenticated player's library.
+  Body:
+    {
+      "platform": "PC",        // required
+      "title":    "Some Game", // required
+      "titleId":  "12345"      // optional
+    }
+  Response:
+    { "success": true, "message": "Game added to library.", "games": [ … ] }
+
+DELETE /api/me/games
+  Remove a game from the authenticated player's library.
+  Body:
+    { "platform": "PC", "title": "Some Game" }
+  Response:
+    { "success": true, "message": "Game removed from library.", "games": [ … ] }
+
+GET /api/me/achievements
+  Returns all achievements unlocked by the authenticated player.
+  Response:
+    {
+      "success": true,
+      "achievements": [
+        {
+          "platform":      "PC",
+          "gameTitle":     "Some Game",
+          "achievementId": "001",
+          "name":          "First Win",
+          "description":   "Win your first match",
+          "unlockedAt":    "2026-01-20T14:30:00.000Z"
+        }
+      ]
+    }
+
+POST /api/me/achievements
+  Unlock (or update) an achievement for the authenticated player.
+  Body:
+    {
+      "platform":      "PC",         // required
+      "gameTitle":     "Some Game",  // required
+      "achievementId": "001",        // required  (string or number)
+      "name":          "First Win",  // required
+      "description":   "Win your first match",  // optional
+      "unlockedAt":    "2026-01-20T14:30:00.000Z"  // optional, defaults to now
+    }
+  Response:
+    { "success": true, "message": "Achievement recorded.", "achievement": { … } }
+
+GET /api/me/friends
+  Returns the authenticated player's friends list.
+  Response:
+    { "success": true, "friends": ["Bob", "Charlie"] }
+
+POST /api/me/activity
+  Log a game-play session for the authenticated player.
+  Body:
+    {
+      "platform":      "PC",                        // required
+      "gameTitle":     "Some Game",                 // required
+      "titleId":       "12345",                     // optional
+      "sessionStart":  "2026-02-01T18:00:00.000Z",  // required
+      "sessionEnd":    "2026-02-01T19:30:00.000Z",  // optional
+      "minutesPlayed": 90                           // required, 0–2880
+    }
+  Response:
+    { "success": true, "message": "Activity logged.", "entry": { … } }
+
+GET /api/me/activity
+  Returns the authenticated player's game-play history.
+  Optional query params:
+    ?platform=PC
+    ?gameTitle=Some%20Game
+    ?limit=50          (max 500, returns the most recent N entries)
+  Response:
+    { "success": true, "activity": [ … ] }
+
+────────────────────────────────────────────────────────────────────────────────
+4e.  PUBLIC USER LOOKUP  /api/users/…
+    Require:  Authorization: Bearer <PUBLIC_API_KEY>
+              OR:  Authorization: Bearer gos_<username>.<hex>
+────────────────────────────────────────────────────────────────────────────────
+
+GET /api/users/:username
+  Returns a player's public profile.
+  Response:
+    {
+      "success": true,
+      "profile": { "username": "Alice", "created_at": "2026-01-01T00:00:00.000Z" }
+    }
+
+GET /api/users/:username/games
+  Returns a player's full game library.
+  Response: same shape as GET /api/me/games
+
+GET /api/users/:username/achievements
+  Returns all of a player's unlocked achievements.
+  Response: same shape as GET /api/me/achievements
+
+────────────────────────────────────────────────────────────────────────────────
+4f.  FRIENDS & SOCIAL
+    No token required – pass the calling username in the request body / query.
+────────────────────────────────────────────────────────────────────────────────
+
+POST /api/send-friend-request
+  Body: { "username": "Alice", "friendUsername": "Bob" }
+  Response: { "success": true, "message": "Friend request sent to Bob! …" }
+  Note: If Bob already sent Alice a request, they are automatically made friends.
+
+POST /api/accept-friend-request
+  Body: { "username": "Alice", "fromUsername": "Bob" }
+  Response: { "success": true, "message": "You are now friends with Bob!" }
+
+POST /api/decline-friend-request
+  Body: { "username": "Alice", "fromUsername": "Bob" }
+  Response: { "success": true, "message": "Friend request declined." }
+
+POST /api/cancel-friend-request
+  Cancel an outgoing request that Alice sent to Bob.
+  Body: { "username": "Alice", "friendUsername": "Bob" }
+  Response: { "success": true, "message": "Friend request cancelled." }
+
+GET /api/get-friend-requests?username=Alice
+  Returns Alice's pending incoming friend requests.
+  Response: { "success": true, "requests": [ { "from": "Bob", "sentAt": "…" } ] }
+
+GET /api/get-sent-requests?username=Alice
+  Returns the list of usernames Alice has sent requests to.
+  Response: { "success": true, "sent": ["Bob", "Charlie"] }
+
+GET /api/get-friends?username=Alice
+  Returns Alice's confirmed friends list.
+  Response: { "success": true, "friends": ["Bob", "Charlie"] }
+
+POST /api/remove-friend
+  Body: { "username": "Alice", "friendUsername": "Bob" }
+  Response: { "success": true, "message": "Friend removed." }
+
+────────────────────────────────────────────────────────────────────────────────
+4g.  MESSAGING
+────────────────────────────────────────────────────────────────────────────────
+
+POST /api/send-message
+  Send a direct message to a friend (both users must be mutual friends).
+  Body:
+    {
+      "username":   "Alice",
+      "toUsername": "Bob",
+      "text":       "gg!"    // max 1000 characters
+    }
+  Response: { "success": true, "message": "Message sent" }
+
+GET /api/get-messages?username=Alice&withUsername=Bob
+  Retrieve the conversation between Alice and Bob.
+  Response:
+    {
+      "success":  true,
+      "messages": [
+        { "from": "Alice", "text": "gg!", "sentAt": "2026-02-01T20:00:00.000Z" }
+      ]
+    }
+
+────────────────────────────────────────────────────────────────────────────────
+4h.  ONLINE PRESENCE
+────────────────────────────────────────────────────────────────────────────────
+
+POST /api/update-presence
+  Call this regularly (e.g. every 60 seconds) while the player is in the launcher.
+  Body: { "username": "Alice" }
+  Response: { "success": true }
+
+GET /api/get-presence?username=Alice
+  Returns the ISO timestamp of when Alice was last seen.
+  Response: { "success": true, "lastSeen": "2026-02-01T20:05:00.000Z" }
+  A player is considered "online" if lastSeen is within the last 5 minutes.
+
+────────────────────────────────────────────────────────────────────────────────
+4i.  GAME LIBRARY  (legacy password-based routes)
+    These pre-date the token system.  For new code prefer POST/DELETE /api/me/games.
+────────────────────────────────────────────────────────────────────────────────
+
+GET /api/game-library?username=Alice
+  Returns Alice's game library without any authentication.
+  Response: { "success": true, "games": [ … ] }
+
+POST /api/game-library/add
+  Add a game using the player's password instead of a token.
+  Body:
+    {
+      "username": "Alice",
+      "password": "s3curePass",
+      "platform": "PC",
+      "title":    "Some Game",
+      "titleId":  "12345",      // optional
+      "coverUrl": "https://…"   // optional
+    }
+  Response: { "success": true, "message": "Game added to your library!" }
+
+POST /api/game-library/remove
+  Remove a game using the player's password instead of a token.
+  Body:
+    { "username": "Alice", "password": "s3curePass", "platform": "PC", "title": "Some Game" }
+  Response: { "success": true, "message": "Game removed from library.", "library": [ … ] }
+
+────────────────────────────────────────────────────────────────────────────────
+4j.  ADMIN / UTILITY
+────────────────────────────────────────────────────────────────────────────────
+
+POST /api/reset-all-accounts
+  Deletes every account in the data repository.  Requires the ADMIN_KEY secret.
+  Body: { "adminKey": "<ADMIN_KEY value from .env>" }
+  ⚠️  DESTRUCTIVE – use only for development / testing.
+
+================================================================================
+5.  C# INTEGRATION GUIDE
+================================================================================
+
+5a.  NUGET PACKAGES
+─────────────────────
+Add these to your .csproj (or install via NuGet Package Manager):
+
+  <PackageReference Include="System.Net.Http.Json" Version="8.*" />
+  <!-- Already included in .NET 6+, no explicit reference needed in most cases -->
+
+No third-party packages are required; System.Net.Http.Json (part of .NET 6+)
+covers all JSON serialization and HTTP work.
+
+5b.  GAMEOSAPLICLIENT CLASS
+─────────────────────────────
+Create a new file GameOsApiClient.cs in your launcher project and paste the
+following class.  Replace the constant values at the top with your real
+backend URL and public API key.
+
+──────────────────────────────────────────────────────────────────────────────
+using System;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+/// <summary>
+/// Client for the Game OS backend API.
+/// All methods throw <see cref="GameOsApiException"/> on failure.
+/// </summary>
+public sealed class GameOsApiClient : IDisposable
+{
+    // ── Configuration ─────────────────────────────────────────────────────────
+    // Replace these two constants with your real values.
+    private const string BaseUrl      = "https://<your-backend-host>";
+    private const string PublicApiKey = "<your-PUBLIC_API_KEY>";
+
+    // ── Fields ────────────────────────────────────────────────────────────────
+    private readonly HttpClient _http;
+    private string? _userToken;      // gos_<username>.<hex>
+    private string? _loggedInUser;   // display username
+
+    // ── Constructor ───────────────────────────────────────────────────────────
+    public GameOsApiClient()
+    {
+        _http = new HttpClient { BaseAddress = new Uri(BaseUrl) };
+        _http.DefaultRequestHeaders.Accept.Add(
+            new MediaTypeWithQualityHeaderValue("application/json"));
+        SetPublicAuth();
+    }
+
+    // ── Auth helpers ──────────────────────────────────────────────────────────
+    private void SetPublicAuth()
+    {
+        _http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", PublicApiKey);
+    }
+
+    private void SetUserAuth(string token)
+    {
+        _http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+    }
+
+    /// <summary>Username of the currently logged-in player, or null.</summary>
+    public string? LoggedInUser => _loggedInUser;
+
+    // ── §5c: Login ────────────────────────────────────────────────────────────
+    /// <summary>
+    /// Exchange a username/email + password for a long-lived API token.
+    /// The token is stored internally and used for all subsequent calls.
+    /// NEVER persist the password – persist the token instead.
+    /// </summary>
+    public async Task<LoginResult> LoginAsync(
+        string usernameOrEmail,
+        string password,
+        CancellationToken ct = default)
+    {
+        var resp = await PostAsync<TokenResponse>(
+            "/api/auth/token",
+            new { username = usernameOrEmail, password },
+            usePublicKey: true,   // token endpoint doesn't require a user token
+            ct);
+
+        _userToken    = resp.Token;
+        _loggedInUser = resp.Username;
+        SetUserAuth(_userToken);
+
+        return new LoginResult(resp.Username, resp.Token, resp.IssuedAt);
+    }
+
+    /// <summary>
+    /// Restore a previously saved token without requiring the password again.
+    /// Call this on launcher start-up if you persisted the token from a prior session.
+    /// </summary>
+    public void RestoreSession(string username, string token)
+    {
+        _userToken    = token;
+        _loggedInUser = username;
+        SetUserAuth(token);
+    }
+
+    /// <summary>Log out and switch back to public-key auth.</summary>
+    public void Logout()
+    {
+        _userToken    = null;
+        _loggedInUser = null;
+        SetPublicAuth();
+    }
+
+    // ── §5d: Profile, games, achievements ────────────────────────────────────
+    /// <summary>Returns the logged-in player's profile.</summary>
+    public Task<UserProfile> GetMyProfileAsync(CancellationToken ct = default)
+        => GetAsync<ProfileWrapper>("/api/me", ct).ContinueWith(t => t.Result.Profile, ct);
+
+    /// <summary>Returns the logged-in player's game library.</summary>
+    public Task<List<Game>> GetMyGamesAsync(CancellationToken ct = default)
+        => GetAsync<GamesWrapper>("/api/me/games", ct).ContinueWith(t => t.Result.Games, ct);
+
+    /// <summary>Add a game to the logged-in player's library.</summary>
+    public Task AddGameAsync(string platform, string title, string? titleId = null, CancellationToken ct = default)
+        => PostAsync<SuccessResponse>("/api/me/games", new { platform, title, titleId }, ct: ct);
+
+    /// <summary>Remove a game from the logged-in player's library.</summary>
+    public Task RemoveGameAsync(string platform, string title, CancellationToken ct = default)
+        => DeleteAsync<SuccessResponse>("/api/me/games", new { platform, title }, ct);
+
+    /// <summary>Returns the logged-in player's achievements.</summary>
+    public Task<List<Achievement>> GetMyAchievementsAsync(CancellationToken ct = default)
+        => GetAsync<AchievementsWrapper>("/api/me/achievements", ct)
+            .ContinueWith(t => t.Result.Achievements, ct);
+
+    /// <summary>Unlock (or update) an achievement for the logged-in player.</summary>
+    public Task UnlockAchievementAsync(
+        string platform,
+        string gameTitle,
+        string achievementId,
+        string name,
+        string? description = null,
+        DateTimeOffset? unlockedAt = null,
+        CancellationToken ct = default)
+    {
+        return PostAsync<SuccessResponse>("/api/me/achievements", new
+        {
+            platform,
+            gameTitle,
+            achievementId,
+            name,
+            description,
+            unlockedAt = (unlockedAt ?? DateTimeOffset.UtcNow).ToString("o")
+        }, ct: ct);
+    }
+
+    // ── §5e: Friends and presence ─────────────────────────────────────────────
+    /// <summary>Returns the logged-in player's friends list.</summary>
+    public Task<List<string>> GetMyFriendsAsync(CancellationToken ct = default)
+        => GetAsync<FriendsWrapper>("/api/me/friends", ct).ContinueWith(t => t.Result.Friends, ct);
+
+    /// <summary>Send a friend request to another player.</summary>
+    public Task SendFriendRequestAsync(string toUsername, CancellationToken ct = default)
+    {
+        EnsureLoggedIn();
+        return PostAsync<SuccessResponse>(
+            "/api/send-friend-request",
+            new { username = _loggedInUser, friendUsername = toUsername },
+            usePublicKey: false,
+            ct);
+    }
+
+    /// <summary>Accept a pending incoming friend request.</summary>
+    public Task AcceptFriendRequestAsync(string fromUsername, CancellationToken ct = default)
+    {
+        EnsureLoggedIn();
+        return PostAsync<SuccessResponse>(
+            "/api/accept-friend-request",
+            new { username = _loggedInUser, fromUsername },
+            usePublicKey: false,
+            ct);
+    }
+
+    /// <summary>Update the logged-in player's "last seen" timestamp.</summary>
+    public Task UpdatePresenceAsync(CancellationToken ct = default)
+    {
+        EnsureLoggedIn();
+        return PostAsync<SuccessResponse>(
+            "/api/update-presence",
+            new { username = _loggedInUser },
+            usePublicKey: false,
+            ct);
+    }
+
+    /// <summary>
+    /// Returns the last-seen timestamp for any player.
+    /// A player is considered online if the timestamp is within the last 5 minutes.
+    /// </summary>
+    public async Task<DateTimeOffset?> GetPresenceAsync(string username, CancellationToken ct = default)
+    {
+        var result = await GetAsync<PresenceResponse>(
+            $"/api/get-presence?username={Uri.EscapeDataString(username)}", ct);
+        return result.LastSeen.HasValue ? result.LastSeen : null;
+    }
+
+    // ── §5f: Activity logging ─────────────────────────────────────────────────
+    /// <summary>Log a completed or in-progress game-play session.</summary>
+    public Task LogActivityAsync(
+        string platform,
+        string gameTitle,
+        DateTimeOffset sessionStart,
+        int minutesPlayed,
+        DateTimeOffset? sessionEnd = null,
+        string? titleId = null,
+        CancellationToken ct = default)
+    {
+        return PostAsync<SuccessResponse>("/api/me/activity", new
+        {
+            platform,
+            gameTitle,
+            titleId,
+            sessionStart  = sessionStart.ToString("o"),
+            sessionEnd    = sessionEnd?.ToString("o"),
+            minutesPlayed
+        }, ct: ct);
+    }
+
+    // ── Public lookups (use PUBLIC_API_KEY, no login needed) ──────────────────
+    /// <summary>Look up any player's public profile.</summary>
+    public async Task<UserProfile> GetUserProfileAsync(string username, CancellationToken ct = default)
+    {
+        var temp = _http.DefaultRequestHeaders.Authorization;
+        SetPublicAuth();
+        try
+        {
+            var wrapper = await GetAsync<ProfileWrapper>(
+                $"/api/users/{Uri.EscapeDataString(username)}", ct);
+            return wrapper.Profile;
+        }
+        finally { _http.DefaultRequestHeaders.Authorization = temp; }
+    }
+
+    /// <summary>Look up any player's game library.</summary>
+    public async Task<List<Game>> GetUserGamesAsync(string username, CancellationToken ct = default)
+    {
+        var temp = _http.DefaultRequestHeaders.Authorization;
+        SetPublicAuth();
+        try
+        {
+            var wrapper = await GetAsync<GamesWrapper>(
+                $"/api/users/{Uri.EscapeDataString(username)}/games", ct);
+            return wrapper.Games;
+        }
+        finally { _http.DefaultRequestHeaders.Authorization = temp; }
+    }
+
+    /// <summary>Look up any player's achievements.</summary>
+    public async Task<List<Achievement>> GetUserAchievementsAsync(
+        string username,
+        CancellationToken ct = default)
+    {
+        var temp = _http.DefaultRequestHeaders.Authorization;
+        SetPublicAuth();
+        try
+        {
+            var wrapper = await GetAsync<AchievementsWrapper>(
+                $"/api/users/{Uri.EscapeDataString(username)}/achievements", ct);
+            return wrapper.Achievements;
+        }
+        finally { _http.DefaultRequestHeaders.Authorization = temp; }
+    }
+
+    // ── HTTP helpers ──────────────────────────────────────────────────────────
+    private async Task<T> GetAsync<T>(string path, CancellationToken ct)
+    {
+        var response = await _http.GetAsync(path, ct);
+        return await ReadResponseAsync<T>(response);
+    }
+
+    private async Task<T> PostAsync<T>(
+        string path,
+        object body,
+        bool usePublicKey = false,
+        CancellationToken ct = default)
+    {
+        // Temporarily switch to public key auth if requested
+        AuthenticationHeaderValue? savedAuth = null;
+        if (usePublicKey)
+        {
+            savedAuth = _http.DefaultRequestHeaders.Authorization;
+            SetPublicAuth();
+        }
+        try
+        {
+            var response = await _http.PostAsJsonAsync(path, body, ct);
+            return await ReadResponseAsync<T>(response);
+        }
+        finally
+        {
+            if (savedAuth != null)
+                _http.DefaultRequestHeaders.Authorization = savedAuth;
+        }
+    }
+
+    private async Task<T> DeleteAsync<T>(string path, object body, CancellationToken ct)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Delete, path)
+        {
+            Content = JsonContent.Create(body)
+        };
+        var response = await _http.SendAsync(request, ct);
+        return await ReadResponseAsync<T>(response);
+    }
+
+    private static async Task<T> ReadResponseAsync<T>(HttpResponseMessage response)
+    {
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorBody = await response.Content.ReadAsStringAsync();
+            throw new GameOsApiException(
+                (int)response.StatusCode,
+                $"HTTP {(int)response.StatusCode}: {errorBody}");
+        }
+        var result = await response.Content.ReadFromJsonAsync<T>();
+        return result ?? throw new GameOsApiException(0, "Empty response body.");
+    }
+
+    private void EnsureLoggedIn()
+    {
+        if (_userToken == null)
+            throw new InvalidOperationException("Not logged in. Call LoginAsync first.");
+    }
+
+    public void Dispose() => _http.Dispose();
+}
+
+// ── Custom exception ──────────────────────────────────────────────────────────
+public class GameOsApiException : Exception
+{
+    public int StatusCode { get; }
+    public GameOsApiException(int statusCode, string message)
+        : base(message) => StatusCode = statusCode;
+}
+
+// ── Result / DTO types ────────────────────────────────────────────────────────
+public record LoginResult(string Username, string Token, string IssuedAt);
+
+public class UserProfile
+{
+    public string Username    { get; set; } = "";
+    public string CreatedAt   { get; set; } = "";
+    public string Email       { get; set; } = "";
+}
+
+public class Game
+{
+    public string   Platform  { get; set; } = "";
+    public string   Title     { get; set; } = "";
+    public string?  TitleId   { get; set; }
+    public string?  CoverUrl  { get; set; }
+    public string   AddedAt   { get; set; } = "";
+}
+
+public class Achievement
+{
+    public string Platform      { get; set; } = "";
+    public string GameTitle     { get; set; } = "";
+    public string AchievementId { get; set; } = "";
+    public string Name          { get; set; } = "";
+    public string Description   { get; set; } = "";
+    public string UnlockedAt    { get; set; } = "";
+}
+
+// Internal API response wrappers
+internal class TokenResponse
+{
+    public bool   Success   { get; set; }
+    public string Token     { get; set; } = "";
+    public string Username  { get; set; } = "";
+    public string IssuedAt  { get; set; } = "";
+}
+internal class SuccessResponse  { public bool Success { get; set; } public string Message { get; set; } = ""; }
+internal class ProfileWrapper   { public bool Success { get; set; } public UserProfile Profile { get; set; } = new(); }
+internal class GamesWrapper     { public bool Success { get; set; } public List<Game> Games { get; set; } = new(); }
+internal class AchievementsWrapper { public bool Success { get; set; } public List<Achievement> Achievements { get; set; } = new(); }
+internal class FriendsWrapper   { public bool Success { get; set; } public List<string> Friends { get; set; } = new(); }
+internal class PresenceResponse
+{
+    public bool            Success  { get; set; }
+    public DateTimeOffset? LastSeen { get; set; }
+}
+──────────────────────────────────────────────────────────────────────────────
+
+5c.  LOGIN AND TOKEN STORAGE
+──────────────────────────────
+var api = new GameOsApiClient();
+
+// ① First launch – ask the player for credentials
+var login = await api.LoginAsync("Alice", "s3curePass");
+Console.WriteLine($"Welcome, {login.Username}!");
+
+// ② Save the token securely so the player stays logged in next time.
+//    Use the Windows Credential Manager, encrypted app settings, or a
+//    per-user encrypted file – never store it in plain text.
+SaveTokenToSecureStorage(login.Username, login.Token);
+
+// ③ On subsequent launches – restore the session without asking for the password
+var (savedUser, savedToken) = LoadTokenFromSecureStorage();
+api.RestoreSession(savedUser, savedToken);
+
+5d.  LOADING PROFILE, GAMES, AND ACHIEVEMENTS
+───────────────────────────────────────────────
+// Own data
+var profile      = await api.GetMyProfileAsync();
+var games        = await api.GetMyGamesAsync();
+var achievements = await api.GetMyAchievementsAsync();
+
+Console.WriteLine($"Account created: {profile.CreatedAt}");
+Console.WriteLine($"Games owned: {games.Count}");
+
+// Add a game when the user buys / installs it
+await api.AddGameAsync("PC", "Awesome Shooter 2", titleId: "AS2-PC");
+
+// Unlock an achievement when the player earns it in-game
+await api.UnlockAchievementAsync(
+    platform:      "PC",
+    gameTitle:     "Awesome Shooter 2",
+    achievementId: "headshot_100",
+    name:          "Sharpshooter",
+    description:   "Land 100 headshots");
+
+// Look up another player's public data (no login required)
+var bobGames = await api.GetUserGamesAsync("Bob");
+
+5e.  FRIENDS AND PRESENCE
+───────────────────────────
+var friends = await api.GetMyFriendsAsync();
+
+// Send a friend request
+await api.SendFriendRequestAsync("Bob");
+
+// Accept a request
+await api.AcceptFriendRequestAsync("Charlie");
+
+// Keep presence alive while the launcher is open (call every ~60 seconds)
+using var cts = new CancellationTokenSource();
+_ = Task.Run(async () =>
+{
+    while (!cts.Token.IsCancellationRequested)
+    {
+        await api.UpdatePresenceAsync();
+        await Task.Delay(TimeSpan.FromSeconds(60), cts.Token);
+    }
+});
+
+// Check if Bob is online
+var lastSeen   = await api.GetPresenceAsync("Bob");
+bool bobOnline = lastSeen.HasValue &&
+                 (DateTimeOffset.UtcNow - lastSeen.Value).TotalMinutes < 5;
+
+5f.  LOGGING GAME ACTIVITY / PLAY SESSIONS
+────────────────────────────────────────────
+// When a game session ends, record how long the player played
+var start = DateTimeOffset.UtcNow.AddHours(-1.5);
+await api.LogActivityAsync(
+    platform:      "PC",
+    gameTitle:     "Awesome Shooter 2",
+    sessionStart:  start,
+    minutesPlayed: 90,
+    sessionEnd:    DateTimeOffset.UtcNow);
+
+5g.  ERROR HANDLING AND RATE LIMITS
+─────────────────────────────────────
+try
+{
+    await api.LoginAsync("Alice", "wrongpassword");
+}
+catch (GameOsApiException ex) when (ex.StatusCode == 401)
+{
+    Console.WriteLine("Incorrect username or password.");
+}
+catch (GameOsApiException ex) when (ex.StatusCode == 429)
+{
+    Console.WriteLine("Too many attempts – please wait a minute and try again.");
+}
+catch (GameOsApiException ex)
+{
+    Console.WriteLine($"API error {ex.StatusCode}: {ex.Message}");
+}
+catch (HttpRequestException ex)
+{
+    Console.WriteLine($"Network error: {ex.Message}");
+}
+
+Rate limits (per IP address, per 60-second window):
+  • Auth endpoints (login, token, revoke)  → 10 requests / minute
+  • Authenticated API endpoints             → 120 requests / minute
+
+================================================================================
+6.  DATA STRUCTURES (JSON SCHEMAS)
+================================================================================
+
+User profile (accounts/<username_lower>/profile.json)
+  {
+    "username":            string,   // display username (original casing)
+    "email":               string,
+    "password_hash":       string,   // bcrypt hash – never exposed via API
+    "created_at":          string,   // ISO 8601
+    "api_token_hash":      string,   // HMAC-SHA256 of the raw token – never exposed
+    "api_token_issued_at": string    // ISO 8601
+  }
+
+Game entry (accounts/<username_lower>/games.json  – array of objects)
+  {
+    "platform":  string,            // e.g. "PC", "PS5", "Xbox", "Switch"
+    "title":     string,
+    "titleId":   string | null,     // your internal game ID
+    "coverUrl":  string | undefined,
+    "addedAt":   string             // ISO 8601
+  }
+
+Achievement entry (accounts/<username_lower>/achievements.json  – array)
+  {
+    "platform":      string,
+    "gameTitle":     string,
+    "achievementId": string,
+    "name":          string,
+    "description":   string,
+    "unlockedAt":    string   // ISO 8601
+  }
+
+Activity entry (accounts/<username_lower>/activity.json  – array, max 500)
+  {
+    "platform":     string,
+    "gameTitle":    string,
+    "titleId":      string | null,
+    "sessionStart": string,         // ISO 8601
+    "sessionEnd":   string | null,  // ISO 8601
+    "minutesPlayed": number,        // 0–2880
+    "loggedAt":     string          // ISO 8601 (server time)
+  }
+
+Friends list (accounts/<username_lower>/friends.json)
+  [ "Bob", "Charlie" ]              // array of display usernames
+
+Friend requests (accounts/<username_lower>/friend_requests.json)
+  [ { "from": "Dave", "sentAt": "…" } ]
+
+Presence (accounts/<username_lower>/presence.json)
+  { "username": "Alice", "lastSeen": "2026-02-01T20:05:00.000Z" }
+
+Message (accounts/<lower_a>_<lower_b>/messages.json  – array)
+  { "from": "Alice", "text": "gg!", "sentAt": "…" }
+
+================================================================================
+7.  SECURITY NOTES
+================================================================================
+
+① Never store player passwords in the launcher.  Store only the gos_ token and
+  discard the password immediately after calling /api/auth/token.
+
+② Store the API token securely.  On Windows use the Windows Credential Manager
+  (System.Security.Credentials.ProtectedData or the Credential Locker).
+
+③ The PUBLIC_API_KEY gives read-only access to profile, games, and achievements.
+  Do not expose it in a way that allows unrestricted write access.
+
+④ All production traffic must use HTTPS.  The backend enforces this through the
+  hosting platform (Railway / Render / Fly.io all provide TLS by default).
+
+⑤ The TOKEN_HMAC_SECRET must be kept private.  If it is ever exposed, rotate it
+  by generating a new secret, updating the environment variable, and asking all
+  players to log in again (their existing tokens will be invalidated).
+
+⑥ Passwords are hashed server-side with bcrypt (10 rounds) and are never
+  returned by any endpoint.
+
+⑦ Rate limiting is enforced per IP address.  If your C# launcher makes requests
+  from multiple threads, add a semaphore or use the CancellationToken overloads
+  to avoid hitting the limit.
+
+================================================================================
+END OF DOCUMENT
+================================================================================
