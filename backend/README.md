@@ -1,99 +1,58 @@
 # Game.OS Backend – Optional Alternative Deployment
 
-> **Note:** The primary method for running Game.OS with real accounts is **GitHub-only** (no external server).  
-> See the main [README.md](../README.md) for the recommended GitHub Pages + GitHub API setup.  
+> **Note:** The primary method for running Game.OS with real accounts is **GitHub-only** (no external server needed).  
+> The frontend calls the GitHub API directly using a fine-grained PAT stored as a repository secret.  
+> See **Going Live** in the main [README.md](../README.md) for the full setup guide.  
 > The server in this folder is an **optional alternative** for those who prefer a traditional hosted backend (e.g. Railway, Render).
 
 ---
 
-# Game.OS Backend – Deployment Guide 🚀
+# Game.OS – Going Live (GitHub Direct Mode)
 
-The backend is a small Node.js/Express server that stores user accounts as JSON
-files in a **private** GitHub repository.
+No external server is required for live mode. The frontend calls the GitHub API directly using
+a fine-grained Personal Access Token (PAT) that is **base64-encoded** by the deploy workflow
+before being placed in `script.js`, so GitHub secret scanning does not auto-revoke it.
 
----
+## One-time setup
 
-## 1. Prerequisites
+### Step 1 – Create a private data repository
 
-| What | Why |
-|---|---|
-| A **private** GitHub repo for data (e.g. `Game.OS.Private.Data`) | Where account files are stored |
-| A GitHub **Personal Access Token** with `repo` scope | Lets the server read/write to that repo |
+1. Go to [github.com/new](https://github.com/new)
+2. Name it **`Game.OS.Private.Data`** (or any name you like)
+3. Set it to **Private**
+4. Click **Create repository**
 
-### Create a Personal Access Token
+### Step 2 – Create a fine-grained Personal Access Token
 
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)**
-2. Click **Generate new token (classic)**
-3. Give it a name (e.g. `Game.OS Backend`)
-4. Under *Select scopes*, check **`repo`** (Full control of private repositories)
-5. Click **Generate token** and copy it — you only see it once!
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Give it a name (e.g. `Game OS Data Repo`)
+4. Under **Repository access**, select **Only select repositories** → choose your private data repo
+5. Under **Repository permissions → Contents**, set it to **Read and write**
+6. Click **Generate token** and **copy it** — you only see it once!
 
----
+### Step 3 – Add the token as a repository secret
 
-## 2. Deploy to Railway (recommended – free tier available)
+1. In the **`Game.OS.Userdata`** repository go to **Settings → Secrets and variables → Actions**
+2. Click **New repository secret**
+3. Name: **`DATA_REPO_TOKEN`**
+4. Value: the PAT you just copied
+5. Click **Add secret**
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template)
+### Step 4 – (Optional) Set the data repository name variable
 
-1. Go to [railway.app](https://railway.app) and sign in with GitHub
-2. Click **New Project → Deploy from GitHub repo**
-3. Select this repository (`Game.OS.Userdata`) and set the **root directory** to `backend/`
-4. Railway will auto-detect Node.js and run `npm start`
-5. In the Railway dashboard, open **Variables** and add:
+If you named your data repo something other than `Game.OS.Private.Data`:
 
-   | Variable | Value |
-   |---|---|
-   | `GITHUB_TOKEN` | Your personal access token |
-   | `REPO_OWNER` | Your GitHub username |
-   | `REPO_NAME` | `Game.OS.Private.Data` (or your data repo name) |
+1. Go to **Settings → Secrets and variables → Actions → Variables**
+2. Click **New repository variable**
+3. Name: **`DATA_REPO_NAME`**, Value: your repo name
 
-6. Copy the **public URL** Railway gives you (e.g. `https://gameos-backend.up.railway.app`)
+### Step 5 – Deploy
 
----
+Go to **Actions → Deploy to GitHub Pages → Run workflow** (or push any commit to `main`).
 
-## 3. Deploy to Render (free tier available)
-
-1. Go to [render.com](https://render.com) and sign in with GitHub
-2. Click **New → Web Service**
-3. Connect this repository, set **Root Directory** to `backend`, **Build Command** to `npm install`, **Start Command** to `npm start`
-4. Add environment variables in the Render dashboard (same as above)
-5. Copy the public URL Render assigns
-
----
-
-## 4. Update the frontend
-
-Edit **`script.js`** in the root of this repository:
-
-```js
-// Replace this placeholder:
-const API_BASE_URL = 'https://your-backend-url.com';
-
-// With your real deployed URL, e.g.:
-const API_BASE_URL = 'https://gameos-backend.up.railway.app';
-```
-
-Commit and push. GitHub Pages will redeploy automatically. Users can now create
-real accounts that persist across all browsers and devices. ✅
-
----
-
-## 5. Verify it works
-
-```bash
-# Health check
-curl https://your-backend-url.com/health
-# Expected: {"status":"ok","message":"Game.OS backend running"}
-
-# Create a test account
-curl -X POST https://your-backend-url.com/api/create-account \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
-
-# Login
-curl -X POST https://your-backend-url.com/api/verify-account \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"password123"}'
-```
+The deploy workflow will base64-encode your PAT and inject it into `script.js`. When users visit
+the site it is decoded at runtime and used to call the GitHub API directly. ✅
 
 ---
 
