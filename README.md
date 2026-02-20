@@ -179,11 +179,10 @@ If your data repo is named something other than `Game.OS.Private.Data`:
 2. Click **New repository variable**
 3. Name: `DATA_REPO_NAME`, Value: your repo name
 
-**Step 5 – Set GitHub Pages source to "Deploy from a branch"**
+**Step 5 – Set GitHub Pages source to "GitHub Actions"**
 
 1. Go to **Settings → Pages**
-2. Under **Source** select **Deploy from a branch**
-3. Branch: `gh-pages` / `(root)` → Save
+2. Under **Source** select **GitHub Actions**
 
 **Step 6 – Trigger the deploy**
 
