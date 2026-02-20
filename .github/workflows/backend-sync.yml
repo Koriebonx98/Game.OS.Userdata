@@ -68,9 +68,9 @@ jobs:
           import sys
 
           REQUIRED_ENDPOINTS = [
-              '/api/login',
-              '/api/signup',
-              '/api/user',
+              '/api/verify-account',
+              '/api/create-account',
+              '/api/check-user',
           ]
 
           with open('backend/index.js', 'r', encoding='utf-8') as f:
