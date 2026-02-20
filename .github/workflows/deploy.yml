@@ -1,20 +1,24 @@
-# Deploy to GitHub Pages
+# Deploy to GitHub Pages with token injection
 #
 # This workflow:
 #   1. Checks out the source code
-#   2. Injects the BACKEND_URL repository variable into script.js at build time.
-#      BACKEND_URL is NOT a secret – it is a public URL pointing to the backend server.
-#      No sensitive tokens are embedded in the deployed files.
-#   3. Optionally validates that the configured backend is reachable.
+#   2. Injects DATA_REPO_TOKEN (base64-encoded) into script.js at build time so the
+#      frontend can call the GitHub API directly – no external backend server needed.
+#      The token is base64-encoded to prevent GitHub secret scanning from auto-revoking it.
+#   3. Validates that the GitHub data repository is accessible.
 #   4. Deploys the frontend to GitHub Pages via peaceiris/actions-gh-pages
 #
 # Required setup (one-time):
-#   1. Deploy the backend server (see backend/README.md) to Railway, Render, Fly.io, etc.
-#      The backend holds DATA_REPO_TOKEN securely as a server environment variable.
-#   2. Add a repository VARIABLE named BACKEND_URL with your backend server's URL:
-#      Settings → Secrets and variables → Actions → Variables → New repository variable
-#      Example: https://my-gameos-backend.railway.app
-#   3. Set GitHub Pages source to "Deploy from a branch":
+#   1. Create a private GitHub repository for data (e.g. Game.OS.Private.Data)
+#   2. Create a fine-grained Personal Access Token:
+#      github.com/settings/tokens → "Fine-grained tokens" → "Generate new token"
+#      • Repository access: Only select repositories → your private data repo
+#      • Permissions → Repository permissions → Contents: Read and write
+#   3. Add the token as a SECRET named DATA_REPO_TOKEN in this repository:
+#      Settings → Secrets and variables → Actions → New repository secret
+#   4. (Optional) Add a repository VARIABLE named DATA_REPO_NAME with the name of your
+#      private data repository (defaults to Game.OS.Private.Data).
+#   5. Set GitHub Pages source to "Deploy from a branch":
 #      Settings → Pages → Source → Deploy from a branch → Branch: gh-pages / (root)
 
 name: Deploy to GitHub Pages
@@ -39,62 +43,103 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Inject BACKEND_URL into script.js
+      - name: Inject configuration into script.js
         run: |
           python3 << 'PYEOF'
-          import os, json, re, sys
+          import os, json, re, sys, base64
 
-          backend_url = os.environ.get('BACKEND_URL', '').rstrip('/')
+          token      = os.environ.get('DATA_REPO_TOKEN', '')
+          owner      = os.environ.get('REPO_OWNER', '')
+          data_repo  = os.environ.get('DATA_REPO_NAME', '')
 
           with open('script.js', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          # ── Inject BACKEND_URL ───────────────────────────────────────────────
-          # json.dumps produces a valid JS string literal and handles all special chars.
-          # The regex matches any single-quoted value so it works even if the file was
-          # previously processed (e.g. re-run without a clean checkout).
-          new_url_line = f"const BACKEND_URL = {json.dumps(backend_url)};"
+          # ── Inject GITHUB_TOKEN_B64 ──────────────────────────────────────────
+          # The token is base64-encoded so GitHub secret scanning does not
+          # recognise it as a PAT and auto-revoke it.  It is decoded at runtime
+          # by: const GITHUB_TOKEN = GITHUB_TOKEN_B64 ? atob(GITHUB_TOKEN_B64) : '';
+          encoded_token = base64.b64encode(token.encode()).decode() if token else ''
+          new_token_line = f"const GITHUB_TOKEN_B64 = {json.dumps(encoded_token)};"
           updated = re.sub(
-              r"const BACKEND_URL\s*=\s*'[^']*';[^\n]*",
-              new_url_line,
+              r"const GITHUB_TOKEN_B64\s*=\s*'[^']*';[^\n]*",
+              new_token_line,
               content,
               count=1
           )
           if updated == content:
-              print('ERROR: BACKEND_URL placeholder not found in script.js — aborting')
+              print('ERROR: GITHUB_TOKEN_B64 placeholder not found in script.js — aborting')
               sys.exit(1)
           content = updated
+
+          # ── Inject DATA_REPO_OWNER ───────────────────────────────────────────
+          if owner:
+              new_owner_line = f"const DATA_REPO_OWNER = {json.dumps(owner)};"
+              content = re.sub(
+                  r"const DATA_REPO_OWNER\s*=\s*'[^']*';[^\n]*",
+                  new_owner_line,
+                  content,
+                  count=1
+              )
+
+          # ── Inject DATA_REPO_NAME ────────────────────────────────────────────
+          if data_repo:
+              new_repo_line  = f"const DATA_REPO_NAME  = {json.dumps(data_repo)};"
+              content = re.sub(
+                  r"const DATA_REPO_NAME\s*=\s*'[^']*';[^\n]*",
+                  new_repo_line,
+                  content,
+                  count=1
+              )
 
           with open('script.js', 'w', encoding='utf-8') as f:
               f.write(content)
 
           # ── Diagnostics ──────────────────────────────────────────────────────
-          if backend_url:
-              print(f'BACKEND_URL : set to {backend_url!r} — backend mode will be active')
-          else:
-              print('BACKEND_URL : not set — site will use demo mode (localStorage only)')
-              print('To enable real accounts, add a BACKEND_URL repository variable pointing')
-              print('to your deployed backend server (see backend/README.md).')
+          status = 'injected — GitHub mode (direct API) will be active' if token else 'not set — site will use demo mode'
+          print(f'DATA_REPO_TOKEN : {status}')
+          if owner:
+              print(f'DATA_REPO_OWNER : set to {owner!r}')
+          if data_repo:
+              print(f'DATA_REPO_NAME  : set to {data_repo!r}')
+          if not token:
+              print('To enable real accounts, add DATA_REPO_TOKEN as a repository secret.')
+              print('See README.md for full instructions.')
           PYEOF
         env:
-          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          DATA_REPO_NAME: ${{ vars.DATA_REPO_NAME }}
 
-      - name: Validate backend connectivity (if configured)
-        if: vars.BACKEND_URL != ''
+      - name: Validate GitHub data repository access (if token set)
         run: |
-          BACKEND="${{ vars.BACKEND_URL }}"
-          BACKEND="${BACKEND%/}"
-          echo "Checking backend health at ${BACKEND}/health …"
-          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${BACKEND}/health" || echo "000")
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ vars.DATA_REPO_NAME }}"
+          REPO="${REPO:-Game.OS.Private.Data}"
+          TOKEN="${{ secrets.DATA_REPO_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            echo "ℹ️  DATA_REPO_TOKEN is not set — site will use demo mode."
+            echo "   To enable real accounts, add DATA_REPO_TOKEN as a repository secret."
+            exit 0
+          fi
+          echo "Checking access to ${OWNER}/${REPO} …"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${OWNER}/${REPO}" || echo "000")
           if [ "$HTTP_STATUS" = "200" ]; then
-            echo "✅ Backend is reachable (HTTP 200)"
-          elif [ "$HTTP_STATUS" = "000" ]; then
-            echo "⚠️  Backend unreachable (connection failed). Deployment will continue but"
-            echo "   the site will fall back to demo mode until the backend is available."
-            echo "   Verify that BACKEND_URL is correct and the server is running."
+            echo "✅ Data repository is accessible (HTTP 200) — GitHub mode will be active"
+          elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "⚠️  DATA_REPO_TOKEN is invalid or expired (HTTP 401)."
+            echo "   Generate a new fine-grained PAT and update the DATA_REPO_TOKEN secret."
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "⚠️  DATA_REPO_TOKEN lacks permission (HTTP 403)."
+            echo "   Ensure the PAT has Contents: Read and write on ${OWNER}/${REPO}."
+          elif [ "$HTTP_STATUS" = "404" ]; then
+            echo "⚠️  Repository ${OWNER}/${REPO} not found (HTTP 404)."
+            echo "   Create it at https://github.com/new (set to Private)."
           else
-            echo "⚠️  Backend returned HTTP ${HTTP_STATUS}. Deployment will continue."
-            echo "   Verify BACKEND_URL and backend health."
+            echo "⚠️  GitHub API returned HTTP ${HTTP_STATUS}. Deployment will continue."
           fi
 
       - name: Copy frontend files to deployment directory

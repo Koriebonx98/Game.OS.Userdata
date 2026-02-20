@@ -1,7 +1,7 @@
 # CI – runs on every pull request targeting main
 #
 # Validates:
-#   1. The deploy.yml BACKEND_URL-injection step would succeed on this branch's script.js
+#   1. The deploy.yml GITHUB_TOKEN_B64-injection step would succeed on this branch's script.js
 #   2. The frontend HTML files are present and syntactically well-formed
 #   3. The backend Node.js code is syntactically valid
 
@@ -22,7 +22,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Verify BACKEND_URL injection regex matches script.js
+      - name: Verify GITHUB_TOKEN_B64 injection regex matches script.js
         run: |
           python3 << 'PYEOF'
           import re, sys
@@ -30,11 +30,11 @@ jobs:
           with open('script.js', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          if not re.search(r"const BACKEND_URL\s*=\s*'[^']*';", content):
-              print('ERROR: BACKEND_URL placeholder missing or malformed in script.js')
+          if not re.search(r"const GITHUB_TOKEN_B64\s*=\s*'[^']*';", content):
+              print('ERROR: GITHUB_TOKEN_B64 placeholder missing or malformed in script.js')
               sys.exit(1)
 
-          print('✅ script.js BACKEND_URL placeholder OK')
+          print('✅ script.js GITHUB_TOKEN_B64 placeholder OK')
           PYEOF
 
       - name: Check frontend files exist
