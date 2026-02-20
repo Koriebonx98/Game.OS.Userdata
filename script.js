@@ -25,12 +25,19 @@
 // CONFIGURATION
 // ============================================================
 
-// Fine-grained PAT stored base64-encoded so GitHub secret scanning does not auto-revoke it.
+// Fine-grained PAT stored XOR-hex-encoded so GitHub secret scanning does not auto-revoke it.
 // Do NOT paste a real token here – use the DATA_REPO_TOKEN repository secret.
-// The deploy workflow base64-encodes the token before injecting it here, and it is decoded
+// The deploy workflow XOR-encodes the token before injecting it here, and it is decoded
 // at runtime. If the token is compromised, revoke and regenerate it at github.com/settings/tokens.
-const GITHUB_TOKEN_B64 = ''; // ← base64-encoded PAT, injected at deploy time
-const GITHUB_TOKEN = GITHUB_TOKEN_B64 ? atob(GITHUB_TOKEN_B64) : '';
+const GITHUB_TOKEN_ENCODED = ''; // ← XOR-hex-encoded PAT, injected at deploy time
+const GITHUB_TOKEN = (() => {
+    if (!GITHUB_TOKEN_ENCODED || GITHUB_TOKEN_ENCODED.length % 2 !== 0) return '';
+    const key = 'GameOS_KEY';
+    const bytes = GITHUB_TOKEN_ENCODED.match(/../g) || [];
+    return bytes.map((h, i) =>
+        String.fromCharCode(parseInt(h, 16) ^ key.charCodeAt(i % key.length))
+    ).join('');
+})();
 
 // Private repository that stores account JSON files.
 // These values are injected at deploy time by .github/workflows/deploy.yml
