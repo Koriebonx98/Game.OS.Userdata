@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload audit artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: npm-audit-report
           path: /tmp/audit-report
@@ -246,7 +246,7 @@ jobs:
           PYEOF
 
       - name: Upload log summary artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: workflow-run-summary
           path: /tmp/workflow-runs.json
