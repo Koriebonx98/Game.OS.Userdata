@@ -221,9 +221,17 @@ async function initializeMode() {
                 initAdminAccountGitHub();
                 return;
             }
+            // Provide specific guidance based on the HTTP status code
+            if (resp.status === 401) {
+                console.warn('⚠️ DATA_REPO_TOKEN is invalid or expired. Generate a new fine-grained PAT and update the DATA_REPO_TOKEN repository secret, then re-run the deploy workflow.');
+            } else if (resp.status === 403) {
+                console.warn(`⚠️ DATA_REPO_TOKEN does not have access to ${DATA_REPO_OWNER}/${DATA_REPO_NAME}. Ensure the PAT was created with Contents: Read and write permission scoped to that repository. If the token was previously exposed in a public branch, GitHub may have auto-revoked it - generate a new token.`);
+            } else if (resp.status === 404) {
+                console.warn(`⚠️ Private data repository "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found. Create it at https://github.com/new (set to Private) and ensure your PAT is scoped to it.`);
+            }
             throw new Error(`GitHub API ${resp.status}`);
         } catch (err) {
-            console.warn('⚠️ GitHub token invalid or data repo unreachable – falling back to demo mode');
+            console.warn('⚠️ GitHub mode unavailable – falling back to demo mode');
             console.warn(err.message);
             MODE = 'demo';
         }
