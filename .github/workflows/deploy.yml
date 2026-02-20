@@ -1,16 +1,20 @@
-# Deploy to GitHub Pages with token injection
+# Deploy to GitHub Pages
 #
 # This workflow:
 #   1. Checks out the source code
-#   2. Injects the DATA_REPO_TOKEN secret into script.js at build time
-#      (the token is NEVER committed to the repository)
-#   3. Deploys the frontend to GitHub Pages via peaceiris/actions-gh-pages
+#   2. Injects the BACKEND_URL repository variable into script.js at build time.
+#      BACKEND_URL is NOT a secret – it is a public URL pointing to the backend server.
+#      No sensitive tokens are embedded in the deployed files.
+#   3. Optionally validates that the configured backend is reachable.
+#   4. Deploys the frontend to GitHub Pages via peaceiris/actions-gh-pages
 #
 # Required setup (one-time):
-#   1. Add a secret named DATA_REPO_TOKEN in this repository:
-#      Settings → Secrets and variables → Actions → New repository secret
-#      Value: your fine-grained PAT (contents: read+write on Game.OS.Private.Data)
-#   2. Set GitHub Pages source to "Deploy from a branch":
+#   1. Deploy the backend server (see backend/README.md) to Railway, Render, Fly.io, etc.
+#      The backend holds DATA_REPO_TOKEN securely as a server environment variable.
+#   2. Add a repository VARIABLE named BACKEND_URL with your backend server's URL:
+#      Settings → Secrets and variables → Actions → Variables → New repository variable
+#      Example: https://my-gameos-backend.railway.app
+#   3. Set GitHub Pages source to "Deploy from a branch":
 #      Settings → Pages → Source → Deploy from a branch → Branch: gh-pages / (root)
 
 name: Deploy to GitHub Pages
@@ -35,69 +39,63 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
 
-      - name: Inject configuration into script.js
+      - name: Inject BACKEND_URL into script.js
         run: |
           python3 << 'PYEOF'
           import os, json, re, sys
 
-          token      = os.environ.get('DATA_REPO_TOKEN', '')
-          owner      = os.environ.get('REPO_OWNER', '')
-          data_repo  = os.environ.get('DATA_REPO_NAME', '')
+          backend_url = os.environ.get('BACKEND_URL', '').rstrip('/')
 
           with open('script.js', 'r', encoding='utf-8') as f:
               content = f.read()
 
-          # ── Inject GITHUB_TOKEN ──────────────────────────────────────────────
+          # ── Inject BACKEND_URL ───────────────────────────────────────────────
           # json.dumps produces a valid JS string literal and handles all special chars.
           # The regex matches any single-quoted value so it works even if the file was
           # previously processed (e.g. re-run without a clean checkout).
-          new_token_line = f"const GITHUB_TOKEN = {json.dumps(token)};"
+          new_url_line = f"const BACKEND_URL = {json.dumps(backend_url)};"
           updated = re.sub(
-              r"const GITHUB_TOKEN\s*=\s*'[^']*';[^\n]*",
-              new_token_line,
+              r"const BACKEND_URL\s*=\s*'[^']*';[^\n]*",
+              new_url_line,
               content,
               count=1
           )
           if updated == content:
-              print('ERROR: GITHUB_TOKEN placeholder not found in script.js — aborting')
+              print('ERROR: BACKEND_URL placeholder not found in script.js — aborting')
               sys.exit(1)
           content = updated
-
-          # ── Inject DATA_REPO_OWNER ───────────────────────────────────────────
-          if owner:
-              new_owner_line = f"const DATA_REPO_OWNER = {json.dumps(owner)};"
-              content = re.sub(
-                  r"const DATA_REPO_OWNER\s*=\s*'[^']*';[^\n]*",
-                  new_owner_line,
-                  content,
-                  count=1
-              )
-
-          # ── Inject DATA_REPO_NAME ────────────────────────────────────────────
-          if data_repo:
-              new_repo_line = f"const DATA_REPO_NAME  = {json.dumps(data_repo)};"
-              content = re.sub(
-                  r"const DATA_REPO_NAME\s*=\s*'[^']*';[^\n]*",
-                  new_repo_line,
-                  content,
-                  count=1
-              )
 
           with open('script.js', 'w', encoding='utf-8') as f:
               f.write(content)
 
           # ── Diagnostics ──────────────────────────────────────────────────────
-          status = 'injected — GitHub mode will be active' if token else 'not set — site will use demo mode'
-          print(f'DATA_REPO_TOKEN : {status}')
-          if owner:
-              print(f'DATA_REPO_OWNER : set to {owner!r}')
-          if data_repo:
-              print(f'DATA_REPO_NAME  : set to {data_repo!r}')
+          if backend_url:
+              print(f'BACKEND_URL : set to {backend_url!r} — backend mode will be active')
+          else:
+              print('BACKEND_URL : not set — site will use demo mode (localStorage only)')
+              print('To enable real accounts, add a BACKEND_URL repository variable pointing')
+              print('to your deployed backend server (see backend/README.md).')
           PYEOF
         env:
-          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
-          REPO_OWNER: ${{ github.repository_owner }}
-          DATA_REPO_NAME: ${{ vars.DATA_REPO_NAME }}
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+
+      - name: Validate backend connectivity (if configured)
+        if: vars.BACKEND_URL != ''
+        run: |
+          BACKEND="${{ vars.BACKEND_URL }}"
+          BACKEND="${BACKEND%/}"
+          echo "Checking backend health at ${BACKEND}/health …"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${BACKEND}/health" || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Backend is reachable (HTTP 200)"
+          elif [ "$HTTP_STATUS" = "000" ]; then
+            echo "⚠️  Backend unreachable (connection failed). Deployment will continue but"
+            echo "   the site will fall back to demo mode until the backend is available."
+            echo "   Verify that BACKEND_URL is correct and the server is running."
+          else
+            echo "⚠️  Backend returned HTTP ${HTTP_STATUS}. Deployment will continue."
+            echo "   Verify BACKEND_URL and backend health."
+          fi
 
       - name: Copy frontend files to deployment directory
         run: |

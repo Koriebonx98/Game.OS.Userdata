@@ -3,46 +3,33 @@
  *
  * Modes
  * ─────
- *   'github' – Real persistent accounts stored in a private GitHub repository.
- *              Free, GitHub-only, no external server required.
+ *   'github' – Real persistent accounts via the Game.OS backend server.
+ *              The backend server holds the GitHub PAT securely as an environment
+ *              variable; the token is NEVER embedded in frontend files.
  *   'demo'   – Accounts stored in browser localStorage (local testing only).
  *
- * Enabling real accounts (GitHub mode)
+ * Enabling real accounts (backend mode)
  * ──────────────────────────────────────
- * 1. Create a private GitHub repository for data (e.g. Koriebonx98/Game.OS.Private.Data)
- * 2. Create a fine-grained Personal Access Token:
- *    https://github.com/settings/tokens → "Fine-grained tokens" → "Generate new token"
- *    • Repository access: Only select repositories → your private data repo
- *    • Permissions → Repository permissions → Contents: Read and write
- * 3. Add the token as a secret named DATA_REPO_TOKEN in THIS repo
- *    (Settings → Secrets and variables → Actions → New repository secret)
- * 4. In THIS repo's Pages settings, set Source to "GitHub Actions"
- * 5. Push to main — the deploy workflow (.github/workflows/deploy.yml) injects
- *    the token at build time so it is never committed to the public repository.
+ * 1. Deploy the backend server (see backend/README.md) to Railway, Render, Fly.io, etc.
+ * 2. Add a repository VARIABLE named BACKEND_URL with your backend server's public URL:
+ *    Settings → Secrets and variables → Actions → Variables → New repository variable
+ *    Example: https://my-gameos-backend.railway.app
+ * 3. In THIS repo's Pages settings, set Source to "GitHub Actions"
+ * 4. Push to main — the deploy workflow (.github/workflows/deploy.yml) injects
+ *    BACKEND_URL at build time. It is a public URL, not a secret.
  */
 
 // ============================================================
 // CONFIGURATION
 // ============================================================
 
-// Fine-grained PAT injected by the deploy workflow (see .github/workflows/deploy.yml).
-// Do NOT paste a real token here – it would be visible in the public repository.
-//
-// Security note: the deployed JS will contain the token and is readable by anyone
-// who inspects the page source. Mitigate by using a fine-grained PAT scoped ONLY
-// to your private data repository (contents: read+write). If the token is compromised
-// you can revoke and regenerate it at https://github.com/settings/tokens.
-const GITHUB_TOKEN = ''; // ← injected at deploy time by .github/workflows/deploy.yml
+// Backend server URL injected by the deploy workflow (see .github/workflows/deploy.yml).
+// This is NOT a secret – it is a public URL pointing to your backend server.
+// Leave empty to use demo mode (localStorage only).
+const BACKEND_URL = ''; // ← injected at deploy time by .github/workflows/deploy.yml
 
-// Private repository that stores account JSON files.
-// These values are injected at deploy time by .github/workflows/deploy.yml
-// (DATA_REPO_OWNER from ${{ github.repository_owner }}, DATA_REPO_NAME from vars.DATA_REPO_NAME).
-// The defaults below are used only when running locally.
-const DATA_REPO_OWNER = 'Koriebonx98'; // ← injected at deploy time
-const DATA_REPO_NAME  = 'Game.OS.Private.Data'; // ← injected at deploy time
-
-// Mode is detected automatically – 'github' when a token is present, else 'demo'
-let MODE = (GITHUB_TOKEN && GITHUB_TOKEN.length > 0) ? 'github' : 'demo';
+// Mode is detected automatically – 'github' (backend) when BACKEND_URL is set, else 'demo'
+let MODE = (BACKEND_URL && BACKEND_URL.length > 0) ? 'github' : 'demo';
 
 // Promise that resolves when initializeMode() has finished detecting the active mode.
 // Form handlers await this to avoid a race condition where MODE is still 'github'
@@ -205,41 +192,41 @@ async function initializeMode() {
     const statusEl = document.getElementById('connectionStatus');
 
     if (MODE === 'github') {
+        const base = getBackendBase();
         try {
-            // Verify the token and data repo are reachable
-            const resp = await fetch(
-                `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
-                { headers: githubHeaders() }
-            );
+            // Verify the backend server is reachable
+            const resp = await fetch(`${base}/health`, { cache: 'no-store' });
             if (resp.ok) {
-                console.log('✅ GitHub mode active – real accounts enabled');
+                console.log('✅ Backend mode active – real accounts enabled');
                 if (statusEl) {
                     statusEl.textContent = '✅ Real accounts active';
                     statusEl.className = 'status connected';
                 }
-                // Initialize the admin account in the background (runs once per session)
-                initAdminAccountGitHub();
                 return;
             }
             // Provide specific guidance based on the HTTP status code
             if (resp.status === 401) {
-                console.warn('⚠️ DATA_REPO_TOKEN is invalid or expired. Generate a new fine-grained PAT and update the DATA_REPO_TOKEN repository secret, then re-run the deploy workflow.');
+                console.warn('⚠️  Backend returned 401. Verify the backend server is correctly configured.');
             } else if (resp.status === 403) {
-                console.warn(`⚠️ DATA_REPO_TOKEN does not have access to ${DATA_REPO_OWNER}/${DATA_REPO_NAME}. Ensure the PAT was created with Contents: Read and write permission scoped to that repository. If the token was previously exposed in a public branch, GitHub may have auto-revoked it - generate a new token.`);
+                console.warn('⚠️  Backend returned 403. Check CORS and access settings on your backend server.');
             } else if (resp.status === 404) {
-                console.warn(`⚠️ Private data repository "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found. Create it at https://github.com/new (set to Private) and ensure your PAT is scoped to it.`);
+                console.warn(`⚠️  Backend health endpoint not found at "${base}/health". Verify BACKEND_URL is correct.`);
+            } else {
+                console.warn(`⚠️  Backend returned HTTP ${resp.status}. Verify BACKEND_URL and backend health.`);
             }
-            throw new Error(`GitHub API ${resp.status}`);
+            throw new Error(`Backend health check failed: HTTP ${resp.status}`);
         } catch (err) {
-            console.warn('⚠️ GitHub mode unavailable – falling back to demo mode');
-            console.warn(err.message);
+            console.warn('⚠️  Backend mode unavailable – falling back to demo mode');
+            console.warn('    BACKEND_URL:', base || '(empty)');
+            console.warn('    Error:', err.message);
+            console.warn('    To fix: ensure BACKEND_URL is set correctly and the backend server is running.');
             MODE = 'demo';
         }
     }
 
     // Demo mode notice
     console.warn('🎮 Demo Mode – accounts stored in browser localStorage only');
-    console.warn('To enable real accounts, follow the setup guide in README.md');
+    console.warn('To enable real accounts, deploy the backend server and set BACKEND_URL (see README.md)');
     if (statusEl) {
         statusEl.textContent = '🎮 Demo Mode – accounts stored locally only';
         statusEl.className = 'status disconnected';
@@ -247,129 +234,15 @@ async function initializeMode() {
 }
 
 // ============================================================
-// GITHUB API HELPERS
+// BACKEND API HELPERS
 // ============================================================
 
 /**
- * Creates the Admin.GameOS account in the GitHub data repo on first launch.
- * Runs silently in the background once per browser session.
- * Initial password: "GameOS2026" – change via Account Settings after first login.
+ * Returns the backend base URL (trailing slash stripped).
+ * All backend API calls use this to build request URLs.
  */
-async function initAdminAccountGitHub() {
-    if (sessionStorage.getItem('adminInitChecked')) return;
-    sessionStorage.setItem('adminInitChecked', '1');
-    try {
-        const existing = await githubRead(`accounts/${ADMIN_USERNAME_LOWER}/profile.json`);
-        if (existing) return; // already exists
-
-        const passwordHash = await hashPassword('GameOS2026', ADMIN_USERNAME);
-        await githubWrite(
-            `accounts/${ADMIN_USERNAME_LOWER}/profile.json`,
-            {
-                username:      ADMIN_USERNAME,
-                email:         ADMIN_EMAIL,
-                password_hash: passwordHash,
-                created_at:    new Date().toISOString(),
-                is_admin:      true
-            },
-            `Initialize admin account: ${ADMIN_USERNAME}`
-        );
-
-        // Update email index
-        const indexFile = await githubRead('accounts/email-index.json');
-        const emailMap  = indexFile ? { ...indexFile.content } : {};
-        if (!emailMap[ADMIN_EMAIL]) {
-            emailMap[ADMIN_EMAIL] = ADMIN_USERNAME_LOWER;
-            await githubWrite(
-                'accounts/email-index.json',
-                emailMap,
-                `Add email index for admin: ${ADMIN_USERNAME}`,
-                indexFile ? indexFile.sha : undefined
-            );
-        }
-        console.log(`✅ Admin account "${ADMIN_USERNAME}" initialized in GitHub mode.`);
-    } catch (err) {
-        // Best-effort – silently ignore failures (e.g. concurrent init race)
-        console.warn('Admin account init skipped:', err.message);
-    }
-}
-
-function githubHeaders() {
-    return {
-        'Authorization': `Bearer ${GITHUB_TOKEN}`,
-        'Accept': 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2022-11-28',
-        'Content-Type': 'application/json'
-    };
-}
-
-/**
- * Read and parse a JSON file from the private data repository.
- * Returns { content, sha } or null when the file does not exist.
- */
-async function githubRead(path) {
-    const resp = await fetch(
-        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
-        { headers: githubHeaders(), cache: 'no-store' }
-    );
-    if (resp.status === 404) return null;
-    if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
-    const file = await resp.json();
-    const json = new TextDecoder().decode(
-        Uint8Array.from(atob(file.content.replace(/\n/g, '')), c => c.charCodeAt(0))
-    );
-    return { content: JSON.parse(json), sha: file.sha };
-}
-
-/**
- * Create or update a JSON file in the private data repository.
- * Pass `sha` when overwriting an existing file.
- */
-/**
- * Delete a file from the private data repository.
- */
-async function githubDelete(path, sha, message) {
-    const resp = await fetch(
-        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
-        {
-            method: 'DELETE',
-            headers: githubHeaders(),
-            body: JSON.stringify({
-                message,
-                sha,
-                committer: { name: 'Game.OS Bot', email: 'game-os-bot@users.noreply.github.com' }
-            })
-        }
-    );
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message || `GitHub API error ${resp.status}`);
-    }
-}
-
-async function githubWrite(path, content, message, sha) {
-    const json   = JSON.stringify(content, null, 2);
-    const bytes  = new TextEncoder().encode(json);
-    let binary   = '';
-    bytes.forEach(b => (binary += String.fromCharCode(b)));
-    const base64 = btoa(binary);
-
-    const body = {
-        message,
-        content: base64,
-        committer: { name: 'Game.OS Bot', email: 'game-os-bot@users.noreply.github.com' }
-    };
-    if (sha) body.sha = sha;
-
-    const resp = await fetch(
-        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/${path}`,
-        { method: 'PUT', headers: githubHeaders(), body: JSON.stringify(body) }
-    );
-    if (!resp.ok) {
-        const err = await resp.json().catch(() => ({}));
-        throw new Error(err.message || `GitHub API error ${resp.status}`);
-    }
-    return resp.json();
+function getBackendBase() {
+    return BACKEND_URL.replace(/\/$/, '');
 }
 
 // ============================================================
@@ -377,56 +250,18 @@ async function githubWrite(path, content, message, sha) {
 // ============================================================
 
 async function createAccountGitHub(username, email, password) {
-    const usernameLower = username.toLowerCase();
-    const emailLower    = email.toLowerCase();
-    const passwordHash  = await hashPassword(password, username);
-
-    // Check for duplicate username
-    const existing = await githubRead(`accounts/${usernameLower}/profile.json`);
-    if (existing) {
-        return { success: false, message: 'Username already exists' };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/create-account`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, email, password })
+    });
+    const data = await resp.json();
+    // Store API token if the backend returned one with the new account
+    if (data.success && data.token) {
+        localStorage.setItem(`gameOS_apiToken_${username.toLowerCase()}`, data.token);
     }
-
-    // Check for duplicate email via index
-    const indexFile = await githubRead('accounts/email-index.json');
-    const emailMap  = indexFile ? indexFile.content : {};
-    if (emailMap[emailLower]) {
-        return { success: false, message: 'Email already registered' };
-    }
-
-    // Create account profile file (one folder per user)
-    await githubWrite(
-        `accounts/${usernameLower}/profile.json`,
-        { username, email, password_hash: passwordHash, created_at: new Date().toISOString() },
-        `Create account: ${username}`
-    );
-
-    // Update email index (up to 3 attempts to handle concurrent write conflicts)
-    emailMap[emailLower] = usernameLower;
-    let indexRef = indexFile;
-    for (let attempt = 0; attempt < 3; attempt++) {
-        try {
-            const map = indexRef ? { ...indexRef.content } : {};
-            map[emailLower] = usernameLower;
-            await githubWrite(
-                'accounts/email-index.json',
-                map,
-                `Add email index for: ${username}`,
-                indexRef ? indexRef.sha : undefined
-            );
-            break; // success – exit loop
-        } catch (err) {
-            if (attempt < 2) {
-                // Re-read for updated SHA, then retry with brief backoff
-                indexRef = await githubRead('accounts/email-index.json');
-                await new Promise(r => setTimeout(r, 200 * (attempt + 1)));
-            } else {
-                throw err;
-            }
-        }
-    }
-
-    return { success: true, message: 'Account created successfully' };
+    return data;
 }
 
 // ============================================================
@@ -434,31 +269,13 @@ async function createAccountGitHub(username, email, password) {
 // ============================================================
 
 async function verifyAccountGitHub(identifier, password) {
-    let accountKey;
-    if (identifier.includes('@')) {
-        // Email login: look up username via email index
-        const indexFile = await githubRead('accounts/email-index.json');
-        if (!indexFile) return { success: false, message: 'Account not found' };
-        accountKey = indexFile.content[identifier.toLowerCase()];
-        if (!accountKey) return { success: false, message: 'Account not found' };
-    } else {
-        accountKey = identifier.toLowerCase();
-    }
-
-    const accountFile = await githubRead(`accounts/${accountKey}/profile.json`);
-    if (!accountFile) return { success: false, message: 'Account not found' };
-
-    const account   = accountFile.content;
-    const inputHash = await hashPassword(password, account.username);
-    if (account.password_hash !== inputHash) {
-        return { success: false, message: 'Invalid password' };
-    }
-
-    return {
-        success: true,
-        message: 'Login successful',
-        user: { username: account.username, email: account.email }
-    };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/verify-account`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username: identifier, password })
+    });
+    return resp.json();
 }
 
 // ============================================================
@@ -1071,52 +888,13 @@ async function updateAccountDemo(username, currentPassword, newEmail, newPasswor
 // ============================================================
 
 async function updateAccountGitHub(username, currentPassword, newEmail, newPassword) {
-    const usernameLower = username.toLowerCase();
-    const accountFile   = await githubRead(`accounts/${usernameLower}/profile.json`);
-    if (!accountFile) return { success: false, message: 'Account not found.' };
-    const account = accountFile.content;
-
-    // Verify current password
-    const currentHash = await hashPassword(currentPassword, account.username);
-    if (account.password_hash !== currentHash) {
-        return { success: false, message: 'Current password is incorrect.' };
-    }
-
-    let updated = { ...account };
-
-    // Handle email change
-    if (newEmail && newEmail.toLowerCase() !== account.email.toLowerCase()) {
-        const emailLower   = newEmail.toLowerCase();
-        const indexFile    = await githubRead('accounts/email-index.json');
-        const emailMap     = indexFile ? { ...indexFile.content } : {};
-        if (emailMap[emailLower] && emailMap[emailLower] !== usernameLower) {
-            return { success: false, message: 'Email already in use by another account.' };
-        }
-        // Remove old email, add new
-        delete emailMap[account.email.toLowerCase()];
-        emailMap[emailLower] = usernameLower;
-        await githubWrite(
-            'accounts/email-index.json',
-            emailMap,
-            `Update email index for: ${username}`,
-            indexFile ? indexFile.sha : undefined
-        );
-        updated.email = newEmail;
-    }
-
-    // Handle password change
-    if (newPassword) {
-        updated.password_hash = await hashPassword(newPassword, account.username);
-    }
-
-    await githubWrite(
-        `accounts/${usernameLower}/profile.json`,
-        updated,
-        `Update account: ${username}`,
-        accountFile.sha
-    );
-
-    return { success: true, message: 'Account updated.', email: updated.email };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/update-account`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, currentPassword, newEmail, newPassword })
+    });
+    return resp.json();
 }
 
 // ============================================================
@@ -1130,14 +908,11 @@ async function updateAccountGitHub(username, currentPassword, newEmail, newPassw
 const API_TOKEN_CACHE_KEY = 'gameOS_apiToken_pending';
 
 /**
- * Locate the backend URL (same logic as elsewhere in the codebase).
- * Falls back to a relative URL so it works when frontend + backend are
- * served from the same origin.
+ * Returns the backend base URL (trailing slash stripped).
+ * All backend API calls use this to build request URLs.
  */
 function getBackendBase() {
-    // Allow override via a global set elsewhere in the page
-    if (typeof BACKEND_URL !== 'undefined' && BACKEND_URL) return BACKEND_URL.replace(/\/$/, '');
-    return '';
+    return BACKEND_URL.replace(/\/$/, '');
 }
 
 /**
@@ -1168,10 +943,12 @@ async function loadApiTokenStatus() {
         display.placeholder = stored ? '••••••••••••••••••••' : 'No token generated yet';
         if (copyBtn) copyBtn.disabled = !stored;
     } else {
-        // In github mode, check whether the profile has a token hash (without exposing the hash)
+        // In backend mode, query token status from the server
         try {
-            const profileFile = await githubRead(`accounts/${user.username.toLowerCase()}/profile.json`);
-            const hasToken = profileFile && profileFile.content.api_token_hash;
+            const base = getBackendBase();
+            const resp = await fetch(`${base}/api/auth/token-status?username=${encodeURIComponent(user.username)}`);
+            const data = await resp.json();
+            const hasToken = data.hasToken;
             display.value       = '';
             display.placeholder = hasToken
                 ? '✅ Token issued – generate again to reveal'
@@ -1240,45 +1017,20 @@ async function handleGenerateToken() {
             token = `gos_${user.username.toLowerCase()}.${randomHex}`;
             localStorage.setItem(`gameOS_apiToken_${user.username.toLowerCase()}`, token);
         } else {
+            // Backend mode – call the backend to issue a signed HMAC token
             const base = getBackendBase();
-            if (base) {
-                // Backend is configured – call it to issue a signed HMAC token
-                const resp = await fetch(`${base}/api/auth/token`, {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ username: user.username, password })
-                });
-                const data = await resp.json();
-                if (!data.success) {
-                    showMessage(msgEl, `❌ ${data.message || 'Failed to generate token.'}`, 'error');
-                    if (btn) btn.disabled = false;
-                    return;
-                }
-                token = data.token;
-            } else {
-                // No backend configured – verify password locally and write the token hash to GitHub
-                const result = await verifyAccountGitHub(user.username, password);
-                if (!result.success) {
-                    showMessage(msgEl, '❌ Incorrect password.', 'error');
-                    if (btn) btn.disabled = false;
-                    return;
-                }
-                const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
-                    .map(b => b.toString(16).padStart(2, '0')).join('');
-                token = `gos_${user.username.toLowerCase()}.${randomHex}`;
-                // Store a SHA-256 hash of the token in the user's GitHub profile
-                const tokenHash   = await sha256Hex(token);
-                const profilePath = `accounts/${user.username.toLowerCase()}/profile.json`;
-                const profileFile = await githubRead(profilePath);
-                if (profileFile) {
-                    await githubWrite(
-                        profilePath,
-                        { ...profileFile.content, api_token_hash: tokenHash, api_token_issued_at: new Date().toISOString() },
-                        `Issue API token for: ${user.username}`,
-                        profileFile.sha
-                    );
-                }
+            const resp = await fetch(`${base}/api/auth/token`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ username: user.username, password })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                showMessage(msgEl, `❌ ${data.message || 'Failed to generate token.'}`, 'error');
+                if (btn) btn.disabled = false;
+                return;
             }
+            token = data.token;
         }
 
         // Cache the token so the page can display it once
@@ -1331,36 +1083,18 @@ async function handleRevokeToken() {
             }
             localStorage.removeItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
         } else {
+            // Backend mode – call the backend to revoke the token
             const base = getBackendBase();
-            if (base) {
-                // Backend is configured – call it to revoke the token
-                const resp = await fetch(`${base}/api/auth/revoke-token`, {
-                    method:  'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body:    JSON.stringify({ username: user.username, password })
-                });
-                const data = await resp.json();
-                if (!data.success) {
-                    showMessage(msgEl, `❌ ${data.message || 'Failed to revoke token.'}`, 'error');
-                    if (btn) btn.disabled = false;
-                    return;
-                }
-            } else {
-                // No backend – verify password locally and clear the token hash from GitHub profile
-                const result = await verifyAccountGitHub(user.username, password);
-                if (!result.success) {
-                    showMessage(msgEl, '❌ Incorrect password.', 'error');
-                    if (btn) btn.disabled = false;
-                    return;
-                }
-                const profilePath = `accounts/${user.username.toLowerCase()}/profile.json`;
-                const profileFile = await githubRead(profilePath);
-                if (profileFile) {
-                    const updated = { ...profileFile.content };
-                    delete updated.api_token_hash;
-                    delete updated.api_token_issued_at;
-                    await githubWrite(profilePath, updated, `Revoke API token for: ${user.username}`, profileFile.sha);
-                }
+            const resp = await fetch(`${base}/api/auth/revoke-token`, {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body:    JSON.stringify({ username: user.username, password })
+            });
+            const data = await resp.json();
+            if (!data.success) {
+                showMessage(msgEl, `❌ ${data.message || 'Failed to revoke token.'}`, 'error');
+                if (btn) btn.disabled = false;
+                return;
             }
         }
 
@@ -1385,200 +1119,74 @@ async function handleRevokeToken() {
 // ============================================================
 
 async function addFriendGitHub(username, friendUsername) {
-    const usernameLower = username.toLowerCase();
-    const friendLower   = friendUsername.toLowerCase();
-
-    if (usernameLower === friendLower) {
-        return { success: false, message: 'You cannot add yourself as a friend' };
-    }
-
-    // Check friend exists
-    const friendFile = await githubRead(`accounts/${friendLower}/profile.json`);
-    if (!friendFile) return { success: false, message: 'User not found' };
-
-    // Check if already accepted friends
-    const friendsPath = `accounts/${usernameLower}/friends.json`;
-    const friendsFile = await githubRead(friendsPath);
-    const friends     = friendsFile ? [...friendsFile.content] : [];
-    if (friends.some(f => f.toLowerCase() === friendLower)) {
-        return { success: false, message: 'Already friends with this user' };
-    }
-
-    // Check if they already sent us a request → auto-accept
-    const myRequestsPath = `accounts/${usernameLower}/friend_requests.json`;
-    const myRequestsFile = await githubRead(myRequestsPath);
-    const myRequests     = myRequestsFile ? myRequestsFile.content : [];
-    if (myRequests.some(r => r.from.toLowerCase() === friendLower)) {
-        return await acceptFriendRequestGitHub(username, friendFile.content.username);
-    }
-
-    // Check if we already sent them a request
-    const sentPath = `accounts/${usernameLower}/sent_requests.json`;
-    const sentFile = await githubRead(sentPath);
-    const sent     = sentFile ? [...sentFile.content] : [];
-    if (sent.some(s => s.toLowerCase() === friendLower)) {
-        return { success: false, message: 'Friend request already pending' };
-    }
-
-    // Add to recipient's incoming requests
-    const theirRequestsPath = `accounts/${friendLower}/friend_requests.json`;
-    const theirRequestsFile = await githubRead(theirRequestsPath);
-    const theirRequests     = theirRequestsFile ? [...theirRequestsFile.content] : [];
-    theirRequests.push({ from: username, sentAt: new Date().toISOString() });
-    await githubWrite(
-        theirRequestsPath,
-        theirRequests,
-        `Friend request from ${username} to ${friendUsername}`,
-        theirRequestsFile ? theirRequestsFile.sha : undefined
-    );
-
-    // Add to sender's outgoing requests
-    sent.push(friendFile.content.username);
-    await githubWrite(
-        sentPath,
-        sent,
-        `Sent friend request to ${friendUsername} for: ${username}`,
-        sentFile ? sentFile.sha : undefined
-    );
-
-    return { success: true, message: `Friend request sent to ${friendFile.content.username}! Waiting for them to accept.` };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/send-friend-request`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, friendUsername })
+    });
+    return resp.json();
 }
 
 async function acceptFriendRequestGitHub(username, fromUsername) {
-    const usernameLower = username.toLowerCase();
-    const fromLower     = fromUsername.toLowerCase();
-
-    // Remove from recipient's incoming requests
-    const requestsPath = `accounts/${usernameLower}/friend_requests.json`;
-    const requestsFile = await githubRead(requestsPath);
-    if (!requestsFile) return { success: false, message: 'Friend request not found' };
-    const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
-    if (updatedRequests.length === requestsFile.content.length) {
-        return { success: false, message: 'Friend request not found' };
-    }
-    await githubWrite(requestsPath, updatedRequests, `Accept friend request from ${fromUsername}`, requestsFile.sha);
-
-    // Remove from sender's outgoing requests
-    const sentPath = `accounts/${fromLower}/sent_requests.json`;
-    const sentFile = await githubRead(sentPath);
-    if (sentFile) {
-        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== usernameLower);
-        await githubWrite(sentPath, updatedSent, `Friend request accepted by ${username}`, sentFile.sha);
-    }
-
-    // Add sender to recipient's friends
-    const myFriendsPath = `accounts/${usernameLower}/friends.json`;
-    const myFriendsFile = await githubRead(myFriendsPath);
-    const myFriends     = myFriendsFile ? [...myFriendsFile.content] : [];
-    if (!myFriends.some(f => f.toLowerCase() === fromLower)) {
-        const fromFile = await githubRead(`accounts/${fromLower}/profile.json`);
-        myFriends.push(fromFile ? fromFile.content.username : fromUsername);
-        await githubWrite(myFriendsPath, myFriends, `Add friend ${fromUsername} for: ${username}`, myFriendsFile ? myFriendsFile.sha : undefined);
-    }
-
-    // Add recipient to sender's friends
-    const theirFriendsPath = `accounts/${fromLower}/friends.json`;
-    const theirFriendsFile = await githubRead(theirFriendsPath);
-    const theirFriends     = theirFriendsFile ? [...theirFriendsFile.content] : [];
-    if (!theirFriends.some(f => f.toLowerCase() === usernameLower)) {
-        const userFile = await githubRead(`accounts/${usernameLower}/profile.json`);
-        theirFriends.push(userFile ? userFile.content.username : username);
-        await githubWrite(theirFriendsPath, theirFriends, `Add friend ${username} for: ${fromUsername}`, theirFriendsFile ? theirFriendsFile.sha : undefined);
-    }
-
-    return { success: true, message: `You are now friends with ${fromUsername}!` };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/accept-friend-request`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, fromUsername })
+    });
+    return resp.json();
 }
 
 async function declineFriendRequestGitHub(username, fromUsername) {
-    const usernameLower = username.toLowerCase();
-    const fromLower     = fromUsername.toLowerCase();
-
-    // Remove from recipient's incoming requests
-    const requestsPath = `accounts/${usernameLower}/friend_requests.json`;
-    const requestsFile = await githubRead(requestsPath);
-    if (!requestsFile) return { success: false, message: 'Friend request not found' };
-    const updatedRequests = requestsFile.content.filter(r => r.from.toLowerCase() !== fromLower);
-    await githubWrite(requestsPath, updatedRequests, `Decline friend request from ${fromUsername}`, requestsFile.sha);
-
-    // Remove from sender's outgoing requests
-    const sentPath = `accounts/${fromLower}/sent_requests.json`;
-    const sentFile = await githubRead(sentPath);
-    if (sentFile) {
-        const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== usernameLower);
-        await githubWrite(sentPath, updatedSent, `Friend request declined by ${username}`, sentFile.sha);
-    }
-
-    return { success: true, message: 'Friend request declined.' };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/decline-friend-request`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, fromUsername })
+    });
+    return resp.json();
 }
 
 async function cancelFriendRequestGitHub(username, toUsername) {
-    const usernameLower = username.toLowerCase();
-    const toLower       = toUsername.toLowerCase();
-
-    // Remove from sender's outgoing requests
-    const sentPath = `accounts/${usernameLower}/sent_requests.json`;
-    const sentFile = await githubRead(sentPath);
-    if (!sentFile) return { success: false, message: 'No sent requests found' };
-    const updatedSent = sentFile.content.filter(s => s.toLowerCase() !== toLower);
-    await githubWrite(sentPath, updatedSent, `Cancel friend request to ${toUsername}`, sentFile.sha);
-
-    // Remove from recipient's incoming requests
-    const theirRequestsPath = `accounts/${toLower}/friend_requests.json`;
-    const theirRequestsFile = await githubRead(theirRequestsPath);
-    if (theirRequestsFile) {
-        const updatedRequests = theirRequestsFile.content.filter(r => r.from.toLowerCase() !== usernameLower);
-        await githubWrite(theirRequestsPath, updatedRequests, `Friend request cancelled by ${username}`, theirRequestsFile.sha);
-    }
-
-    return { success: true };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/cancel-friend-request`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, toUsername })
+    });
+    return resp.json();
 }
 
 async function getFriendsGitHub(username) {
-    const friendsFile = await githubRead(`accounts/${username.toLowerCase()}/friends.json`);
-    return friendsFile ? friendsFile.content : [];
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/get-friends?username=${encodeURIComponent(username)}`);
+    const data = await resp.json();
+    return data.friends || [];
 }
 
 async function getFriendRequestsGitHub(username) {
-    const requestsFile = await githubRead(`accounts/${username.toLowerCase()}/friend_requests.json`);
-    return requestsFile ? requestsFile.content : [];
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/get-friend-requests?username=${encodeURIComponent(username)}`);
+    const data = await resp.json();
+    return data.requests || [];
 }
 
 async function getSentRequestsGitHub(username) {
-    const sentFile = await githubRead(`accounts/${username.toLowerCase()}/sent_requests.json`);
-    return sentFile ? sentFile.content : [];
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/get-sent-requests?username=${encodeURIComponent(username)}`);
+    const data = await resp.json();
+    return data.sent || [];
 }
 
 async function removeFriendGitHub(username, friendUsername) {
-    const usernameLower = username.toLowerCase();
-    const friendLower   = friendUsername.toLowerCase();
-
-    // Remove friend from requesting user's list
-    const friendsPath = `accounts/${usernameLower}/friends.json`;
-    const friendsFile = await githubRead(friendsPath);
-    if (!friendsFile) return { success: false, message: 'Friends list not found' };
-
-    const updated = friendsFile.content.filter(f => f.toLowerCase() !== friendLower);
-    await githubWrite(
-        friendsPath,
-        updated,
-        `Remove friend ${friendUsername} for: ${username}`,
-        friendsFile.sha
-    );
-
-    // Also remove requesting user from the friend's list
-    const theirFriendsPath = `accounts/${friendLower}/friends.json`;
-    const theirFriendsFile = await githubRead(theirFriendsPath);
-    if (theirFriendsFile) {
-        const theirUpdated = theirFriendsFile.content.filter(f => f.toLowerCase() !== usernameLower);
-        await githubWrite(
-            theirFriendsPath,
-            theirUpdated,
-            `Remove friend ${username} for: ${friendUsername}`,
-            theirFriendsFile.sha
-        );
-    }
-
-    return { success: true, friends: updated };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/remove-friend`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, friendUsername })
+    });
+    return resp.json();
 }
 
 // ============================================================
@@ -1595,15 +1203,17 @@ const PRESENCE_ONLINE_THRESHOLD_MS = 5 * 60 * 1000;
  */
 async function updatePresence(username) {
     if (!username) return;
-    const now = new Date().toISOString();
     if (MODE === 'demo') {
-        localStorage.setItem(`gameOS_presence_${username.toLowerCase()}`, now);
+        localStorage.setItem(`gameOS_presence_${username.toLowerCase()}`, new Date().toISOString());
         return;
     }
     try {
-        const path     = `accounts/${username.toLowerCase()}/presence.json`;
-        const existing = await githubRead(path);
-        await githubWrite(path, { lastSeen: now, username }, `Presence: ${username}`, existing ? existing.sha : undefined);
+        const base = getBackendBase();
+        await fetch(`${base}/api/update-presence`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ username })
+        });
     } catch (_) { /* best-effort */ }
 }
 
@@ -1616,8 +1226,10 @@ async function getFriendPresence(friendUsername) {
         return localStorage.getItem(`gameOS_presence_${friendUsername.toLowerCase()}`) || null;
     }
     try {
-        const file = await githubRead(`accounts/${friendUsername.toLowerCase()}/presence.json`);
-        return file ? file.content.lastSeen : null;
+        const base = getBackendBase();
+        const resp = await fetch(`${base}/api/get-presence?username=${encodeURIComponent(friendUsername)}`);
+        const data = await resp.json();
+        return data.lastSeen || null;
     } catch (_) {
         return null;
     }
@@ -2073,22 +1685,21 @@ function conversationKey(userA, userB) {
 }
 
 async function sendMessageGitHub(username, toUsername, text) {
-    const profileFile = await githubRead(`accounts/${username.toLowerCase()}/profile.json`);
-    if (!profileFile) return { success: false, message: 'Your account was not found' };
-
-    const convPath = conversationKey(username, toUsername);
-    const convFile = await githubRead(convPath);
-    const messages = convFile ? [...convFile.content] : [];
-    messages.push({ from: profileFile.content.username, text, sentAt: new Date().toISOString() });
-
-    await githubWrite(convPath, messages, `Message from ${username} to ${toUsername}`, convFile ? convFile.sha : undefined);
-    return { success: true };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/send-message`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, toUsername, text })
+    });
+    return resp.json();
 }
 
 async function getMessagesGitHub(username, withUsername) {
-    const convPath = conversationKey(username, withUsername);
-    const convFile = await githubRead(convPath);
-    return { success: true, messages: convFile ? convFile.content : [] };
+    const base = getBackendBase();
+    const resp = await fetch(
+        `${base}/api/get-messages?username=${encodeURIComponent(username)}&withUsername=${encodeURIComponent(withUsername)}`
+    );
+    return resp.json();
 }
 
 // ============================================================
@@ -2292,30 +1903,16 @@ function escapeHtml(str) {
  * then deletes email-index.json and any other top-level files.
  */
 async function resetAllAccountsGitHub() {
-    const resp = await fetch(
-        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}/contents/accounts`,
-        { headers: githubHeaders() }
-    );
-    if (resp.status === 404) return; // Nothing to delete
-    if (!resp.ok) throw new Error(`GitHub API error ${resp.status}`);
-    const items = await resp.json();
-
-    for (const item of items) {
-        // Preserve the Admin.GameOS account directory
-        if (item.name && item.name.toLowerCase() === ADMIN_USERNAME_LOWER) continue;
-        if (item.type === 'dir') {
-            // List files inside the user sub-folder and delete each one
-            const folderResp = await fetch(item.url, { headers: githubHeaders() });
-            if (folderResp.ok) {
-                const files = await folderResp.json();
-                for (const file of files) {
-                    await githubDelete(file.path, file.sha, `Reset: delete ${file.path}`);
-                }
-            }
-        } else {
-            await githubDelete(item.path, item.sha, `Reset: delete ${item.path}`);
-        }
-    }
+    const base     = getBackendBase();
+    const adminKey = prompt('Enter the server ADMIN_KEY to confirm account reset:');
+    if (!adminKey) throw new Error('Admin key is required to reset all accounts.');
+    const resp = await fetch(`${base}/api/reset-all-accounts`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ adminKey })
+    });
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.message || 'Failed to reset accounts');
 }
 
 /**
@@ -2388,14 +1985,13 @@ async function handleResetAllAccounts() {
  */
 async function getTotalUsersCount() {
     if (MODE === 'demo') {
-        // Count usernames stored in demo mode
-        const keys = Object.keys(localStorage).filter(k => k.startsWith('gameOS_user_'));
-        return keys.length;
+        return getDemoAccounts().length;
     }
     try {
-        const file = await githubRead('accounts/email-index.json');
-        if (!file) return 0;
-        return Object.keys(file.content).length;
+        const base = getBackendBase();
+        const resp = await fetch(`${base}/api/users-count`);
+        const data = await resp.json();
+        return data.count ?? null;
     } catch (_) {
         return null;
     }
@@ -2450,44 +2046,33 @@ async function fetchGamesDbPlatform(platform) {
 // ============================================================
 
 async function getGameLibraryGitHub(username) {
-    const file = await githubRead(`accounts/${username.toLowerCase()}/games.json`);
-    return file ? file.content : [];
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/game-library?username=${encodeURIComponent(username)}`);
+    const data = await resp.json();
+    return data.games || [];
 }
 
 async function addGameGitHub(username, game, platform) {
-    const path = `accounts/${username.toLowerCase()}/games.json`;
-    const file = await githubRead(path);
-    const library = file ? [...file.content] : [];
-
-    // Deduplicate by platform + title (case-insensitive)
-    const alreadyOwned = library.some(
-        g => g.platform === platform &&
-             (g.title || '').toLowerCase() === (game.Title || game.game_name || game.title || '').toLowerCase()
-    );
-    if (alreadyOwned) return { success: false, message: 'Game already in your library' };
-
-    library.push({
-        platform,
-        title:    game.Title || game.game_name || game.title,
-        titleId:  game.TitleID || game.title_id || game.id || null,
-        coverUrl: getGameCoverUrl(game) || undefined,
-        addedAt:  new Date().toISOString()
+    const base    = getBackendBase();
+    const title   = game.Title || game.game_name || game.title || '';
+    const titleId = game.TitleID || game.title_id || game.id || null;
+    const coverUrl = getGameCoverUrl(game) || undefined;
+    const resp = await fetch(`${base}/api/game-library/add`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, platform, title, titleId, coverUrl })
     });
-
-    await githubWrite(path, library, `Add game: ${game.Title || game.title} (${platform})`, file ? file.sha : undefined);
-    return { success: true, message: 'Game added to your library!' };
+    return resp.json();
 }
 
 async function removeGameGitHub(username, platform, title) {
-    const path = `accounts/${username.toLowerCase()}/games.json`;
-    const file = await githubRead(path);
-    if (!file) return { success: false, message: 'Library not found' };
-
-    const updated = file.content.filter(
-        g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
-    );
-    await githubWrite(path, updated, `Remove game: ${title} (${platform})`, file.sha);
-    return { success: true, library: updated };
+    const base = getBackendBase();
+    const resp = await fetch(`${base}/api/game-library/remove`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ username, platform, title })
+    });
+    return resp.json();
 }
 
 // ============================================================

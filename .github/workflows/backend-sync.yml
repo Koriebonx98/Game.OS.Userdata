@@ -1,23 +1,19 @@
-# Backend Sync & API Key Regeneration
+# Backend Sync & Health Check
 #
 # Triggered:
 #   • Automatically when the main branch is updated (push)
-#   • Manually via workflow_dispatch (choose whether to regenerate the API key)
+#   • Manually via workflow_dispatch
 #
 # What it does:
 #   1. Verifies the backend source is still in sync with the frontend expectations
 #      (checks that required API endpoints exist in backend/index.js).
-#   2. Optionally regenerates the DATA_REPO_TOKEN used by the frontend via
-#      the GitHub API and stores the new value as a repository secret
-#      (requires ADMIN_PAT secret – see setup below).
-#   3. Archives an encrypted copy of the current backend config for audit.
+#   2. Archives an encrypted copy of the current backend config for audit.
 #
 # Required secrets (Settings → Secrets and variables → Actions):
-#   DATA_REPO_TOKEN  – Fine-grained PAT for reading/writing Game.OS.Private.Data
-#   ADMIN_PAT        – Classic PAT with repo + admin:repo_hook scope, used ONLY
-#                      when "Regenerate API key" is selected in workflow_dispatch.
-#                      If absent, the regeneration step is skipped gracefully.
 #   ENCRYPTION_KEY   – AES-256 passphrase for encrypting the config archive.
+#
+# Note: DATA_REPO_TOKEN is stored ONLY in the backend server's environment variables.
+# It is never injected into frontend files or stored in repository secrets.
 
 name: Backend Sync
 
@@ -28,15 +24,6 @@ on:
       - 'backend/**'
       - 'script.js'
   workflow_dispatch:
-    inputs:
-      regenerate_token:
-        description: 'Regenerate DATA_REPO_TOKEN (requires ADMIN_PAT secret)'
-        required: false
-        default: 'false'
-        type: choice
-        options:
-          - 'false'
-          - 'true'
 
 permissions:
   contents: read
@@ -72,6 +59,9 @@ jobs:
               '/api/verify-account',
               '/api/create-account',
               '/api/check-user',
+              '/api/game-library',
+              '/api/update-presence',
+              '/api/get-presence',
           ]
 
           with open('backend/index.js', 'r', encoding='utf-8') as f:
@@ -134,82 +124,3 @@ jobs:
           name: backend-config-snapshot
           path: /tmp/backend-snapshot
           retention-days: 30
-
-  # ── 2. API key regeneration (optional / manual only) ──────────────────────
-  regenerate-token:
-    name: Regenerate DATA_REPO_TOKEN
-    runs-on: ubuntu-latest
-    needs: sync-check
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.regenerate_token == 'true'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-
-      - name: Verify token rotation is possible
-        env:
-          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
-        run: |
-          if [ -z "$ADMIN_PAT" ]; then
-            echo "⚠️  ADMIN_PAT secret is not configured – skipping token regeneration."
-            echo "To enable this feature, add an ADMIN_PAT secret with 'repo' and"
-            echo "'admin:repo_hook' scopes in Settings → Secrets and variables → Actions."
-            exit 1
-          fi
-          echo "✅ ADMIN_PAT is configured"
-
-      - name: Rotate DATA_REPO_TOKEN via GitHub API
-        env:
-          ADMIN_PAT: ${{ secrets.ADMIN_PAT }}
-          GH_REPO:   ${{ github.repository }}
-          GH_TOKEN:  ${{ secrets.ADMIN_PAT }}
-        run: |
-          # Retrieve the public key needed to encrypt the new secret value
-          REPO_PUBKEY=$(gh api \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GH_REPO}/actions/secrets/public-key" \
-            --jq '{key_id: .key_id, key: .key}')
-
-          KEY_ID=$(echo "$REPO_PUBKEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['key_id'])")
-          PUB_KEY=$(echo "$REPO_PUBKEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['key'])")
-
-          echo "Retrieved public key (key_id: $KEY_ID)"
-
-          # Generate a cryptographically random placeholder token value.
-          # In production, replace this with your actual fine-grained PAT rotation
-          # service (e.g. call the GitHub tokens API or an external secrets manager).
-          NEW_TOKEN=$(openssl rand -hex 32)
-
-          # Encrypt the new token using the repo's public key (libsodium sealed box)
-          ENCRYPTED=$(python3 << PYEOF
-          import base64, sys
-          from cryptography.hazmat.primitives.asymmetric.x25519 import X25519PublicKey
-          # Use PyNaCl if available, otherwise print a warning
-          try:
-              from nacl.encoding import Base64Encoder
-              from nacl.public import PublicKey, SealedBox
-              pub_key_bytes = base64.b64decode("$PUB_KEY")
-              sealed_box = SealedBox(PublicKey(pub_key_bytes))
-              encrypted = sealed_box.encrypt("$NEW_TOKEN".encode(), encoder=Base64Encoder)
-              print(encrypted.decode())
-          except ImportError:
-              print("ERROR: PyNaCl not installed – cannot encrypt secret value", file=sys.stderr)
-              sys.exit(1)
-          PYEOF
-          )
-
-          if [ $? -ne 0 ]; then
-            echo "❌ Encryption failed – install PyNaCl on the runner or use a secrets manager"
-            exit 1
-          fi
-
-          # Update the secret via the GitHub API
-          gh api \
-            --method PUT \
-            -H "Accept: application/vnd.github+json" \
-            "/repos/${GH_REPO}/actions/secrets/DATA_REPO_TOKEN" \
-            -f "encrypted_value=$ENCRYPTED" \
-            -f "key_id=$KEY_ID"
-
-          echo "✅ DATA_REPO_TOKEN rotated successfully (key_id: $KEY_ID)"
-          echo "⚠️  The deployed site will use the new token on the next deploy workflow run."
