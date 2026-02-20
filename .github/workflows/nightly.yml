@@ -26,7 +26,7 @@ on:
 permissions:
   contents: read
   security-events: write   # required for CodeQL to upload SARIF results
-  actions: read            # required for log aggregation step
+  actions: write           # required for actions/upload-artifact and log aggregation
 
 jobs:
   # ── 1. Dependency audit ────────────────────────────────────────────────────

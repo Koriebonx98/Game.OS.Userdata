@@ -40,6 +40,7 @@ on:
 
 permissions:
   contents: read
+  actions: write   # required for actions/upload-artifact to store artifacts
 
 jobs:
   # ── 1. Sync check ──────────────────────────────────────────────────────────
