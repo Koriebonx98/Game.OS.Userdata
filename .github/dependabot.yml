@@ -1,0 +1,49 @@
+# Dependabot configuration
+#
+# Automatically opens pull requests to keep dependencies up to date.
+# PRs are created weekly (Monday mornings) to minimise noise while
+# still ensuring security patches are applied promptly.
+#
+# Coverage:
+#   1. npm packages in backend/     – Node.js server dependencies
+#   2. GitHub Actions                – workflow action versions
+
+version: 2
+
+updates:
+  # ── Backend Node.js dependencies ──────────────────────────────────────────
+  - package-ecosystem: npm
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: UTC
+    open-pull-requests-limit: 10
+    labels:
+      - dependencies
+      - security
+    # Group all non-major updates into a single PR to reduce noise
+    groups:
+      non-major-backend:
+        update-types:
+          - minor
+          - patch
+
+  # ── GitHub Actions ──────────────────────────────────────────────────────────
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      time: '06:00'
+      timezone: UTC
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - security
+    groups:
+      non-major-actions:
+        update-types:
+          - minor
+          - patch

@@ -1,0 +1,187 @@
+# Security Audit & Integrity Check
+#
+# Runs automatically every night at midnight UTC.
+# Also runs on every push to main and every pull request so vulnerabilities
+# are caught before they reach production.
+#
+# What this workflow checks:
+#   1. Dependency vulnerabilities  – npm audit (moderate+ severity fails the build)
+#   2. Outdated packages           – reports packages that have newer versions
+#   3. File integrity              – SHA-256 checksums against security/checksums.sha256
+#   4. CodeQL analysis             – GitHub's static-analysis engine for JS security issues
+#
+# When a nightly run finds a problem it opens a GitHub Issue automatically so
+# the team is notified first thing in the morning.
+
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 0 * * *'   # 00:00 UTC every night
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write   # needed by CodeQL
+  issues: write            # needed to open alert issues on nightly failures
+
+jobs:
+  # ── 1. Dependency vulnerability scan ────────────────────────────────────────
+  dependency-audit:
+    name: Dependency Vulnerability Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run npm audit (moderate+ severity)
+        working-directory: backend
+        # npm audit exits non-zero when vulnerabilities are found at the given level.
+        run: npm audit --audit-level=moderate
+
+      - name: Report outdated packages
+        working-directory: backend
+        # outdated exits non-zero when packages exist; treat as informational only.
+        run: npm outdated || true
+
+  # ── 2. File integrity verification ──────────────────────────────────────────
+  file-integrity:
+    name: File Integrity Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify SHA-256 checksums
+        id: integrity
+        run: |
+          python3 << 'PYEOF'
+          import hashlib, os, sys
+
+          CHECKSUM_FILE = 'security/checksums.sha256'
+
+          def sha256_file(path):
+              h = hashlib.sha256()
+              with open(path, 'rb') as f:
+                  for chunk in iter(lambda: f.read(8192), b''):
+                      h.update(chunk)
+              return h.hexdigest()
+
+          if not os.path.exists(CHECKSUM_FILE):
+              print(f'❌ Checksum manifest not found: {CHECKSUM_FILE}')
+              sys.exit(1)
+
+          stored = {}
+          with open(CHECKSUM_FILE, 'r') as f:
+              for line in f:
+                  line = line.strip()
+                  if line and not line.startswith('#'):
+                      parts = line.split('  ', 1)
+                      if len(parts) == 2:
+                          stored[parts[1]] = parts[0]
+
+          failures = []
+          for filepath, expected in stored.items():
+              if not os.path.exists(filepath):
+                  print(f'⚠️  File listed in manifest but missing: {filepath}')
+                  failures.append(filepath)
+                  continue
+              actual = sha256_file(filepath)
+              if actual != expected:
+                  failures.append(filepath)
+                  print(f'❌ MODIFIED:  {filepath}')
+                  print(f'   expected: {expected}')
+                  print(f'   actual:   {actual}')
+              else:
+                  print(f'✅ OK:        {filepath}')
+
+          if failures:
+              print(f'\n🚨 {len(failures)} file(s) differ from the stored checksums.')
+              print('If this is a legitimate change, run the "Update File Checksums" workflow.')
+              sys.exit(1)
+          else:
+              print('\n✅ All file integrity checks passed.')
+          PYEOF
+
+      - name: Open issue on integrity failure (nightly only)
+        if: failure() && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🚨 File integrity check failed – possible tampering detected';
+            const body = [
+              '## Security Alert',
+              '',
+              'The nightly **file integrity check** has failed.',
+              'One or more tracked source files no longer match the SHA-256 checksums',
+              'stored in `security/checksums.sha256`.',
+              '',
+              '### Possible causes',
+              '- A file was modified directly on the `main` branch without going through a PR',
+              '- A dependency or CI artefact overwrote a source file',
+              '- The checksums manifest is out of date after a legitimate change',
+              '',
+              '### Recommended actions',
+              '1. Review recent commits with `git log --oneline -20`',
+              '2. Run `sha256sum <file>` locally and compare against the manifest',
+              '3. If the change was intentional, run the **Update File Checksums** workflow',
+              '4. If the change was NOT intentional, treat this as a security incident',
+              '',
+              `_Triggered by workflow run: ${context.runId}_`,
+            ].join('\n');
+
+            // Check for an existing open issue to avoid duplicates
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'security',
+            });
+            const existing = issues.find(i => i.title === title);
+            if (!existing) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['security'],
+              });
+            }
+
+  # ── 3. CodeQL security analysis ─────────────────────────────────────────────
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    # CodeQL only needs to run on pushes/schedule – not on every PR to keep it fast
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialise CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+          # Use the security-and-quality query suite for maximum coverage
+          queries: security-and-quality
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:javascript
