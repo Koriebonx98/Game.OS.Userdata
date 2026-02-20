@@ -339,6 +339,143 @@ app.get('/api/users-count', async (req, res) => {
     }
 });
 
+// ── GET /api/auth/token-status ────────────────────────────────────────────────
+// Returns whether the user currently has an active API token (no sensitive data).
+app.get('/api/auth/token-status', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const accountFile = await getFile(`accounts/${username.toLowerCase()}/profile.json`);
+        const hasToken = !!(accountFile && accountFile.content.api_token_hash);
+        res.json({ success: true, hasToken });
+    } catch (err) {
+        console.error('GET /api/auth/token-status error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/game-library ─────────────────────────────────────────────────────
+// Read any user's game library without authentication (public data).
+app.get('/api/game-library', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const file = await getFile(`accounts/${username.toLowerCase()}/games.json`);
+        res.json({ success: true, games: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/game-library error:', err);
+        res.status(500).json({ success: false, message: 'Failed to get game library.' });
+    }
+});
+
+// ── POST /api/game-library/add ────────────────────────────────────────────────
+// Add a game to a user's library.
+// Security: the caller must supply the account password to prove ownership.
+app.post('/api/game-library/add', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
+    try {
+        const { username, password, platform, title, titleId, coverUrl } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
+        }
+        if (!sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+
+        const usernameLower = username.toLowerCase();
+        const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        // Verify password to prevent unauthorised writes
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
+        }
+
+        const path    = `accounts/${usernameLower}/games.json`;
+        const file    = await getFile(path);
+        const library = file ? [...file.content] : [];
+
+        const alreadyOwned = library.some(
+            g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+        );
+        if (alreadyOwned) {
+            return res.status(400).json({ success: false, message: 'Game already in library.' });
+        }
+
+        library.push({
+            platform,
+            title,
+            titleId:  titleId || null,
+            coverUrl: coverUrl || undefined,
+            addedAt:  new Date().toISOString()
+        });
+
+        await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Game added to your library!' });
+    } catch (err) {
+        console.error('POST /api/game-library/add error:', err);
+        res.status(500).json({ success: false, message: 'Failed to add game.' });
+    }
+});
+
+// ── POST /api/game-library/remove ─────────────────────────────────────────────
+// Remove a game from a user's library.
+// Security: the caller must supply the account password to prove ownership.
+app.post('/api/game-library/remove', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
+    try {
+        const { username, password, platform, title } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
+        }
+        if (!sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+
+        const usernameLower = username.toLowerCase();
+        const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        // Verify password to prevent unauthorised deletions
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
+        }
+
+        const path = `accounts/${usernameLower}/games.json`;
+        const file = await getFile(path);
+        if (!file) return res.status(404).json({ success: false, message: 'Game library not found.' });
+
+        const updated = file.content.filter(
+            g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+        );
+        await putFile(path, updated, `Remove game: ${title} (${platform})`, file.sha);
+        res.json({ success: true, message: 'Game removed from library.', library: updated });
+    } catch (err) {
+        console.error('POST /api/game-library/remove error:', err);
+        res.status(500).json({ success: false, message: 'Failed to remove game.' });
+    }
+});
+
 // ── POST /api/create-account ──────────────────────────────────────────────────
 app.post('/api/create-account', async (req, res) => {
     try {

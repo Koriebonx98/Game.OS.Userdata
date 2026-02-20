@@ -132,16 +132,16 @@ For production use, this system integrates with a private GitHub repository ([Ga
 ![Error Message](https://github.com/user-attachments/assets/8158e6dd-d029-41c5-8547-a9647ea58bb3)
 *Error message displayed for invalid credentials*
 
-## 🚀 Going Live (Real Accounts – GitHub Only, Free)
+## 🚀 Going Live (Real Accounts – Backend Mode)
 
-Two repositories work together to form the complete account system:
+Real accounts require the backend server which holds your GitHub PAT securely.
+**Sensitive tokens are never embedded in frontend files** or the deployed `gh-pages` branch.
 
-| Repository | Role |
+| Component | Role |
 |---|---|
 | `Game.OS.Userdata` (this repo, public) | Frontend – HTML/CSS/JS served via GitHub Pages |
+| Backend server (Railway/Render/Fly.io) | API server – holds the PAT, manages account data |
 | `Game.OS.Private.Data` (your private repo) | Data store – one JSON file per user account |
-
-No external server or hosting service is needed. Everything runs on GitHub's free infrastructure.
 
 ### One-time Setup
 
@@ -152,24 +152,27 @@ No external server or hosting service is needed. Everything runs on GitHub's fre
 3. Set it to **Private**
 4. Click **Create repository**
 
-**Step 2 – Create a Personal Access Token**
+**Step 2 – Deploy the backend server**
 
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-2. Click **Generate new token**
-3. Set a name (e.g. `Game.OS Data Access`) and an expiry
-4. Under **Repository access** → *Only select repositories* → choose your private data repo
-5. Under **Permissions → Repository permissions** → **Contents** → select **Read and write**
-6. Click **Generate token** and **copy it immediately** (you only see it once)
+See `backend/README.md` for full instructions. In summary:
 
-**Step 3 – Add the token as a repository secret**
+1. Deploy `backend/index.js` to Railway, Render, Fly.io, or any Node.js host
+2. Set the following environment variables on your backend host:
+   - `GITHUB_TOKEN` – a fine-grained PAT with Contents: Read+Write on your private data repo
+   - `REPO_OWNER` – your GitHub username
+   - `REPO_NAME` – `Game.OS.Private.Data`
+   - `TOKEN_HMAC_SECRET` – a random 32-byte hex string
+   - `ADMIN_KEY` – a secret key for the reset-all-accounts admin endpoint
+
+**Step 3 – Configure BACKEND_URL in this repository**
 
 In the `Game.OS.Userdata` repository (this repo):
 
-1. Go to **Settings → Secrets and variables → Actions**
-2. Click **New repository secret**
-3. Name: `DATA_REPO_TOKEN`
-4. Value: paste the token you just copied
-5. Click **Add secret**
+1. Go to **Settings → Secrets and variables → Actions → Variables**
+2. Click **New repository variable**
+3. Name: `BACKEND_URL`
+4. Value: your backend server's public URL (e.g. `https://my-gameos-backend.railway.app`)
+5. Click **Add variable**
 
 **Step 4 – Enable GitHub Actions deployment for Pages**
 
@@ -183,32 +186,32 @@ In the `Game.OS.Userdata` repository:
 
 Push any commit to `main` (or go to **Actions → Deploy to GitHub Pages → Run workflow**).  
 The deploy workflow will:
-- Inject your token into `script.js` at build time (never stored in git)
+- Inject your `BACKEND_URL` (not a secret – just a public URL) into `script.js` at build time
 - Deploy the frontend to GitHub Pages
 
-Your site is now live at `https://koriebonx98.github.io/Game.OS.Userdata/` with real accounts! ✅
+Your site is now live with real accounts! ✅
 
 ### How it works (architecture)
 
 ```
 User's Browser
     │
-    ├── Signup:  PUT  https://api.github.com/repos/…/Game.OS.Private.Data/contents/accounts/{user}.json
-    │                 (creates a new account file in the private repo)
+    ├── Signup:  POST  https://your-backend.railway.app/api/create-account
+    │                 (backend creates account in private repo using server-side PAT)
     │
-    └── Login:   GET  https://api.github.com/repos/…/Game.OS.Private.Data/contents/accounts/{user}.json
-                      (reads the account file, compares SHA-256 password hash)
+    └── Login:   POST  https://your-backend.railway.app/api/verify-account
+                      (backend verifies credentials against private repo)
 ```
 
-All communication is between the browser and the GitHub API directly.  
-No intermediate server. No external service. 100% free.
+The PAT is stored **only** in the backend server's environment variables.
+It is never injected into JavaScript files or committed to any branch.
 
 ### Security notes
 
-- The PAT is stored as a GitHub Secret — never committed to the repository
-- The deploy workflow injects it into the built JS (not the source)
-- The PAT is scoped only to `Game.OS.Private.Data` — it cannot access any other repository
-- Passwords are hashed with SHA-256 (username-salted) before being stored or compared
+- The GitHub PAT lives only in the backend server's environment – **never in deployed frontend files**
+- GitHub's secret scanning can no longer detect and revoke the PAT because it is not in the repository
+- Passwords are hashed with bcrypt (server-side) before storage
+- The `BACKEND_URL` injected into `script.js` is a public server URL, not a secret
 
 ---
 
