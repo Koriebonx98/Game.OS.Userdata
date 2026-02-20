@@ -58,18 +58,14 @@ See README.md for all screenshots!
 
 ## Moving to Production
 
-When ready for production with real accounts:
+When ready for production with real accounts, use the **GitHub-only** setup —
+no external server or hosting costs required:
 
-### Option 1: GitHub Repository Backend
-- Follow `GITHUB_INTEGRATION.md`
-- Uses GitHub as database
-- No traditional server needed
-- Free with GitHub Actions
-
-### Option 2: Traditional Backend
-- Deploy backend server code (provided)
-- Use Railway, Render, or Vercel
-- Update `API_BASE_URL` in script.js
+- Follow the **Going Live** section in `README.md`
+- Uses GitHub Pages (frontend) + a private GitHub repository (data storage)
+- No server to run, no monthly bill, everything on GitHub's free infrastructure
+- One-time setup: create a private data repo, add a fine-grained PAT as a
+  repository secret (`DATA_REPO_TOKEN`), enable GitHub Pages, push to main
 
 ## Files Structure
 
@@ -87,11 +83,14 @@ Game.OS.Userdata/
 
 ## Key Configuration
 
-Current settings in `script.js`:
-```javascript
-const API_BASE_URL = 'https://your-backend-url.com';
-let DEMO_MODE = true;  // Currently using demo mode
-```
+The site auto-detects its mode when loaded:
+- **GitHub mode** – active on GitHub Pages once `DATA_REPO_TOKEN` is configured.
+  The deploy workflow (GitHub Actions) XOR-encodes the token and injects it into
+  `script.js` at **build time**; the deployed page decodes it at runtime and uses
+  it to call the GitHub API directly.  Users never see the raw token.
+- **Demo mode**  – active locally / when the secret is not set (browser localStorage only)
+
+No manual configuration changes to `script.js` are needed for the GitHub-only setup.
 
 ## Security Notes
 
@@ -116,10 +115,10 @@ let DEMO_MODE = true;  // Currently using demo mode
 ## Next Steps
 
 1. ✅ Test the demo mode (works now!)
-2. 📖 Read GITHUB_INTEGRATION.md for production
-3. 🚀 Deploy backend when ready
-4. 🔒 Update API_BASE_URL in script.js
-5. ✨ Launch with real users!
+2. 📖 Follow the **Going Live** section in README.md for production
+3. 🔑 Add `DATA_REPO_TOKEN` as a repository secret
+4. 🚀 Push to main – GitHub Actions deploys everything automatically
+5. ✨ Launch with real users — no server bills!
 
 ---
 

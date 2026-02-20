@@ -15,16 +15,27 @@ Instead of using a traditional database, this system can store user account data
 ## Architecture
 
 ```
-User Browser (Frontend)
-    ↓
-GitHub Actions API / Backend Server
-    ↓
+User's Browser / C# Launcher
+    │
+    │  HTTPS  (api.github.com)
+    ▼
+GitHub REST API  ←────────────────── GitHub Pages (frontend)
+    │
+    ▼
 Private GitHub Repository (Game.OS.Private.Data)
     └── accounts/
-        ├── user1.json
-        ├── user2.json
-        └── user3.json
+        ├── email-index.json
+        ├── alice/
+        │     ├── profile.json
+        │     ├── games.json
+        │     ├── achievements.json
+        │     └── friends.json
+        └── bob/ ...
 ```
+
+No external server is required. The frontend (hosted on GitHub Pages) calls the
+GitHub REST API directly, and all data is stored as JSON files in the private
+data repository.
 
 ## Implementation Options
 
@@ -104,180 +115,6 @@ async function createAccountGitHub(username, email, password) {
 }
 ```
 
-### Option 2: Backend Server with GitHub API
-
-Create a simple backend server that manages GitHub repository operations.
-
-**Advantages:**
-- More control over logic
-- Can implement complex features
-- Better error handling
-- Rate limiting support
-
-**Setup:**
-
-1. **Create Backend Server** (Node.js example):
-
-```javascript
-// backend-server/index.js
-const express = require('express');
-const { Octokit } = require('@octokit/rest');
-const bcrypt = require('bcrypt');
-const cors = require('cors');
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
-const octokit = new Octokit({
-    auth: process.env.GITHUB_TOKEN
-});
-
-const REPO_OWNER = 'Koriebonx98';
-const REPO_NAME = 'Game.OS.Private.Data';
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-    res.json({ status: 'ok', message: 'Backend server running' });
-});
-
-// Create account endpoint
-app.post('/api/create-account', async (req, res) => {
-    try {
-        const { username, email, password } = req.body;
-        
-        // Hash password
-        const passwordHash = await bcrypt.hash(password, 10);
-        
-        // Create account data
-        const accountData = {
-            username,
-            email,
-            password_hash: passwordHash,
-            created_at: new Date().toISOString()
-        };
-        
-        // Check if account exists
-        try {
-            await octokit.repos.getContent({
-                owner: REPO_OWNER,
-                repo: REPO_NAME,
-                path: `accounts/${username}.json`
-            });
-            // If we get here, file exists
-            return res.status(400).json({
-                success: false,
-                message: 'Username already exists'
-            });
-        } catch (error) {
-            // File doesn't exist, continue
-        }
-        
-        // Create file in GitHub
-        await octokit.repos.createOrUpdateFileContents({
-            owner: REPO_OWNER,
-            repo: REPO_NAME,
-            path: `accounts/${username}.json`,
-            message: `Create account: ${username}`,
-            content: Buffer.from(JSON.stringify(accountData, null, 2)).toString('base64'),
-            committer: {
-                name: 'Game OS Bot',
-                email: 'bot@gameos.com'
-            }
-        });
-        
-        res.json({ success: true, message: 'Account created successfully' });
-    } catch (error) {
-        console.error('Error creating account:', error);
-        res.status(500).json({
-            success: false,
-            message: 'Failed to create account'
-        });
-    }
-});
-
-// Verify account endpoint
-app.post('/api/verify-account', async (req, res) => {
-    try {
-        const { username, password } = req.body;
-        
-        // Get account file from GitHub
-        const { data } = await octokit.repos.getContent({
-            owner: REPO_OWNER,
-            repo: REPO_NAME,
-            path: `accounts/${username}.json`
-        });
-        
-        // Decode content
-        const accountData = JSON.parse(
-            Buffer.from(data.content, 'base64').toString()
-        );
-        
-        // Verify password
-        const valid = await bcrypt.compare(password, accountData.password_hash);
-        
-        if (valid) {
-            res.json({
-                success: true,
-                message: 'Login successful',
-                user: {
-                    username: accountData.username,
-                    email: accountData.email
-                }
-            });
-        } else {
-            res.status(401).json({
-                success: false,
-                message: 'Invalid password'
-            });
-        }
-    } catch (error) {
-        console.error('Error verifying account:', error);
-        res.status(401).json({
-            success: false,
-            message: 'Account not found'
-        });
-    }
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
-```
-
-2. **Package.json**:
-
-```json
-{
-  "name": "gameos-backend",
-  "version": "1.0.0",
-  "description": "Backend server for Game.OS Userdata",
-  "main": "index.js",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
-  },
-  "dependencies": {
-    "@octokit/rest": "^19.0.0",
-    "bcrypt": "^5.1.0",
-    "cors": "^2.8.5",
-    "express": "^4.18.0",
-    "dotenv": "^16.0.0"
-  },
-  "devDependencies": {
-    "nodemon": "^2.0.0"
-  }
-}
-```
-
-3. **Environment Variables** (.env):
-
-```
-GITHUB_TOKEN=your_github_personal_access_token
-PORT=3000
-```
-
 ## GitHub Token Setup
 
 1. Go to GitHub Settings → Developer settings → Personal access tokens
@@ -286,39 +123,6 @@ PORT=3000
    - `repo` (Full control of private repositories)
 4. Copy token and store securely
 5. Add to environment variables or GitHub Secrets
-
-## Deployment Options
-
-### Railway
-
-```bash
-# Install Railway CLI
-npm install -g @railway/cli
-
-# Login
-railway login
-
-# Deploy
-railway up
-```
-
-### Render
-
-1. Create new Web Service
-2. Connect GitHub repository
-3. Set build command: `npm install`
-4. Set start command: `npm start`
-5. Add environment variables
-
-### Vercel
-
-```bash
-# Install Vercel CLI
-npm install -g vercel
-
-# Deploy
-vercel
-```
 
 ## Security Best Practices
 
@@ -352,24 +156,16 @@ vercel
 
 ## Testing
 
-### Test Backend Locally:
+### Test the site locally:
 
 ```bash
-# Start backend server
-npm start
+# Serve the frontend with any static file server
+python3 -m http.server 8080
+# Then open http://localhost:8080
 
-# Test health endpoint
-curl http://localhost:3000/health
-
-# Test account creation
-curl -X POST http://localhost:3000/api/create-account \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"password123"}'
-
-# Test login
-curl -X POST http://localhost:3000/api/verify-account \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"password123"}'
+# The site will run in demo mode (localStorage) locally.
+# GitHub mode activates automatically after deploying to GitHub Pages
+# with the DATA_REPO_TOKEN secret configured.
 ```
 
 ## Troubleshooting
@@ -394,36 +190,18 @@ curl -X POST http://localhost:3000/api/verify-account \
 
 ## Migration from Demo Mode
 
-To migrate existing demo mode accounts to GitHub:
-
-```javascript
-// Migration script
-async function migrateDemoAccounts() {
-    const accounts = getDemoAccounts();
-    
-    for (const account of accounts) {
-        await fetch(`${API_BASE_URL}/api/create-account`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(account)
-        });
-    }
-    
-    console.log(`Migrated ${accounts.length} accounts`);
-}
-```
+To migrate existing demo mode accounts to the GitHub-backed live site,
+re-register them through the sign-up page once the site is deployed to
+GitHub Pages with `DATA_REPO_TOKEN` configured.  Demo-mode data is stored only
+in browser localStorage and cannot be transferred automatically.
 
 ## Monitoring
 
 ### GitHub Actions Monitoring:
-- Check workflow runs in GitHub Actions tab
-- Review commit history in data repository
-- Set up notifications for failed workflows
-
-### Backend Server Monitoring:
-- Use logging service (Logtail, Papertrail)
-- Monitor server uptime (UptimeRobot, Pingdom)
-- Track API usage and errors
+- Check workflow runs in the **Actions** tab of your GitHub repository
+- Review commit history in the data repository to audit all account changes
+- Set up email / Slack notifications for failed workflow runs in
+  Settings → Notifications
 
 ## Future Enhancements
 
