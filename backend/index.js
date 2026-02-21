@@ -18,6 +18,7 @@ const { Octokit } = require('@octokit/rest');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const cors = require('cors');
+const cheerio = require('cheerio');
 require('dotenv').config();
 
 const app = express();
@@ -38,6 +39,71 @@ const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const REPO_OWNER = process.env.REPO_OWNER;
 const REPO_NAME  = process.env.REPO_NAME;
 const BCRYPT_ROUNDS = 10;
+
+// ── Games.Database client (optional) ─────────────────────────────────────────
+// Used to write achievements.json alongside Name.txt in Data/{folder}/Games/{titleId}/
+const GAMES_DB_TOKEN      = process.env.GAMES_DB_TOKEN || null;
+const GAMES_DB_REPO_OWNER = process.env.GAMES_DB_REPO_OWNER || 'Koriebonx98';
+const GAMES_DB_REPO_NAME  = process.env.GAMES_DB_REPO_NAME  || 'Games.Database';
+const octokitGamesDb = GAMES_DB_TOKEN ? new Octokit({ auth: GAMES_DB_TOKEN }) : null;
+
+/**
+ * Map a platform name (as used in games.json) to its folder name inside
+ * Data/ in the Games.Database repository.
+ * Returns null for unknown platforms.
+ */
+const PLATFORM_TO_GAMES_DB_FOLDER = {
+    'Switch':   'Nintendo - Switch',
+    'Xbox 360': 'Microsoft - Xbox 360',
+    'PS3':      'Sony - PlayStation 3',
+    'PS4':      'Sony - PlayStation 4',
+    'PS5':      'Sony - PlayStation 5',
+    'Xbox One': 'Microsoft - Xbox One',
+    'PC':       'PC'
+};
+function platformToGamesDbFolder(platform) {
+    return PLATFORM_TO_GAMES_DB_FOLDER[platform] || null;
+}
+
+/**
+ * Read a file from the Games.Database repository.
+ * Returns { content (raw string), sha } on success, or null if not found.
+ */
+async function getGamesDbFile(path) {
+    if (!octokitGamesDb) return null;
+    try {
+        const { data } = await octokitGamesDb.repos.getContent({
+            owner: GAMES_DB_REPO_OWNER,
+            repo:  GAMES_DB_REPO_NAME,
+            path
+        });
+        return {
+            content: Buffer.from(data.content, 'base64').toString('utf8'),
+            sha: data.sha
+        };
+    } catch (err) {
+        if (err.status === 404) return null;
+        throw err;
+    }
+}
+
+/**
+ * Create or update a JSON file in the Games.Database repository.
+ * Pass `sha` when updating an existing file.
+ */
+async function putGamesDbFile(path, content, message, sha) {
+    if (!octokitGamesDb) throw new Error('GAMES_DB_TOKEN is not configured.');
+    const params = {
+        owner: GAMES_DB_REPO_OWNER,
+        repo:  GAMES_DB_REPO_NAME,
+        path,
+        message,
+        content: Buffer.from(JSON.stringify(content, null, 2)).toString('base64'),
+        committer: { name: 'Game OS Bot', email: 'bot@gameos.com' }
+    };
+    if (sha) params.sha = sha;
+    await octokitGamesDb.repos.createOrUpdateFileContents(params);
+}
 
 // ── Game OS API token system ──────────────────────────────────────────────────
 
@@ -1914,6 +1980,194 @@ app.get('/api/users/:username/wishlist', authenticatePublicOrUserToken, async (r
         res.json({ success: true, wishlist: file ? file.content : [] });
     } catch (err) {
         console.error('GET /api/users/:username/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/achievements/sync-exophase ───────────────────────────────────
+// Fetch an Exophase game achievements/trophies page, scrape the list, and merge
+// the results into the authenticated user's achievements.json file.
+// Also writes the achievement template to Data/{folder}/Games/{titleId}/achievements.json
+// in the Games.Database repository when titleId is supplied and GAMES_DB_TOKEN is set.
+//
+// Exophase page structure (verified against live site):
+//   <ul class="achievement|trophy|challenge">
+//     <li data-average="45.2" class="[secret]">
+//       <img src="https://...icon.jpg">
+//       <a>Achievement Name</a>
+//       <div class="award-description"><p>Description</p></div>
+//     </li>
+//   </ul>
+//
+// Body: { exophaseUrl, platform, gameTitle, titleId? }
+app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { exophaseUrl, platform, gameTitle, titleId } = req.body;
+
+        if (!exophaseUrl || !platform || !gameTitle) {
+            return res.status(400).json({ success: false, message: 'exophaseUrl, platform, and gameTitle are required.' });
+        }
+
+        // SSRF protection: only allow https://exophase.com URLs
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(exophaseUrl);
+        } catch {
+            return res.status(400).json({ success: false, message: 'Invalid URL.' });
+        }
+        if (parsedUrl.protocol !== 'https:' ||
+            (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
+            return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
+        }
+
+        // Fetch the Exophase page with a 15-second timeout.
+        // Exophase uses server-side rendering so a plain fetch returns the full HTML.
+        // Use a real browser User-Agent to avoid being blocked.
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+        let html;
+        try {
+            const response = await fetch(exophaseUrl, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
+            });
+            if (!response.ok) {
+                return res.status(502).json({ success: false, message: `Failed to fetch Exophase page (HTTP ${response.status}).` });
+            }
+            html = await response.text();
+        } catch (fetchErr) {
+            if (fetchErr.name === 'AbortError') {
+                return res.status(504).json({ success: false, message: 'Exophase request timed out.' });
+            }
+            throw fetchErr;
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
+
+        // Parse achievements using Exophase's confirmed HTML structure.
+        // The page has one or more <ul class="achievement|trophy|challenge"> sections,
+        // each containing <li> elements with the award data.
+        const $ = cheerio.load(html);
+        const scraped = [];
+
+        // Primary selectors — match the real Exophase page structure
+        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+            const $el = $(el);
+
+            const name = ($el.find('a').first().text() || '').trim();
+            if (!name) return; // skip items with no name
+
+            const description = ($el.find('div.award-description p').first().text() || '').trim();
+            const iconUrl     = $el.find('img').first().attr('src') || undefined;
+            const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
+
+            // Rarity: data-average attribute (0–100 float, percentage of players who earned it)
+            const avgRaw = $el.attr('data-average');
+            const percent = avgRaw !== undefined ? parseFloat(avgRaw) : undefined;
+
+            // Use 1-based position as the achievement ID (no numeric ID in Exophase HTML)
+            const entry = {
+                platform,
+                gameTitle,
+                achievementId: String(i + 1),
+                name,
+                description,
+                unlockedAt: null,
+                source: 'exophase'
+            };
+            if (iconUrl)              entry.iconUrl  = iconUrl;
+            if (isHidden)             entry.hidden   = true;
+            if (percent !== undefined && !isNaN(percent)) entry.percent = percent;
+            scraped.push(entry);
+        });
+
+        if (!scraped.length) {
+            return res.status(422).json({
+                success: false,
+                message: 'No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.'
+            });
+        }
+
+        // Merge into achievements.json (upsert by achievementId + platform + gameTitle)
+        const path = `accounts/${usernameLower}/achievements.json`;
+        const file = await getFile(path);
+        const list = file ? [...file.content] : [];
+
+        let added = 0;
+        let updated = 0;
+        for (const ach of scraped) {
+            const idx = list.findIndex(
+                a => a.platform === platform &&
+                     (a.gameTitle || '').toLowerCase() === gameTitle.toLowerCase() &&
+                     String(a.achievementId) === String(ach.achievementId)
+            );
+            if (idx !== -1) {
+                list[idx] = { ...list[idx], ...ach };
+                updated++;
+            } else {
+                list.push(ach);
+                added++;
+            }
+        }
+
+        await putFile(
+            path,
+            list,
+            `Sync ${scraped.length} achievements from Exophase for ${gameTitle} (${platform})`,
+            file ? file.sha : undefined
+        );
+
+        // ── Write achievement template to Games.Database alongside Name.txt ──
+        // Path: Data/{platformFolder}/Games/{titleId}/achievements.json
+        let gamesDbWritten = false;
+        if (titleId && typeof titleId === 'string' && titleId.trim() && octokitGamesDb) {
+            const platformFolder = platformToGamesDbFolder(platform);
+            if (platformFolder) {
+                const safeTitle = titleId.trim();
+                // Only allow alphanumeric, underscore, and hyphen to prevent path traversal
+                if (/^[a-zA-Z0-9_-]+$/.test(safeTitle)) {
+                    const gamesDbPath = `Data/${platformFolder}/Games/${safeTitle}/achievements.json`;
+                    // Strip user-specific fields; keep only game-level data
+                    const template = scraped.map(a => {
+                        const t = { achievementId: a.achievementId, name: a.name, description: a.description };
+                        if (a.iconUrl) t.iconUrl = a.iconUrl;
+                        return t;
+                    });
+                    // Sanitise user inputs used in the commit message
+                    const safeGameTitle = String(gameTitle).replace(/[\r\n]/g, ' ').slice(0, 80);
+                    const safePlatform  = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+                    try {
+                        const existing = await getGamesDbFile(gamesDbPath);
+                        await putGamesDbFile(
+                            gamesDbPath,
+                            template,
+                            `Add achievements for ${safeGameTitle} (${safePlatform}) from Exophase`,
+                            existing ? existing.sha : undefined
+                        );
+                        gamesDbWritten = true;
+                    } catch (dbErr) {
+                        // Non-fatal: log but don't fail the whole request
+                        console.error('sync-exophase: failed to write to Games.Database:', dbErr.message);
+                    }
+                }
+            }
+        }
+
+        res.json({
+            success: true,
+            message: `Synced achievements from Exophase: ${added} added, ${updated} updated.`,
+            added,
+            updated,
+            total: scraped.length,
+            gamesDbUpdated: gamesDbWritten
+        });
+    } catch (err) {
+        console.error('POST /api/me/achievements/sync-exophase error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
