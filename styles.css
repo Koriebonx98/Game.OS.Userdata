@@ -1311,8 +1311,33 @@ footer {
     margin: 0;
 }
 
+.btn-modal-wishlist {
+    background: transparent;
+    border: 2px solid rgba(255,255,255,0.45);
+    color: #fff;
+    border-radius: 8px;
+    padding: 5px 10px;
+    font-size: 1.2em;
+    cursor: pointer;
+    flex-shrink: 0;
+    align-self: flex-start;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+.btn-modal-wishlist:hover:not(:disabled) {
+    background: rgba(255,255,255,0.15);
+    border-color: #fbbf24;
+    color: #fbbf24;
+}
+.btn-modal-wishlist.btn-wishlisted {
+    background: rgba(251,191,36,0.2);
+    border-color: #fbbf24;
+    color: #fbbf24;
+}
+.btn-modal-wishlist:disabled { opacity: 0.6; }
+
 .game-modal-close {
-    margin-left: auto;
+    margin-left: 6px;
     background: transparent;
     border: none;
     color: #fff;
