@@ -3651,16 +3651,66 @@ function _buildSystemSpecsSection(game) {
     </div>`;
 }
 
-/** Render an achievements link / URL from game.achievementsUrl. */
+/** Convert a GitHub blob URL to a raw content URL so it can be fetched as JSON. */
+function _toRawUrl(url) {
+    if (!url) return url;
+    // https://github.com/{owner}/{repo}/blob/{branch}/{path} → https://raw.githubusercontent.com/{owner}/{repo}/{branch}/{path}
+    return url.replace(
+        /^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//,
+        'https://raw.githubusercontent.com/$1/'
+    );
+}
+
+/** Return a placeholder div that will be populated asynchronously with achievement cards. */
 function _buildAchievementsSection(game) {
     const url = game.achievementsUrl;
     if (!url) return '';
-    return `<div class="game-modal-field">
-        <span class="game-modal-field-label">🏆 Achievements</span>
-        <span class="game-modal-field-value">
-            <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">View Achievements</a>
-        </span>
+    return `<div class="game-modal-achievements" data-ach-url="${escapeHtml(url)}">
+        <div class="game-modal-achievements-label">🏆 Achievements</div>
+        <div class="ach-loading">⏳ Loading achievements…</div>
     </div>`;
+}
+
+/** Fetch the achievements JSON and render cards inside the placeholder div. */
+async function _loadAchievementsInModal() {
+    const container = document.querySelector('.game-modal-achievements[data-ach-url]');
+    if (!container) return;
+    const url = container.dataset.achUrl;
+    if (!url) return;
+    const rawUrl = _toRawUrl(url);
+    try {
+        const resp = await fetch(rawUrl);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        const items = Array.isArray(data) ? data : (data.Items || []);
+        if (!items.length) {
+            container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements</div>
+                <p style="color:#888;font-size:0.88em;">No achievements found.</p>
+                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link" style="margin-top:6px;display:inline-block;">View Raw JSON</a>`;
+            return;
+        }
+        const cards = items.map(ach => {
+            const name = escapeHtml(ach.Name || ach.name || '');
+            const desc = escapeHtml(ach.Description || ach.description || '');
+            const rawImg = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
+            // Only allow https:// image URLs to prevent CSS injection via javascript:/data: schemes
+            const safeImg = /^https:\/\//i.test(rawImg) ? rawImg : '';
+            const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
+            return `<div class="ach-card" ${bgStyle} title="${name}">
+                <div class="ach-card-overlay">
+                    <div class="ach-card-name">${name}</div>
+                    ${desc ? `<div class="ach-card-desc">${desc}</div>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+        container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements <span class="ach-count">${items.length}</span></div>
+            <div class="ach-grid">${cards}</div>`;
+    } catch (err) {
+        console.error('[Achievements] Failed to load achievements from', rawUrl, err);
+        container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements</div>
+            <p style="color:#888;font-size:0.88em;">Could not load achievements.</p>
+            <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link" style="margin-top:6px;display:inline-block;">View JSON ↗</a>`;
+    }
 }
 
 function _getYouTubeId(urlOrId) {
@@ -3752,6 +3802,7 @@ function openGameModal(game, platform) {
     bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
     document.getElementById('gameModalBody').innerHTML = bodyHtml;
     modal.style.display = 'flex';
+    _loadAchievementsInModal();
 }
 
 async function openGameModalFromLibrary(title, platform, titleId) {
@@ -3810,6 +3861,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         }
         bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
         document.getElementById('gameModalBody').innerHTML = bodyHtml;
+        _loadAchievementsInModal();
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =
             '<p style="color:#c00;font-size:0.9em;">Failed to load game details.</p>';
