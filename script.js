@@ -2878,6 +2878,8 @@ function _gamesDbHeaders() {
  * 1 MB Contents-API limit that would affect Switch.Games.json and PS3.Games.json.
  */
 async function _gamesDbWriteFile(platform, content, message) {
+    if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.');
+
     const owner = 'Koriebonx98';
     const repo  = 'Games.Database';
     const path  = `${platform}.Games.json`;
@@ -2888,7 +2890,11 @@ async function _gamesDbWriteFile(platform, content, message) {
         `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/main`,
         { headers: h }
     );
-    if (!refResp.ok) throw new Error(`Cannot read ref: ${refResp.status}`);
+    if (!refResp.ok) {
+        if (refResp.status === 401 || refResp.status === 403)
+            throw new Error('GAMES_DB_TOKEN is invalid, expired, or lacks write permission. Update the repository secret and re-deploy.');
+        throw new Error(`Cannot read ref: ${refResp.status}`);
+    }
     const ref         = await refResp.json();
     const latestSha   = ref.object.sha;
 
