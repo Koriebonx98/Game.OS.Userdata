@@ -983,6 +983,10 @@ function populateAccountDetails() {
         ? new Date(user.loginTime).toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' })
         : '—';
 
+    // Wire up the "View My Profile" link so the current user can see their public profile
+    const profileLinkEl = document.getElementById('viewMyProfileLink');
+    if (profileLinkEl) profileLinkEl.href = `profile.html?user=${encodeURIComponent(user.username)}`;
+
     // Show the Danger Zone only for the admin account
     const dangerZone = document.getElementById('dangerZone');
     if (dangerZone) {
