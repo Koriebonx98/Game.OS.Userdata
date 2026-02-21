@@ -1839,9 +1839,9 @@ async function loadFriendsList() {
             const statusText = `<span class="friend-status-label ${online ? 'online' : ''}">${online ? 'Online' : 'Offline'}</span>`;
             return `
             <div class="friend-item">
-                <span class="friend-name">${statusDot}${escapeHtml(f)}${statusText}</span>
+                <a class="friend-name friend-name-link" href="profile.html?user=${encodeURIComponent(f)}" style="text-decoration:none;">${statusDot}${escapeHtml(f)}${statusText}</a>
                 <div class="friend-actions">
-                    <a class="btn-message-friend" href="profile.html?user=${encodeURIComponent(f)}" style="text-decoration:none;">🎮 Games</a>
+                    <a class="btn-message-friend" href="profile.html?user=${encodeURIComponent(f)}" style="text-decoration:none;">👤 Profile</a>
                     <button class="btn-message-friend" onclick="openChat('${escapeHtml(f)}')">💬 Message</button>
                     <button class="btn-remove-friend" onclick="handleRemoveFriend('${escapeHtml(f)}')">Remove</button>
                 </div>
