@@ -1985,10 +1985,20 @@ app.get('/api/users/:username/wishlist', authenticatePublicOrUserToken, async (r
 });
 
 // ── POST /api/me/achievements/sync-exophase ───────────────────────────────────
-// Fetch an Exophase URL, scrape the achievement list, and merge the results into
-// the authenticated user's achievements.json file.
+// Fetch an Exophase game achievements/trophies page, scrape the list, and merge
+// the results into the authenticated user's achievements.json file.
 // Also writes the achievement template to Data/{folder}/Games/{titleId}/achievements.json
 // in the Games.Database repository when titleId is supplied and GAMES_DB_TOKEN is set.
+//
+// Exophase page structure (verified against live site):
+//   <ul class="achievement|trophy|challenge">
+//     <li data-average="45.2" class="[secret]">
+//       <img src="https://...icon.jpg">
+//       <a>Achievement Name</a>
+//       <div class="award-description"><p>Description</p></div>
+//     </li>
+//   </ul>
+//
 // Body: { exophaseUrl, platform, gameTitle, titleId? }
 app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, res) => {
     try {
@@ -2011,14 +2021,20 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
         }
 
-        // Fetch the Exophase page with a 10-second timeout
+        // Fetch the Exophase page with a 15-second timeout.
+        // Exophase uses server-side rendering so a plain fetch returns the full HTML.
+        // Use a real browser User-Agent to avoid being blocked.
         const controller = new AbortController();
-        const fetchTimeout = setTimeout(() => controller.abort(), 10000);
+        const fetchTimeout = setTimeout(() => controller.abort(), 15000);
         let html;
         try {
             const response = await fetch(exophaseUrl, {
                 signal: controller.signal,
-                headers: { 'User-Agent': 'GameOS-Achievement-Bot/1.0' }
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
             });
             if (!response.ok) {
                 return res.status(502).json({ success: false, message: `Failed to fetch Exophase page (HTTP ${response.status}).` });
@@ -2033,89 +2049,42 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             clearTimeout(fetchTimeout);
         }
 
-        // Parse achievements from the HTML using cheerio
+        // Parse achievements using Exophase's confirmed HTML structure.
+        // The page has one or more <ul class="achievement|trophy|challenge"> sections,
+        // each containing <li> elements with the award data.
         const $ = cheerio.load(html);
         const scraped = [];
 
-        // Strategy 1: Exophase game trophy/achievement list pages
-        // Selectors cover multiple Exophase page designs
-        const selectors = [
-            'ul.achievement-list > li',
-            '.achievement-list .achievement',
-            '.trophy-list .trophy',
-            '[class*="AchievementList"] [class*="Achievement"]',
-            '.list-achievements li',
-            '.achievements-list li',
-            'li.achievement',
-            '.achievement-item'
-        ];
+        // Primary selectors — match the real Exophase page structure
+        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+            const $el = $(el);
 
-        for (const selector of selectors) {
-            const items = $(selector);
-            if (!items.length) continue;
+            const name = ($el.find('a').first().text() || '').trim();
+            if (!name) return; // skip items with no name
 
-            items.each((i, el) => {
-                const $el = $(el);
-                const name = (
-                    $el.find('[class*="title"], [class*="name"], h3, h4, h5, strong').first().text() ||
-                    $el.attr('data-name') || ''
-                ).trim();
-                const description = (
-                    $el.find('[class*="desc"], [class*="body"], p').first().text() || ''
-                ).trim();
-                const iconUrl = $el.find('img').first().attr('src') || undefined;
-                const rawId = (
-                    $el.attr('data-id') ||
-                    $el.attr('data-achievement-id') ||
-                    $el.attr('id') ||
-                    String(i + 1)
-                );
-                const earnedEl = $el.find('[class*="date"], [class*="earned"], [class*="unlocked"], time').first();
-                const earnedText = earnedEl.attr('datetime') || earnedEl.text().trim() || null;
+            const description = ($el.find('div.award-description p').first().text() || '').trim();
+            const iconUrl     = $el.find('img').first().attr('src') || undefined;
+            const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
 
-                if (!name) return; // skip items with no name
-                const entry = {
-                    platform,
-                    gameTitle,
-                    achievementId: String(rawId),
-                    name,
-                    description: description || '',
-                    unlockedAt: earnedText ? new Date(earnedText).toISOString() : null,
-                    source: 'exophase'
-                };
-                if (iconUrl) entry.iconUrl = iconUrl;
-                scraped.push(entry);
-            });
+            // Rarity: data-average attribute (0–100 float, percentage of players who earned it)
+            const avgRaw = $el.attr('data-average');
+            const percent = avgRaw !== undefined ? parseFloat(avgRaw) : undefined;
 
-            if (scraped.length) break; // stop after the first successful selector
-        }
-
-        // Strategy 2: look for embedded JSON data (some Exophase pages embed data as JSON-LD)
-        if (!scraped.length) {
-            $('script[type="application/json"], script[type="application/ld+json"]').each((_, el) => {
-                if (scraped.length) return;
-                try {
-                    const data = JSON.parse($(el).html() || '');
-                    const list = Array.isArray(data) ? data
-                        : (data && Array.isArray(data.trophies)) ? data.trophies
-                        : (data && Array.isArray(data.achievements)) ? data.achievements
-                        : [];
-                    list.forEach((item, i) => {
-                        const name = (item.name || item.title || '').trim();
-                        if (!name) return;
-                        scraped.push({
-                            platform,
-                            gameTitle,
-                            achievementId: String(item.id || item.achievement_id || i + 1),
-                            name,
-                            description: (item.description || item.desc || '').trim(),
-                            unlockedAt: item.earned_at || item.unlockedAt || null,
-                            source: 'exophase'
-                        });
-                    });
-                } catch { /* ignore parse errors */ }
-            });
-        }
+            // Use 1-based position as the achievement ID (no numeric ID in Exophase HTML)
+            const entry = {
+                platform,
+                gameTitle,
+                achievementId: String(i + 1),
+                name,
+                description,
+                unlockedAt: null,
+                source: 'exophase'
+            };
+            if (iconUrl)              entry.iconUrl  = iconUrl;
+            if (isHidden)             entry.hidden   = true;
+            if (percent !== undefined && !isNaN(percent)) entry.percent = percent;
+            scraped.push(entry);
+        });
 
         if (!scraped.length) {
             return res.status(422).json({
