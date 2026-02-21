@@ -21,6 +21,10 @@
 #      private data repository (defaults to Game.OS.Private.Data).
 #   5. Set GitHub Pages source to "GitHub Actions":
 #      Settings → Pages → Source → GitHub Actions
+#   6. (Optional) To enable Admin.GameOS cover/trailer editing, create a second
+#      fine-grained PAT with Contents: Read and write on the Games.Database repository
+#      and add it as a SECRET named GAMES_DB_TOKEN in this repository.
+#      Without this secret the admin editing panel will show a configuration notice.
 
 name: Deploy to GitHub Pages
 
