@@ -3469,28 +3469,34 @@ async function handleAdminEditSave() {
         }
         _currentModalGame = updated;
 
-        // If an Exophase URL was provided and a backend is configured, trigger scraping
-        if (exophaseUrl && getBackendBase()) {
+        // If an Exophase URL was provided, trigger scraping via backend or workflow dispatch
+        if (exophaseUrl && (getBackendBase() || GAMES_DB_TOKEN)) {
             showMsg('⏳ Scraping achievements from Exophase…', 'success');
             try {
-                const user = getCurrentUser();
-                const storedToken = user
-                    ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                       localStorage.getItem('gameOS_apiToken_pending') || '')
-                    : '';
-                const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
-                    },
-                    body: JSON.stringify({ exophaseUrl, platform: _currentModalPlatform, gameTitle: title, titleId })
-                });
-                const scrapeData = await scrapeResp.json();
-                if (scrapeData.success) {
-                    showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                if (getBackendBase()) {
+                    const user = getCurrentUser();
+                    const storedToken = user
+                        ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                           localStorage.getItem('gameOS_apiToken_pending') || '')
+                        : '';
+                    const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                        },
+                        body: JSON.stringify({ exophaseUrl, platform: _currentModalPlatform, gameTitle: title, titleId })
+                    });
+                    const scrapeData = await scrapeResp.json();
+                    if (scrapeData.success) {
+                        showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                    } else {
+                        showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                    }
                 } else {
-                    showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                    // No backend – trigger the scrape-exophase GitHub Actions workflow directly
+                    const result = await _triggerScrapeExophaseWorkflow(exophaseUrl, _currentModalPlatform, title, titleId);
+                    showMsg(`✅ Game updated. ${result.message}`, result.success ? 'success' : 'success');
                 }
             } catch (scrapeErr) {
                 showMsg(`✅ Game updated. ⚠️ Exophase scrape failed: ${scrapeErr.message}`, 'success');
@@ -3507,6 +3513,38 @@ async function handleAdminEditSave() {
     } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
     }
+}
+
+/**
+ * Trigger the scrape-exophase GitHub Actions workflow via workflow_dispatch.
+ * Used as a fallback when no backend is configured but GAMES_DB_TOKEN is available.
+ * Requires GAMES_DB_TOKEN to have Actions: Write on Koriebonx98/Game.OS.Userdata.
+ * Returns { success: boolean, message: string }.
+ */
+async function _triggerScrapeExophaseWorkflow(exophaseUrl, platform, gameTitle, titleId) {
+    const resp = await fetch(
+        `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml/dispatches`,
+        {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                ref: 'main',
+                inputs: { exophaseUrl, platform, gameTitle, titleId }
+            })
+        }
+    );
+    if (resp.status === 204) {
+        return { success: true, message: '⏳ Scrape workflow started — achievements will be saved to Games.Database shortly. Check the Actions tab in the Game.OS.Userdata repository for progress.' };
+    }
+    if (resp.status === 403 || resp.status === 422) {
+        return { success: false, message: '⚠️ GAMES_DB_TOKEN needs Actions: Write permission on Game.OS.Userdata to trigger the scrape workflow without a backend. Update the token or deploy a backend. See README for instructions.' };
+    }
+    return { success: false, message: `⚠️ Failed to start scrape workflow (HTTP ${resp.status}). Ensure GAMES_DB_TOKEN has Actions: Write on Game.OS.Userdata.` };
 }
 
 /**
@@ -3536,37 +3574,44 @@ async function _adminScrapeExophaseNow() {
     if (!title)    { showScrapeMsg('⚠️ Enter the game title first.', false); return; }
     if (!titleId)  { showScrapeMsg('⚠️ Enter the Title ID first.', false); return; }
     if (!platform) { showScrapeMsg('⚠️ No platform selected for this game.', false); return; }
-    if (!getBackendBase()) { showScrapeMsg('⚠️ No backend configured.', false); return; }
+    if (!getBackendBase() && !GAMES_DB_TOKEN) { showScrapeMsg('⚠️ No backend configured.', false); return; }
 
     if (btn)   { btn.disabled = true; btn.textContent = '⏳ Scraping…'; }
     if (msgEl) { msgEl.style.display = 'none'; }
 
     try {
-        const user  = getCurrentUser();
-        const token = user
-            ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-               localStorage.getItem('gameOS_apiToken_pending') || '')
-            : '';
-        const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
-            body: JSON.stringify({ exophaseUrl: urlVal, platform, gameTitle: title, titleId })
-        });
-        const data = await resp.json();
-        if (data.success) {
-            let downloadLink = '';
-            if (Array.isArray(data.achievements) && data.achievements.length) {
-                const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
-                const objUrl  = URL.createObjectURL(blob);
-                const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
-                downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+        if (getBackendBase()) {
+            // Backend path: proxy the scrape through the backend server
+            const user  = getCurrentUser();
+            const token = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ exophaseUrl: urlVal, platform, gameTitle: title, titleId })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                let downloadLink = '';
+                if (Array.isArray(data.achievements) && data.achievements.length) {
+                    const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
+                    const objUrl  = URL.createObjectURL(blob);
+                    const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                    downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+                }
+                showScrapeMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
+            } else {
+                showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
             }
-            showScrapeMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
         } else {
-            showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
+            // No backend – trigger the scrape-exophase GitHub Actions workflow directly
+            const result = await _triggerScrapeExophaseWorkflow(urlVal, platform, title, titleId);
+            showScrapeMsg(escapeHtml(result.message), result.success);
         }
     } catch (err) {
         showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
