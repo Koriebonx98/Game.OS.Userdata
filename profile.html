@@ -330,7 +330,7 @@
                     ${recentActivity.length === 0
                         ? '<p class="profile-empty">No recent activity.</p>'
                         : recentActivity.map(g => `
-                        <div class="activity-item">
+                        <div class="activity-item" style="cursor:pointer;" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(g.platform || '')}', '${escapeHtml(String(g.titleId || ''))}')">
                             <div class="activity-icon" style="background:${getPlatformColor(g.platform)};">${getPlatformIcon(g.platform)}</div>
                             <div class="activity-text">Added <strong>${escapeHtml(g.title || '')}</strong> to their library <span style="color:#64748b;">(${escapeHtml(g.platform || '')})</span></div>
                             <div class="activity-time">${formatRelativeTime(g.addedAt)}</div>
@@ -343,7 +343,7 @@
                     ${wishlist.length === 0
                         ? '<p class="profile-empty">Wishlist is empty.</p>'
                         : wishlist.map(g => `
-                        <div class="wishlist-item">
+                        <div class="wishlist-item" style="cursor:pointer;" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(g.platform || '')}', '${escapeHtml(String(g.titleId || ''))}')">
                             <div class="activity-icon" style="background:${getPlatformColor(g.platform)};">${getPlatformIcon(g.platform)}</div>
                             <div class="activity-text">
                                 <strong>${escapeHtml(g.title || '')}</strong>
