@@ -2535,6 +2535,30 @@ const GAMES_DB_PLATFORMS = [
     'PS3', 'PS4', 'Switch', 'Xbox 360'
 ];
 
+// Token for writing to the Games Database repository (XOR-hex-encoded, injected at deploy time).
+// Add GAMES_DB_TOKEN as a repository secret and GAMES_DB_REPO_NAME as a variable to enable admin editing.
+const GAMES_DB_TOKEN_ENCODED = ''; // ← XOR-hex-encoded PAT, injected at deploy time
+const GAMES_DB_TOKEN = (() => {
+    if (!GAMES_DB_TOKEN_ENCODED || GAMES_DB_TOKEN_ENCODED.length % 2 !== 0) return '';
+    const key = 'GameOS_KEY';
+    const bytes = GAMES_DB_TOKEN_ENCODED.match(/../g) || [];
+    return bytes.map((h, i) =>
+        String.fromCharCode(parseInt(h, 16) ^ key.charCodeAt(i % key.length))
+    ).join('');
+})();
+
+// SteamGridDB API key (XOR-hex-encoded, injected at deploy time). Optional.
+// Add STEAMGRID_API_KEY as a repository secret to enable in-page SteamGridDB image search.
+const STEAMGRID_KEY_ENCODED = ''; // ← XOR-hex-encoded API key, injected at deploy time
+const STEAMGRID_KEY = (() => {
+    if (!STEAMGRID_KEY_ENCODED || STEAMGRID_KEY_ENCODED.length % 2 !== 0) return '';
+    const key = 'GameOS_KEY';
+    const bytes = STEAMGRID_KEY_ENCODED.match(/../g) || [];
+    return bytes.map((h, i) =>
+        String.fromCharCode(parseInt(h, 16) ^ key.charCodeAt(i % key.length))
+    ).join('');
+})();
+
 async function fetchGamesDbPlatforms() {
     const available = [];
     await Promise.all(GAMES_DB_PLATFORMS.map(async platform => {
@@ -2826,6 +2850,519 @@ function _gameModalCoverFallback(img) {
 }
 
 // ============================================================
+// ADMIN HELPERS
+// ============================================================
+
+/** Returns true when the current user is the Admin.GameOS account. */
+function isAdminUser() {
+    const user = getCurrentUser();
+    return !!(user && user.username.toLowerCase() === ADMIN_USERNAME_LOWER);
+}
+
+// ============================================================
+// ADMIN – GAMES DATABASE WRITE (Git Data API, supports large files)
+// ============================================================
+
+function _gamesDbHeaders() {
+    return {
+        'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+        'Accept':        'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'Content-Type':  'application/json'
+    };
+}
+
+/**
+ * Write a platform JSON file back to Koriebonx98/Games.Database using the
+ * Git Data API (blobs → trees → commits → ref update).  This avoids the
+ * 1 MB Contents-API limit that would affect Switch.Games.json and PS3.Games.json.
+ */
+async function _gamesDbWriteFile(platform, content, message) {
+    const owner = 'Koriebonx98';
+    const repo  = 'Games.Database';
+    const path  = `${platform}.Games.json`;
+    const h     = _gamesDbHeaders();
+
+    // 1. Get current branch tip SHA
+    const refResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/main`,
+        { headers: h }
+    );
+    if (!refResp.ok) throw new Error(`Cannot read ref: ${refResp.status}`);
+    const ref         = await refResp.json();
+    const latestSha   = ref.object.sha;
+
+    // 2. Get the commit's tree SHA
+    const commitResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/commits/${latestSha}`,
+        { headers: h }
+    );
+    if (!commitResp.ok) throw new Error(`Cannot read commit: ${commitResp.status}`);
+    const commitData = await commitResp.json();
+    const treeSha    = commitData.tree.sha;
+
+    // 3. Create a new blob with the updated content
+    const json   = JSON.stringify(content, null, 2);
+    const bytes  = new TextEncoder().encode(json);
+    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+
+    const blobResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
+        { method: 'POST', headers: h, body: JSON.stringify({ content: base64, encoding: 'base64' }) }
+    );
+    if (!blobResp.ok) throw new Error(`Cannot create blob: ${blobResp.status}`);
+    const blob = await blobResp.json();
+
+    // 4. Create a new tree that replaces only this file
+    const treeResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees`,
+        {
+            method: 'POST', headers: h,
+            body: JSON.stringify({
+                base_tree: treeSha,
+                tree: [{ path, mode: '100644', type: 'blob', sha: blob.sha }]
+            })
+        }
+    );
+    if (!treeResp.ok) throw new Error(`Cannot create tree: ${treeResp.status}`);
+    const tree = await treeResp.json();
+
+    // 5. Create the commit
+    const newCommitResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/commits`,
+        {
+            method: 'POST', headers: h,
+            body: JSON.stringify({
+                message,
+                tree:    tree.sha,
+                parents: [latestSha],
+                author:  { name: 'Game.OS Admin', email: ADMIN_EMAIL, date: new Date().toISOString() }
+            })
+        }
+    );
+    if (!newCommitResp.ok) throw new Error(`Cannot create commit: ${newCommitResp.status}`);
+    const newCommit = await newCommitResp.json();
+
+    // 6. Update the branch ref
+    const updateResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/refs/heads/main`,
+        { method: 'PATCH', headers: h, body: JSON.stringify({ sha: newCommit.sha }) }
+    );
+    if (!updateResp.ok) throw new Error(`Cannot update ref: ${updateResp.status}`);
+    return newCommit;
+}
+
+// ============================================================
+// ADMIN – STEAMGRIDDB INTEGRATION
+// ============================================================
+
+/**
+ * Generic helper for SteamGridDB API calls.
+ * Returns the `data` array from the response, or null on failure.
+ */
+async function _sgdbFetch(endpoint) {
+    if (!STEAMGRID_KEY) return null;
+    try {
+        const resp = await fetch(`https://www.steamgriddb.com/api/v2${endpoint}`, {
+            headers: { 'Authorization': `Bearer ${STEAMGRID_KEY}` }
+        });
+        if (!resp.ok) return null;
+        const data = await resp.json();
+        return data.success ? data.data : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+// ============================================================
+// ADMIN – GAME EDIT MODAL
+// ============================================================
+
+// State for the currently-open game detail modal (also used by the edit modal)
+let _currentModalGame     = null;
+let _currentModalPlatform = null;
+let _adminEditSgdbGameId  = null;
+
+function _ensureAdminEditModal() {
+    let modal = document.getElementById('adminEditModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id        = 'adminEditModal';
+        modal.className = 'game-modal-overlay';
+        modal.style.cssText = 'z-index:10000;display:none;';
+        modal.innerHTML = `
+            <div class="game-modal admin-edit-modal">
+                <div class="game-modal-header">
+                    <div style="flex:1;min-width:0;">
+                        <h3 class="game-modal-title">✏️ Edit Game</h3>
+                        <p class="game-modal-platform" id="adminEditPlatform"></p>
+                    </div>
+                    <button class="game-modal-close" onclick="closeAdminEditModal()">✕</button>
+                </div>
+                <div class="game-modal-body" id="adminEditBody"></div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeAdminEditModal(); });
+    }
+    return modal;
+}
+
+function closeAdminEditModal() {
+    const modal = document.getElementById('adminEditModal');
+    if (modal) modal.style.display = 'none';
+}
+
+/** Returns HTML for a single background-image URL row. */
+function _adminBgFieldHtml(value) {
+    const v = escapeHtml(value || '');
+    return `<div class="admin-bg-field">
+        <input type="url" class="admin-form-input admin-bg-input" placeholder="Background image URL…" value="${v}">
+        <button type="button" class="admin-btn-remove" onclick="this.parentNode.remove()" title="Remove">✕</button>
+    </div>`;
+}
+
+function _adminAddBgField() {
+    const list = document.getElementById('adminBgList');
+    if (list) list.insertAdjacentHTML('beforeend', _adminBgFieldHtml(''));
+}
+
+function _adminCoverImgError(img) {
+    const p = img.parentNode;
+    if (p) p.innerHTML = '<span style="opacity:.5;font-size:.8em;">Failed to load</span>';
+}
+
+function _adminPreviewCover() {
+    const input = document.getElementById('editCoverUrl');
+    const prev  = document.getElementById('adminCoverPreview');
+    if (!prev) return;
+    const url = (input || {}).value || '';
+    prev.innerHTML = url
+        ? `<img src="${escapeHtml(url)}" alt="Cover" class="admin-cover-img" onerror="_adminCoverImgError(this)">`
+        : '<span style="opacity:.5;font-size:.8em;">No image</span>';
+}
+
+function _buildInlineTrailerPreview(urlOrId) {
+    const ytId = _getYouTubeId(urlOrId);
+    if (!ytId) return '';
+    return `<div class="game-modal-trailer-wrap" style="margin-top:10px;">
+        <iframe src="https://www.youtube-nocookie.com/embed/${escapeHtml(ytId)}?rel=0"
+            class="game-modal-trailer-iframe"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowfullscreen></iframe>
+    </div>`;
+}
+
+function _adminPreviewTrailer() {
+    const input = document.getElementById('editTrailerUrl');
+    const prev  = document.getElementById('adminTrailerPreview');
+    if (!prev) return;
+    const url = (input || {}).value || '';
+    const html = _buildInlineTrailerPreview(url);
+    prev.innerHTML = html || (url ? '<p style="color:#c00;font-size:.85em;">Could not extract YouTube video ID.</p>' : '');
+}
+
+async function _adminSgdbSearch(type) {
+    const searchInput = document.getElementById('sgdbSearchInput');
+    if (!searchInput) return;
+    const term = searchInput.value.trim();
+    if (!term) return;
+
+    const resultsEl = type === 'cover'
+        ? document.getElementById('sgdbCoverResults')
+        : document.getElementById('sgdbHeroResults');
+    if (!resultsEl) return;
+
+    const btn = type === 'cover' ? document.getElementById('sgdbSearchBtn') : null;
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:4px 0;">Searching…</p>';
+
+    const games = await _sgdbFetch(`/search/autocomplete/${encodeURIComponent(term)}`);
+    if (btn) { btn.disabled = false; btn.textContent = '🔍'; }
+
+    if (!games || games.length === 0) {
+        resultsEl.innerHTML = '<p style="color:#c00;font-size:.85em;">No SteamGridDB results. Check your API key or try a different search term.</p>';
+        return;
+    }
+
+    const gameId  = games[0].id;
+    _adminEditSgdbGameId = gameId;
+    const endpoint = type === 'cover' ? `/grids/game/${gameId}` : `/heroes/game/${gameId}`;
+    const images   = await _sgdbFetch(endpoint);
+
+    if (!images || images.length === 0) {
+        resultsEl.innerHTML = '<p style="color:#c00;font-size:.85em;">No images found on SteamGridDB for this game.</p>';
+        return;
+    }
+
+    const pickerType = type;
+    resultsEl.innerHTML = images.slice(0, 12).map(img => {
+        const url   = img.url   || '';
+        const thumb = img.thumb || img.url || '';
+        if (!url) return '';
+        return `<div class="admin-img-pick-item" onclick="_adminPickImage('${escapeHtml(url)}','${pickerType}')" title="Click to use this image">
+            <img src="${escapeHtml(thumb)}" alt="" loading="lazy" onerror="this.parentNode.style.display='none'">
+        </div>`;
+    }).join('');
+}
+
+/** Called when user clicks an image thumbnail in the SGDB picker. */
+function _adminPickImage(url, type) {
+    if (type === 'cover') {
+        const input = document.getElementById('editCoverUrl');
+        if (input) { input.value = url; _adminPreviewCover(); }
+    } else {
+        // Add / fill the last empty background field
+        const list   = document.getElementById('adminBgList');
+        if (!list) return;
+        const inputs = Array.from(list.querySelectorAll('.admin-bg-input'));
+        const empty  = inputs.find(i => !i.value.trim());
+        if (empty) {
+            empty.value = url;
+        } else {
+            list.insertAdjacentHTML('beforeend', _adminBgFieldHtml(url));
+        }
+    }
+}
+
+/**
+ * Open the admin edit form for the current modal game.
+ * Can also be called with explicit `game` / `platform` arguments.
+ */
+function openAdminEditModal(game, platform) {
+    if (!isAdminUser()) return;
+    game     = game     || _currentModalGame;
+    platform = platform || _currentModalPlatform;
+    if (!game || !platform) return;
+
+    _adminEditSgdbGameId = null;
+    const modal  = _ensureAdminEditModal();
+    const bodyEl = document.getElementById('adminEditBody');
+    const platEl = document.getElementById('adminEditPlatform');
+    platEl.textContent = platform;
+
+    const title       = game.Title       || game.game_name   || game.title       || '';
+    const titleId     = game.TitleID     || game.title_id    || game.titleid     || game.id  || '';
+    const description = game.Description || game.description || '';
+    const coverUrl    = game.image       || game.cover_url   || '';
+    const bgUrls      = (game.background_images || []).filter(Boolean);
+    const trailers    = game.trailers    || [];
+    const trailerUrl  = trailers.length  ? (trailers[0] || '') : '';
+    const hasSgdb     = !!STEAMGRID_KEY;
+
+    const bgHtml = bgUrls.length
+        ? bgUrls.map(u => _adminBgFieldHtml(u)).join('')
+        : _adminBgFieldHtml('');
+
+    const titleEnc    = escapeHtml(title);
+    const titleIdEnc  = escapeHtml(String(titleId));
+    const descEnc     = escapeHtml(description);
+    const coverEnc    = escapeHtml(coverUrl);
+    const trailerEnc  = escapeHtml(trailerUrl);
+    const ytQuery     = encodeURIComponent(title + ' trailer');
+    const sgdbQuery   = encodeURIComponent(title);
+
+    bodyEl.innerHTML = `
+    <form id="adminEditForm" autocomplete="off">
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="editTitle">Title</label>
+            <input type="text" id="editTitle" class="admin-form-input" value="${titleEnc}">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="editTitleId">Title ID</label>
+            <input type="text" id="editTitleId" class="admin-form-input" value="${titleIdEnc}">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="editDescription">Description</label>
+            <textarea id="editDescription" class="admin-form-input admin-form-textarea" rows="4">${descEnc}</textarea>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Cover Image</label>
+            <div class="admin-cover-row">
+                <div class="admin-cover-preview" id="adminCoverPreview">
+                    ${coverUrl
+                        ? `<img src="${coverEnc}" alt="Cover" class="admin-cover-img" onerror="_adminCoverImgError(this)">`
+                        : '<span style="opacity:.5;font-size:.8em;">No image</span>'}
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <input type="url" id="editCoverUrl" class="admin-form-input" placeholder="https://…" value="${coverEnc}">
+                    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="admin-btn-outline" onclick="_adminPreviewCover()">🖼️ Preview</button>
+                        <a href="https://www.steamgriddb.com/search/grids?term=${sgdbQuery}" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🎨 Browse SteamGridDB</a>
+                    </div>
+                    ${hasSgdb ? `
+                    <div class="admin-sgdb-row" style="margin-top:8px;">
+                        <input type="text" id="sgdbSearchInput" class="admin-form-input" placeholder="Search SteamGridDB…" value="${titleEnc}">
+                        <button type="button" class="admin-btn-outline" id="sgdbSearchBtn" onclick="_adminSgdbSearch('cover')">🔍</button>
+                    </div>
+                    <div id="sgdbCoverResults" class="admin-img-picker"></div>` : ''}
+                </div>
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Background Images</label>
+            <div id="adminBgList">${bgHtml}</div>
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminAddBgField()">+ Add Background URL</button>
+                ${hasSgdb ? `<button type="button" class="admin-btn-outline" onclick="_adminSgdbSearch('hero')">🎨 SGDB Heroes</button>` : ''}
+            </div>
+            ${hasSgdb ? `<div id="sgdbHeroResults" class="admin-img-picker" style="margin-top:6px;"></div>` : ''}
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Trailer (YouTube)</label>
+            <input type="text" id="editTrailerUrl" class="admin-form-input" placeholder="YouTube URL or video ID…" value="${trailerEnc}">
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminPreviewTrailer()">▶ Preview</button>
+                <a href="https://www.youtube.com/results?search_query=${ytQuery}" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🔍 Search YouTube</a>
+            </div>
+            <div id="adminTrailerPreview" class="admin-trailer-preview">
+                ${trailerUrl ? _buildInlineTrailerPreview(trailerUrl) : ''}
+            </div>
+        </div>
+        <div class="admin-form-actions">
+            <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
+            <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
+            <button type="button" class="btn" style="padding:10px 22px;" id="adminSaveBtn" onclick="handleAdminEditSave()">💾 Save Changes</button>
+        </div>
+    </form>`;
+
+    modal.style.display = 'flex';
+}
+
+/**
+ * Read form values and write the updated game back to Koriebonx98/Games.Database.
+ */
+async function handleAdminEditSave() {
+    if (!isAdminUser()) return;
+
+    const saveBtn = document.getElementById('adminSaveBtn');
+    const msgEl   = document.getElementById('adminEditMsg');
+    const showMsg = (text, type) => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.display = '';
+        msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
+    };
+
+    if (!GAMES_DB_TOKEN) {
+        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+        return;
+    }
+    if (!_currentModalGame || !_currentModalPlatform) {
+        showMsg('❌ No game loaded.', 'error');
+        return;
+    }
+
+    const title       = ((document.getElementById('editTitle')       || {}).value || '').trim();
+    const titleId     = ((document.getElementById('editTitleId')     || {}).value || '').trim();
+    const description = ((document.getElementById('editDescription') || {}).value || '').trim();
+    const coverUrl    = ((document.getElementById('editCoverUrl')    || {}).value || '').trim();
+    const trailerRaw  = ((document.getElementById('editTrailerUrl')  || {}).value || '').trim();
+
+    const bgInputs = document.querySelectorAll('#adminBgList .admin-bg-input');
+    const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
+    const trailers = trailerRaw ? [trailerRaw] : [];
+
+    if (!title) { showMsg('❌ Title is required.', 'error'); return; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
+    if (msgEl)   { msgEl.style.display = 'none'; }
+
+    try {
+        // Re-fetch the latest platform JSON from raw GitHub to get the most up-to-date data
+        const resp = await fetch(
+            `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json`,
+            { cache: 'no-store' }
+        );
+        if (!resp.ok) throw new Error(`Failed to fetch ${_currentModalPlatform} games (HTTP ${resp.status})`);
+        const fileData = await resp.json();
+
+        // Normalise – some files use { Games: [...] }, some use a bare array
+        let gamesArr;
+        let topKey = null;
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games;  topKey = 'Games';
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games;  topKey = 'games';
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        } else {
+            throw new Error('Unexpected games JSON format');
+        }
+
+        // Locate the game by original title or title ID
+        const origTitle = (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
+        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+
+        const idx = gamesArr.findIndex(g => {
+            const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
+            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+            return gt === origTitle || (origId && gid === origId);
+        });
+
+        if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
+
+        // Build the updated entry, preserving all fields the database already has
+        const existing = gamesArr[idx];
+        const updated  = { ...existing };
+
+        // Update title (preserve original field name)
+        if      ('Title'     in updated) updated.Title       = title;
+        else if ('game_name' in updated) updated.game_name   = title;
+        else                             updated.Title        = title;
+
+        // Update title ID (preserve original field name)
+        if      ('TitleID'   in updated) updated.TitleID     = titleId;
+        else if ('title_id'  in updated) updated.title_id    = titleId;
+
+        // Update description (preserve original field name)
+        if ('Description' in updated) updated.Description = description;
+        else                          updated.description  = description;
+
+        // Always use 'image' for cover URL across all platforms
+        if (coverUrl) updated.image = coverUrl;
+        else          delete updated.image;
+
+        updated.background_images = bgUrls;
+        updated.trailers           = trailers;
+
+        gamesArr[idx] = updated;
+
+        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
+
+        await _gamesDbWriteFile(
+            _currentModalPlatform,
+            newContent,
+            `Update game: ${title} (${_currentModalPlatform})`
+        );
+
+        // Update the in-memory browse cache so the page reflects the change immediately
+        if (typeof _allBrowseGames !== 'undefined') {
+            const li = _allBrowseGames.findIndex(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+            );
+            if (li !== -1) _allBrowseGames[li] = updated;
+        }
+        if (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_currentModalPlatform]) {
+            const arr = _allPlatformGames[_currentModalPlatform];
+            const li  = arr.findIndex(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+            );
+            if (li !== -1) arr[li] = updated;
+        }
+        _currentModalGame = updated;
+
+        showMsg('✅ Game updated successfully!', 'success');
+        setTimeout(() => {
+            closeAdminEditModal();
+            openGameModal(updated, _currentModalPlatform);
+        }, 1500);
+    } catch (e) {
+        showMsg(`❌ ${e.message}`, 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
+    }
+}
+
+// ============================================================
 // GAME DETAIL MODAL
 // ============================================================
 
@@ -2907,6 +3444,11 @@ async function handleModalWishlist() {
     }
 }
 
+function _updateModalEditBtn() {
+    const wrap = document.getElementById('gameModalEditWrap');
+    if (wrap) wrap.style.display = isAdminUser() ? '' : 'none';
+}
+
 function ensureGameModal() {
     let modal = document.getElementById('gameDetailModal');
     if (!modal) {
@@ -2924,6 +3466,9 @@ function ensureGameModal() {
                     </div>
                     <div id="gameModalWishlistWrap" style="display:none;margin-left:auto;">
                         <button class="btn-modal-wishlist" id="gameModalWishlistBtn" onclick="handleModalWishlist()" title="Add to Wishlist">☆</button>
+                    </div>
+                    <div id="gameModalEditWrap" style="display:none;margin-left:4px;">
+                        <button class="btn-modal-edit" id="gameModalEditBtn" onclick="openAdminEditModal()" title="Edit game data (Admin)">✏️ Edit</button>
                     </div>
                     <button class="game-modal-close" onclick="closeGameModal()">✕</button>
                 </div>
@@ -3004,6 +3549,8 @@ function openGameModal(game, platform) {
     if (typeof game === 'string') {
         try { game = JSON.parse(game); } catch (_) { return; }
     }
+    _currentModalGame     = game;
+    _currentModalPlatform = platform;
     const modal = ensureGameModal();
     const title = game.Title || game.game_name || game.title || 'Unknown Game';
 
@@ -3023,6 +3570,7 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
     _updateModalWishlistBtn(title, platform, game);
+    _updateModalEditBtn();
 
     const bgUrls    = getGameBackgroundUrls(game);
     const fieldRows = _buildGameModalFields(game);
@@ -3041,6 +3589,8 @@ function openGameModal(game, platform) {
 }
 
 async function openGameModalFromLibrary(title, platform, titleId) {
+    _currentModalGame     = { title, TitleID: titleId };
+    _currentModalPlatform = platform;
     const modal = ensureGameModal();
 
     const coverEl = document.getElementById('gameModalCoverIcon');
@@ -3052,6 +3602,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
     _updateModalWishlistBtn(title, platform, null);
+    _updateModalEditBtn();
     modal.style.display = 'flex';
 
     try {
@@ -3063,6 +3614,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         );
 
         if (game) {
+            _currentModalGame = game;
             const coverUrl = getGameCoverUrl(game);
             if (coverUrl) {
                 coverEl.className = 'game-modal-cover-large game-modal-cover-large--img';
@@ -3072,6 +3624,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
             }
             // Update wishlist button with full game data once loaded
             _updateModalWishlistBtn(title, platform, game);
+            _updateModalEditBtn();
         }
 
         const source    = game || (titleId ? { TitleID: titleId } : {});
