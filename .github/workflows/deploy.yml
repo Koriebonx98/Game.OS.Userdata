@@ -206,6 +206,37 @@ jobs:
             echo "⚠️  GitHub API returned HTTP ${HTTP_STATUS}. Deployment will continue."
           fi
 
+      - name: Validate Games Database repository access (if GAMES_DB_TOKEN set)
+        run: |
+          TOKEN="${{ secrets.GAMES_DB_TOKEN }}"
+          if [ -z "$TOKEN" ]; then
+            echo "ℹ️  GAMES_DB_TOKEN is not set — admin game editing will show a configuration notice."
+            exit 0
+          fi
+          echo "Checking access to Koriebonx98/Games.Database …"
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Koriebonx98/Games.Database" || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ Games.Database repository is accessible (HTTP 200) — admin game editing will be active"
+          elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "❌ GAMES_DB_TOKEN is invalid or expired (HTTP 401)."
+            echo "   Generate a new fine-grained PAT with Contents: Read and write on Koriebonx98/Games.Database"
+            echo "   and update the GAMES_DB_TOKEN repository secret, then re-run this workflow."
+            exit 1
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "❌ GAMES_DB_TOKEN lacks write permission (HTTP 403)."
+            echo "   Ensure the PAT has Contents: Read and write permission scoped to Koriebonx98/Games.Database."
+            echo "   Update the GAMES_DB_TOKEN repository secret and re-run this workflow."
+            exit 1
+          elif [ "$HTTP_STATUS" = "404" ]; then
+            echo "⚠️  Repository Koriebonx98/Games.Database not found (HTTP 404)."
+            echo "   Verify the repository exists and the token has access to it."
+          else
+            echo "⚠️  GitHub API returned HTTP ${HTTP_STATUS}. Deployment will continue."
+          fi
+
       - name: Copy frontend files to deployment directory
         run: |
           mkdir -p _site
