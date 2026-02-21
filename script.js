@@ -2581,7 +2581,7 @@ async function addGameGitHub(username, game, platform) {
     library.push({
         platform,
         title:    game.Title || game.game_name || game.title,
-        titleId:  game.TitleID || game.title_id || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2668,7 +2668,7 @@ function addGameDemo(username, game, platform) {
     library.push({
         platform,
         title,
-        titleId:  game.TitleID || game.title_id || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2708,7 +2708,7 @@ async function addToWishlistGitHub(username, game, platform) {
     wishlist.push({
         platform,
         title:    game.Title || game.game_name || game.title,
-        titleId:  game.TitleID || game.title_id || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2755,7 +2755,7 @@ function addToWishlistDemo(username, game, platform) {
     wishlist.push({
         platform,
         title,
-        titleId:  game.TitleID || game.title_id || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -3059,7 +3059,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         const titleLower = title.toLowerCase();
         const game = games.find(g =>
             (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower ||
-            (titleId && String(g.TitleID || g.title_id || g.id || '') === String(titleId))
+            (titleId && String(g.TitleID || g.title_id || g.titleid || g.id || '') === String(titleId))
         );
 
         if (game) {

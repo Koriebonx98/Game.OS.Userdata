@@ -1168,6 +1168,32 @@ footer {
     gap: 8px;
 }
 
+.owned-platform-header.collapsible {
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 0;
+}
+
+.owned-platform-header.collapsible::after {
+    content: '▶';
+    margin-left: auto;
+    font-size: 0.7em;
+    transition: transform 0.2s;
+}
+
+.owned-platform-header.collapsible.expanded::after {
+    transform: rotate(90deg);
+}
+
+.platform-games-list {
+    display: none;
+}
+
+.platform-games-list.expanded {
+    display: block;
+    padding-top: 8px;
+}
+
 .games-count-badge {
     background: var(--primary-color);
     color: var(--white);
