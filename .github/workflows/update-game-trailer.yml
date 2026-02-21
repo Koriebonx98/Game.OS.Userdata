@@ -1,0 +1,158 @@
+# Update Game Trailer in Games.Database
+#
+# Triggered manually via workflow_dispatch.
+# Uses GAMES_DB_TOKEN to:
+#   1. Validate the token has write access to Koriebonx98/Games.Database
+#   2. Fetch the platform's games JSON file
+#   3. Update the trailer URL for the specified game
+#   4. Commit the change back to Koriebonx98/Games.Database
+#
+# Required secret (Settings → Secrets and variables → Actions):
+#   GAMES_DB_TOKEN  – Fine-grained PAT with Contents: Read and write on
+#                     Koriebonx98/Games.Database
+
+name: Update Game Trailer
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform (PS4, PS3, Switch, Xbox 360)'
+        required: true
+        default: 'PS4'
+      title:
+        description: 'Game title (exact match)'
+        required: true
+        default: 'God of War'
+      trailer_url:
+        description: 'Trailer YouTube URL or video ID'
+        required: true
+        default: 'https://youtu.be/K0u_kAWLJOA'
+
+permissions:
+  contents: read
+
+jobs:
+  update-trailer:
+    name: Update Game Trailer in Games.Database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate GAMES_DB_TOKEN is configured
+        run: |
+          if [ -z "$GAMES_DB_TOKEN" ]; then
+            echo "❌ GAMES_DB_TOKEN is not set."
+            echo "   Add it as a repository secret: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   The token must be a fine-grained PAT with Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          fi
+          echo "✅ GAMES_DB_TOKEN is configured"
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Test GAMES_DB_TOKEN access to Games.Database
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${GAMES_DB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Koriebonx98/Games.Database" || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ GAMES_DB_TOKEN is valid – Games.Database is accessible"
+          elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "❌ GAMES_DB_TOKEN is invalid or expired (HTTP 401)."
+            echo "   Generate a new fine-grained PAT and update the GAMES_DB_TOKEN secret."
+            exit 1
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "❌ GAMES_DB_TOKEN lacks permission (HTTP 403)."
+            echo "   Ensure the PAT has Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          else
+            echo "❌ Unexpected response from GitHub API: HTTP ${HTTP_STATUS}"
+            exit 1
+          fi
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Update game trailer in Games.Database
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, sys
+          import urllib.request, urllib.parse, urllib.error
+
+          OWNER       = 'Koriebonx98'
+          REPO        = 'Games.Database'
+          TOKEN       = os.environ['GAMES_DB_TOKEN']
+          PLATFORM    = os.environ['PLATFORM']
+          TITLE       = os.environ['GAME_TITLE']
+          TRAILER_URL = os.environ['TRAILER_URL']
+
+          path    = f'{PLATFORM}.Games.json'
+          api_url = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/{urllib.parse.quote(path)}'
+          headers = {
+              'Authorization': f'Bearer {TOKEN}',
+              'Accept':        'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type':  'application/json',
+          }
+
+          # Fetch current file
+          req = urllib.request.Request(api_url, headers=headers)
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  data = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              print(f'❌ Failed to fetch {path}: HTTP {e.code}')
+              sys.exit(1)
+
+          sha     = data['sha']
+          decoded = base64.b64decode(data['content'].replace('\n', '')).decode('utf-8')
+          content = json.loads(decoded)
+
+          # Find the game and update its trailers.
+          # Expected schema: {"Platform": "...", "Games": [{"Title": "...", "trailers": [...], ...}]}
+          # The 'Games' key is used by all current platform files; 'games'/'game_name' are
+          # fallbacks for alternative schemas.  The trailers array is replaced (not appended)
+          # to match the behaviour of the admin editing panel in the Game.OS frontend.
+          games   = content.get('Games', content.get('games', []))
+          updated = False
+          for game in games:
+              t = game.get('Title') or game.get('title') or game.get('game_name') or ''
+              if not game.get('Title'):
+                  print(f'⚠️  Game entry uses non-standard title field; matched on fallback key')
+              if t.lower() == TITLE.lower():
+                  game['trailers'] = [TRAILER_URL]
+                  updated = True
+                  print(f'✅ Updated trailers for "{t}" on {PLATFORM}')
+                  break
+
+          if not updated:
+              print(f'❌ Game "{TITLE}" not found in {PLATFORM}.Games.json')
+              sys.exit(1)
+
+          # Write the updated file back
+          new_json = json.dumps(content, indent=2)
+          encoded  = base64.b64encode(new_json.encode('utf-8')).decode('utf-8')
+          body     = json.dumps({
+              'message': f'Update trailer for {TITLE} ({PLATFORM})',
+              'content': encoded,
+              'sha':     sha,
+          }).encode('utf-8')
+
+          put_req = urllib.request.Request(api_url, data=body, headers=headers, method='PUT')
+          try:
+              with urllib.request.urlopen(put_req) as resp:
+                  result = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              body_text = e.read().decode('utf-8', errors='replace')
+              print(f'❌ Failed to update {path}: HTTP {e.code} – {body_text}')
+              sys.exit(1)
+
+          commit_sha = result.get('commit', {}).get('sha', 'unknown')
+          print(f'✅ {PLATFORM}.Games.json updated successfully')
+          print(f'   Commit: {commit_sha}')
+          PYEOF
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+          PLATFORM: ${{ inputs.platform }}
+          GAME_TITLE: ${{ inputs.title }}
+          TRAILER_URL: ${{ inputs.trailer_url }}
