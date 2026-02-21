@@ -40,6 +40,71 @@ const REPO_OWNER = process.env.REPO_OWNER;
 const REPO_NAME  = process.env.REPO_NAME;
 const BCRYPT_ROUNDS = 10;
 
+// ── Games.Database client (optional) ─────────────────────────────────────────
+// Used to write achievements.json alongside Name.txt in Data/{folder}/Games/{titleId}/
+const GAMES_DB_TOKEN      = process.env.GAMES_DB_TOKEN || null;
+const GAMES_DB_REPO_OWNER = process.env.GAMES_DB_REPO_OWNER || 'Koriebonx98';
+const GAMES_DB_REPO_NAME  = process.env.GAMES_DB_REPO_NAME  || 'Games.Database';
+const octokitGamesDb = GAMES_DB_TOKEN ? new Octokit({ auth: GAMES_DB_TOKEN }) : null;
+
+/**
+ * Map a platform name (as used in games.json) to its folder name inside
+ * Data/ in the Games.Database repository.
+ * Returns null for unknown platforms.
+ */
+const PLATFORM_TO_GAMES_DB_FOLDER = {
+    'Switch':   'Nintendo - Switch',
+    'Xbox 360': 'Microsoft - Xbox 360',
+    'PS3':      'Sony - PlayStation 3',
+    'PS4':      'Sony - PlayStation 4',
+    'PS5':      'Sony - PlayStation 5',
+    'Xbox One': 'Microsoft - Xbox One',
+    'PC':       'PC'
+};
+function platformToGamesDbFolder(platform) {
+    return PLATFORM_TO_GAMES_DB_FOLDER[platform] || null;
+}
+
+/**
+ * Read a file from the Games.Database repository.
+ * Returns { content (raw string), sha } on success, or null if not found.
+ */
+async function getGamesDbFile(path) {
+    if (!octokitGamesDb) return null;
+    try {
+        const { data } = await octokitGamesDb.repos.getContent({
+            owner: GAMES_DB_REPO_OWNER,
+            repo:  GAMES_DB_REPO_NAME,
+            path
+        });
+        return {
+            content: Buffer.from(data.content, 'base64').toString('utf8'),
+            sha: data.sha
+        };
+    } catch (err) {
+        if (err.status === 404) return null;
+        throw err;
+    }
+}
+
+/**
+ * Create or update a JSON file in the Games.Database repository.
+ * Pass `sha` when updating an existing file.
+ */
+async function putGamesDbFile(path, content, message, sha) {
+    if (!octokitGamesDb) throw new Error('GAMES_DB_TOKEN is not configured.');
+    const params = {
+        owner: GAMES_DB_REPO_OWNER,
+        repo:  GAMES_DB_REPO_NAME,
+        path,
+        message,
+        content: Buffer.from(JSON.stringify(content, null, 2)).toString('base64'),
+        committer: { name: 'Game OS Bot', email: 'bot@gameos.com' }
+    };
+    if (sha) params.sha = sha;
+    await octokitGamesDb.repos.createOrUpdateFileContents(params);
+}
+
 // ── Game OS API token system ──────────────────────────────────────────────────
 
 const TOKEN_PREFIX = 'gos_';
@@ -1922,11 +1987,13 @@ app.get('/api/users/:username/wishlist', authenticatePublicOrUserToken, async (r
 // ── POST /api/me/achievements/sync-exophase ───────────────────────────────────
 // Fetch an Exophase URL, scrape the achievement list, and merge the results into
 // the authenticated user's achievements.json file.
-// Body: { exophaseUrl, platform, gameTitle }
+// Also writes the achievement template to Data/{folder}/Games/{titleId}/achievements.json
+// in the Games.Database repository when titleId is supplied and GAMES_DB_TOKEN is set.
+// Body: { exophaseUrl, platform, gameTitle, titleId? }
 app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, res) => {
     try {
         const { usernameLower } = req.tokenUser;
-        const { exophaseUrl, platform, gameTitle } = req.body;
+        const { exophaseUrl, platform, gameTitle, titleId } = req.body;
 
         if (!exophaseUrl || !platform || !gameTitle) {
             return res.status(400).json({ success: false, message: 'exophaseUrl, platform, and gameTitle are required.' });
@@ -2086,12 +2153,49 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             file ? file.sha : undefined
         );
 
+        // ── Write achievement template to Games.Database alongside Name.txt ──
+        // Path: Data/{platformFolder}/Games/{titleId}/achievements.json
+        let gamesDbWritten = false;
+        if (titleId && typeof titleId === 'string' && titleId.trim() && octokitGamesDb) {
+            const platformFolder = platformToGamesDbFolder(platform);
+            if (platformFolder) {
+                const safeTitle = titleId.trim();
+                // Only allow alphanumeric, underscore, and hyphen to prevent path traversal
+                if (/^[a-zA-Z0-9_-]+$/.test(safeTitle)) {
+                    const gamesDbPath = `Data/${platformFolder}/Games/${safeTitle}/achievements.json`;
+                    // Strip user-specific fields; keep only game-level data
+                    const template = scraped.map(a => {
+                        const t = { achievementId: a.achievementId, name: a.name, description: a.description };
+                        if (a.iconUrl) t.iconUrl = a.iconUrl;
+                        return t;
+                    });
+                    // Sanitise user inputs used in the commit message
+                    const safeGameTitle = String(gameTitle).replace(/[\r\n]/g, ' ').slice(0, 80);
+                    const safePlatform  = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+                    try {
+                        const existing = await getGamesDbFile(gamesDbPath);
+                        await putGamesDbFile(
+                            gamesDbPath,
+                            template,
+                            `Add achievements for ${safeGameTitle} (${safePlatform}) from Exophase`,
+                            existing ? existing.sha : undefined
+                        );
+                        gamesDbWritten = true;
+                    } catch (dbErr) {
+                        // Non-fatal: log but don't fail the whole request
+                        console.error('sync-exophase: failed to write to Games.Database:', dbErr.message);
+                    }
+                }
+            }
+        }
+
         res.json({
             success: true,
             message: `Synced achievements from Exophase: ${added} added, ${updated} updated.`,
             added,
             updated,
-            total: scraped.length
+            total: scraped.length,
+            gamesDbUpdated: gamesDbWritten
         });
     } catch (err) {
         console.error('POST /api/me/achievements/sync-exophase error:', err);
