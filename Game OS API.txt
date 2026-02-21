@@ -169,11 +169,28 @@ accounts/{username_lower}/profile.json
 accounts/{username_lower}/games.json   (array)
   [
     {
-      "platform":  "PC",
-      "title":     "Awesome Shooter 2",
-      "titleId":   "AS2-PC",          // optional
-      "coverUrl":  "https://…",       // optional
-      "addedAt":   "2026-01-15T10:00:00.000Z"
+      "platform":             "PC",
+      "title":                "Awesome Shooter 2",
+      "titleId":              "AS2-PC",          // optional
+      "coverUrl":             "https://…",       // optional
+      "addedAt":              "2026-01-15T10:00:00.000Z",
+      "mods": [                                  // optional – mod site links
+        { "name": "Nexus Mods", "url": "https://www.nexusmods.com/…" },
+        { "name": "ModDB",      "url": "https://www.moddb.com/…" }
+      ],
+      "sysSpecMin": {                            // optional – minimum requirements
+        "cpu":        "Intel Core i5-2500K",
+        "gpu":        "NVIDIA GTX 660",
+        "ram":        "8 GB",
+        "resolution": "720p"
+      },
+      "sysSpecRecommended": {                    // optional – recommended requirements
+        "cpu":        "Intel Core i7-8700K",
+        "gpu":        "NVIDIA GTX 1070",
+        "ram":        "16 GB",
+        "resolution": "1080p"
+      },
+      "achievementsUrl":  "https://…/achievements.json"  // optional – link to achievement data
     }
   ]
 
@@ -557,6 +574,9 @@ public sealed class GameOsClient : IDisposable
     public async Task AddGameAsync(
         string username, string platform, string title,
         string? titleId = null, string? coverUrl = null,
+        List<ModLink>? mods = null,
+        SystemSpec? sysSpecMin = null, SystemSpec? sysSpecRecommended = null,
+        string? achievementsUrl = null,
         CancellationToken ct = default)
     {
         string path = $"accounts/{username.ToLower()}/games.json";
@@ -570,9 +590,15 @@ public sealed class GameOsClient : IDisposable
 
         games.Add(new Game
         {
-            Platform = platform, Title = title,
-            TitleId  = titleId,  CoverUrl = coverUrl,
-            AddedAt  = DateTimeOffset.UtcNow.ToString("o")
+            Platform           = platform,
+            Title              = title,
+            TitleId            = titleId,
+            CoverUrl           = coverUrl,
+            AddedAt            = DateTimeOffset.UtcNow.ToString("o"),
+            Mods               = mods,
+            SysSpecMin         = sysSpecMin,
+            SysSpecRecommended = sysSpecRecommended,
+            AchievementsUrl    = achievementsUrl
         });
         await WriteFileAsync(path, games, $"Add game: {title} ({platform})", sha, ct);
     }
@@ -780,11 +806,31 @@ public class UserProfile
 
 public class Game
 {
-    [JsonPropertyName("platform")]  public string  Platform { get; set; } = "";
-    [JsonPropertyName("title")]     public string  Title    { get; set; } = "";
-    [JsonPropertyName("titleId")]   public string? TitleId  { get; set; }
-    [JsonPropertyName("coverUrl")]  public string? CoverUrl { get; set; }
-    [JsonPropertyName("addedAt")]   public string  AddedAt  { get; set; } = "";
+    [JsonPropertyName("platform")]            public string       Platform            { get; set; } = "";
+    [JsonPropertyName("title")]               public string       Title               { get; set; } = "";
+    [JsonPropertyName("titleId")]             public string?      TitleId             { get; set; }
+    [JsonPropertyName("coverUrl")]            public string?      CoverUrl            { get; set; }
+    [JsonPropertyName("addedAt")]             public string       AddedAt             { get; set; } = "";
+    [JsonPropertyName("mods")]                public List<ModLink>?   Mods            { get; set; }
+    [JsonPropertyName("sysSpecMin")]          public SystemSpec?  SysSpecMin          { get; set; }
+    [JsonPropertyName("sysSpecRecommended")]  public SystemSpec?  SysSpecRecommended  { get; set; }
+    [JsonPropertyName("achievementsUrl")]     public string?      AchievementsUrl     { get; set; }
+}
+
+/// <summary>Represents a labelled link to a mod site for a game.</summary>
+public class ModLink
+{
+    [JsonPropertyName("name")] public string  Name { get; set; } = "";
+    [JsonPropertyName("url")]  public string  Url  { get; set; } = "";
+}
+
+/// <summary>Minimum or recommended system requirements for a game.</summary>
+public class SystemSpec
+{
+    [JsonPropertyName("cpu")]        public string? Cpu        { get; set; }
+    [JsonPropertyName("gpu")]        public string? Gpu        { get; set; }
+    [JsonPropertyName("ram")]        public string? Ram        { get; set; }
+    [JsonPropertyName("resolution")] public string? Resolution { get; set; }
 }
 
 public class Achievement
@@ -859,8 +905,31 @@ var (bobGames, _) = await client.GetGamesAsync("Bob");
 
 7e.  ADD / REMOVE GAMES
 ────────────────────────
-// Add a game when the player installs or purchases it
+// Add a game (minimal)
 await client.AddGameAsync("Alice", "PC", "Awesome Shooter 2", titleId: "AS2-PC");
+
+// Add a game with mods, system specs, and an achievements URL
+await client.AddGameAsync(
+    username:           "Alice",
+    platform:           "PC",
+    title:              "Awesome Shooter 2",
+    titleId:            "AS2-PC",
+    mods: new List<ModLink>
+    {
+        new ModLink { Name = "Nexus Mods", Url = "https://www.nexusmods.com/awesomeshooter2" },
+        new ModLink { Name = "ModDB",      Url = "https://www.moddb.com/games/awesome-shooter-2" }
+    },
+    sysSpecMin: new SystemSpec
+    {
+        Cpu = "Intel Core i5-2500K", Gpu = "NVIDIA GTX 660",
+        Ram = "8 GB", Resolution = "720p"
+    },
+    sysSpecRecommended: new SystemSpec
+    {
+        Cpu = "Intel Core i7-8700K", Gpu = "NVIDIA GTX 1070",
+        Ram = "16 GB", Resolution = "1080p"
+    },
+    achievementsUrl: "https://raw.githubusercontent.com/…/AS2-achievements.json");
 
 // Remove a game
 await client.RemoveGameAsync("Alice", "PC", "Awesome Shooter 2");

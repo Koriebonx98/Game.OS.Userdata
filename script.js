@@ -3032,6 +3032,22 @@ function _adminAddBgField() {
     if (list) list.insertAdjacentHTML('beforeend', _adminBgFieldHtml(''));
 }
 
+/** Returns HTML for a single mod link row (name + URL). */
+function _adminModFieldHtml(name, url) {
+    const n = escapeHtml(name || '');
+    const u = escapeHtml(url  || '');
+    return `<div class="admin-bg-field admin-mod-field">
+        <input type="text" class="admin-form-input admin-mod-name" placeholder="Button label (e.g. Nexus Mods)" value="${n}" style="flex:1;">
+        <input type="url"  class="admin-form-input admin-mod-url"  placeholder="Mod site URL…" value="${u}" style="flex:2;">
+        <button type="button" class="admin-btn-remove" onclick="this.parentNode.remove()" title="Remove">✕</button>
+    </div>`;
+}
+
+function _adminAddModField() {
+    const list = document.getElementById('adminModList');
+    if (list) list.insertAdjacentHTML('beforeend', _adminModFieldHtml('', ''));
+}
+
 function _adminCoverImgError(img) {
     const p = img.parentNode;
     if (p) p.innerHTML = '<span style="opacity:.5;font-size:.8em;">Failed to load</span>';
@@ -3146,18 +3162,26 @@ function openAdminEditModal(game, platform) {
     const platEl = document.getElementById('adminEditPlatform');
     platEl.textContent = platform;
 
-    const title       = game.Title       || game.game_name   || game.title       || '';
-    const titleId     = game.TitleID     || game.title_id    || game.titleid     || game.id  || '';
-    const description = game.Description || game.description || '';
-    const coverUrl    = game.image       || game.cover_url   || '';
-    const bgUrls      = (game.background_images || []).filter(Boolean);
-    const trailers    = game.trailers    || [];
-    const trailerUrl  = trailers.length  ? (trailers[0] || '') : '';
-    const hasSgdb     = !!STEAMGRID_KEY;
+    const title           = game.Title       || game.game_name   || game.title       || '';
+    const titleId         = game.TitleID     || game.title_id    || game.titleid     || game.id  || '';
+    const description     = game.Description || game.description || '';
+    const coverUrl        = game.image       || game.cover_url   || '';
+    const bgUrls          = (game.background_images || []).filter(Boolean);
+    const trailers        = game.trailers    || [];
+    const trailerUrl      = trailers.length  ? (trailers[0] || '') : '';
+    const hasSgdb         = !!STEAMGRID_KEY;
+    const existingMods    = Array.isArray(game.mods) ? game.mods : [];
+    const specMin         = game.sysSpecMin         || {};
+    const specRec         = game.sysSpecRecommended || {};
+    const achievementsUrl = game.achievementsUrl    || '';
 
     const bgHtml = bgUrls.length
         ? bgUrls.map(u => _adminBgFieldHtml(u)).join('')
         : _adminBgFieldHtml('');
+
+    const modsHtml = existingMods.length
+        ? existingMods.map(m => _adminModFieldHtml(m.name || '', m.url || '')).join('')
+        : _adminModFieldHtml('', '');
 
     const titleEnc    = escapeHtml(title);
     const titleIdEnc  = escapeHtml(String(titleId));
@@ -3224,6 +3248,33 @@ function openAdminEditModal(game, platform) {
                 ${trailerUrl ? _buildInlineTrailerPreview(trailerUrl) : ''}
             </div>
         </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🧩 Mods</label>
+            <div id="adminModList">${modsHtml}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Minimum System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecMinCpu" class="admin-form-input" placeholder="CPU" value="${escapeHtml(specMin.cpu || '')}">
+                <input type="text" id="editSpecMinGpu" class="admin-form-input" placeholder="GPU" value="${escapeHtml(specMin.gpu || '')}">
+                <input type="text" id="editSpecMinRam" class="admin-form-input" placeholder="RAM" value="${escapeHtml(specMin.ram || '')}">
+                <input type="text" id="editSpecMinRes" class="admin-form-input" placeholder="Resolution" value="${escapeHtml(specMin.resolution || '')}">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Recommended System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecRecCpu" class="admin-form-input" placeholder="CPU" value="${escapeHtml(specRec.cpu || '')}">
+                <input type="text" id="editSpecRecGpu" class="admin-form-input" placeholder="GPU" value="${escapeHtml(specRec.gpu || '')}">
+                <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="${escapeHtml(specRec.ram || '')}">
+                <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="${escapeHtml(specRec.resolution || '')}">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🏆 Achievements JSON URL</label>
+            <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="${escapeHtml(achievementsUrl)}">
+        </div>
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
             <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
@@ -3267,6 +3318,34 @@ async function handleAdminEditSave() {
     const bgInputs = document.querySelectorAll('#adminBgList .admin-bg-input');
     const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
     const trailers = trailerRaw ? [trailerRaw] : [];
+
+    // Collect mod links (name + url pairs)
+    const modFields = document.querySelectorAll('#adminModList .admin-mod-field');
+    const mods = Array.from(modFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-mod-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
+
+    // Collect system specs
+    const specMinCpu = ((document.getElementById('editSpecMinCpu') || {}).value || '').trim();
+    const specMinGpu = ((document.getElementById('editSpecMinGpu') || {}).value || '').trim();
+    const specMinRam = ((document.getElementById('editSpecMinRam') || {}).value || '').trim();
+    const specMinRes = ((document.getElementById('editSpecMinRes') || {}).value || '').trim();
+    const specRecCpu = ((document.getElementById('editSpecRecCpu') || {}).value || '').trim();
+    const specRecGpu = ((document.getElementById('editSpecRecGpu') || {}).value || '').trim();
+    const specRecRam = ((document.getElementById('editSpecRecRam') || {}).value || '').trim();
+    const specRecRes = ((document.getElementById('editSpecRecRes') || {}).value || '').trim();
+
+    const sysSpecMin = (specMinCpu || specMinGpu || specMinRam || specMinRes)
+        ? { cpu: specMinCpu, gpu: specMinGpu, ram: specMinRam, resolution: specMinRes }
+        : null;
+    const sysSpecRecommended = (specRecCpu || specRecGpu || specRecRam || specRecRes)
+        ? { cpu: specRecCpu, gpu: specRecGpu, ram: specRecRam, resolution: specRecRes }
+        : null;
+
+    const achievementsUrl = ((document.getElementById('editAchievementsUrl') || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
@@ -3329,6 +3408,16 @@ async function handleAdminEditSave() {
 
         updated.background_images = bgUrls;
         updated.trailers           = trailers;
+
+        // Persist new structured fields
+        if (mods.length)           updated.mods                = mods;
+        else                       delete updated.mods;
+        if (sysSpecMin)            updated.sysSpecMin          = sysSpecMin;
+        else                       delete updated.sysSpecMin;
+        if (sysSpecRecommended)    updated.sysSpecRecommended  = sysSpecRecommended;
+        else                       delete updated.sysSpecRecommended;
+        if (achievementsUrl)       updated.achievementsUrl     = achievementsUrl;
+        else                       delete updated.achievementsUrl;
 
         gamesArr[idx] = updated;
 
@@ -3504,7 +3593,8 @@ function closeGameModal() {
 }
 
 function _buildGameModalFields(game) {
-    const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers']);
+    const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
+        'mods', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -3515,6 +3605,62 @@ function _buildGameModalFields(game) {
                 <span class="game-modal-field-value">${escapeHtml(value)}</span>
             </div>`;
         }).join('');
+}
+
+/** Render a mods section from game.mods array of { name, url } objects. */
+function _buildModsSection(game) {
+    const mods = game.mods;
+    if (!Array.isArray(mods) || !mods.length) return '';
+    const buttons = mods
+        .filter(m => m && m.url)
+        .map(m => `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">${escapeHtml(m.name || 'Mod Link')}</a>`)
+        .join('');
+    if (!buttons) return '';
+    return `<div class="game-modal-field">
+        <span class="game-modal-field-label">🧩 Mods</span>
+        <span class="game-modal-field-value game-modal-mods">${buttons}</span>
+    </div>`;
+}
+
+/** Render system specifications (min + recommended) from game data. */
+function _buildSystemSpecsSection(game) {
+    const min = game.sysSpecMin;
+    const rec = game.sysSpecRecommended;
+    if (!min && !rec) return '';
+    const renderSpec = (spec) => {
+        if (!spec) return '<em style="color:#999;">Not specified</em>';
+        return ['cpu', 'gpu', 'ram', 'resolution']
+            .filter(k => spec[k])
+            .map(k => `<div class="game-spec-row"><span class="game-spec-key">${escapeHtml(k.toUpperCase())}</span><span class="game-spec-val">${escapeHtml(String(spec[k]))}</span></div>`)
+            .join('') || '<em style="color:#999;">Not specified</em>';
+    };
+    return `<div class="game-modal-field game-modal-specs-field">
+        <span class="game-modal-field-label">⚙️ System Requirements</span>
+        <span class="game-modal-field-value">
+            <div class="game-specs-grid">
+                <div class="game-specs-col">
+                    <div class="game-specs-col-title">Minimum</div>
+                    ${renderSpec(min)}
+                </div>
+                <div class="game-specs-col">
+                    <div class="game-specs-col-title">Recommended</div>
+                    ${renderSpec(rec)}
+                </div>
+            </div>
+        </span>
+    </div>`;
+}
+
+/** Render an achievements link / URL from game.achievementsUrl. */
+function _buildAchievementsSection(game) {
+    const url = game.achievementsUrl;
+    if (!url) return '';
+    return `<div class="game-modal-field">
+        <span class="game-modal-field-label">🏆 Achievements</span>
+        <span class="game-modal-field-value">
+            <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">View Achievements</a>
+        </span>
+    </div>`;
 }
 
 function _getYouTubeId(urlOrId) {
@@ -3595,6 +3741,9 @@ function openGameModal(game, platform) {
     let bodyHtml = '';
     bodyHtml += _buildTrailerSection(game);
     bodyHtml += _buildFriendsSection(libs, platform, title);
+    bodyHtml += _buildModsSection(game);
+    bodyHtml += _buildSystemSpecsSection(game);
+    bodyHtml += _buildAchievementsSection(game);
     if (bgUrls.length > 0) {
         bodyHtml += `<div class="game-modal-bg-gallery">${
             bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
@@ -3651,6 +3800,9 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         let bodyHtml = '';
         bodyHtml += _buildTrailerSection(source);
         bodyHtml += _buildFriendsSection(libs, platform, title);
+        bodyHtml += _buildModsSection(source);
+        bodyHtml += _buildSystemSpecsSection(source);
+        bodyHtml += _buildAchievementsSection(source);
         if (bgUrls.length > 0) {
             bodyHtml += `<div class="game-modal-bg-gallery">${
                 bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')

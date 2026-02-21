@@ -1776,3 +1776,92 @@ footer {
     border: 1px solid #fecaca;
 }
 
+/* Mod link button (game modal) */
+.btn-mod-link {
+    display: inline-block;
+    padding: 4px 10px;
+    background: #eff6ff;
+    border: 1.5px solid #bfdbfe;
+    color: #1d4ed8;
+    border-radius: 6px;
+    font-size: 0.82em;
+    text-decoration: none;
+    margin: 2px 4px 2px 0;
+    transition: background 0.15s, border-color 0.15s;
+}
+.btn-mod-link:hover {
+    background: #dbeafe;
+    border-color: #93c5fd;
+}
+
+/* Mods field value */
+.game-modal-mods {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* System specs grid inside game modal */
+.game-specs-grid {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-end;
+}
+.game-specs-col { min-width: 140px; }
+.game-specs-col-title {
+    font-weight: 600;
+    color: var(--text-muted);
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 4px;
+}
+.game-spec-row {
+    display: flex;
+    gap: 6px;
+    font-size: 0.83em;
+    margin-bottom: 2px;
+}
+.game-spec-key {
+    color: var(--text-muted);
+    font-weight: 600;
+    min-width: 42px;
+    flex-shrink: 0;
+}
+.game-spec-val { color: var(--text-color); }
+
+/* Specs field — allow full-width layout */
+.game-modal-specs-field {
+    flex-direction: column;
+    align-items: flex-start;
+}
+.game-modal-specs-field .game-modal-field-value {
+    text-align: left;
+    width: 100%;
+    margin-top: 6px;
+}
+
+/* Admin edit form: mod link rows */
+.admin-mod-field {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+/* Admin edit form: system spec 2×2 grid */
+.admin-spec-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 4px;
+}
+@media (max-width: 480px) {
+    .admin-spec-grid { grid-template-columns: 1fr; }
+    .game-specs-grid { flex-direction: column; }
+    .game-modal-mods { justify-content: flex-start; }
+}
+

@@ -394,7 +394,8 @@ app.post('/api/game-library/add', async (req, res) => {
     }
 
     try {
-        const { username, password, platform, title, titleId, coverUrl } = req.body;
+        const { username, password, platform, title, titleId, coverUrl,
+                mods, sysSpecMin, sysSpecRecommended, achievementsUrl } = req.body;
 
         if (!username || !password || !platform || !title) {
             return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
@@ -426,13 +427,34 @@ app.post('/api/game-library/add', async (req, res) => {
             return res.status(400).json({ success: false, message: 'Game already in library.' });
         }
 
-        library.push({
+        const entry = {
             platform,
             title,
             titleId:  titleId || null,
             coverUrl: coverUrl || undefined,
             addedAt:  new Date().toISOString()
-        });
+        };
+
+        // Validate and sanitise optional structured fields
+        if (Array.isArray(mods) && mods.length) {
+            const cleanMods = mods.filter(m => m && typeof m.name === 'string' && typeof m.url === 'string' && m.name.trim() && m.url.trim())
+                                  .map(m => ({ name: m.name.trim(), url: m.url.trim() }));
+            if (cleanMods.length) entry.mods = cleanMods;
+        }
+        const SPEC_KEYS = ['cpu', 'gpu', 'ram', 'resolution'];
+        if (sysSpecMin && typeof sysSpecMin === 'object' && !Array.isArray(sysSpecMin)) {
+            const clean = {};
+            SPEC_KEYS.forEach(k => { if (sysSpecMin[k]) clean[k] = String(sysSpecMin[k]).trim(); });
+            if (Object.keys(clean).length) entry.sysSpecMin = clean;
+        }
+        if (sysSpecRecommended && typeof sysSpecRecommended === 'object' && !Array.isArray(sysSpecRecommended)) {
+            const clean = {};
+            SPEC_KEYS.forEach(k => { if (sysSpecRecommended[k]) clean[k] = String(sysSpecRecommended[k]).trim(); });
+            if (Object.keys(clean).length) entry.sysSpecRecommended = clean;
+        }
+        if (achievementsUrl && typeof achievementsUrl === 'string') entry.achievementsUrl = achievementsUrl.trim();
+
+        library.push(entry);
 
         await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
         res.json({ success: true, message: 'Game added to your library!' });
