@@ -1,0 +1,215 @@
+# Scrape Exophase Achievements
+#
+# Triggered manually via workflow_dispatch, or programmatically from the
+# Game.OS admin panel when no backend is configured.
+# Fetches an Exophase achievements page, parses the achievement list, and writes
+# Data/{platform}/Games/{titleId}/achievements.json to Koriebonx98/Games.Database.
+#
+# Required secret (Settings → Secrets and variables → Actions):
+#   GAMES_DB_TOKEN  – Fine-grained PAT with:
+#                     • Contents: Read and write on Koriebonx98/Games.Database
+#                     • Actions: Write on Koriebonx98/Game.OS.Userdata
+#                       (so the admin panel can trigger this workflow without a backend)
+
+name: Scrape Exophase Achievements
+
+on:
+  workflow_dispatch:
+    inputs:
+      exophaseUrl:
+        description: 'Exophase achievements page URL (https://www.exophase.com/game/…)'
+        required: true
+      platform:
+        description: 'Platform (PS4, PS3, Switch, Xbox 360)'
+        required: true
+        default: 'PS4'
+      gameTitle:
+        description: 'Game title'
+        required: true
+      titleId:
+        description: 'Title ID (alphanumeric, underscores, hyphens only)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    name: Scrape achievements from Exophase
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate inputs and token
+        run: |
+          if [ -z "$GAMES_DB_TOKEN" ]; then
+            echo "❌ GAMES_DB_TOKEN is not configured."
+            echo "   Add it as a repository secret with Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          fi
+          if [[ ! "$EXOPHASE_URL" =~ ^https://(www\.)?exophase\.com/ ]]; then
+            echo "❌ URL must be an https://exophase.com URL."
+            exit 1
+          fi
+          if [[ ! "$TITLE_ID" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "❌ titleId may only contain alphanumeric characters, underscores, and hyphens."
+            exit 1
+          fi
+          echo "✅ Inputs validated"
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+          EXOPHASE_URL: ${{ inputs.exophaseUrl }}
+          TITLE_ID: ${{ inputs.titleId }}
+
+      - name: Install Python dependencies
+        run: pip install requests beautifulsoup4 --quiet
+
+      - name: Scrape achievements and write to Games.Database
+        run: |
+          python3 << 'PYEOF'
+          import json, os, sys
+          import urllib.request, urllib.parse, urllib.error
+          import base64
+          import requests
+          from bs4 import BeautifulSoup
+
+          EXOPHASE_URL = os.environ['EXOPHASE_URL']
+          PLATFORM     = os.environ['PLATFORM']
+          GAME_TITLE   = os.environ['GAME_TITLE']
+          TITLE_ID     = os.environ['TITLE_ID']
+          TOKEN        = os.environ['GAMES_DB_TOKEN']
+          OWNER        = 'Koriebonx98'
+          REPO         = 'Games.Database'
+
+          PLATFORM_FOLDER_MAP = {
+              'PS3':      'PS3',
+              'PS4':      'PS4',
+              'Switch':   'Switch',
+              'Xbox 360': 'Xbox360',
+          }
+
+          platform_folder = PLATFORM_FOLDER_MAP.get(PLATFORM)
+          if not platform_folder:
+              print(f'❌ Unknown platform: {PLATFORM}')
+              sys.exit(1)
+
+          # Fetch the Exophase page
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+              'Accept-Language': 'en-US,en;q=0.9',
+          }
+          try:
+              resp = requests.get(EXOPHASE_URL, headers=headers, timeout=20)
+              resp.raise_for_status()
+          except Exception as e:
+              print(f'❌ Failed to fetch Exophase page: {e}')
+              sys.exit(1)
+
+          soup = BeautifulSoup(resp.text, 'html.parser')
+          scraped = []
+
+          for i, el in enumerate(soup.select('ul.achievement > li, ul.trophy > li, ul.challenge > li')):
+              a_tag = el.find('a')
+              name = a_tag.get_text(strip=True) if a_tag else ''
+              if not name:
+                  continue
+
+              desc_el = el.select_one('div.award-description p')
+              description = desc_el.get_text(strip=True) if desc_el else ''
+
+              icon_url = None
+              img = el.find('img')
+              if img and img.get('src'):
+                  raw = img['src']
+                  try:
+                      from urllib.parse import urlparse
+                      p = urlparse(raw)
+                      if p.scheme == 'https' and (p.hostname == 'exophase.com' or (p.hostname and p.hostname.endswith('.exophase.com'))):
+                          icon_url = raw
+                  except Exception:
+                      pass
+
+              classes = el.get('class') or []
+              is_hidden = 'secret' in classes
+              avg_raw = el.get('data-average')
+              percent = None
+              if avg_raw is not None:
+                  try:
+                      percent = float(avg_raw)
+                  except Exception:
+                      pass
+
+              entry = {
+                  'achievementId': str(i + 1),
+                  'name': name,
+                  'description': description,
+              }
+              if icon_url is not None:
+                  entry['iconUrl'] = icon_url
+              if is_hidden:
+                  entry['hidden'] = True
+              if percent is not None:
+                  entry['percent'] = percent
+              scraped.append(entry)
+
+          if not scraped:
+              print('❌ No achievements found on the Exophase page. Verify the URL points to an achievement/trophy list.')
+              sys.exit(1)
+
+          print(f'✅ Scraped {len(scraped)} achievements')
+
+          # Write to Games.Database via GitHub Contents API
+          api_headers = {
+              'Authorization': f'Bearer {TOKEN}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type': 'application/json',
+          }
+          path = f'Data/{platform_folder}/Games/{TITLE_ID}/achievements.json'
+          api_url = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/{urllib.parse.quote(path)}'
+
+          # Check if file already exists (get its SHA for update)
+          sha = None
+          get_headers = {k: v for k, v in api_headers.items() if k != 'Content-Type'}
+          req = urllib.request.Request(api_url, headers=get_headers)
+          try:
+              with urllib.request.urlopen(req) as r:
+                  existing = json.loads(r.read())
+                  sha = existing.get('sha')
+                  print(f'ℹ️  Overwriting existing achievements file (sha: {sha[:7]}…)')
+          except urllib.error.HTTPError as e:
+              if e.code != 404:
+                  print(f'❌ Error checking existing file: HTTP {e.code}')
+                  sys.exit(1)
+
+          new_json  = json.dumps(scraped, indent=2)
+          encoded   = base64.b64encode(new_json.encode('utf-8')).decode('utf-8')
+          body = {
+              'message': f'Add achievements for {GAME_TITLE[:80]} ({PLATFORM}) from Exophase',
+              'content': encoded,
+          }
+          if sha:
+              body['sha'] = sha
+          body_bytes = json.dumps(body).encode('utf-8')
+
+          put_req = urllib.request.Request(api_url, data=body_bytes, headers=api_headers, method='PUT')
+          try:
+              with urllib.request.urlopen(put_req) as r:
+                  result = json.loads(r.read())
+                  commit_sha = result.get('commit', {}).get('sha', 'unknown')
+                  print(f'✅ Achievements written to {path}')
+                  print(f'   Commit: {commit_sha}')
+                  print(f'   Total achievements: {len(scraped)}')
+          except urllib.error.HTTPError as e:
+              body_text = e.read().decode('utf-8', errors='replace')
+              print(f'❌ Failed to write achievements: HTTP {e.code} – {body_text}')
+              if e.code in (401, 403):
+                  print('   Ensure GAMES_DB_TOKEN has Contents: Read and write on Koriebonx98/Games.Database.')
+              sys.exit(1)
+          PYEOF
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+          EXOPHASE_URL: ${{ inputs.exophaseUrl }}
+          PLATFORM: ${{ inputs.platform }}
+          GAME_TITLE: ${{ inputs.gameTitle }}
+          TITLE_ID: ${{ inputs.titleId }}
