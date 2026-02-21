@@ -2563,7 +2563,7 @@ async function fetchGamesDbPlatforms() {
     const available = [];
     await Promise.all(GAMES_DB_PLATFORMS.map(async platform => {
         try {
-            const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json`);
+            const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
             if (resp.ok) available.push(platform);
         } catch (_) {}
     }));
@@ -2572,7 +2572,7 @@ async function fetchGamesDbPlatforms() {
 }
 
 async function fetchGamesDbPlatform(platform) {
-    const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json`);
+    const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
     if (!resp.ok) throw new Error(`Failed to load ${platform} games`);
     const data = await resp.json();
     if (data.Games && Array.isArray(data.Games)) return data.Games;
@@ -3275,7 +3275,7 @@ async function handleAdminEditSave() {
     try {
         // Re-fetch the latest platform JSON from raw GitHub to get the most up-to-date data
         const resp = await fetch(
-            `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json`,
+            `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json?t=${Date.now()}`,
             { cache: 'no-store' }
         );
         if (!resp.ok) throw new Error(`Failed to fetch ${_currentModalPlatform} games (HTTP ${resp.status})`);
