@@ -14,6 +14,7 @@
                 <a href="index.html" class="nav-link">Home</a>
                 <a href="games.html" class="nav-link">🔍 Games</a>
                 <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="games.html?tab=wishlist" class="nav-link">⭐ Wishlist</a>
                 <div id="guestNav" style="display:inline;">
                     <a href="login.html" class="nav-link">Login</a>
                     <a href="signup.html" class="nav-link">Sign Up</a>
@@ -40,6 +41,7 @@
             <div class="games-tab-row">
                 <button class="games-tab active" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
                 <button class="games-tab" id="tabOwned" onclick="switchTab('owned')">📚 My Library</button>
+                <button class="games-tab" id="tabWishlist" onclick="switchTab('wishlist')">⭐ Wishlist</button>
             </div>
 
             <!-- BROWSE TAB -->
@@ -70,6 +72,12 @@
                 <div id="ownedMessage" class="message"></div>
                 <div id="ownedGamesList"></div>
             </div>
+
+            <!-- WISHLIST TAB -->
+            <div id="wishlistPanelWrap" style="display:none;">
+                <div id="wishlistMessage" class="message"></div>
+                <div id="wishlistGamesList"></div>
+            </div>
         </main>
 
         <footer>
@@ -84,6 +92,7 @@
     let _allBrowseGames  = [];
     let _allPlatformGames = {}; // { platform: [...games] } used in ALL mode
     let _myLibrary       = [];
+    let _myWishlist      = [];
     let _friendLibraries = {}; // { friendName: [...games] } for "friends also own" counts
     let _currentPlatform = '';
     let _isLoggedIn      = false; // cached after init, avoids per-item calls
@@ -107,7 +116,9 @@
         // Hide the My Library tab and nav link for guests
         if (!loggedIn) {
             document.getElementById('tabOwned').style.display = 'none';
+            document.getElementById('tabWishlist').style.display = 'none';
             document.querySelectorAll('a[href="games.html?tab=library"]').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('a[href="games.html?tab=wishlist"]').forEach(el => el.style.display = 'none');
             // Show guest notice
             const notice = document.getElementById('guestNotice');
             if (notice) notice.style.display = 'flex';
@@ -117,6 +128,9 @@
         const params = new URLSearchParams(window.location.search);
         if (loggedIn && params.get('tab') === 'library') {
             switchTab('owned');
+        }
+        if (loggedIn && params.get('tab') === 'wishlist') {
+            switchTab('wishlist');
         }
     });
 
@@ -142,6 +156,7 @@
         // Load library for "My Library" tab (only for logged-in users)
         if (isLoggedIn()) {
             await refreshOwnedGames();
+            await refreshWishlist();
         }
     }
 
@@ -238,6 +253,10 @@
             o => o.platform === platform &&
                  (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
         );
+        const wishlisted = _isLoggedIn && _myWishlist.some(
+            w => w.platform === platform &&
+                 (w.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
+        );
         const gameJsonAttr = escapeHtml(JSON.stringify(g).replace(/'/g, '&#39;'));
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
@@ -255,6 +274,14 @@
             </button>`
             : `<a href="login.html" class="btn-add-game" onclick="event.stopPropagation();" style="text-decoration:none;text-align:center;">🔒 Log in</a>`;
 
+        const wishlistBtnHtml = _isLoggedIn
+            ? `<button class="btn-wishlist ${wishlisted ? 'btn-wishlisted' : ''}"
+                title="${wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}"
+                onclick="event.stopPropagation(); handleToggleWishlist(this, '${gameJsonAttr}', '${platEsc}')">
+                ${wishlisted ? '⭐' : '☆'}
+            </button>`
+            : '';
+
         return `
         <div class="games-browse-item clickable" onclick="openGameModal('${gameJsonAttr}', '${platEsc}')">
             ${coverHtml}
@@ -262,6 +289,7 @@
                 <span class="games-browse-title">${title}</span>
                 ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
             </div>
+            ${wishlistBtnHtml}
             ${addBtnHtml}
         </div>`;
     }
@@ -395,7 +423,7 @@
     function renderOwnedGames() {
         const listEl = document.getElementById('ownedGamesList');
         if (_myLibrary.length === 0) {
-            listEl.innerHTML = '<p style="color:#666;font-size:0.95em;">Your library is empty. Browse games above and click "+ Add" to track what you own!</p>';
+            listEl.innerHTML = '<p class="games-list-empty">Your library is empty. Browse games above and click "+ Add" to track what you own!</p>';
             return;
         }
 
@@ -476,13 +504,139 @@
         }
     }
 
+    // ── Wishlist Tab ───────────────────────────────────────────
+    async function refreshWishlist() {
+        const user = getCurrentUser();
+        if (!user) return;
+        try {
+            if (MODE === 'demo') {
+                _myWishlist = getDemoWishlist(user.username);
+            } else {
+                _myWishlist = await getWishlistGitHub(user.username);
+            }
+        } catch (_) {
+            _myWishlist = [];
+        }
+        renderWishlistGames();
+    }
+
+    function renderWishlistGames() {
+        const listEl = document.getElementById('wishlistGamesList');
+        if (_myWishlist.length === 0) {
+            listEl.innerHTML = '<p class="games-list-empty">Your wishlist is empty. Browse games and click ☆ to add games you want!</p>';
+            return;
+        }
+
+        // Group by platform
+        const byPlatform = {};
+        _myWishlist.forEach(g => {
+            if (!byPlatform[g.platform]) byPlatform[g.platform] = [];
+            byPlatform[g.platform].push(g);
+        });
+
+        listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
+            const games      = byPlatform[plat];
+            const coverColor = getPlatformColor(plat);
+            const coverIcon  = getPlatformIcon(plat);
+            return `
+            <div class="owned-platform-group">
+                <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
+                ${games.map(g => {
+                    const coverUrl  = g.coverUrl || null;
+                    const coverHtml = coverUrl
+                        ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
+                        : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
+                    return `
+                <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
+                    ${coverHtml}
+                    <div class="games-browse-info">
+                        <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
+                        ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
+                    </div>
+                    <button class="btn-remove-game"
+                        onclick="event.stopPropagation(); handleRemoveWishlist('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
+                        🗑️ Remove
+                    </button>
+                </div>`;
+                }).join('')}
+            </div>`;
+        }).join('');
+    }
+
+    async function handleToggleWishlist(btn, gameJson, platform) {
+        const user = getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        let game;
+        try { game = JSON.parse(gameJson); } catch (_) { return; }
+
+        const gamePlatform  = platform || _currentPlatform;
+        const gameTitle     = game.Title || game.game_name || game.title || '';
+        const alreadyInList = _myWishlist.some(
+            w => w.platform === gamePlatform && (w.title || '').toLowerCase() === gameTitle.toLowerCase()
+        );
+        btn.disabled = true;
+        try {
+            if (alreadyInList) {
+                if (MODE === 'demo') {
+                    removeFromWishlistDemo(user.username, gamePlatform, gameTitle);
+                } else {
+                    await removeFromWishlistGitHub(user.username, gamePlatform, gameTitle);
+                }
+            } else {
+                if (MODE === 'demo') {
+                    addToWishlistDemo(user.username, game, gamePlatform);
+                } else {
+                    await addToWishlistGitHub(user.username, game, gamePlatform);
+                }
+            }
+            await refreshWishlist();
+            // Re-render browse so wishlist star badges update
+            if (_currentPlatform === 'ALL') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    document.getElementById('browseSearch').value);
+            } else if (_allBrowseGames.length) {
+                renderBrowseGames(_allBrowseGames);
+            }
+        } catch (e) {
+            btn.disabled = false;
+            alert('Failed to update wishlist: ' + e.message);
+        }
+    }
+
+    async function handleRemoveWishlist(platform, title, btn) {
+        const user = getCurrentUser();
+        if (!user) return;
+        btn.disabled = true;
+        try {
+            if (MODE === 'demo') {
+                removeFromWishlistDemo(user.username, platform, title);
+            } else {
+                await removeFromWishlistGitHub(user.username, platform, title);
+            }
+            await refreshWishlist();
+            // Re-render browse so wishlist star badges update
+            if (_currentPlatform === 'ALL') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    document.getElementById('browseSearch').value);
+            } else if (_currentPlatform === platform && _allBrowseGames.length) {
+                renderBrowseGames(_allBrowseGames);
+            }
+        } catch (e) {
+            btn.disabled = false;
+            alert('Failed to remove from wishlist: ' + e.message);
+        }
+    }
+
     // ── Tab switching ──────────────────────────────────────────
     function switchTab(tab) {
         document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse');
         document.getElementById('tabOwned').classList.toggle('active', tab === 'owned');
-        document.getElementById('browsePanelWrap').style.display = tab === 'browse' ? '' : 'none';
-        document.getElementById('ownedPanelWrap').style.display  = tab === 'owned'  ? '' : 'none';
-        if (tab === 'owned') refreshOwnedGames();
+        document.getElementById('tabWishlist').classList.toggle('active', tab === 'wishlist');
+        document.getElementById('browsePanelWrap').style.display  = tab === 'browse'   ? '' : 'none';
+        document.getElementById('ownedPanelWrap').style.display   = tab === 'owned'    ? '' : 'none';
+        document.getElementById('wishlistPanelWrap').style.display = tab === 'wishlist' ? '' : 'none';
+        if (tab === 'owned')    refreshOwnedGames();
+        if (tab === 'wishlist') refreshWishlist();
     }
     </script>
 </body>
