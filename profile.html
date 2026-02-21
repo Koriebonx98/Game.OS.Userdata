@@ -253,6 +253,9 @@
             const platformList = Object.keys(byPlatform).sort();
 
             const safeUser = escapeHtml(username);
+            const lastActiveText = presence
+                ? formatRelativeTime(presence)
+                : (recentActivity.length > 0 ? formatRelativeTime(recentActivity[0].addedAt) : '–');
 
             content.innerHTML = `
                 <!-- Profile Header -->
@@ -286,7 +289,7 @@
                         <div class="stat-label">Wishlist</div>
                     </div>
                     <div class="profile-stat-card">
-                        <div class="stat-value">${recentActivity.length > 0 ? formatRelativeTime(recentActivity[0].addedAt) : '–'}</div>
+                        <div class="stat-value">${lastActiveText}</div>
                         <div class="stat-label">Last Active</div>
                     </div>
                 </div>
