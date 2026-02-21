@@ -18,6 +18,7 @@ const { Octokit } = require('@octokit/rest');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const cors = require('cors');
+const cheerio = require('cheerio');
 require('dotenv').config();
 
 const app = express();
@@ -1914,6 +1915,186 @@ app.get('/api/users/:username/wishlist', authenticatePublicOrUserToken, async (r
         res.json({ success: true, wishlist: file ? file.content : [] });
     } catch (err) {
         console.error('GET /api/users/:username/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/achievements/sync-exophase ───────────────────────────────────
+// Fetch an Exophase URL, scrape the achievement list, and merge the results into
+// the authenticated user's achievements.json file.
+// Body: { exophaseUrl, platform, gameTitle }
+app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { exophaseUrl, platform, gameTitle } = req.body;
+
+        if (!exophaseUrl || !platform || !gameTitle) {
+            return res.status(400).json({ success: false, message: 'exophaseUrl, platform, and gameTitle are required.' });
+        }
+
+        // SSRF protection: only allow https://exophase.com URLs
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(exophaseUrl);
+        } catch {
+            return res.status(400).json({ success: false, message: 'Invalid URL.' });
+        }
+        if (parsedUrl.protocol !== 'https:' ||
+            (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
+            return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
+        }
+
+        // Fetch the Exophase page with a 10-second timeout
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 10000);
+        let html;
+        try {
+            const response = await fetch(exophaseUrl, {
+                signal: controller.signal,
+                headers: { 'User-Agent': 'GameOS-Achievement-Bot/1.0' }
+            });
+            if (!response.ok) {
+                return res.status(502).json({ success: false, message: `Failed to fetch Exophase page (HTTP ${response.status}).` });
+            }
+            html = await response.text();
+        } catch (fetchErr) {
+            if (fetchErr.name === 'AbortError') {
+                return res.status(504).json({ success: false, message: 'Exophase request timed out.' });
+            }
+            throw fetchErr;
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
+
+        // Parse achievements from the HTML using cheerio
+        const $ = cheerio.load(html);
+        const scraped = [];
+
+        // Strategy 1: Exophase game trophy/achievement list pages
+        // Selectors cover multiple Exophase page designs
+        const selectors = [
+            'ul.achievement-list > li',
+            '.achievement-list .achievement',
+            '.trophy-list .trophy',
+            '[class*="AchievementList"] [class*="Achievement"]',
+            '.list-achievements li',
+            '.achievements-list li',
+            'li.achievement',
+            '.achievement-item'
+        ];
+
+        for (const selector of selectors) {
+            const items = $(selector);
+            if (!items.length) continue;
+
+            items.each((i, el) => {
+                const $el = $(el);
+                const name = (
+                    $el.find('[class*="title"], [class*="name"], h3, h4, h5, strong').first().text() ||
+                    $el.attr('data-name') || ''
+                ).trim();
+                const description = (
+                    $el.find('[class*="desc"], [class*="body"], p').first().text() || ''
+                ).trim();
+                const iconUrl = $el.find('img').first().attr('src') || undefined;
+                const rawId = (
+                    $el.attr('data-id') ||
+                    $el.attr('data-achievement-id') ||
+                    $el.attr('id') ||
+                    String(i + 1)
+                );
+                const earnedEl = $el.find('[class*="date"], [class*="earned"], [class*="unlocked"], time').first();
+                const earnedText = earnedEl.attr('datetime') || earnedEl.text().trim() || null;
+
+                if (!name) return; // skip items with no name
+                const entry = {
+                    platform,
+                    gameTitle,
+                    achievementId: String(rawId),
+                    name,
+                    description: description || '',
+                    unlockedAt: earnedText ? new Date(earnedText).toISOString() : null,
+                    source: 'exophase'
+                };
+                if (iconUrl) entry.iconUrl = iconUrl;
+                scraped.push(entry);
+            });
+
+            if (scraped.length) break; // stop after the first successful selector
+        }
+
+        // Strategy 2: look for embedded JSON data (some Exophase pages embed data as JSON-LD)
+        if (!scraped.length) {
+            $('script[type="application/json"], script[type="application/ld+json"]').each((_, el) => {
+                if (scraped.length) return;
+                try {
+                    const data = JSON.parse($(el).html() || '');
+                    const list = Array.isArray(data) ? data
+                        : (data && Array.isArray(data.trophies)) ? data.trophies
+                        : (data && Array.isArray(data.achievements)) ? data.achievements
+                        : [];
+                    list.forEach((item, i) => {
+                        const name = (item.name || item.title || '').trim();
+                        if (!name) return;
+                        scraped.push({
+                            platform,
+                            gameTitle,
+                            achievementId: String(item.id || item.achievement_id || i + 1),
+                            name,
+                            description: (item.description || item.desc || '').trim(),
+                            unlockedAt: item.earned_at || item.unlockedAt || null,
+                            source: 'exophase'
+                        });
+                    });
+                } catch { /* ignore parse errors */ }
+            });
+        }
+
+        if (!scraped.length) {
+            return res.status(422).json({
+                success: false,
+                message: 'No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.'
+            });
+        }
+
+        // Merge into achievements.json (upsert by achievementId + platform + gameTitle)
+        const path = `accounts/${usernameLower}/achievements.json`;
+        const file = await getFile(path);
+        const list = file ? [...file.content] : [];
+
+        let added = 0;
+        let updated = 0;
+        for (const ach of scraped) {
+            const idx = list.findIndex(
+                a => a.platform === platform &&
+                     (a.gameTitle || '').toLowerCase() === gameTitle.toLowerCase() &&
+                     String(a.achievementId) === String(ach.achievementId)
+            );
+            if (idx !== -1) {
+                list[idx] = { ...list[idx], ...ach };
+                updated++;
+            } else {
+                list.push(ach);
+                added++;
+            }
+        }
+
+        await putFile(
+            path,
+            list,
+            `Sync ${scraped.length} achievements from Exophase for ${gameTitle} (${platform})`,
+            file ? file.sha : undefined
+        );
+
+        res.json({
+            success: true,
+            message: `Synced achievements from Exophase: ${added} added, ${updated} updated.`,
+            added,
+            updated,
+            total: scraped.length
+        });
+    } catch (err) {
+        console.error('POST /api/me/achievements/sync-exophase error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
