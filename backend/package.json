@@ -8,7 +8,8 @@
   },
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "node test-exophase.js --fixture"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
