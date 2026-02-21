@@ -2829,6 +2829,84 @@ function _gameModalCoverFallback(img) {
 // GAME DETAIL MODAL
 // ============================================================
 
+function _updateModalWishlistBtn(title, platform, game) {
+    const wrap = document.getElementById('gameModalWishlistWrap');
+    const btn  = document.getElementById('gameModalWishlistBtn');
+    if (!wrap || !btn) return;
+    if (!isLoggedIn()) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    btn.dataset.title    = title    || '';
+    btn.dataset.platform = platform || '';
+    btn.dataset.gameJson = game ? JSON.stringify(game) : '';
+    const wl = (typeof _myWishlist !== 'undefined') ? _myWishlist : [];
+    const titleLower    = (title    || '').toLowerCase();
+    const platformLower = (platform || '').toLowerCase();
+    const wishlisted = wl.some(
+        w => (w.platform || '').toLowerCase() === platformLower && (w.title || '').toLowerCase() === titleLower
+    );
+    btn.textContent = wishlisted ? '⭐' : '☆';
+    btn.title = wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist';
+    btn.classList.toggle('btn-wishlisted', wishlisted);
+    btn.disabled = false;
+}
+
+async function handleModalWishlist() {
+    const user = getCurrentUser();
+    if (!user) { window.location.href = 'login.html'; return; }
+    const btn = document.getElementById('gameModalWishlistBtn');
+    if (!btn) return;
+    const title    = btn.dataset.title    || '';
+    const platform = btn.dataset.platform || '';
+    const gameJson = btn.dataset.gameJson || '';
+    if (!title || !platform) return;
+    btn.disabled = true;
+    try {
+        let wishlist;
+        if (MODE === 'demo') {
+            wishlist = getDemoWishlist(user.username);
+        } else {
+            wishlist = await getWishlistGitHub(user.username);
+        }
+        const alreadyWishlisted = wishlist.some(
+            w => (w.platform || '').toLowerCase() === platform.toLowerCase() && (w.title || '').toLowerCase() === title.toLowerCase()
+        );
+        if (alreadyWishlisted) {
+            if (MODE === 'demo') {
+                removeFromWishlistDemo(user.username, platform, title);
+            } else {
+                await removeFromWishlistGitHub(user.username, platform, title);
+            }
+        } else {
+            let game = {};
+            try { game = gameJson ? JSON.parse(gameJson) : {}; } catch (_) { game = {}; }
+            if (!game.title && !game.Title) game.title = title;
+            if (MODE === 'demo') {
+                addToWishlistDemo(user.username, game, platform);
+            } else {
+                await addToWishlistGitHub(user.username, game, platform);
+            }
+        }
+        const nowWishlisted = !alreadyWishlisted;
+        btn.textContent = nowWishlisted ? '⭐' : '☆';
+        btn.title = nowWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist';
+        btn.classList.toggle('btn-wishlisted', nowWishlisted);
+        // If on games page, refresh wishlist and re-render browse list
+        if (typeof _myWishlist !== 'undefined') {
+            await refreshWishlist();
+            if (_currentPlatform === 'ALL') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    document.getElementById('browseSearch').value);
+            } else if (_allBrowseGames.length) {
+                renderBrowseGames(_allBrowseGames);
+            }
+        }
+    } catch (e) {
+        alert('Failed to update wishlist: ' + e.message);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
 function ensureGameModal() {
     let modal = document.getElementById('gameDetailModal');
     if (!modal) {
@@ -2843,6 +2921,9 @@ function ensureGameModal() {
                     <div style="flex:1;min-width:0;">
                         <h3 class="game-modal-title" id="gameModalTitle"></h3>
                         <p class="game-modal-platform" id="gameModalPlatform"></p>
+                    </div>
+                    <div id="gameModalWishlistWrap" style="display:none;margin-left:auto;">
+                        <button class="btn-modal-wishlist" id="gameModalWishlistBtn" onclick="handleModalWishlist()" title="Add to Wishlist">☆</button>
                     </div>
                     <button class="game-modal-close" onclick="closeGameModal()">✕</button>
                 </div>
@@ -2941,6 +3022,8 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalTitle').textContent = title;
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
+    _updateModalWishlistBtn(title, platform, game);
+
     const bgUrls    = getGameBackgroundUrls(game);
     const fieldRows = _buildGameModalFields(game);
     const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
@@ -2968,6 +3051,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
     document.getElementById('gameModalPlatform').textContent = platform || '';
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
+    _updateModalWishlistBtn(title, platform, null);
     modal.style.display = 'flex';
 
     try {
@@ -2986,6 +3070,8 @@ async function openGameModalFromLibrary(title, platform, titleId) {
                 coverEl.dataset.platform = platform || '';
                 coverEl.innerHTML = `<img src="${coverUrl}" class="game-modal-cover-img" alt="${escapeHtml(title)}" onerror="_gameModalCoverFallback(this)">`;
             }
+            // Update wishlist button with full game data once loaded
+            _updateModalWishlistBtn(title, platform, game);
         }
 
         const source    = game || (titleId ? { TitleID: titleId } : {});
