@@ -108,6 +108,42 @@ jobs:
                   count=1
               )
 
+          # ── Inject GAMES_DB_TOKEN_ENCODED ────────────────────────────────────
+          gdb_token = os.environ.get('GAMES_DB_TOKEN', '')
+          if gdb_token:
+              gdb_bytes = gdb_token.encode('utf-8')
+              encoded_gdb = ''.join(
+                  f'{b ^ XOR_KEY[i % len(XOR_KEY)]:02x}'
+                  for i, b in enumerate(gdb_bytes)
+              )
+          else:
+              encoded_gdb = ''
+          new_gdb_line = f"const GAMES_DB_TOKEN_ENCODED = {json.dumps(encoded_gdb)};"
+          content = re.sub(
+              r"const GAMES_DB_TOKEN_ENCODED\s*=\s*'[^']*';[^\n]*",
+              new_gdb_line,
+              content,
+              count=1
+          )
+
+          # ── Inject STEAMGRID_KEY_ENCODED ─────────────────────────────────────
+          sgdb_key = os.environ.get('STEAMGRID_API_KEY', '')
+          if sgdb_key:
+              sgdb_bytes = sgdb_key.encode('utf-8')
+              encoded_sgdb = ''.join(
+                  f'{b ^ XOR_KEY[i % len(XOR_KEY)]:02x}'
+                  for i, b in enumerate(sgdb_bytes)
+              )
+          else:
+              encoded_sgdb = ''
+          new_sgdb_line = f"const STEAMGRID_KEY_ENCODED = {json.dumps(encoded_sgdb)};"
+          content = re.sub(
+              r"const STEAMGRID_KEY_ENCODED\s*=\s*'[^']*';[^\n]*",
+              new_sgdb_line,
+              content,
+              count=1
+          )
+
           with open('script.js', 'w', encoding='utf-8') as f:
               f.write(content)
 
@@ -118,6 +154,12 @@ jobs:
               print(f'DATA_REPO_OWNER : set to {owner!r}')
           if data_repo:
               print(f'DATA_REPO_NAME  : set to {data_repo!r}')
+          if gdb_token:
+              print(f'GAMES_DB_TOKEN  : injected — admin game editing enabled')
+          else:
+              print(f'GAMES_DB_TOKEN  : not set — admin editing will show a configuration notice')
+          if sgdb_key:
+              print(f'STEAMGRID_API_KEY: injected — in-page SteamGridDB search enabled')
           if not token:
               print('To enable real accounts, add DATA_REPO_TOKEN as a repository secret.')
               print('See README.md for full instructions.')
@@ -126,6 +168,8 @@ jobs:
           DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
           REPO_OWNER: ${{ github.repository_owner }}
           DATA_REPO_NAME: ${{ vars.DATA_REPO_NAME }}
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+          STEAMGRID_API_KEY: ${{ secrets.STEAMGRID_API_KEY }}
 
       - name: Validate GitHub data repository access (if token set)
         run: |
