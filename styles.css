@@ -1890,11 +1890,47 @@ footer {
     color: var(--text-muted);
     font-size: 0.88em;
 }
+/* Legacy grid (kept for compatibility) */
 .ach-grid {
     display: flex;
     flex-wrap: wrap;
     gap: 10px;
 }
+/* Swipeable carousel */
+.ach-carousel-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.ach-carousel {
+    display: flex;
+    gap: 10px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex: 1;
+    padding-bottom: 4px;
+}
+.ach-carousel::-webkit-scrollbar { display: none; }
+.ach-nav {
+    background: var(--primary-color);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    width: 28px;
+    height: 28px;
+    font-size: 1.3em;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    opacity: 0.8;
+    transition: opacity 0.15s;
+}
+.ach-nav:hover { opacity: 1; }
 .ach-card {
     position: relative;
     width: 110px;
@@ -1908,6 +1944,7 @@ footer {
     cursor: default;
     border: 1.5px solid rgba(255,255,255,0.08);
     transition: transform 0.15s, box-shadow 0.15s;
+    scroll-snap-align: start;
 }
 .ach-card:hover {
     transform: scale(1.05);
@@ -1941,7 +1978,58 @@ footer {
     -webkit-box-orient: vertical;
     overflow: hidden;
 }
+/* "Add Achievement" button in label */
+.ach-add-btn {
+    margin-left: auto;
+    background: none;
+    border: 1.5px solid var(--primary-color);
+    color: var(--primary-color);
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 0.8em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+}
+.ach-add-btn:hover {
+    background: var(--primary-color);
+    color: #fff;
+}
+/* Inline "Add Achievement" form */
+.ach-add-form {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 12px;
+    margin-top: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.ach-add-input {
+    padding: 7px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    font-size: 0.88em;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+.ach-add-input:focus { border-color: var(--primary-color); }
+.ach-add-save, .ach-add-cancel {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 16px;
+    font-size: 0.85em;
+    font-weight: 600;
+    cursor: pointer;
+}
+.ach-add-save { background: var(--primary-color); color: #fff; }
+.ach-add-save:hover { opacity: 0.9; }
+.ach-add-cancel { background: #e2e8f0; color: #475569; }
+.ach-add-cancel:hover { background: #cbd5e1; }
 @media (max-width: 480px) {
     .ach-card { width: 90px; height: 90px; }
+    .ach-nav { width: 24px; height: 24px; font-size: 1.1em; }
 }
 

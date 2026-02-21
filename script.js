@@ -2987,6 +2987,7 @@ async function _sgdbFetch(endpoint) {
 // State for the currently-open game detail modal (also used by the edit modal)
 let _currentModalGame     = null;
 let _currentModalPlatform = null;
+let _modalOnlineAchievements = [];
 let _adminEditSgdbGameId  = null;
 
 function _ensureAdminEditModal() {
@@ -3663,54 +3664,152 @@ function _toRawUrl(url) {
 
 /** Return a placeholder div that will be populated asynchronously with achievement cards. */
 function _buildAchievementsSection(game) {
-    const url = game.achievementsUrl;
-    if (!url) return '';
-    return `<div class="game-modal-achievements" data-ach-url="${escapeHtml(url)}">
-        <div class="game-modal-achievements-label">🏆 Achievements</div>
-        <div class="ach-loading">⏳ Loading achievements…</div>
+    const url = game.achievementsUrl || '';
+    return `<div class="game-modal-achievements"${url ? ` data-ach-url="${escapeHtml(url)}"` : ''}>
+        <div class="game-modal-achievements-label">🏆 Achievements <span class="ach-count" style="display:none"></span>
+            <button class="ach-add-btn" onclick="openAddAchievementForm()" title="Add a custom achievement">➕ Add</button>
+        </div>
+        <div class="ach-content">${url ? '<span class="ach-loading">⏳ Loading achievements…</span>' : ''}</div>
     </div>`;
 }
 
-/** Fetch the achievements JSON and render cards inside the placeholder div. */
-async function _loadAchievementsInModal() {
-    const container = document.querySelector('.game-modal-achievements[data-ach-url]');
-    if (!container) return;
-    const url = container.dataset.achUrl;
-    if (!url) return;
-    const rawUrl = _toRawUrl(url);
-    try {
-        const resp = await fetch(rawUrl);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        const data = await resp.json();
-        const items = Array.isArray(data) ? data : (data.Items || []);
-        if (!items.length) {
-            container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements</div>
-                <p style="color:#888;font-size:0.88em;">No achievements found.</p>
-                <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link" style="margin-top:6px;display:inline-block;">View Raw JSON</a>`;
-            return;
-        }
-        const cards = items.map(ach => {
-            const name = escapeHtml(ach.Name || ach.name || '');
-            const desc = escapeHtml(ach.Description || ach.description || '');
-            const rawImg = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
-            // Only allow https:// image URLs to prevent CSS injection via javascript:/data: schemes
-            const safeImg = /^https:\/\//i.test(rawImg) ? rawImg : '';
-            const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
-            return `<div class="ach-card" ${bgStyle} title="${name}">
-                <div class="ach-card-overlay">
-                    <div class="ach-card-name">${name}</div>
-                    ${desc ? `<div class="ach-card-desc">${desc}</div>` : ''}
-                </div>
-            </div>`;
-        }).join('');
-        container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements <span class="ach-count">${items.length}</span></div>
-            <div class="ach-grid">${cards}</div>`;
-    } catch (err) {
-        console.error('[Achievements] Failed to load achievements from', rawUrl, err);
-        container.innerHTML = `<div class="game-modal-achievements-label">🏆 Achievements</div>
-            <p style="color:#888;font-size:0.88em;">Could not load achievements.</p>
-            <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link" style="margin-top:6px;display:inline-block;">View JSON ↗</a>`;
+/** Build an achievement card HTML string. */
+function _buildAchCard(ach) {
+    const name   = escapeHtml(ach.Name || ach.name || '');
+    const desc   = escapeHtml(ach.Description || ach.description || '');
+    const rawImg = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
+    // Only allow https:// image URLs to prevent CSS injection via javascript:/data: schemes
+    // Also strip single quotes to prevent breaking out of CSS url('...') context
+    const safeImg = /^https:\/\//i.test(rawImg) ? rawImg.replace(/'/g, '') : '';
+    const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
+    return `<div class="ach-card" ${bgStyle} title="${name}">
+        <div class="ach-card-overlay">
+            <div class="ach-card-name">${name}</div>
+            ${desc ? `<div class="ach-card-desc">${desc}</div>` : ''}
+        </div>
+    </div>`;
+}
+
+/** Render the achievements carousel (online + manual) inside the section. */
+function _renderAchievementsContent(container, content, onlineItems) {
+    const manual = _getManualAchievements();
+    const items  = [...onlineItems, ...manual];
+    const url    = container.dataset.achUrl || '';
+    const countEl = container.querySelector('.ach-count');
+    if (countEl) {
+        countEl.textContent = items.length || '';
+        countEl.style.display = items.length ? '' : 'none';
     }
+    if (!items.length) {
+        content.innerHTML = url
+            ? `<p style="color:#888;font-size:0.88em;">No achievements found. <a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">View JSON ↗</a></p>`
+            : '<p style="color:#888;font-size:0.88em;">No achievements yet. Use ➕ Add to add one.</p>';
+        return;
+    }
+    const cards = items.map(_buildAchCard).join('');
+    content.innerHTML = `<div class="ach-carousel-wrap">
+        <button class="ach-nav ach-nav-prev" onclick="_achScroll(-1)" aria-label="Previous achievements">‹</button>
+        <div class="ach-carousel">${cards}</div>
+        <button class="ach-nav ach-nav-next" onclick="_achScroll(1)" aria-label="Next achievements">›</button>
+    </div>`;
+}
+
+/** Scroll the achievement carousel left (-1) or right (1). */
+function _achScroll(dir) {
+    const carousel = document.querySelector('.ach-carousel');
+    if (!carousel) return;
+    const card = carousel.querySelector('.ach-card');
+    const step = card ? (card.offsetWidth + 10) * 2 : 240;
+    carousel.scrollBy({ left: dir * step, behavior: 'smooth' });
+}
+
+/** Return the localStorage key for manual achievements of the current modal game. */
+function _getManualAchievementKey() {
+    const gameTitle = _currentModalGame ? (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '') : '';
+    const platform  = _currentModalPlatform || '';
+    return `gameOS_ach_${platform}_${gameTitle}`;
+}
+
+/** Return manually-added achievements for the current modal game. */
+function _getManualAchievements() {
+    try {
+        const raw = localStorage.getItem(_getManualAchievementKey());
+        return raw ? JSON.parse(raw) : [];
+    } catch (err) { console.warn('[Achievements] Failed to read manual achievements:', err); return []; }
+}
+
+/** Show/hide the inline "Add Achievement" form inside the achievements section. */
+function openAddAchievementForm() {
+    const container = document.querySelector('.game-modal-achievements');
+    if (!container) return;
+    const existing = container.querySelector('.ach-add-form');
+    if (existing) { existing.remove(); return; }
+    container.insertAdjacentHTML('beforeend', `
+        <div class="ach-add-form">
+            <input class="ach-add-input" id="achAddName" placeholder="Achievement name *" maxlength="60" aria-label="Achievement name (required)">
+            <div class="ach-add-error" id="achAddNameError" style="display:none;color:#e53e3e;font-size:0.8em;" role="alert">Please enter an achievement name.</div>
+            <input class="ach-add-input" id="achAddDesc" placeholder="Description (optional)" maxlength="160" aria-label="Achievement description">
+            <input class="ach-add-input" id="achAddImg" placeholder="Image URL (https://…)" type="url" maxlength="500" aria-label="Achievement image URL">
+            <div style="display:flex;gap:8px;">
+                <button class="ach-add-save" onclick="_saveManualAchievement()">Save</button>
+                <button class="ach-add-cancel" onclick="this.closest('.ach-add-form').remove()">Cancel</button>
+            </div>
+        </div>`);
+    const nameInput = document.getElementById('achAddName');
+    if (nameInput) nameInput.focus();
+}
+
+/** Save a manually-entered achievement to localStorage and refresh the carousel. */
+function _saveManualAchievement() {
+    const name   = (document.getElementById('achAddName')?.value || '').trim();
+    const desc   = (document.getElementById('achAddDesc')?.value || '').trim();
+    const imgUrl = (document.getElementById('achAddImg')?.value  || '').trim();
+    if (!name) {
+        const input   = document.getElementById('achAddName');
+        const errEl   = document.getElementById('achAddNameError');
+        if (input)  { input.focus(); input.style.borderColor = '#e53e3e'; }
+        if (errEl)  { errEl.style.display = ''; }
+        return;
+    }
+    const key  = _getManualAchievementKey();
+    const list = _getManualAchievements();
+    list.push({ name, description: desc, image: imgUrl });
+    let saved = false;
+    try { localStorage.setItem(key, JSON.stringify(list)); saved = true; } catch (err) {
+        console.warn('[Achievements] Could not save to localStorage:', err);
+    }
+    const form = document.querySelector('.ach-add-form');
+    if (form) form.remove();
+    if (!saved) {
+        const container = document.querySelector('.game-modal-achievements');
+        if (container) container.insertAdjacentHTML('beforeend',
+            '<p class="ach-save-warn" style="color:#c05000;font-size:0.82em;margin-top:6px;">⚠️ Achievement saved for this session only (storage unavailable).</p>');
+    }
+    const container = document.querySelector('.game-modal-achievements');
+    const content   = container ? container.querySelector('.ach-content') : null;
+    if (container && content) _renderAchievementsContent(container, content, saved ? _modalOnlineAchievements : [..._modalOnlineAchievements, { name, description: desc, image: imgUrl }]);
+}
+
+/** Fetch the achievements JSON and render the swipeable carousel. */
+async function _loadAchievementsInModal() {
+    const container = document.querySelector('.game-modal-achievements');
+    if (!container) return;
+    const url     = container.dataset.achUrl || '';
+    const content = container.querySelector('.ach-content');
+    if (!content) return;
+    _modalOnlineAchievements = [];
+    if (url) {
+        const rawUrl = _toRawUrl(url);
+        try {
+            const resp = await fetch(rawUrl);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            const data = await resp.json();
+            _modalOnlineAchievements = Array.isArray(data) ? data : (data.Items || []);
+        } catch (err) {
+            console.error('[Achievements] Failed to load from', rawUrl, err);
+        }
+    }
+    _renderAchievementsContent(container, content, _modalOnlineAchievements);
 }
 
 function _getYouTubeId(urlOrId) {
