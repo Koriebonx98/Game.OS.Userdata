@@ -3279,7 +3279,11 @@ function openAdminEditModal(game, platform) {
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🔗 Exophase URL <span style="font-size:.8em;opacity:.7;">(saves achievements to Games.Database on save)</span></label>
-            <input type="url" id="editExophaseUrl" class="admin-form-input" placeholder="https://www.exophase.com/game/…/achievements/" value="${escapeHtml(exophaseUrl)}">
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="url" id="editExophaseUrl" class="admin-form-input" placeholder="https://www.exophase.com/game/…/achievements/" value="${escapeHtml(exophaseUrl)}" style="flex:1;">
+                <button type="button" class="btn" style="padding:8px 14px;white-space:nowrap;flex-shrink:0;" id="adminScrapeExophaseBtn" onclick="_adminScrapeExophaseNow()" title="Scrape achievements from Exophase now and save JSON to Games.Database">🔄 Scrape JSON</button>
+            </div>
+            <div id="adminScrapeMsg" style="display:none;margin-top:6px;font-size:0.85em;"></div>
         </div>
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
@@ -3502,6 +3506,72 @@ async function handleAdminEditSave() {
         showMsg(`❌ ${e.message}`, 'error');
     } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
+    }
+}
+
+/**
+ * Immediately scrape the Exophase URL in the edit form and save achievements to
+ * Games.Database, without requiring a full form save. Offers a JSON download on success.
+ */
+async function _adminScrapeExophaseNow() {
+    if (!isAdminUser()) return;
+
+    const btn     = document.getElementById('adminScrapeExophaseBtn');
+    const msgEl   = document.getElementById('adminScrapeMsg');
+    const urlVal  = ((document.getElementById('editExophaseUrl') || {}).value || '').trim();
+    const titleInput = document.getElementById('editTitle');
+    const title   = (titleInput ? titleInput.value.trim() : '')
+                    || (_currentModalGame ? (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '') : '');
+    const titleId = ((document.getElementById('editTitleId')     || {}).value || '').trim();
+    const platform = _currentModalPlatform || '';
+
+    const showScrapeMsg = (text, ok) => {
+        if (!msgEl) return;
+        msgEl.innerHTML    = text;
+        msgEl.style.display = '';
+        msgEl.style.color  = ok ? '#22c55e' : '#ef4444';
+    };
+
+    if (!urlVal)   { showScrapeMsg('⚠️ Enter an Exophase URL first.', false); return; }
+    if (!title)    { showScrapeMsg('⚠️ Enter the game title first.', false); return; }
+    if (!titleId)  { showScrapeMsg('⚠️ Enter the Title ID first.', false); return; }
+    if (!platform) { showScrapeMsg('⚠️ No platform selected for this game.', false); return; }
+    if (!getBackendBase()) { showScrapeMsg('⚠️ No backend configured.', false); return; }
+
+    if (btn)   { btn.disabled = true; btn.textContent = '⏳ Scraping…'; }
+    if (msgEl) { msgEl.style.display = 'none'; }
+
+    try {
+        const user  = getCurrentUser();
+        const token = user
+            ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+               localStorage.getItem('gameOS_apiToken_pending') || '')
+            : '';
+        const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ exophaseUrl: urlVal, platform, gameTitle: title, titleId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            let downloadLink = '';
+            if (Array.isArray(data.achievements) && data.achievements.length) {
+                const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
+                const objUrl  = URL.createObjectURL(blob);
+                const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+            }
+            showScrapeMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
+        } else {
+            showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
+        }
+    } catch (err) {
+        showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔄 Scrape JSON'; }
     }
 }
 

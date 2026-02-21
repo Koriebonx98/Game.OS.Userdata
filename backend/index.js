@@ -2302,7 +2302,8 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
             success: true,
             message: `Scraped and saved ${scraped.length} achievements to Games.Database.`,
             total: scraped.length,
-            path: gamesDbPath
+            path: gamesDbPath,
+            achievements: scraped
         });
     } catch (err) {
         console.error('POST /api/admin/scrape-exophase error:', err);
