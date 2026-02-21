@@ -3175,6 +3175,7 @@ function openAdminEditModal(game, platform) {
     const specMin         = game.sysSpecMin         || {};
     const specRec         = game.sysSpecRecommended || {};
     const achievementsUrl = game.achievementsUrl    || '';
+    const exophaseUrl     = game.exophaseUrl        || '';
 
     const bgHtml = bgUrls.length
         ? bgUrls.map(u => _adminBgFieldHtml(u)).join('')
@@ -3276,6 +3277,10 @@ function openAdminEditModal(game, platform) {
             <label class="admin-form-label">🏆 Achievements JSON URL</label>
             <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="${escapeHtml(achievementsUrl)}">
         </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🔗 Exophase URL <span style="font-size:.8em;opacity:.7;">(saves achievements to Games.Database on save)</span></label>
+            <input type="url" id="editExophaseUrl" class="admin-form-input" placeholder="https://www.exophase.com/game/…/achievements/" value="${escapeHtml(exophaseUrl)}">
+        </div>
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
             <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
@@ -3347,6 +3352,7 @@ async function handleAdminEditSave() {
         : null;
 
     const achievementsUrl = ((document.getElementById('editAchievementsUrl') || {}).value || '').trim();
+    const exophaseUrl     = ((document.getElementById('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
@@ -3419,6 +3425,8 @@ async function handleAdminEditSave() {
         else                       delete updated.sysSpecRecommended;
         if (achievementsUrl)       updated.achievementsUrl     = achievementsUrl;
         else                       delete updated.achievementsUrl;
+        if (exophaseUrl)           updated.exophaseUrl         = exophaseUrl;
+        else                       delete updated.exophaseUrl;
 
         gamesArr[idx] = updated;
 
@@ -3457,7 +3465,35 @@ async function handleAdminEditSave() {
         }
         _currentModalGame = updated;
 
-        showMsg('✅ Game updated successfully!', 'success');
+        // If an Exophase URL was provided and a backend is configured, trigger scraping
+        if (exophaseUrl && getBackendBase()) {
+            showMsg('⏳ Scraping achievements from Exophase…', 'success');
+            try {
+                const user = getCurrentUser();
+                const storedToken = user
+                    ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                       localStorage.getItem('gameOS_apiToken_pending') || '')
+                    : '';
+                const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                    },
+                    body: JSON.stringify({ exophaseUrl, platform: _currentModalPlatform, gameTitle: title, titleId })
+                });
+                const scrapeData = await scrapeResp.json();
+                if (scrapeData.success) {
+                    showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                } else {
+                    showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                }
+            } catch (scrapeErr) {
+                showMsg(`✅ Game updated. ⚠️ Exophase scrape failed: ${scrapeErr.message}`, 'success');
+            }
+        } else {
+            showMsg('✅ Game updated successfully!', 'success');
+        }
         setTimeout(() => {
             closeAdminEditModal();
             openGameModal(updated, _currentModalPlatform);
@@ -3595,7 +3631,7 @@ function closeGameModal() {
 
 function _buildGameModalFields(game) {
     const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
-        'mods', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl']);
+        'mods', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {

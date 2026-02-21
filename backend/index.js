@@ -2172,6 +2172,144 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
     }
 });
 
+// ── POST /api/admin/scrape-exophase ──────────────────────────────────────────
+// Admin-only endpoint: scrape an Exophase achievements page and write the
+// template directly to Games.Database (Data/{folder}/Games/{titleId}/achievements.json).
+// Authentication: the caller must be the Admin.GameOS account (checked via token).
+// Body: { exophaseUrl, platform, gameTitle, titleId }
+app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
+    try {
+        // Admin-only guard
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+
+        const { exophaseUrl, platform, gameTitle, titleId } = req.body;
+
+        if (!exophaseUrl || !platform || !gameTitle || !titleId) {
+            return res.status(400).json({ success: false, message: 'exophaseUrl, platform, gameTitle, and titleId are required.' });
+        }
+
+        // SSRF protection: only allow https://exophase.com URLs
+        let parsedUrl;
+        try {
+            parsedUrl = new URL(exophaseUrl);
+        } catch {
+            return res.status(400).json({ success: false, message: 'Invalid URL.' });
+        }
+        if (parsedUrl.protocol !== 'https:' ||
+            (parsedUrl.hostname !== 'exophase.com' && parsedUrl.hostname !== 'www.exophase.com')) {
+            return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
+        }
+
+        if (!octokitGamesDb) {
+            return res.status(503).json({ success: false, message: 'GAMES_DB_TOKEN is not configured on the server.' });
+        }
+
+        const platformFolder = platformToGamesDbFolder(platform);
+        if (!platformFolder) {
+            return res.status(400).json({ success: false, message: `Unknown platform: ${platform}` });
+        }
+
+        const safeTitleId = String(titleId).trim();
+        if (!/^[a-zA-Z0-9_-]+$/.test(safeTitleId)) {
+            return res.status(400).json({ success: false, message: 'titleId may only contain alphanumeric characters, underscores, and hyphens.' });
+        }
+
+        // Fetch the Exophase page
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+        let html;
+        try {
+            const response = await fetch(exophaseUrl, {
+                signal: controller.signal,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.9'
+                }
+            });
+            if (!response.ok) {
+                return res.status(502).json({ success: false, message: `Failed to fetch Exophase page (HTTP ${response.status}).` });
+            }
+            html = await response.text();
+        } catch (fetchErr) {
+            if (fetchErr.name === 'AbortError') {
+                return res.status(504).json({ success: false, message: 'Exophase request timed out.' });
+            }
+            throw fetchErr;
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
+
+        // Parse achievements
+        const $ = cheerio.load(html);
+        const scraped = [];
+
+        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+            const $el = $(el);
+            const name = ($el.find('a').first().text() || '').trim();
+            if (!name) return;
+
+            const description = ($el.find('div.award-description p').first().text() || '').trim();
+            const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
+            // Only accept icon URLs served over HTTPS from exophase.com
+            let iconUrl;
+            if (rawIconUrl) {
+                try {
+                    const iconParsed = new URL(rawIconUrl);
+                    if (iconParsed.protocol === 'https:' &&
+                        (iconParsed.hostname === 'exophase.com' || iconParsed.hostname.endsWith('.exophase.com'))) {
+                        iconUrl = rawIconUrl;
+                    }
+                } catch { /* ignore malformed icon URLs */ }
+            }
+            const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
+            const avgRaw      = $el.attr('data-average');
+            const percent     = avgRaw !== undefined ? parseFloat(avgRaw) : undefined;
+
+            const entry = {
+                achievementId: String(i + 1),
+                name,
+                description
+            };
+            if (iconUrl)                                  entry.iconUrl = iconUrl;
+            if (isHidden)                                 entry.hidden  = true;
+            if (percent !== undefined && !isNaN(percent)) entry.percent = percent;
+            scraped.push(entry);
+        });
+
+        if (!scraped.length) {
+            return res.status(422).json({
+                success: false,
+                message: 'No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.'
+            });
+        }
+
+        // Write achievement template to Games.Database
+        const gamesDbPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+        const safeGameTitle = String(gameTitle).replace(/[\r\n]/g, ' ').slice(0, 80);
+        const safePlatform  = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+        const existing = await getGamesDbFile(gamesDbPath);
+        await putGamesDbFile(
+            gamesDbPath,
+            scraped,
+            `Add achievements for ${safeGameTitle} (${safePlatform}) from Exophase`,
+            existing ? existing.sha : undefined
+        );
+
+        res.json({
+            success: true,
+            message: `Scraped and saved ${scraped.length} achievements to Games.Database.`,
+            total: scraped.length,
+            path: gamesDbPath
+        });
+    } catch (err) {
+        console.error('POST /api/admin/scrape-exophase error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── Admin account initialisation ──────────────────────────────────────────────
 /**
  * Creates the Admin.GameOS account on first startup if it doesn't already exist.
