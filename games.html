@@ -153,11 +153,22 @@
 
         document.getElementById('browseSearch').addEventListener('input', debounceSearch);
 
+        // Default to All Platforms on first load
+        select.value = 'ALL';
+        loadBrowsePlatform('ALL');
+
         // Load library for "My Library" tab (only for logged-in users)
         if (isLoggedIn()) {
             await refreshOwnedGames();
             await refreshWishlist();
         }
+    }
+
+    function toggleBrowsePlatformGroup(headerEl) {
+        const list = headerEl.nextElementSibling;
+        const expanded = list.classList.toggle('expanded');
+        headerEl.classList.toggle('expanded', expanded);
+        headerEl.setAttribute('aria-expanded', String(expanded));
     }
 
     // ── Platform loading ───────────────────────────────────────
@@ -248,7 +259,7 @@
     // ── Render a single game item (used by both single-platform and grouped views) ──
     function renderGameItem(g, platform) {
         const title    = escapeHtml(g.Title || g.game_name || g.title || '');
-        const titleId  = g.TitleID || g.title_id || g.id || '';
+        const titleId  = g.TitleID || g.title_id || g.titleid || g.id || '';
         const owned    = _isLoggedIn && _myLibrary.some(
             o => o.platform === platform &&
                  (o.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
@@ -320,7 +331,7 @@
                 if (term) {
                     games = games.filter(g => {
                         const name = (g.Title || g.game_name || g.title || '').toLowerCase();
-                        const tid  = String(g.TitleID || g.title_id || g.id || '').toLowerCase();
+                        const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
                         const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
                         return name.includes(term) || tid.includes(term) || alts.includes(term);
                     });
@@ -332,8 +343,10 @@
                 total += games.length;
                 return `
             <div class="owned-platform-group">
-                <h4 class="owned-platform-header">${escapeHtml(platform)} <span class="games-count-badge">${games.length}</span></h4>
-                ${games.map(g => renderGameItem(g, platform)).join('')}
+                <h4 class="owned-platform-header collapsible" tabindex="0" aria-expanded="false" onclick="toggleBrowsePlatformGroup(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBrowsePlatformGroup(this);}">${escapeHtml(platform)} <span class="games-count-badge">${games.length}</span></h4>
+                <div class="platform-games-list">
+                    ${games.map(g => renderGameItem(g, platform)).join('')}
+                </div>
             </div>`;
             }).join('');
 
@@ -357,7 +370,7 @@
             if (!term) { renderBrowseGames(_allBrowseGames); return; }
             const filtered = _allBrowseGames.filter(g => {
                 const name = (g.Title || g.game_name || g.title || '').toLowerCase();
-                const tid  = String(g.TitleID || g.title_id || g.id || '').toLowerCase();
+                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
                 const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
                 return name.includes(term) || tid.includes(term) || alts.includes(term);
             });
