@@ -3354,6 +3354,17 @@ async function handleAdminEditSave() {
             );
             if (li !== -1) arr[li] = updated;
         }
+        // Re-render the browse list so the baked-in game JSON in card onclick attributes
+        // reflects the updated data (prevents showing stale game details on next card click)
+        if (typeof _currentPlatform !== 'undefined') {
+            if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    (document.getElementById('browseSearch') || {}).value || '');
+            } else if (typeof renderBrowseGames === 'function' &&
+                       typeof _allBrowseGames !== 'undefined' && _allBrowseGames.length) {
+                renderBrowseGames(_allBrowseGames);
+            }
+        }
         _currentModalGame = updated;
 
         showMsg('✅ Game updated successfully!', 'success');
