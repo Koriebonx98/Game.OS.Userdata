@@ -190,6 +190,27 @@ The deploy workflow will:
 
 Your site is now live with real accounts! ✅
 
+**Step 7 – (Optional) Enable Admin game editing (covers & trailers)**
+
+The `Admin.GameOS` account can update game covers and trailers directly from the browser.
+This requires a second PAT with write access to the **`Koriebonx98/Games.Database`** repository.
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Click **Generate new token**
+3. Give it a name (e.g. `Game OS Games DB`)
+4. Under **Repository access**, select **Only select repositories** → `Koriebonx98/Games.Database`
+5. Under **Repository permissions → Contents**, set to **Read and write**
+6. Click **Generate token** and **copy it**
+7. In this repository go to **Settings → Secrets and variables → Actions**
+8. Click **New repository secret**
+9. Name: `GAMES_DB_TOKEN`
+10. Value: the PAT you just copied
+11. Click **Add secret**
+12. Re-run (or push to `main`) to trigger a fresh deploy
+
+> Without this secret the admin game-editing panel will show:
+> *"⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing."*
+
 ### How it works (architecture)
 
 ```
