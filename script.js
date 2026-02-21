@@ -2682,6 +2682,93 @@ function removeGameDemo(username, platform, title) {
 }
 
 // ============================================================
+// WISHLIST – GITHUB MODE
+// ============================================================
+
+async function getWishlistGitHub(username) {
+    const file = await githubRead(`accounts/${username.toLowerCase()}/wishlist.json`);
+    return file ? file.content : [];
+}
+
+async function addToWishlistGitHub(username, game, platform) {
+    const path = `accounts/${username.toLowerCase()}/wishlist.json`;
+    const file = await githubRead(path);
+    const wishlist = file ? [...file.content] : [];
+
+    const alreadyWishlisted = wishlist.some(
+        g => g.platform === platform &&
+             (g.title || '').toLowerCase() === (game.Title || game.game_name || game.title || '').toLowerCase()
+    );
+    if (alreadyWishlisted) return { success: false, message: 'Game already in your wishlist' };
+
+    wishlist.push({
+        platform,
+        title:    game.Title || game.game_name || game.title,
+        titleId:  game.TitleID || game.title_id || game.id || null,
+        coverUrl: getGameCoverUrl(game) || undefined,
+        addedAt:  new Date().toISOString()
+    });
+
+    await githubWrite(path, wishlist, `Add to wishlist: ${game.Title || game.title} (${platform})`, file ? file.sha : undefined);
+    return { success: true, message: 'Game added to your wishlist!' };
+}
+
+async function removeFromWishlistGitHub(username, platform, title) {
+    const path = `accounts/${username.toLowerCase()}/wishlist.json`;
+    const file = await githubRead(path);
+    if (!file) return { success: false, message: 'Wishlist not found' };
+
+    const updated = file.content.filter(
+        g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+    );
+    await githubWrite(path, updated, `Remove from wishlist: ${title} (${platform})`, file.sha);
+    return { success: true, wishlist: updated };
+}
+
+// ============================================================
+// WISHLIST – DEMO MODE
+// ============================================================
+
+function getDemoWishlist(username) {
+    const key  = `gameOS_wishlist_${username.toLowerCase()}`;
+    const data = localStorage.getItem(key);
+    return data ? JSON.parse(data) : [];
+}
+
+function saveDemoWishlist(username, wishlist) {
+    localStorage.setItem(`gameOS_wishlist_${username.toLowerCase()}`, JSON.stringify(wishlist));
+}
+
+function addToWishlistDemo(username, game, platform) {
+    const wishlist = getDemoWishlist(username);
+    const title    = game.Title || game.game_name || game.title || '';
+
+    const alreadyWishlisted = wishlist.some(
+        g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+    );
+    if (alreadyWishlisted) return { success: false, message: 'Game already in your wishlist' };
+
+    wishlist.push({
+        platform,
+        title,
+        titleId:  game.TitleID || game.title_id || game.id || null,
+        coverUrl: getGameCoverUrl(game) || undefined,
+        addedAt:  new Date().toISOString()
+    });
+    saveDemoWishlist(username, wishlist);
+    return { success: true, message: 'Game added to your wishlist!' };
+}
+
+function removeFromWishlistDemo(username, platform, title) {
+    const wishlist = getDemoWishlist(username);
+    const updated  = wishlist.filter(
+        g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+    );
+    saveDemoWishlist(username, updated);
+    return { success: true, wishlist: updated };
+}
+
+// ============================================================
 // PLATFORM HELPERS
 // ============================================================
 

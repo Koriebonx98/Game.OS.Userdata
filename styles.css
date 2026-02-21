@@ -1088,6 +1088,35 @@ footer {
     opacity: 0.7;
 }
 
+.btn-wishlist {
+    background: transparent;
+    border: 1px solid #f59e0b;
+    color: #f59e0b;
+    border-radius: 6px;
+    padding: 4px 8px;
+    font-size: 1em;
+    cursor: pointer;
+    white-space: nowrap;
+    flex-shrink: 0;
+    margin-left: 8px;
+    transition: all 0.2s ease;
+    line-height: 1;
+}
+
+.btn-wishlist:hover:not(:disabled) {
+    background: #fef3c7;
+}
+
+.btn-wishlist.btn-wishlisted {
+    background: #fef3c7;
+    border-color: #d97706;
+    color: #d97706;
+}
+
+.btn-wishlist:disabled {
+    opacity: 0.7;
+}
+
 .btn-remove-game {
     background: transparent;
     border: 1px solid var(--danger-color);
@@ -1105,6 +1134,11 @@ footer {
 .btn-remove-game:hover {
     background: var(--danger-color);
     color: var(--white);
+}
+
+.games-list-empty {
+    color: #666;
+    font-size: 0.95em;
 }
 
 .owned-platform-group {
@@ -1151,7 +1185,8 @@ footer {
         gap: 8px;
     }
     .btn-add-game,
-    .btn-remove-game {
+    .btn-remove-game,
+    .btn-wishlist {
         margin-left: 0;
     }
 }

@@ -488,6 +488,124 @@ app.post('/api/game-library/remove', async (req, res) => {
     }
 });
 
+// ── GET /api/wishlist ─────────────────────────────────────────────────────────
+// Read any user's wishlist without authentication (public data).
+app.get('/api/wishlist', async (req, res) => {
+    try {
+        const { username } = req.query;
+        if (!username || !sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const file = await getFile(`accounts/${username.toLowerCase()}/wishlist.json`);
+        res.json({ success: true, wishlist: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Failed to get wishlist.' });
+    }
+});
+
+// ── POST /api/wishlist/add ────────────────────────────────────────────────────
+// Add a game to a user's wishlist.
+// Security: the caller must supply the account password to prove ownership.
+app.post('/api/wishlist/add', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
+    try {
+        const { username, password, platform, title, titleId, coverUrl } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
+        }
+        if (!sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+
+        const usernameLower = username.toLowerCase();
+        const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
+        }
+
+        const path     = `accounts/${usernameLower}/wishlist.json`;
+        const file     = await getFile(path);
+        const wishlist = file ? [...file.content] : [];
+
+        const alreadyWishlisted = wishlist.some(
+            g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+        );
+        if (alreadyWishlisted) {
+            return res.status(400).json({ success: false, message: 'Game already in wishlist.' });
+        }
+
+        wishlist.push({
+            platform,
+            title,
+            titleId:  titleId || null,
+            coverUrl: coverUrl || undefined,
+            addedAt:  new Date().toISOString()
+        });
+
+        await putFile(path, wishlist, `Add to wishlist: ${title} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Game added to your wishlist!' });
+    } catch (err) {
+        console.error('POST /api/wishlist/add error:', err);
+        res.status(500).json({ success: false, message: 'Failed to add game to wishlist.' });
+    }
+});
+
+// ── POST /api/wishlist/remove ─────────────────────────────────────────────────
+// Remove a game from a user's wishlist.
+// Security: the caller must supply the account password to prove ownership.
+app.post('/api/wishlist/remove', async (req, res) => {
+    const ip = req.ip || (req.connection && req.connection.remoteAddress) || 'unknown';
+    if (!checkRateLimit(ip, RATE_LIMIT_AUTH)) {
+        return res.status(429).json({ success: false, message: 'Too many requests – wait a minute and try again.' });
+    }
+
+    try {
+        const { username, password, platform, title } = req.body;
+
+        if (!username || !password || !platform || !title) {
+            return res.status(400).json({ success: false, message: 'username, password, platform, and title are required.' });
+        }
+        if (!sanitiseUsername(username)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+
+        const usernameLower = username.toLowerCase();
+        const accountFile   = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) {
+            return res.status(404).json({ success: false, message: 'Account not found.' });
+        }
+
+        const valid = await verifyPassword(password, accountFile.content.password_hash, accountFile.content.username);
+        if (!valid) {
+            return res.status(401).json({ success: false, message: 'Invalid password.' });
+        }
+
+        const path = `accounts/${usernameLower}/wishlist.json`;
+        const file = await getFile(path);
+        if (!file) return res.json({ success: true, message: 'Game removed from wishlist.', wishlist: [] });
+
+        const updated = file.content.filter(
+            g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+        );
+        await putFile(path, updated, `Remove from wishlist: ${title} (${platform})`, file.sha);
+        res.json({ success: true, message: 'Game removed from wishlist.', wishlist: updated });
+    } catch (err) {
+        console.error('POST /api/wishlist/remove error:', err);
+        res.status(500).json({ success: false, message: 'Failed to remove game from wishlist.' });
+    }
+});
+
 // ── POST /api/create-account ──────────────────────────────────────────────────
 app.post('/api/create-account', async (req, res) => {
     try {
@@ -1505,6 +1623,82 @@ app.delete('/api/me/games', authenticateToken, async (req, res) => {
     }
 });
 
+// ── GET /api/me/wishlist ──────────────────────────────────────────────────────
+app.get('/api/me/wishlist', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/wishlist.json`);
+        res.json({ success: true, wishlist: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/me/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/wishlist ─────────────────────────────────────────────────────
+// Add a game to the authenticated user's wishlist.
+// Body: { platform, title, titleId? }
+app.post('/api/me/wishlist', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, title, titleId, coverUrl } = req.body;
+        if (!platform || !title) {
+            return res.status(400).json({ success: false, message: 'platform and title are required.' });
+        }
+
+        const path     = `accounts/${usernameLower}/wishlist.json`;
+        const file     = await getFile(path);
+        const wishlist = file ? [...file.content] : [];
+
+        const alreadyWishlisted = wishlist.some(
+            g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
+        );
+        if (alreadyWishlisted) {
+            return res.status(400).json({ success: false, message: 'Game already in wishlist.' });
+        }
+
+        wishlist.push({
+            platform,
+            title,
+            titleId:  titleId || null,
+            coverUrl: coverUrl || undefined,
+            addedAt:  new Date().toISOString()
+        });
+
+        await putFile(path, wishlist, `Add to wishlist: ${title} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Game added to wishlist.', wishlist });
+    } catch (err) {
+        console.error('POST /api/me/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── DELETE /api/me/wishlist ───────────────────────────────────────────────────
+// Remove a game from the authenticated user's wishlist.
+// Body: { platform, title }
+app.delete('/api/me/wishlist', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, title } = req.body;
+        if (!platform || !title) {
+            return res.status(400).json({ success: false, message: 'platform and title are required.' });
+        }
+
+        const path = `accounts/${usernameLower}/wishlist.json`;
+        const file = await getFile(path);
+        if (!file) return res.json({ success: true, message: 'Game removed from wishlist.', wishlist: [] });
+
+        const updated = file.content.filter(
+            g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
+        );
+        await putFile(path, updated, `Remove from wishlist: ${title} (${platform})`, file.sha);
+        res.json({ success: true, message: 'Game removed from wishlist.', wishlist: updated });
+    } catch (err) {
+        console.error('DELETE /api/me/wishlist error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── GET /api/me/achievements ──────────────────────────────────────────────────
 app.get('/api/me/achievements', authenticateToken, async (req, res) => {
     try {
@@ -1682,6 +1876,22 @@ app.get('/api/users/:username/achievements', authenticatePublicOrUserToken, asyn
         res.json({ success: true, achievements: file ? file.content : [] });
     } catch (err) {
         console.error('GET /api/users/:username/achievements error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── GET /api/users/:username/wishlist ─────────────────────────────────────────
+// Read any user's wishlist using either the public key or a per-user token.
+app.get('/api/users/:username/wishlist', authenticatePublicOrUserToken, async (req, res) => {
+    try {
+        const targetUser = req.params.username;
+        if (!targetUser || !sanitiseUsername(targetUser)) {
+            return res.status(400).json({ success: false, message: 'Invalid username.' });
+        }
+        const file = await getFile(`accounts/${targetUser.toLowerCase()}/wishlist.json`);
+        res.json({ success: true, wishlist: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/users/:username/wishlist error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
