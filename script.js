@@ -3698,9 +3698,10 @@ async function handleAdminEditSave() {
         } else {
             showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'} successfully!`, 'success');
         }
+        const wasNewGame = _adminEditIsNewGame;
         setTimeout(() => {
             closeAdminEditModal();
-            if (!_adminEditIsNewGame) openGameModal(updated, _currentModalPlatform);
+            if (!wasNewGame) openGameModal(updated, _currentModalPlatform);
         }, 1500);
     } catch (e) {
         showMsg(`❌ ${e.message}`, 'error');
