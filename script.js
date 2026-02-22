@@ -2532,7 +2532,7 @@ async function displayTotalUsersCount() {
 const GAMES_DB_RAW_BASE = 'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main';
 
 const GAMES_DB_PLATFORMS = [
-    'PS3', 'PS4', 'Switch', 'Xbox 360'
+    'PC', 'PS3', 'PS4', 'Switch', 'Xbox 360'
 ];
 
 // Token for writing to the Games Database repository (XOR-hex-encoded, injected at deploy time).
@@ -2560,20 +2560,15 @@ const STEAMGRID_KEY = (() => {
 })();
 
 async function fetchGamesDbPlatforms() {
-    const available = [];
-    await Promise.all(GAMES_DB_PLATFORMS.map(async platform => {
-        try {
-            const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
-            if (resp.ok) available.push(platform);
-        } catch (_) {}
-    }));
-    // Return in the original order
-    return GAMES_DB_PLATFORMS.filter(p => available.includes(p));
+    return [...GAMES_DB_PLATFORMS];
 }
 
 async function fetchGamesDbPlatform(platform) {
     const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
-    if (!resp.ok) throw new Error(`Failed to load ${platform} games`);
+    if (!resp.ok) {
+        if (resp.status === 404) return [];
+        throw new Error(`Failed to load ${platform} games`);
+    }
     const data = await resp.json();
     if (data.Games && Array.isArray(data.Games)) return data.Games;
     if (Array.isArray(data.games)) return data.games;
@@ -2806,12 +2801,14 @@ function getPlatformColor(platform) {
     if (p.includes('ps4') || p.includes('ps5')) return 'linear-gradient(135deg, #003087 0%, #0050a0 100%)';
     if (p.includes('switch')) return 'linear-gradient(135deg, #e60012 0%, #b90010 100%)';
     if (p.includes('xbox')) return 'linear-gradient(135deg, #107c10 0%, #52b043 100%)';
+    if (p === 'pc') return 'linear-gradient(135deg, #2d3748 0%, #718096 100%)';
     return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
 }
 
 function getPlatformIcon(platform) {
     const p = (platform || '').toLowerCase();
     if (p.includes('switch')) return '🕹️';
+    if (p === 'pc') return '🖥️';
     return '🎮';
 }
 
@@ -3173,6 +3170,22 @@ function _adminAddModField() {
     if (list) list.insertAdjacentHTML('beforeend', _adminModFieldHtml('', ''));
 }
 
+/** Returns HTML for a single store link row (name + URL). */
+function _adminStoreFieldHtml(name, url) {
+    const n = escapeHtml(name || '');
+    const u = escapeHtml(url  || '');
+    return `<div class="admin-bg-field admin-store-field">
+        <input type="text" class="admin-form-input admin-store-name" placeholder="Store name (e.g. Steam, Epic, GOG)" value="${n}" style="flex:1;" aria-label="Store name">
+        <input type="url"  class="admin-form-input admin-store-url"  placeholder="Store page URL…" value="${u}" style="flex:2;" aria-label="Store URL">
+        <button type="button" class="admin-btn-remove" onclick="this.parentNode.remove()" title="Remove" aria-label="Remove store link">✕</button>
+    </div>`;
+}
+
+function _adminAddStoreField() {
+    const list = document.getElementById('adminStoreList');
+    if (list) list.insertAdjacentHTML('beforeend', _adminStoreFieldHtml('', ''));
+}
+
 function _adminCoverImgError(img) {
     const p = img.parentNode;
     if (p) p.innerHTML = '<span style="opacity:.5;font-size:.8em;">Failed to load</span>';
@@ -3295,7 +3308,8 @@ function openAdminEditModal(game, platform) {
     const trailers        = game.trailers    || [];
     const trailerUrl      = trailers.length  ? (trailers[0] || '') : '';
     const hasSgdb         = !!STEAMGRID_KEY;
-    const existingMods    = Array.isArray(game.mods) ? game.mods : [];
+    const existingMods    = Array.isArray(game.mods)   ? game.mods   : [];
+    const existingStores  = Array.isArray(game.stores) ? game.stores : [];
     const specMin         = game.sysSpecMin         || {};
     const specRec         = game.sysSpecRecommended || {};
     const achievementsUrl = game.achievementsUrl    || '';
@@ -3308,6 +3322,10 @@ function openAdminEditModal(game, platform) {
     const modsHtml = existingMods.length
         ? existingMods.map(m => _adminModFieldHtml(m.name || '', m.url || '')).join('')
         : _adminModFieldHtml('', '');
+
+    const storesHtml = existingStores.length
+        ? existingStores.map(s => _adminStoreFieldHtml(s.name || '', s.url || '')).join('')
+        : _adminStoreFieldHtml('', '');
 
     const titleEnc    = escapeHtml(title);
     const titleIdEnc  = escapeHtml(String(titleId));
@@ -3378,6 +3396,11 @@ function openAdminEditModal(game, platform) {
             <label class="admin-form-label">🧩 Mods</label>
             <div id="adminModList">${modsHtml}</div>
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🛒 Stores</label>
+            <div id="adminStoreList">${storesHtml}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddStoreField()">+ Add Store Link</button>
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">⚙️ Minimum System Requirements</label>
@@ -3458,6 +3481,15 @@ async function handleAdminEditSave() {
     const mods = Array.from(modFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
+
+    // Collect store links (name + url pairs)
+    const storeFields = document.querySelectorAll('#adminStoreList .admin-store-field');
+    const stores = Array.from(storeFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-store-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
         if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
         return acc;
     }, []);
@@ -3547,6 +3579,8 @@ async function handleAdminEditSave() {
         // Persist new structured fields
         if (mods.length)           updated.mods                = mods;
         else                       delete updated.mods;
+        if (stores.length)         updated.stores              = stores;
+        else                       delete updated.stores;
         if (sysSpecMin)            updated.sysSpecMin          = sysSpecMin;
         else                       delete updated.sysSpecMin;
         if (sysSpecRecommended)    updated.sysSpecRecommended  = sysSpecRecommended;
@@ -3648,6 +3682,201 @@ async function handleAdminEditSave() {
         showMsg(`❌ ${e.message}`, 'error');
     } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
+    }
+}
+
+// ============================================================
+// ADD PC GAME TO DATABASE
+// ============================================================
+
+function _ensureAddPcGameModal() {
+    let modal = document.getElementById('addPcGameModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id        = 'addPcGameModal';
+        modal.className = 'game-modal-overlay';
+        modal.style.cssText = 'z-index:10000;display:none;';
+        modal.innerHTML = `
+            <div class="game-modal admin-edit-modal">
+                <div class="game-modal-header">
+                    <div style="flex:1;min-width:0;">
+                        <h3 class="game-modal-title">🖥️ Add PC Game</h3>
+                        <p class="game-modal-platform">PC</p>
+                    </div>
+                    <button class="game-modal-close" onclick="closeAddPcGameModal()" aria-label="Close dialog">✕</button>
+                </div>
+                <div class="game-modal-body" id="addPcGameBody">
+                    <form id="addPcGameForm" autocomplete="off">
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" for="pcGameTitle">Title *</label>
+                            <input type="text" id="pcGameTitle" class="admin-form-input" placeholder="Game title…" required>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" for="pcGameDesc">Description</label>
+                            <textarea id="pcGameDesc" class="admin-form-input admin-form-textarea" rows="3" placeholder="Short description…"></textarea>
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-form-label" for="pcGameCover">Cover Image URL</label>
+                            <input type="url" id="pcGameCover" class="admin-form-input" placeholder="https://…">
+                        </div>
+                        <div class="admin-form-group">
+                            <label class="admin-form-label">🛒 Stores</label>
+                            <div id="pcGameStoreList">${_adminStoreFieldHtml('', '')}</div>
+                            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_pcGameAddStoreField()">+ Add Store</button>
+                        </div>
+                        <div class="admin-form-actions">
+                            <div id="addPcGameMsg" class="admin-edit-msg" style="display:none;"></div>
+                            <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAddPcGameModal()">Cancel</button>
+                            <button type="button" class="btn" style="padding:10px 22px;" id="addPcGameSaveBtn" onclick="handleAddPcGameToDb()">💾 Add Game</button>
+                        </div>
+                    </form>
+                </div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeAddPcGameModal(); });
+    }
+    return modal;
+}
+
+function _pcGameAddStoreField() {
+    const list = document.getElementById('pcGameStoreList');
+    if (list) list.insertAdjacentHTML('beforeend', _adminStoreFieldHtml('', ''));
+}
+
+function openAddPcGameModal() {
+    if (!isAdminUser()) return;
+    const modal = _ensureAddPcGameModal();
+    const titleInput = document.getElementById('pcGameTitle');
+    const descInput  = document.getElementById('pcGameDesc');
+    const coverInput = document.getElementById('pcGameCover');
+    const msgEl      = document.getElementById('addPcGameMsg');
+    if (titleInput) titleInput.value = '';
+    if (descInput)  descInput.value  = '';
+    if (coverInput) coverInput.value = '';
+    if (msgEl) msgEl.style.display = 'none';
+    // Reset store list to a single empty row
+    const storeList = document.getElementById('pcGameStoreList');
+    if (storeList) storeList.innerHTML = _adminStoreFieldHtml('', '');
+    const saveBtn = document.getElementById('addPcGameSaveBtn');
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+    modal.style.display = 'flex';
+    if (titleInput) titleInput.focus();
+}
+
+function closeAddPcGameModal() {
+    const modal = document.getElementById('addPcGameModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function handleAddPcGameToDb() {
+    if (!isAdminUser()) return;
+
+    const saveBtn = document.getElementById('addPcGameSaveBtn');
+    const msgEl   = document.getElementById('addPcGameMsg');
+    const showMsg = (text, type) => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.display = '';
+        msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
+    };
+
+    if (!GAMES_DB_TOKEN) {
+        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+        return;
+    }
+
+    const title       = ((document.getElementById('pcGameTitle')  || {}).value || '').trim();
+    const description = ((document.getElementById('pcGameDesc')   || {}).value || '').trim();
+    const coverUrl    = ((document.getElementById('pcGameCover')  || {}).value || '').trim();
+
+    // Collect store links
+    const pcStoreFields = document.querySelectorAll('#pcGameStoreList .admin-store-field');
+    const stores = Array.from(pcStoreFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-store-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
+
+    if (!title) { showMsg('❌ Title is required.', 'error'); return; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Checking…'; }
+
+    try {
+        // Fetch current PC.Games.json (or start with empty array if it doesn't exist yet)
+        let gamesArr = [];
+        let topKey   = null;
+        let fileData = null;
+
+        const resp = await fetch(
+            `${GAMES_DB_RAW_BASE}/PC.Games.json?t=${Date.now()}`,
+            { cache: 'no-store' }
+        );
+        if (resp.ok) {
+            fileData = await resp.json();
+            if (fileData && Array.isArray(fileData.Games)) {
+                gamesArr = fileData.Games; topKey = 'Games';
+            } else if (fileData && Array.isArray(fileData.games)) {
+                gamesArr = fileData.games; topKey = 'games';
+            } else if (Array.isArray(fileData)) {
+                gamesArr = fileData;
+            }
+        }
+
+        // Check for duplicate (case-insensitive title match)
+        const titleLower = title.toLowerCase();
+        const duplicate  = gamesArr.some(g =>
+            (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+        );
+        if (duplicate) {
+            showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+            return;
+        }
+
+        // Build new game entry using the standard template
+        const newGame = { Title: title };
+        if (description)   newGame.description = description;
+        if (coverUrl)       newGame.image       = coverUrl;
+        if (stores.length)  newGame.stores      = stores;
+
+        gamesArr.push(newGame);
+        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+
+        if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+
+        await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+
+        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+
+        // Update in-memory browse cache
+        const sorted = [...gamesArr].sort((a, b) => {
+            const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+            const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+            return na.localeCompare(nb);
+        });
+        if (typeof _allBrowseGames !== 'undefined' &&
+            (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+            _allBrowseGames = sorted;
+        }
+        if (typeof _allPlatformGames !== 'undefined') {
+            _allPlatformGames['PC'] = sorted;
+        }
+
+        setTimeout(() => {
+            closeAddPcGameModal();
+            if (typeof _currentPlatform !== 'undefined') {
+                if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                    renderBrowseGamesGrouped(_allPlatformGames,
+                        (document.getElementById('browseSearch') || {}).value || '');
+                } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                    renderBrowseGames(_allBrowseGames);
+                }
+            }
+        }, 1500);
+    } catch (e) {
+        showMsg(`❌ ${e.message}`, 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
     }
 }
 
@@ -3947,7 +4176,7 @@ function closeGameModal() {
 
 function _buildGameModalFields(game) {
     const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
-        'mods', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
+        'mods', 'stores', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -3971,6 +4200,21 @@ function _buildModsSection(game) {
     if (!buttons) return '';
     return `<div class="game-modal-field">
         <span class="game-modal-field-label">🧩 Mods</span>
+        <span class="game-modal-field-value game-modal-mods">${buttons}</span>
+    </div>`;
+}
+
+/** Render a stores section from game.stores array of { name, url } objects. */
+function _buildStoresSection(game) {
+    const stores = game.stores;
+    if (!Array.isArray(stores) || !stores.length) return '';
+    const buttons = stores
+        .filter(s => s && s.url)
+        .map(s => `<a href="${escapeHtml(s.url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">🛒 ${escapeHtml(s.name || 'Store')}</a>`)
+        .join('');
+    if (!buttons) return '';
+    return `<div class="game-modal-field">
+        <span class="game-modal-field-label">🛒 Stores</span>
         <span class="game-modal-field-value game-modal-mods">${buttons}</span>
     </div>`;
 }
@@ -4274,6 +4518,7 @@ function openGameModal(game, platform) {
     let bodyHtml = '';
     bodyHtml += _buildTrailerSection(game);
     bodyHtml += _buildFriendsSection(libs, platform, title);
+    bodyHtml += _buildStoresSection(game);
     bodyHtml += _buildModsSection(game);
     bodyHtml += _buildSystemSpecsSection(game);
     bodyHtml += _buildAchievementsSection(game);
@@ -4334,6 +4579,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         let bodyHtml = '';
         bodyHtml += _buildTrailerSection(source);
         bodyHtml += _buildFriendsSection(libs, platform, title);
+        bodyHtml += _buildStoresSection(source);
         bodyHtml += _buildModsSection(source);
         bodyHtml += _buildSystemSpecsSection(source);
         bodyHtml += _buildAchievementsSection(source);
