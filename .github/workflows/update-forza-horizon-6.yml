@@ -1,0 +1,156 @@
+# Update Forza Horizon 6 game data in PC.Games.json
+#
+# Patches the Forza Horizon 6 entry in Koriebonx98/Games.Database with:
+#   • image            – cover art (portrait grid from Steam CDN)
+#   • background_images – hero banner + wide capsule from Steam CDN
+#   • trailers         – official reveal trailer (unchanged)
+#
+# The entry is matched by title ("Forza Horizon 6") and updated in-place so
+# all other fields (description, stores, etc.) are preserved.
+#
+# Required secret (Settings → Secrets and variables → Actions):
+#   GAMES_DB_TOKEN  – Fine-grained PAT with Contents: Read and write on
+#                     Koriebonx98/Games.Database
+
+name: Update Forza Horizon 6 PC Game Data
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  update-forza-horizon-6:
+    name: Patch Forza Horizon 6 cover, backgrounds & trailer in PC.Games.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate GAMES_DB_TOKEN is configured
+        run: |
+          if [ -z "$GAMES_DB_TOKEN" ]; then
+            echo "❌ GAMES_DB_TOKEN is not set."
+            echo "   Add it as a repository secret: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   The token must be a fine-grained PAT with Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          fi
+          echo "✅ GAMES_DB_TOKEN is configured"
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Test GAMES_DB_TOKEN access to Games.Database
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${GAMES_DB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Koriebonx98/Games.Database" || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ GAMES_DB_TOKEN is valid – Games.Database is accessible"
+          elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "❌ GAMES_DB_TOKEN is invalid or expired (HTTP 401)."
+            echo "   Generate a new fine-grained PAT and update the GAMES_DB_TOKEN secret."
+            exit 1
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "❌ GAMES_DB_TOKEN lacks permission (HTTP 403)."
+            echo "   Ensure the PAT has Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          else
+            echo "❌ Unexpected response from GitHub API: HTTP ${HTTP_STATUS}"
+            exit 1
+          fi
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Patch Forza Horizon 6 game data
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, sys
+          import urllib.request, urllib.parse, urllib.error
+
+          OWNER = 'Koriebonx98'
+          REPO  = 'Games.Database'
+          TOKEN = os.environ['GAMES_DB_TOKEN']
+
+          # ── Image assets ──────────────────────────────────────────────────────
+          # Steam CDN hosts all store images for app 2483190 (Forza Horizon 6).
+          # library_600x900 → portrait cover shown in game-card grids.
+          # library_hero    → wide hero banner used as modal background.
+          # header          → 460×215 store header used as a secondary background.
+          COVER_URL = 'https://cdn.cloudflare.steamstatic.com/steam/apps/2483190/library_600x900.jpg'
+          BACKGROUND_URLS = [
+              'https://cdn.cloudflare.steamstatic.com/steam/apps/2483190/library_hero.jpg',
+              'https://cdn.cloudflare.steamstatic.com/steam/apps/2483190/header.jpg',
+          ]
+          TRAILER_URL = 'https://youtu.be/IW0tSjI8JEk'
+          GAME_TITLE  = 'Forza Horizon 6'
+
+          # ── Fetch current PC.Games.json ───────────────────────────────────────
+          path    = 'PC.Games.json'
+          api_url = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/{urllib.parse.quote(path)}'
+          headers = {
+              'Authorization':       f'Bearer {TOKEN}',
+              'Accept':              'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type':        'application/json',
+          }
+
+          req = urllib.request.Request(api_url, headers=headers)
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  data = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              print(f'❌ Failed to fetch {path}: HTTP {e.code}')
+              sys.exit(1)
+
+          file_sha = data['sha']
+          decoded  = base64.b64decode(data['content'].replace('\n', '')).decode('utf-8')
+          content  = json.loads(decoded)
+
+          # ── Locate and patch the Forza Horizon 6 entry ───────────────────────
+          games = content.get('Games', content.get('games', []))
+          updated = False
+          for game in games:
+              t = game.get('Title') or game.get('title') or game.get('game_name') or ''
+              if t.lower() == GAME_TITLE.lower():
+                  game['image']             = COVER_URL
+                  game['background_images'] = BACKGROUND_URLS
+                  game['trailers']          = [TRAILER_URL]
+                  updated = True
+                  print(f'✅ Patched "{t}": image, background_images, trailers updated')
+                  break
+
+          if not updated:
+              print(f'❌ "{GAME_TITLE}" not found in {path}')
+              sys.exit(1)
+
+          # ── Write the updated file back ───────────────────────────────────────
+          new_json = json.dumps(content, indent=2, ensure_ascii=False)
+          encoded  = base64.b64encode(new_json.encode('utf-8')).decode('utf-8')
+          body     = json.dumps({
+              'message':   f'Update game data: {GAME_TITLE} (PC) – add cover and backgrounds',
+              'content':   encoded,
+              'sha':       file_sha,
+              'committer': {
+                  'name':  'Game.OS Admin',
+                  'email': 'admin@gameos.local',
+              },
+          }).encode('utf-8')
+
+          put_req = urllib.request.Request(api_url, data=body, headers=headers, method='PUT')
+          try:
+              with urllib.request.urlopen(put_req) as resp:
+                  result = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              body_text = e.read().decode('utf-8', errors='replace')
+              print(f'❌ Failed to update {path}: HTTP {e.code} – {body_text}')
+              sys.exit(1)
+
+          commit_sha = result.get('commit', {}).get('sha', 'unknown')[:7]
+          print(f'✅ PC.Games.json updated successfully (commit: {commit_sha})')
+          print(f'   Cover:       {COVER_URL}')
+          for bg in BACKGROUND_URLS:
+              print(f'   Background:  {bg}')
+          print(f'   Trailer:     {TRAILER_URL}')
+          PYEOF
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
