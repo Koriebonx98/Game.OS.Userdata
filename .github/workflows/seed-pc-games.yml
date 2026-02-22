@@ -1,8 +1,13 @@
-# Seed PC.Games.json in the Games.Database repository
+# Seed / refresh PC.Games.json in the Games.Database repository
 #
-# Creates PC.Games.json with an initial set of PC games if the file does not
-# already exist.  Run this once after initial deployment to make the PC
-# platform browsable in Game.OS.
+# Fetches the full Steam app list from dgibbs64/SteamCMD-AppID-List, filters
+# it down to actual PC games (strips servers, SDKs, soundtracks, betas, etc.),
+# then creates or updates PC.Games.json in Koriebonx98/Games.Database.
+#
+# Triggers:
+#   • Manual  – workflow_dispatch
+#   • Weekly  – every Monday at 03:00 UTC (keeps the list fresh as new games
+#               are added to the Steam catalogue)
 #
 # Required secret:
 #   GAMES_DB_TOKEN  – fine-grained PAT with Contents: Read and write on
@@ -12,13 +17,15 @@ name: Seed PC Games Database
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: "0 3 * * 1"   # every Monday at 03:00 UTC (GitHub Actions: 0=Sun, 1=Mon)
 
 permissions:
   contents: read
 
 jobs:
   seed:
-    name: Create PC.Games.json if missing
+    name: Create / update PC.Games.json from Steam catalogue
     runs-on: ubuntu-latest
 
     steps:
@@ -32,7 +39,7 @@ jobs:
           fi
           echo "✅ GAMES_DB_TOKEN is present."
 
-      - name: Seed PC.Games.json
+      - name: Fetch Steam app list and update PC.Games.json
         env:
           GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
         run: |
@@ -40,11 +47,87 @@ jobs:
           import json, base64, os, sys
           import urllib.request, urllib.error
 
-          token = os.environ['GAMES_DB_TOKEN']
-          owner = 'Koriebonx98'
-          repo  = 'Games.Database'
-          path  = 'PC.Games.json'
-          api   = f'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
+          # ── 1. Fetch the SteamCMD app-ID list ─────────────────────────────
+          STEAM_LIST_URL = (
+              'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List'
+              '/main/steamcmd_appid.json'
+          )
+          print(f'⬇️  Fetching Steam app list from {STEAM_LIST_URL} …')
+          try:
+              with urllib.request.urlopen(STEAM_LIST_URL, timeout=60) as resp:
+                  steam_data = json.loads(resp.read())
+          except Exception as exc:
+              print(f'❌ Failed to fetch Steam app list: {exc}')
+              sys.exit(1)
+
+          all_apps = steam_data.get('applist', {}).get('apps', [])
+          print(f'   Total entries in source list: {len(all_apps)}')
+
+          # ── 2. Filter to actual games ──────────────────────────────────────
+          # Keywords in the name that indicate non-game entries.
+          # 'tool ' / ' tool' are space-anchored to avoid false-positive matches
+          # on legitimate game titles that happen to contain the substring
+          # (e.g. "Protocol", "Football", "Multi-Tool").
+          SKIP_KEYWORDS = [
+              'dedicated server',
+              ' sdk',
+              'source sdk',
+              'soundtrack',
+              ' ost',
+              'playtest',
+              'press review',
+              'linux client',
+              'winui',
+              'steamcmd',
+              'steam client',
+              'tool ',
+              ' tool',
+              'beta test',
+              'server beta',
+              'dev kit',
+              'devkit',
+          ]
+
+          games = []
+          seen_names = set()
+          for app in all_apps:
+              appid = app.get('appid')
+              name  = app.get('name', '').strip()
+              if not name or appid is None:
+                  continue
+              name_lower = name.lower()
+              if any(kw in name_lower for kw in SKIP_KEYWORDS):
+                  continue
+              # Deduplicate by normalised title
+              if name_lower in seen_names:
+                  continue
+              seen_names.add(name_lower)
+              games.append({
+                  'Title': name,
+                  'appid': appid,
+                  'stores': [
+                      {
+                          'name': 'Steam',
+                          'url': f'https://store.steampowered.com/app/{appid}/',
+                      }
+                  ],
+              })
+
+          print(f'   Games after filtering: {len(games)}')
+
+          # ── 3. Build the payload ───────────────────────────────────────────
+          pc_games_data = {
+              'Platform': 'PC',
+              'source': 'https://github.com/dgibbs64/SteamCMD-AppID-List',
+              'Games': games,
+          }
+
+          # ── 4. Create or update PC.Games.json in Games.Database ───────────
+          token  = os.environ['GAMES_DB_TOKEN']
+          owner  = 'Koriebonx98'
+          repo   = 'Games.Database'
+          path   = 'PC.Games.json'
+          api    = f'https://api.github.com/repos/{owner}/{repo}/contents/{path}'
 
           headers = {
               'Authorization': f'Bearer {token}',
@@ -53,92 +136,84 @@ jobs:
               'Content-Type': 'application/json',
           }
 
-          # Check whether the file already exists
+          def get_blob_sha_via_tree(owner, repo, path, headers):
+              """Return the blob SHA for *path* using the Git Trees API.
+              Used as a fallback when the file is too large for the Contents API."""
+              # Resolve HEAD → commit → tree
+              ref_url = f'https://api.github.com/repos/{owner}/{repo}/git/ref/heads/main'
+              with urllib.request.urlopen(
+                      urllib.request.Request(ref_url, headers=headers)) as r:
+                  commit_sha = json.loads(r.read())['object']['sha']
+              commit_url = (
+                  f'https://api.github.com/repos/{owner}/{repo}/git/commits/{commit_sha}'
+              )
+              with urllib.request.urlopen(
+                      urllib.request.Request(commit_url, headers=headers)) as r:
+                  tree_sha = json.loads(r.read())['tree']['sha']
+              tree_url = (
+                  f'https://api.github.com/repos/{owner}/{repo}'
+                  f'/git/trees/{tree_sha}?recursive=true'
+              )
+              with urllib.request.urlopen(
+                      urllib.request.Request(tree_url, headers=headers)) as r:
+                  tree = json.loads(r.read())
+              for item in tree.get('tree', []):
+                  if item.get('path') == path:
+                      return item['sha']
+              return None
+
+          # Check whether the file already exists (need its blob SHA for updates).
+          # The Contents API only returns file content up to 1 MB; for larger files
+          # it returns HTTP 403, so we fall back to the Git Trees API.
+          existing_sha = None
           req = urllib.request.Request(api, headers=headers)
           try:
               with urllib.request.urlopen(req) as resp:
                   existing = json.loads(resp.read())
-              print(f'ℹ️  PC.Games.json already exists (sha: {existing["sha"][:7]}) — nothing to do.')
-              sys.exit(0)
+              existing_sha = existing.get('sha')
+              print(f'ℹ️  PC.Games.json already exists (sha: {existing_sha[:7]}) — will update.')
           except urllib.error.HTTPError as e:
-              if e.code != 404:
+              if e.code == 404:
+                  print('ℹ️  PC.Games.json does not exist yet — will create.')
+              elif e.code == 403:
+                  # File exists but is too large for the Contents API GET; use tree
+                  try:
+                      existing_sha = get_blob_sha_via_tree(owner, repo, path, headers)
+                      if existing_sha:
+                          print(f'ℹ️  PC.Games.json is large; sha via tree: {existing_sha[:7]} — will update.')
+                      else:
+                          print('ℹ️  PC.Games.json not found in tree — will create.')
+                  except Exception as tree_exc:
+                      print(f'⚠️  Could not look up SHA via tree API: {tree_exc}; will attempt create.')
+              else:
                   print(f'❌ Unexpected HTTP {e.code} checking for PC.Games.json')
                   sys.exit(1)
-              # 404 → file does not exist; proceed to create it
 
-          seed_data = {
-              "Platform": "PC",
-              "Games": [
-                  {
-                      "Title": "Minecraft",
-                      "Description": (
-                          "A sandbox game where players explore procedurally generated "
-                          "worlds, gather resources, craft tools, and build structures. "
-                          "Survive the night or unleash your creativity in Creative mode."
-                      ),
-                      "stores": [
-                          {"name": "Microsoft Store", "url": "https://www.minecraft.net/en-us/store/minecraft-java-bedrock-edition-pc"}
-                      ]
-                  },
-                  {
-                      "Title": "Counter-Strike 2",
-                      "Description": (
-                          "The latest chapter in the iconic tactical shooter franchise. "
-                          "CS2 builds on the legacy of Counter-Strike with overhauled "
-                          "graphics, responsive smokes, and tick-rate independent gameplay."
-                      ),
-                      "stores": [
-                          {"name": "Steam", "url": "https://store.steampowered.com/app/730/CounterStrike_2/"}
-                      ]
-                  },
-                  {
-                      "Title": "Stardew Valley",
-                      "Description": (
-                          "You've inherited your grandfather's old farm plot in Stardew Valley. "
-                          "Armed with hand-me-down tools, you set out to turn the overgrown "
-                          "fields into a thriving farm. Explore caves, befriend townsfolk, "
-                          "and build the farm of your dreams."
-                      ),
-                      "stores": [
-                          {"name": "Steam", "url": "https://store.steampowered.com/app/413150/Stardew_Valley/"}
-                      ]
-                  },
-                  {
-                      "Title": "Terraria",
-                      "Description": (
-                          "Dig, fight, explore, build! Nothing is impossible in this "
-                          "action-packed adventure game. Four decades of content are "
-                          "waiting to be discovered."
-                      ),
-                      "stores": [
-                          {"name": "Steam", "url": "https://store.steampowered.com/app/105600/Terraria/"}
-                      ]
-                  }
-              ]
-          }
-
-          body = json.dumps({
-              'message': 'Seed PC.Games.json with initial PC game entries',
+          commit_payload = {
+              'message': f'Update PC.Games.json from Steam catalogue ({len(games)} games)',
               'content': base64.b64encode(
-                  json.dumps(seed_data, indent=2).encode('utf-8')
+                  json.dumps(pc_games_data, indent=2, ensure_ascii=False).encode('utf-8')
               ).decode('ascii'),
               'committer': {
                   'name':  'Game.OS Admin',
-                  'email': 'admin@gameos.local'
-              }
-          }).encode('utf-8')
+                  'email': 'admin@gameos.local',
+              },
+          }
+          if existing_sha:
+              commit_payload['sha'] = existing_sha
 
-          req = urllib.request.Request(api, data=body, headers=headers, method='PUT')
+          body = json.dumps(commit_payload).encode('utf-8')
+          req  = urllib.request.Request(api, data=body, headers=headers, method='PUT')
           try:
               with urllib.request.urlopen(req) as resp:
                   result = json.loads(resp.read())
               sha = result.get('content', {}).get('sha', '')[:7]
-              print(f'✅ PC.Games.json created successfully (sha: {sha})')
-              print(f'   {len(seed_data["Games"])} games seeded: ' +
-                    ', '.join(g["Title"] for g in seed_data["Games"]))
+              action = 'updated' if existing_sha else 'created'
+              print(f'✅ PC.Games.json {action} successfully (sha: {sha})')
+              print(f'   {len(games)} games written to {owner}/{repo}/{path}')
           except urllib.error.HTTPError as e:
               body_text = e.read().decode('utf-8', errors='replace')
-              print(f'❌ Failed to create PC.Games.json: HTTP {e.code}')
+              print(f'❌ Failed to write PC.Games.json: HTTP {e.code}')
               print(body_text)
               sys.exit(1)
           PYEOF
