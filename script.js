@@ -3571,12 +3571,21 @@ async function handleAdminEditSave() {
             if (!updateData.success) throw new Error(updateData.message || 'Failed to update game.');
         } else {
             // ── Client-side path: fetch platform JSON, patch, and write via GAMES_DB_TOKEN ──
-            const resp = await fetch(
-                `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json?t=${Date.now()}`,
-                { cache: 'no-store' }
+            // Use the authenticated Contents API rather than raw.githubusercontent.com so we
+            // always read the latest committed version.  The CDN-cached raw URL can lag behind
+            // by several minutes, causing a second save to overwrite fields (cover image, etc.)
+            // set by a recent first save that is still in CDN cache.
+            const platFile = `${_currentModalPlatform}.Games.json`;
+            const contentsResp = await fetch(
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent(platFile)}`,
+                { headers: _gamesDbHeaders() }
             );
-            if (!resp.ok) throw new Error(`Failed to fetch ${_currentModalPlatform} games (HTTP ${resp.status})`);
-            const fileData = await resp.json();
+            if (!contentsResp.ok) throw new Error(`Failed to fetch ${platFile} (HTTP ${contentsResp.status})`);
+            const fileMeta = await contentsResp.json();
+            // Inline base64 content for files < 1 MB; download_url for larger files
+            const fileData = fileMeta.content
+                ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
 
             // Normalise – some files use { Games: [...] }, some use a bare array
             let gamesArr;
@@ -3599,6 +3608,7 @@ async function handleAdminEditSave() {
 
             if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
 
+            // Merge form values over the CURRENT entry (preserves any fields not in the form)
             updated = _buildUpdatedGameEntry(gamesArr[idx], {
                 title, titleId, description, coverUrl, bgUrls, trailers,
                 mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
@@ -3611,6 +3621,25 @@ async function handleAdminEditSave() {
                 newContent,
                 `Update game: ${title} (${_currentModalPlatform})`
             );
+
+            // Write game data to Data/{platformFolder}/Games/{title}/info.json
+            const _platFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
+            if (_platFolder) {
+                const _infoTitle = title
+                    .replace(/\.\./g, '').replace(/[/\\]/g, '-')
+                    .replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100);
+                if (_infoTitle) {
+                    try {
+                        await _gamesDbWriteAchievementsFile(
+                            `Data/${_platFolder}/Games/${_infoTitle}/info.json`,
+                            updated,
+                            `Update game info: ${title} (${_currentModalPlatform})`
+                        );
+                    } catch (_infoErr) {
+                        console.warn('update-game: failed to write info.json:', _infoErr.message);
+                    }
+                }
+            }
         }
 
         // Update the in-memory browse cache so the page reflects the change immediately
