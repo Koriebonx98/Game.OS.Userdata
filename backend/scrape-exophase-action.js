@@ -2,31 +2,41 @@
  * scrape-exophase-action.js
  *
  * GitHub Actions entrypoint: fetch an Exophase achievements page server-side
- * (no CORS restriction), parse the achievement list with cheerio, then write
- * achievements.json to the Games.Database repository via the GitHub API.
+ * (no CORS restriction), parse the achievement list with cheerio, then either:
  *
- * Environment variables (all required unless noted):
+ *   a) Write achievements.json to a local file path (OUTPUT_FILE mode — preferred),
+ *      after which the workflow checks out Games.Database and commits the file via git.
+ *   b) Write directly to the Games.Database repository via the GitHub API (legacy mode,
+ *      used when OUTPUT_FILE is not set).
+ *
+ * Environment variables:
+ *   EXOPHASE_URL         – https://www.exophase.com/game/…/achievements/ (required)
+ *   PLATFORM             – PS4 | PS3 | Switch | Xbox 360 | PS5 | Xbox One | PC (required)
+ *   GAME_TITLE           – Human-readable game name (used in the commit message) (required)
+ *   TITLE_ID             – Folder name inside Data/{platform}/Games/ (alnum/_/-) (required)
+ *   OUTPUT_FILE          – Local file path to write achievements.json (preferred mode)
  *   GAMES_DB_TOKEN       – Fine-grained PAT with Contents: R/W on Games.Database
- *   EXOPHASE_URL         – https://www.exophase.com/game/…/achievements/
- *   PLATFORM             – PS4 | PS3 | Switch | Xbox 360 | PS5 | Xbox One | PC
- *   GAME_TITLE           – Human-readable game name (used in the commit message)
- *   TITLE_ID             – Folder name inside Data/{platform}/Games/ (alnum/_/-)
+ *                          (required only when OUTPUT_FILE is not set)
  *   GAMES_DB_REPO_OWNER  – (optional) Games.Database owner, default: Koriebonx98
  *   GAMES_DB_REPO_NAME   – (optional) Games.Database repo name, default: Games.Database
  */
 
 'use strict';
 
+const fs      = require('fs');
+const path    = require('path');
 const cheerio = require('cheerio');
-const { Octokit } = require('@octokit/rest');
 
 // ── Read and validate environment variables ───────────────────────────────────
 
-const GAMES_DB_TOKEN      = process.env.GAMES_DB_TOKEN || '';
 const EXOPHASE_URL        = (process.env.EXOPHASE_URL || '').trim();
 const PLATFORM            = (process.env.PLATFORM || '').trim();
 const GAME_TITLE          = (process.env.GAME_TITLE || '').trim();
 const TITLE_ID            = (process.env.TITLE_ID || '').trim();
+const OUTPUT_FILE         = (process.env.OUTPUT_FILE || '').trim();
+
+// Legacy (Octokit) mode variables – only required when OUTPUT_FILE is not set
+const GAMES_DB_TOKEN      = process.env.GAMES_DB_TOKEN || '';
 const GAMES_DB_REPO_OWNER = (process.env.GAMES_DB_REPO_OWNER || 'Koriebonx98').trim();
 const GAMES_DB_REPO_NAME  = (process.env.GAMES_DB_REPO_NAME  || 'Games.Database').trim();
 
@@ -35,11 +45,13 @@ function fail(msg) {
     process.exit(1);
 }
 
-if (!GAMES_DB_TOKEN) fail('GAMES_DB_TOKEN is not set. Add it as a repository secret.');
 if (!EXOPHASE_URL)   fail('EXOPHASE_URL is required.');
 if (!PLATFORM)       fail('PLATFORM is required.');
 if (!GAME_TITLE)     fail('GAME_TITLE is required.');
 if (!TITLE_ID)       fail('TITLE_ID is required.');
+
+// GAMES_DB_TOKEN is only required in legacy (Octokit) mode
+if (!OUTPUT_FILE && !GAMES_DB_TOKEN) fail('Either OUTPUT_FILE or GAMES_DB_TOKEN must be set.');
 
 // Validate URL: must be https://exophase.com
 let parsedUrl;
@@ -156,45 +168,57 @@ if (!scraped.length) {
 
 console.log(`✅ Scraped ${scraped.length} achievements`);
 
-// ── Write achievements.json to Games.Database ─────────────────────────────────
+// ── Write achievements.json ───────────────────────────────────────────────────
 
-const octokit = new Octokit({ auth: GAMES_DB_TOKEN });
-const gamesDbPath  = `Data/${platformFolder}/Games/${TITLE_ID}/achievements.json`;
+const jsonContent  = JSON.stringify(scraped, null, 2) + '\n';
 const safeTitle    = String(GAME_TITLE).replace(/[\r\n]/g, ' ').slice(0, 80);
 const safePlatform = String(PLATFORM).replace(/[\r\n]/g, ' ').slice(0, 20);
 const commitMsg    = `Add achievements for ${safeTitle} (${safePlatform}) from Exophase`;
 
-console.log(`\nWriting to ${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/${gamesDbPath}`);
+if (OUTPUT_FILE) {
+    // Preferred path: write to a local file so the workflow can commit it via git.
+    fs.mkdirSync(path.dirname(path.resolve(OUTPUT_FILE)), { recursive: true });
+    fs.writeFileSync(OUTPUT_FILE, jsonContent, 'utf8');
+    console.log(`\n✅ achievements.json written locally to ${OUTPUT_FILE} (${scraped.length} entries)`);
+    console.log(`   The workflow will now copy this file into Games.Database and push via git.`);
+} else {
+    // Legacy path: write directly to Games.Database via the GitHub API.
+    const { Octokit } = require('@octokit/rest');
+    const octokit = new Octokit({ auth: GAMES_DB_TOKEN });
+    const gamesDbPath = `Data/${platformFolder}/Games/${TITLE_ID}/achievements.json`;
 
-// Check if file already exists (to get the SHA for update)
-let existingSha;
-try {
-    const { data } = await octokit.repos.getContent({
-        owner: GAMES_DB_REPO_OWNER,
-        repo:  GAMES_DB_REPO_NAME,
-        path:  gamesDbPath
-    });
-    existingSha = data.sha;
-    console.log('   (updating existing file)');
-} catch (err) {
-    if (err.status !== 404) throw err;
-    console.log('   (creating new file)');
+    console.log(`\nWriting to ${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/${gamesDbPath}`);
+
+    // Check if file already exists (to get the SHA for update)
+    let existingSha;
+    try {
+        const { data } = await octokit.repos.getContent({
+            owner: GAMES_DB_REPO_OWNER,
+            repo:  GAMES_DB_REPO_NAME,
+            path:  gamesDbPath
+        });
+        existingSha = data.sha;
+        console.log('   (updating existing file)');
+    } catch (err) {
+        if (err.status !== 404) throw err;
+        console.log('   (creating new file)');
+    }
+
+    const params = {
+        owner:   GAMES_DB_REPO_OWNER,
+        repo:    GAMES_DB_REPO_NAME,
+        path:    gamesDbPath,
+        message: commitMsg,
+        content: Buffer.from(jsonContent).toString('base64'),
+        committer: { name: 'Game OS Bot', email: 'bot@gameos.com' }
+    };
+    if (existingSha) params.sha = existingSha;
+
+    await octokit.repos.createOrUpdateFileContents(params);
+
+    console.log(`✅ achievements.json written (${scraped.length} entries)`);
+    console.log(`   Path   : ${gamesDbPath}`);
+    console.log(`   Commit : ${commitMsg}`);
 }
-
-const params = {
-    owner:   GAMES_DB_REPO_OWNER,
-    repo:    GAMES_DB_REPO_NAME,
-    path:    gamesDbPath,
-    message: commitMsg,
-    content: Buffer.from(JSON.stringify(scraped, null, 2)).toString('base64'),
-    committer: { name: 'Game OS Bot', email: 'bot@gameos.com' }
-};
-if (existingSha) params.sha = existingSha;
-
-await octokit.repos.createOrUpdateFileContents(params);
-
-console.log(`✅ achievements.json written (${scraped.length} entries)`);
-console.log(`   Path   : ${gamesDbPath}`);
-console.log(`   Commit : ${commitMsg}`);
 
 })();

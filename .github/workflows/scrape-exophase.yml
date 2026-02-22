@@ -1,20 +1,17 @@
 # Scrape Exophase Achievements
 #
 # Fetches an Exophase achievements page server-side (no CORS restriction),
-# parses the achievement list, and writes achievements.json to Games.Database.
+# parses the achievement list, writes it to a local JSON file, then checks out
+# Games.Database and commits the file via git — no Octokit API calls needed.
 #
 # Can be triggered two ways:
 #   1. Manually via the GitHub Actions UI (Actions → Scrape Exophase → Run workflow)
-#   2. Automatically from the Game.OS admin panel "🔄 Scrape JSON" button when
-#      no backend server is deployed (requires GAMES_DB_TOKEN to have
-#      Actions: Read and write on this repository in addition to Contents: R/W
-#      on Koriebonx98/Games.Database).
+#      — works from any device including a phone.
+#   2. Automatically from the Game.OS admin panel "🔄 Scrape JSON" button.
 #
 # Required secret (Settings → Secrets and variables → Actions):
-#   GAMES_DB_TOKEN  – Fine-grained PAT with:
-#                     • Contents: Read and write on Koriebonx98/Games.Database
-#                     • Actions: Read and write on this repository
-#                       (only needed for the admin-panel "🔄 Scrape JSON" dispatch)
+#   GAMES_DB_TOKEN  – Fine-grained PAT with Contents: Read and write on
+#                     Koriebonx98/Games.Database
 
 name: Scrape Exophase Achievements
 
@@ -56,7 +53,7 @@ jobs:
         env:
           GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
 
-      - name: Checkout
+      - name: Checkout Game.OS.Userdata (for the scrape script)
         uses: actions/checkout@v6
 
       - name: Set up Node.js
@@ -68,13 +65,53 @@ jobs:
         working-directory: backend
         run: npm ci --ignore-scripts
 
-      - name: Scrape Exophase and write to Games.Database
+      - name: Scrape Exophase and write local JSON
         run: node backend/scrape-exophase-action.js
         env:
-          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
           EXOPHASE_URL: ${{ inputs.exophase_url }}
           PLATFORM: ${{ inputs.platform }}
           GAME_TITLE: ${{ inputs.game_title }}
           TITLE_ID: ${{ inputs.title_id }}
-          GAMES_DB_REPO_OWNER: Koriebonx98
-          GAMES_DB_REPO_NAME: Games.Database
+          OUTPUT_FILE: /tmp/achievements.json
+
+      - name: Determine Games.Database platform folder
+        id: platform
+        run: |
+          case "${{ inputs.platform }}" in
+            "Switch")   echo "folder=Nintendo - Switch"    >> "$GITHUB_OUTPUT" ;;
+            "Xbox 360") echo "folder=Microsoft - Xbox 360" >> "$GITHUB_OUTPUT" ;;
+            "PS3")      echo "folder=Sony - PlayStation 3" >> "$GITHUB_OUTPUT" ;;
+            "PS4")      echo "folder=Sony - PlayStation 4" >> "$GITHUB_OUTPUT" ;;
+            "PS5")      echo "folder=Sony - PlayStation 5" >> "$GITHUB_OUTPUT" ;;
+            "Xbox One") echo "folder=Microsoft - Xbox One" >> "$GITHUB_OUTPUT" ;;
+            "PC")       echo "folder=PC"                   >> "$GITHUB_OUTPUT" ;;
+            *)          echo "❌ Unknown platform: ${{ inputs.platform }}. Supported: Switch, Xbox 360, PS3, PS4, PS5, Xbox One, PC"; exit 1 ;;
+          esac
+
+      - name: Checkout Games.Database
+        uses: actions/checkout@v6
+        with:
+          repository: Koriebonx98/Games.Database
+          token: ${{ secrets.GAMES_DB_TOKEN }}
+          path: games-database
+
+      - name: Copy achievements.json into Games.Database
+        run: |
+          DEST="games-database/Data/${{ steps.platform.outputs.folder }}/Games/${{ inputs.title_id }}/achievements.json"
+          mkdir -p "$(dirname "$DEST")"
+          cp /tmp/achievements.json "$DEST"
+          echo "✅ Copied to $DEST"
+
+      - name: Commit and push to Games.Database
+        working-directory: games-database
+        run: |
+          git config user.name  "Game OS Bot"
+          git config user.email "bot@gameos.com"
+          git add .
+          if git diff --cached --quiet; then
+            echo "ℹ️  No changes to commit — achievements.json is already up to date."
+          else
+            git commit -m "Add achievements for ${{ inputs.game_title }} (${{ inputs.platform }}) from Exophase"
+            git push
+          fi
+
