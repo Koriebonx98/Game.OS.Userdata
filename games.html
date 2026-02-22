@@ -90,6 +90,9 @@
     <script src="script.js"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
+    const PAGE_SIZE      = 100;  // max items rendered at once per view/group
+    let _browseOffset    = 0;    // items shown so far in single-platform view
+    let _groupedOffsets  = {};   // { platform: offset } for all-platforms grouped view
     let _allBrowseGames  = [];
     let _allPlatformGames = {}; // { platform: [...games] } used in ALL mode
     let _myLibrary       = [];
@@ -154,9 +157,8 @@
 
         document.getElementById('browseSearch').addEventListener('input', debounceSearch);
 
-        // Default to All Platforms on first load
-        select.value = 'ALL';
-        loadBrowsePlatform('ALL');
+        // No platform auto-loaded on init – PC.Games.json is very large and loading it
+        // automatically would download 30+ MB and render 150K+ items, crashing the browser.
 
         // Load library for "My Library" tab (only for logged-in users)
         if (isLoggedIn()) {
@@ -311,24 +313,66 @@
         </div>`;
     }
 
-    // ── Render browse list (single platform) ──────────────────
+    // ── Render browse list (single platform, paginated) ───────
     function renderBrowseGames(games) {
         const listEl  = document.getElementById('browseGamesList');
         const countEl = document.getElementById('browseCount');
-        countEl.textContent = `Showing ${games.length} game${games.length !== 1 ? 's' : ''}`;
+        _browseOffset = 0;
 
         if (games.length === 0) {
             listEl.innerHTML = '<p style="color:#666;">No games found.</p>';
+            countEl.textContent = '';
             return;
         }
-        listEl.innerHTML = games.map(g => renderGameItem(g, _currentPlatform)).join('');
+
+        const slice     = games.slice(0, PAGE_SIZE);
+        _browseOffset   = slice.length;
+        const remaining = games.length - _browseOffset;
+        const loadMoreHtml = remaining > 0
+            ? `<div class="load-more-wrap"><button class="btn btn-secondary load-more-btn" onclick="_loadMoreBrowse()">Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining} remaining)</button></div>`
+            : '';
+        listEl.innerHTML = slice.map(g => renderGameItem(g, _currentPlatform)).join('') + loadMoreHtml;
+        countEl.textContent = `Showing ${_browseOffset} of ${games.length} game${games.length !== 1 ? 's' : ''}`;
     }
 
-    // ── Render browse list (all platforms, grouped) ────────────
+    function _loadMoreBrowse() {
+        const term = document.getElementById('browseSearch').value.toLowerCase().trim();
+        const games = term
+            ? _allBrowseGames.filter(g => {
+                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
+                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
+                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
+                return name.includes(term) || tid.includes(term) || alts.includes(term);
+            })
+            : _allBrowseGames;
+
+        const listEl     = document.getElementById('browseGamesList');
+        const countEl    = document.getElementById('browseCount');
+        const newOffset  = Math.min(_browseOffset + PAGE_SIZE, games.length);
+        const slice      = games.slice(_browseOffset, newOffset);
+        _browseOffset    = newOffset;
+
+        const wrapper = listEl.querySelector('.load-more-wrap');
+        if (wrapper) {
+            wrapper.insertAdjacentHTML('beforebegin', slice.map(g => renderGameItem(g, _currentPlatform)).join(''));
+            if (_browseOffset >= games.length) {
+                wrapper.remove();
+            } else {
+                const remaining = games.length - _browseOffset;
+                wrapper.querySelector('.load-more-btn').textContent = `Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining} remaining)`;
+            }
+        }
+        countEl.textContent = `Showing ${_browseOffset} of ${games.length} game${games.length !== 1 ? 's' : ''}`;
+    }
+
+    // ── Render browse list (all platforms, grouped, paginated) ─
     function renderBrowseGamesGrouped(platformGames, searchTerm) {
         const listEl  = document.getElementById('browseGamesList');
         const countEl = document.getElementById('browseCount');
         const term    = (searchTerm || '').toLowerCase().trim();
+
+        // Always reset per-group offsets on a fresh render (search term change or platform switch)
+        _groupedOffsets = {};
 
         let total = 0;
         const html = Object.keys(platformGames).sort()
@@ -347,11 +391,17 @@
             .filter(({ games }) => games.length > 0)
             .map(({ platform, games }) => {
                 total += games.length;
+                const shown     = games.slice(0, PAGE_SIZE);
+                const remaining = games.length - shown.length;
+                const loadMoreHtml = remaining > 0
+                    ? `<div class="load-more-wrap"><button class="btn btn-secondary load-more-btn" data-platform="${escapeHtml(platform)}" onclick="_loadMoreGroup(this)">Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining} remaining)</button></div>`
+                    : '';
                 return `
             <div class="owned-platform-group">
                 <h4 class="owned-platform-header collapsible" tabindex="0" aria-expanded="false" onclick="toggleBrowsePlatformGroup(this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();toggleBrowsePlatformGroup(this);}">${escapeHtml(platform)} <span class="games-count-badge">${games.length}</span></h4>
                 <div class="platform-games-list">
-                    ${games.map(g => renderGameItem(g, platform)).join('')}
+                    ${shown.map(g => renderGameItem(g, platform)).join('')}
+                    ${loadMoreHtml}
                 </div>
             </div>`;
             }).join('');
@@ -361,6 +411,35 @@
             : `Showing ${total} game${total !== 1 ? 's' : ''} across all platforms`;
 
         listEl.innerHTML = total > 0 ? html : '<p style="color:#666;">No games found.</p>';
+    }
+
+    function _loadMoreGroup(btn) {
+        const platform = btn.getAttribute('data-platform');
+        const allGames = _allPlatformGames[platform] || [];
+        const term     = document.getElementById('browseSearch').value.toLowerCase().trim();
+        const games    = term
+            ? allGames.filter(g => {
+                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
+                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
+                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
+                return name.includes(term) || tid.includes(term) || alts.includes(term);
+            })
+            : allGames;
+
+        const offset    = _groupedOffsets[platform] || PAGE_SIZE;
+        const newOffset = Math.min(offset + PAGE_SIZE, games.length);
+        _groupedOffsets[platform] = newOffset;
+
+        const slice   = games.slice(offset, newOffset);
+        const wrapper = btn.closest('.load-more-wrap');
+        wrapper.insertAdjacentHTML('beforebegin', slice.map(g => renderGameItem(g, platform)).join(''));
+
+        if (newOffset >= games.length) {
+            wrapper.remove();
+        } else {
+            const remaining = games.length - newOffset;
+            btn.textContent = `Load ${Math.min(PAGE_SIZE, remaining)} more (${remaining} remaining)`;
+        }
     }
 
     // ── Search ─────────────────────────────────────────────────
