@@ -5,9 +5,11 @@
 # then creates or updates PC.Games.json in Koriebonx98/Games.Database.
 #
 # Triggers:
-#   • Manual  – workflow_dispatch
-#   • Weekly  – every Monday at 03:00 UTC (keeps the list fresh as new games
-#               are added to the Steam catalogue)
+#   • Automatic – whenever this workflow file is pushed to main (ensures it
+#                 runs immediately after merge and on any future updates)
+#   • Manual    – workflow_dispatch
+#   • Weekly    – every Monday at 03:00 UTC (keeps the list fresh as new games
+#                 are added to the Steam catalogue)
 #
 # Required secret:
 #   GAMES_DB_TOKEN  – fine-grained PAT with Contents: Read and write on
@@ -16,6 +18,10 @@
 name: Seed PC Games Database
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/seed-pc-games.yml'
   workflow_dispatch:
   schedule:
     - cron: "0 3 * * 1"   # every Monday at 03:00 UTC (GitHub Actions: 0=Sun, 1=Mon)
