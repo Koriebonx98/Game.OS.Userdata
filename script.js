@@ -3450,6 +3450,9 @@ function openAdminEditModal(game, platform) {
             <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
             <button type="button" class="btn" style="padding:10px 22px;" id="adminSaveBtn" onclick="handleAdminEditSave()">💾 Save Changes</button>
         </div>
+        <div style="margin-top:12px;text-align:center;border-top:1px solid rgba(255,255,255,0.1);padding-top:12px;">
+            <button type="button" class="btn" style="padding:8px 18px;background:#c00;border-color:#900;color:#fff;" onclick="handleAdminDeleteGame()">🗑️ Delete Game</button>
+        </div>
     </form>`;
 
     modal.style.display = 'flex';
@@ -3728,6 +3731,110 @@ async function handleAdminEditSave() {
 }
 
 /**
+ * Delete the currently-loaded game from the Games.Database.
+ */
+async function handleAdminDeleteGame() {
+    if (!isAdminUser()) return;
+    if (!_currentModalGame || !_currentModalPlatform) return;
+
+    const title = _currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '';
+    if (!confirm(`⚠️ Permanently delete "${title}" from ${_currentModalPlatform}? This cannot be undone.`)) return;
+
+    const msgEl   = document.getElementById('adminEditMsg');
+    const saveBtn = document.getElementById('adminSaveBtn');
+    const showMsg = (text, type) => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.display = '';
+        msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
+    };
+
+    if (!GAMES_DB_TOKEN) {
+        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+        return;
+    }
+
+    if (saveBtn) saveBtn.disabled = true;
+
+    try {
+        const platFile = `${_currentModalPlatform}.Games.json`;
+        const contentsResp = await fetch(
+            `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent(platFile)}`,
+            { headers: _gamesDbHeaders() }
+        );
+        if (!contentsResp.ok) throw new Error(`Failed to fetch ${platFile} (HTTP ${contentsResp.status})`);
+        const fileMeta = await contentsResp.json();
+        const fileData = fileMeta.content
+            ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+            : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
+
+        let gamesArr;
+        let topKey = null;
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games;  topKey = 'Games';
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games;  topKey = 'games';
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        } else {
+            throw new Error('Unexpected games JSON format');
+        }
+
+        const origTitle = title.toLowerCase();
+        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+        const idx = gamesArr.findIndex(g => {
+            const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
+            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+            return gt === origTitle || (origId && gid === origId);
+        });
+
+        if (idx === -1) throw new Error('Game not found in database – it may have already been removed.');
+
+        gamesArr.splice(idx, 1);
+        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
+        await _gamesDbWriteFile(
+            _currentModalPlatform,
+            newContent,
+            `Delete game: ${title} (${_currentModalPlatform})`
+        );
+
+        // Update in-memory browse cache
+        if (typeof _allBrowseGames !== 'undefined') {
+            const li = _allBrowseGames.findIndex(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+            );
+            if (li !== -1) _allBrowseGames.splice(li, 1);
+        }
+        if (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_currentModalPlatform]) {
+            const arr = _allPlatformGames[_currentModalPlatform];
+            const li  = arr.findIndex(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+            );
+            if (li !== -1) arr.splice(li, 1);
+        }
+
+        showMsg(`✅ "${title}" deleted successfully.`, 'success');
+        setTimeout(() => {
+            closeAdminEditModal();
+            closeGameModal();
+            if (typeof _currentPlatform !== 'undefined') {
+                if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                    renderBrowseGamesGrouped(_allPlatformGames,
+                        (document.getElementById('browseSearch') || {}).value || '');
+                } else if (typeof renderBrowseGames === 'function' &&
+                           typeof _allBrowseGames !== 'undefined') {
+                    renderBrowseGames(_allBrowseGames);
+                }
+            }
+        }, 1200);
+    } catch (e) {
+        showMsg(`❌ ${e.message}`, 'error');
+    } finally {
+        if (saveBtn) saveBtn.disabled = false;
+    }
+}
+
+/**
  * Build an updated game entry by merging the form values into the existing entry,
  * preserving all original field names and any fields not touched by the form.
  */
@@ -3792,32 +3899,7 @@ function _ensureAddPcGameModal() {
                     </div>
                     <button class="game-modal-close" onclick="closeAddPcGameModal()" aria-label="Close dialog">✕</button>
                 </div>
-                <div class="game-modal-body" id="addPcGameBody">
-                    <form id="addPcGameForm" autocomplete="off">
-                        <div class="admin-form-group">
-                            <label class="admin-form-label" for="pcGameTitle">Title *</label>
-                            <input type="text" id="pcGameTitle" class="admin-form-input" placeholder="Game title…" required>
-                        </div>
-                        <div class="admin-form-group">
-                            <label class="admin-form-label" for="pcGameDesc">Description</label>
-                            <textarea id="pcGameDesc" class="admin-form-input admin-form-textarea" rows="3" placeholder="Short description…"></textarea>
-                        </div>
-                        <div class="admin-form-group">
-                            <label class="admin-form-label" for="pcGameCover">Cover Image URL</label>
-                            <input type="url" id="pcGameCover" class="admin-form-input" placeholder="https://…">
-                        </div>
-                        <div class="admin-form-group">
-                            <label class="admin-form-label">🛒 Stores</label>
-                            <div id="pcGameStoreList">${_adminStoreFieldHtml('', '')}</div>
-                            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_pcGameAddStoreField()">+ Add Store</button>
-                        </div>
-                        <div class="admin-form-actions">
-                            <div id="addPcGameMsg" class="admin-edit-msg" style="display:none;"></div>
-                            <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAddPcGameModal()">Cancel</button>
-                            <button type="button" class="btn" style="padding:10px 22px;" id="addPcGameSaveBtn" onclick="handleAddPcGameToDb()">💾 Add Game</button>
-                        </div>
-                    </form>
-                </div>
+                <div class="game-modal-body" id="addPcGameBody"></div>
             </div>`;
         document.body.appendChild(modal);
         modal.addEventListener('click', e => { if (e.target === modal) closeAddPcGameModal(); });
@@ -3825,28 +3907,110 @@ function _ensureAddPcGameModal() {
     return modal;
 }
 
-function _pcGameAddStoreField() {
-    const list = document.getElementById('pcGameStoreList');
-    if (list) list.insertAdjacentHTML('beforeend', _adminStoreFieldHtml('', ''));
-}
-
 function openAddPcGameModal() {
     if (!isAdminUser()) return;
-    const modal = _ensureAddPcGameModal();
-    const titleInput = document.getElementById('pcGameTitle');
-    const descInput  = document.getElementById('pcGameDesc');
-    const coverInput = document.getElementById('pcGameCover');
-    const msgEl      = document.getElementById('addPcGameMsg');
-    if (titleInput) titleInput.value = '';
-    if (descInput)  descInput.value  = '';
-    if (coverInput) coverInput.value = '';
-    if (msgEl) msgEl.style.display = 'none';
-    // Reset store list to a single empty row
-    const storeList = document.getElementById('pcGameStoreList');
-    if (storeList) storeList.innerHTML = _adminStoreFieldHtml('', '');
-    const saveBtn = document.getElementById('addPcGameSaveBtn');
-    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+    const modal  = _ensureAddPcGameModal();
+    const bodyEl = document.getElementById('addPcGameBody');
+    const hasSgdb = !!STEAMGRID_KEY;
+
+    bodyEl.innerHTML = `
+    <form id="addPcGameForm" autocomplete="off">
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="pcGameTitle">Title *</label>
+            <input type="text" id="pcGameTitle" class="admin-form-input" placeholder="Game title…" required>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="editTitleId">Title ID</label>
+            <input type="text" id="editTitleId" class="admin-form-input" placeholder="Unique ID (optional)…" value="">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="pcGameDesc">Description</label>
+            <textarea id="pcGameDesc" class="admin-form-input admin-form-textarea" rows="4" placeholder="Short description…"></textarea>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Cover Image</label>
+            <div class="admin-cover-row">
+                <div class="admin-cover-preview" id="adminCoverPreview">
+                    <span style="opacity:.5;font-size:.8em;">No image</span>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <input type="url" id="editCoverUrl" class="admin-form-input" placeholder="https://…" value="">
+                    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="admin-btn-outline" onclick="_adminPreviewCover()">🖼️ Preview</button>
+                        <a href="https://www.steamgriddb.com/search/grids" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🎨 Browse SteamGridDB</a>
+                    </div>
+                    ${hasSgdb ? `
+                    <div class="admin-sgdb-row" style="margin-top:8px;">
+                        <input type="text" id="sgdbSearchInput" class="admin-form-input" placeholder="Search SteamGridDB…">
+                        <button type="button" class="admin-btn-outline" id="sgdbSearchBtn" onclick="_adminSgdbSearch('cover')">🔍</button>
+                    </div>
+                    <div id="sgdbCoverResults" class="admin-img-picker"></div>` : ''}
+                </div>
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Background Images</label>
+            <div id="adminBgList">${_adminBgFieldHtml('')}</div>
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminAddBgField()">+ Add Background URL</button>
+                ${hasSgdb ? `<button type="button" class="admin-btn-outline" onclick="_adminSgdbSearch('hero')">🎨 SGDB Heroes</button>` : ''}
+            </div>
+            ${hasSgdb ? `<div id="sgdbHeroResults" class="admin-img-picker" style="margin-top:6px;"></div>` : ''}
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Trailer (YouTube)</label>
+            <input type="text" id="editTrailerUrl" class="admin-form-input" placeholder="YouTube URL or video ID…" value="">
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminPreviewTrailer()">▶ Preview</button>
+                <a href="https://www.youtube.com/results?search_query=" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🔍 Search YouTube</a>
+            </div>
+            <div id="adminTrailerPreview" class="admin-trailer-preview"></div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🧩 Mods</label>
+            <div id="adminModList">${_adminModFieldHtml('', '')}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🛒 Stores</label>
+            <div id="adminStoreList">${_adminStoreFieldHtml('', '')}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddStoreField()">+ Add Store Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Minimum System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecMinCpu" class="admin-form-input" placeholder="CPU" value="">
+                <input type="text" id="editSpecMinGpu" class="admin-form-input" placeholder="GPU" value="">
+                <input type="text" id="editSpecMinRam" class="admin-form-input" placeholder="RAM" value="">
+                <input type="text" id="editSpecMinRes" class="admin-form-input" placeholder="Resolution" value="">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Recommended System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecRecCpu" class="admin-form-input" placeholder="CPU" value="">
+                <input type="text" id="editSpecRecGpu" class="admin-form-input" placeholder="GPU" value="">
+                <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="">
+                <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🏆 Achievements JSON URL</label>
+            <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🔗 Exophase URL</label>
+            <input type="url" id="editExophaseUrl" class="admin-form-input" placeholder="https://www.exophase.com/game/…/achievements/" value="">
+        </div>
+        <div class="admin-form-actions">
+            <div id="addPcGameMsg" class="admin-edit-msg" style="display:none;"></div>
+            <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAddPcGameModal()">Cancel</button>
+            <button type="button" class="btn" style="padding:10px 22px;" id="addPcGameSaveBtn" onclick="handleAddPcGameToDb()">💾 Add Game</button>
+        </div>
+    </form>`;
+
     modal.style.display = 'flex';
+    const titleInput = document.getElementById('pcGameTitle');
     if (titleInput) titleInput.focus();
 }
 
@@ -3872,18 +4036,51 @@ async function handleAddPcGameToDb() {
         return;
     }
 
-    const title       = ((document.getElementById('pcGameTitle')  || {}).value || '').trim();
-    const description = ((document.getElementById('pcGameDesc')   || {}).value || '').trim();
-    const coverUrl    = ((document.getElementById('pcGameCover')  || {}).value || '').trim();
+    const title       = ((document.getElementById('pcGameTitle')      || {}).value || '').trim();
+    const titleId     = ((document.getElementById('editTitleId')      || {}).value || '').trim();
+    const description = ((document.getElementById('pcGameDesc')       || {}).value || '').trim();
+    const coverUrl    = ((document.getElementById('editCoverUrl')      || {}).value || '').trim();
+    const trailerRaw  = ((document.getElementById('editTrailerUrl')    || {}).value || '').trim();
+    const trailers    = trailerRaw ? [trailerRaw] : [];
+
+    const bgInputs = document.querySelectorAll('#adminBgList .admin-bg-input');
+    const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
+
+    const modFields = document.querySelectorAll('#adminModList .admin-mod-field');
+    const mods = Array.from(modFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-mod-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
 
     // Collect store links
-    const pcStoreFields = document.querySelectorAll('#pcGameStoreList .admin-store-field');
+    const pcStoreFields = document.querySelectorAll('#adminStoreList .admin-store-field');
     const stores = Array.from(pcStoreFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
         if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
         return acc;
     }, []);
+
+    const specMinCpu = ((document.getElementById('editSpecMinCpu') || {}).value || '').trim();
+    const specMinGpu = ((document.getElementById('editSpecMinGpu') || {}).value || '').trim();
+    const specMinRam = ((document.getElementById('editSpecMinRam') || {}).value || '').trim();
+    const specMinRes = ((document.getElementById('editSpecMinRes') || {}).value || '').trim();
+    const specRecCpu = ((document.getElementById('editSpecRecCpu') || {}).value || '').trim();
+    const specRecGpu = ((document.getElementById('editSpecRecGpu') || {}).value || '').trim();
+    const specRecRam = ((document.getElementById('editSpecRecRam') || {}).value || '').trim();
+    const specRecRes = ((document.getElementById('editSpecRecRes') || {}).value || '').trim();
+
+    const sysSpecMin = (specMinCpu || specMinGpu || specMinRam || specMinRes)
+        ? { cpu: specMinCpu, gpu: specMinGpu, ram: specMinRam, resolution: specMinRes }
+        : null;
+    const sysSpecRecommended = (specRecCpu || specRecGpu || specRecRam || specRecRes)
+        ? { cpu: specRecCpu, gpu: specRecGpu, ram: specRecRam, resolution: specRecRes }
+        : null;
+
+    const achievementsUrl = ((document.getElementById('editAchievementsUrl') || {}).value || '').trim();
+    const exophaseUrl     = ((document.getElementById('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Checking…'; }
@@ -3922,9 +4119,17 @@ async function handleAddPcGameToDb() {
 
         // Build new game entry using the standard template
         const newGame = { Title: title };
-        if (description)   newGame.description = description;
-        if (coverUrl)       newGame.image       = coverUrl;
-        if (stores.length)  newGame.stores      = stores;
+        if (titleId)            newGame.TitleID            = titleId;
+        if (description)        newGame.description        = description;
+        if (coverUrl)           newGame.image              = coverUrl;
+        if (bgUrls.length)      newGame.background_images  = bgUrls;
+        if (trailers.length)    newGame.trailers            = trailers;
+        if (mods.length)        newGame.mods               = mods;
+        if (stores.length)      newGame.stores             = stores;
+        if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
+        if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
+        if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
+        if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
         gamesArr.push(newGame);
         const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
