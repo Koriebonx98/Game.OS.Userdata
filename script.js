@@ -3652,6 +3652,55 @@ async function handleAdminEditSave() {
 }
 
 /**
+ * Dispatch the scrape-exophase GitHub Actions workflow to scrape an Exophase
+ * page server-side and write achievements.json to Games.Database.
+ *
+ * Requires GAMES_DB_TOKEN to have:
+ *   • Actions: Read and write on the Game.OS.Userdata repository
+ *   • Contents: Read and write on Koriebonx98/Games.Database
+ *
+ * Returns a URL to the workflow runs page on success, or throws on error.
+ */
+async function _dispatchScrapeWorkflow(exophaseUrl, platform, gameTitle, titleId) {
+    if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured.');
+
+    // DATA_REPO_OWNER is the same GitHub user who owns this (Game.OS.Userdata) repo.
+    const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml/dispatches`;
+    const resp = await fetch(dispatchUrl, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            ref: 'main',
+            inputs: {
+                exophase_url: exophaseUrl,
+                platform:     platform,
+                game_title:   gameTitle,
+                title_id:     titleId
+            }
+        })
+    });
+
+    if (resp.status === 204) {
+        // Success – return a link to the workflow runs page
+        return `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml`;
+    }
+    if (resp.status === 403 || resp.status === 401) {
+        throw new Error(
+            'Token lacks Actions write permission on this repository. ' +
+            'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
+            `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`
+        );
+    }
+    const body = await resp.json().catch(() => ({}));
+    throw new Error(body.message || `Workflow dispatch failed (HTTP ${resp.status}).`);
+}
+
+/**
  * Immediately scrape the Exophase URL in the edit form and save achievements to
  * Games.Database, without requiring a full form save. Offers a JSON download on success.
  */
@@ -3716,10 +3765,11 @@ async function _adminScrapeExophaseNow() {
                 showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
             }
         } else {
-            // No-backend path: fetch & parse client-side, write directly via GAMES_DB_TOKEN
+            // No-backend path: try to dispatch the GitHub Actions workflow (server-side,
+            // no CORS restriction), falling back to a direct client-side scrape.
             const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[platform];
             if (!platformFolder) {
-                showScrapeMsg(`⚠️ Unsupported platform for client-side scraping: ${escapeHtml(platform)}`, false);
+                showScrapeMsg(`⚠️ Unsupported platform: ${escapeHtml(platform)}`, false);
                 return;
             }
             const safeTitleId = String(titleId).trim();
@@ -3728,23 +3778,41 @@ async function _adminScrapeExophaseNow() {
                 return;
             }
 
-            const achievements = await _scrapeExophaseClientSide(urlVal);
-            const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
-            const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
-            await _gamesDbWriteAchievementsFile(
-                gamesDbPath,
-                achievements,
-                `Add achievements for ${safeTitle} (${platform}) from Exophase`
-            );
-
-            let downloadLink = '';
-            if (achievements.length) {
-                const blob    = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
-                const objUrl  = URL.createObjectURL(blob);
-                const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
-                downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+            let workflowDispatched = false;
+            try {
+                // Preferred path: dispatch the scrape-exophase workflow so scraping
+                // runs server-side on GitHub Actions (avoids CORS entirely).
+                const runsUrl = await _dispatchScrapeWorkflow(urlVal, platform, title, safeTitleId);
+                workflowDispatched = true;
+                showScrapeMsg(
+                    `✅ Scraping workflow started — achievements will be written to Games.Database in ~1 minute. ` +
+                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View progress →</a>`,
+                    true
+                );
+            } catch (_) {
+                // Workflow dispatch failed (token may lack Actions write permission).
+                // Fall back to direct client-side scrape + write via GAMES_DB_TOKEN.
             }
-            showScrapeMsg(`✅ Scraped and saved ${achievements.length} achievements to Games.Database.${downloadLink}`, true);
+
+            if (!workflowDispatched) {
+                const achievements = await _scrapeExophaseClientSide(urlVal);
+                const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
+                await _gamesDbWriteAchievementsFile(
+                    gamesDbPath,
+                    achievements,
+                    `Add achievements for ${safeTitle} (${platform}) from Exophase`
+                );
+
+                let downloadLink = '';
+                if (achievements.length) {
+                    const blob    = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
+                    const objUrl  = URL.createObjectURL(blob);
+                    const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                    downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+                }
+                showScrapeMsg(`✅ Scraped and saved ${achievements.length} achievements to Games.Database.${downloadLink}`, true);
+            }
         }
     } catch (err) {
         showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);

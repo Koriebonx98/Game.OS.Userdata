@@ -1,0 +1,80 @@
+# Scrape Exophase Achievements
+#
+# Fetches an Exophase achievements page server-side (no CORS restriction),
+# parses the achievement list, and writes achievements.json to Games.Database.
+#
+# Can be triggered two ways:
+#   1. Manually via the GitHub Actions UI (Actions → Scrape Exophase → Run workflow)
+#   2. Automatically from the Game.OS admin panel "🔄 Scrape JSON" button when
+#      no backend server is deployed (requires GAMES_DB_TOKEN to have
+#      Actions: Read and write on this repository in addition to Contents: R/W
+#      on Koriebonx98/Games.Database).
+#
+# Required secret (Settings → Secrets and variables → Actions):
+#   GAMES_DB_TOKEN  – Fine-grained PAT with:
+#                     • Contents: Read and write on Koriebonx98/Games.Database
+#                     • Actions: Read and write on this repository
+#                       (only needed for the admin-panel "🔄 Scrape JSON" dispatch)
+
+name: Scrape Exophase Achievements
+
+on:
+  workflow_dispatch:
+    inputs:
+      exophase_url:
+        description: 'Exophase achievements page URL (https://www.exophase.com/game/…/achievements/)'
+        required: true
+      platform:
+        description: 'Platform (PS4, PS3, Switch, Xbox 360, PS5, Xbox One, PC)'
+        required: true
+        default: 'PS4'
+      game_title:
+        description: 'Game title (used in the commit message)'
+        required: true
+      title_id:
+        description: 'Title ID — folder name inside Data/{platform}/Games/ (alphanumeric, underscores, hyphens only)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  scrape:
+    name: Scrape and Write Achievements
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate GAMES_DB_TOKEN is configured
+        run: |
+          if [ -z "$GAMES_DB_TOKEN" ]; then
+            echo "❌ GAMES_DB_TOKEN is not set."
+            echo "   Add it as a repository secret: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   The token must be a fine-grained PAT with Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          fi
+          echo "✅ GAMES_DB_TOKEN is configured"
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
+      - name: Scrape Exophase and write to Games.Database
+        run: node backend/scrape-exophase-action.js
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+          EXOPHASE_URL: ${{ inputs.exophase_url }}
+          PLATFORM: ${{ inputs.platform }}
+          GAME_TITLE: ${{ inputs.game_title }}
+          TITLE_ID: ${{ inputs.title_id }}
+          GAMES_DB_REPO_OWNER: Koriebonx98
+          GAMES_DB_REPO_NAME: Games.Database
