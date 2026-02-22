@@ -292,6 +292,19 @@ async function initAdminAccountGitHub() {
             `Initialize admin account: ${ADMIN_USERNAME}`
         );
 
+        // Seed admin game library with a starter PC game
+        await githubWrite(
+            `accounts/${ADMIN_USERNAME_LOWER}/games.json`,
+            [
+                {
+                    platform: 'PC',
+                    title:    'Minecraft',
+                    addedAt:  new Date().toISOString()
+                }
+            ],
+            `Initialize admin game library: Minecraft (PC)`
+        );
+
         // Update email index
         const indexFile = await githubRead('accounts/email-index.json');
         const emailMap  = indexFile ? { ...indexFile.content } : {};
