@@ -4027,19 +4027,51 @@ function _buildAchievementsSection(game) {
 
 /** Build an achievement card HTML string. */
 function _buildAchCard(ach) {
-    const name   = escapeHtml(ach.Name || ach.name || '');
-    const desc   = escapeHtml(ach.Description || ach.description || '');
-    const rawImg = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
+    const rawName = ach.Name || ach.name || '';
+    const rawDesc = ach.Description || ach.description || '';
+    const rawImg  = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
     // Only allow https:// image URLs to prevent CSS injection via javascript:/data: schemes
     // Also strip single quotes to prevent breaking out of CSS url('...') context
     const safeImg = /^https:\/\//i.test(rawImg) ? rawImg.replace(/'/g, '') : '';
     const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
-    return `<div class="ach-card" ${bgStyle} title="${name}">
+    return `<div class="ach-card" ${bgStyle} title="${escapeHtml(rawName)}"
+        data-ach-name="${escapeHtml(rawName)}"
+        data-ach-desc="${escapeHtml(rawDesc)}"
+        data-ach-img="${escapeHtml(safeImg)}"
+        onclick="_showAchievementDetail(this)">
         <div class="ach-card-overlay">
-            <div class="ach-card-name">${name}</div>
-            ${desc ? `<div class="ach-card-desc">${desc}</div>` : ''}
+            <div class="ach-card-name">${escapeHtml(rawName)}</div>
+            ${rawDesc ? `<div class="ach-card-desc">${escapeHtml(rawDesc)}</div>` : ''}
         </div>
     </div>`;
+}
+
+/** Show an achievement detail popup when an achievement card is clicked. */
+function _showAchievementDetail(el) {
+    const name = el.dataset.achName || '';
+    const desc = el.dataset.achDesc || '';
+    const img  = el.dataset.achImg  || '';
+    const overlay = document.createElement('div');
+    overlay.className = 'ach-detail-overlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', name || 'Achievement details');
+    const imgStyle = img ? `background-image:url('${escapeHtml(img)}')` : '';
+    overlay.innerHTML = `
+        <div class="ach-detail-popup">
+            <div class="ach-detail-img" style="${imgStyle}">${img ? '' : '🏆'}</div>
+            <div class="ach-detail-body">
+                <div class="ach-detail-name">${escapeHtml(name)}</div>
+                ${desc ? `<div class="ach-detail-desc">${escapeHtml(desc)}</div>` : ''}
+            </div>
+            <button class="ach-detail-close">Close</button>
+        </div>`;
+    const dismiss = () => { document.removeEventListener('keydown', onKey); overlay.remove(); };
+    const onKey   = e => { if (e.key === 'Escape') dismiss(); };
+    overlay.addEventListener('click', e => { if (e.target === overlay) dismiss(); });
+    overlay.querySelector('.ach-detail-close').addEventListener('click', dismiss);
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
 }
 
 /** Render the achievements carousel (online + manual) inside the section. */
