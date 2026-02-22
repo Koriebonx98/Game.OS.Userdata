@@ -3204,9 +3204,23 @@ function _adminCoverImgError(img) {
     if (p) p.innerHTML = '<span style="opacity:.5;font-size:.8em;">Failed to load</span>';
 }
 
+/**
+ * Returns the currently-visible admin modal element, or `document` as fallback.
+ * Used to scope form-field queries so they don't accidentally read values from the
+ * co-existing "Add PC Game" / "Edit Game" modal which shares the same element IDs.
+ */
+function _getActiveAdminModal() {
+    const editModal = document.getElementById('adminEditModal');
+    if (editModal && editModal.style.display !== 'none') return editModal;
+    const addModal  = document.getElementById('addPcGameModal');
+    if (addModal  && addModal.style.display  !== 'none') return addModal;
+    return document;
+}
+
 function _adminPreviewCover() {
-    const input = document.getElementById('editCoverUrl');
-    const prev  = document.getElementById('adminCoverPreview');
+    const activeModal = _getActiveAdminModal();
+    const input = activeModal.querySelector('#editCoverUrl');
+    const prev  = activeModal.querySelector('#adminCoverPreview');
     if (!prev) return;
     const url = (input || {}).value || '';
     prev.innerHTML = url
@@ -3226,8 +3240,9 @@ function _buildInlineTrailerPreview(urlOrId) {
 }
 
 function _adminPreviewTrailer() {
-    const input = document.getElementById('editTrailerUrl');
-    const prev  = document.getElementById('adminTrailerPreview');
+    const activeModal = _getActiveAdminModal();
+    const input = activeModal.querySelector('#editTrailerUrl');
+    const prev  = activeModal.querySelector('#adminTrailerPreview');
     if (!prev) return;
     const url = (input || {}).value || '';
     const html = _buildInlineTrailerPreview(url);
@@ -3280,12 +3295,14 @@ async function _adminSgdbSearch(type) {
 
 /** Called when user clicks an image thumbnail in the SGDB picker. */
 function _adminPickImage(url, type) {
+    // Scope to the active admin modal to avoid interacting with hidden modal's elements.
+    const activeModal = _getActiveAdminModal();
     if (type === 'cover') {
-        const input = document.getElementById('editCoverUrl');
+        const input = activeModal.querySelector('#editCoverUrl');
         if (input) { input.value = url; _adminPreviewCover(); }
     } else {
         // Add / fill the last empty background field
-        const list   = document.getElementById('adminBgList');
+        const list   = activeModal.querySelector('#adminBgList');
         if (!list) return;
         const inputs = Array.from(list.querySelectorAll('.admin-bg-input'));
         const empty  = inputs.find(i => !i.value.trim());
@@ -3484,18 +3501,24 @@ async function handleAdminEditSave() {
         return;
     }
 
-    const title       = ((document.getElementById('editTitle')       || {}).value || '').trim();
-    const titleId     = ((document.getElementById('editTitleId')     || {}).value || '').trim();
-    const description = ((document.getElementById('editDescription') || {}).value || '').trim();
-    const coverUrl    = ((document.getElementById('editCoverUrl')    || {}).value || '').trim();
-    const trailerRaw  = ((document.getElementById('editTrailerUrl')  || {}).value || '').trim();
+    // Scope all form-field lookups to the edit form so they don't accidentally read
+    // values from the co-existing "Add PC Game" modal which shares the same element IDs.
+    const form        = document.getElementById('adminEditForm') || document;
+    const getField    = id  => form.querySelector('#' + id);
+    const getFields   = sel => form.querySelectorAll(sel);
 
-    const bgInputs = document.querySelectorAll('#adminBgList .admin-bg-input');
+    const title       = ((getField('editTitle')       || {}).value || '').trim();
+    const titleId     = ((getField('editTitleId')     || {}).value || '').trim();
+    const description = ((getField('editDescription') || {}).value || '').trim();
+    const coverUrl    = ((getField('editCoverUrl')    || {}).value || '').trim();
+    const trailerRaw  = ((getField('editTrailerUrl')  || {}).value || '').trim();
+
+    const bgInputs = getFields('#adminBgList .admin-bg-input');
     const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
     const trailers = trailerRaw ? [trailerRaw] : [];
 
     // Collect mod links (name + url pairs)
-    const modFields = document.querySelectorAll('#adminModList .admin-mod-field');
+    const modFields = getFields('#adminModList .admin-mod-field');
     const mods = Array.from(modFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
@@ -3504,7 +3527,7 @@ async function handleAdminEditSave() {
     }, []);
 
     // Collect store links (name + url pairs)
-    const storeFields = document.querySelectorAll('#adminStoreList .admin-store-field');
+    const storeFields = getFields('#adminStoreList .admin-store-field');
     const stores = Array.from(storeFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
@@ -3513,14 +3536,14 @@ async function handleAdminEditSave() {
     }, []);
 
     // Collect system specs
-    const specMinCpu = ((document.getElementById('editSpecMinCpu') || {}).value || '').trim();
-    const specMinGpu = ((document.getElementById('editSpecMinGpu') || {}).value || '').trim();
-    const specMinRam = ((document.getElementById('editSpecMinRam') || {}).value || '').trim();
-    const specMinRes = ((document.getElementById('editSpecMinRes') || {}).value || '').trim();
-    const specRecCpu = ((document.getElementById('editSpecRecCpu') || {}).value || '').trim();
-    const specRecGpu = ((document.getElementById('editSpecRecGpu') || {}).value || '').trim();
-    const specRecRam = ((document.getElementById('editSpecRecRam') || {}).value || '').trim();
-    const specRecRes = ((document.getElementById('editSpecRecRes') || {}).value || '').trim();
+    const specMinCpu = ((getField('editSpecMinCpu') || {}).value || '').trim();
+    const specMinGpu = ((getField('editSpecMinGpu') || {}).value || '').trim();
+    const specMinRam = ((getField('editSpecMinRam') || {}).value || '').trim();
+    const specMinRes = ((getField('editSpecMinRes') || {}).value || '').trim();
+    const specRecCpu = ((getField('editSpecRecCpu') || {}).value || '').trim();
+    const specRecGpu = ((getField('editSpecRecGpu') || {}).value || '').trim();
+    const specRecRam = ((getField('editSpecRecRam') || {}).value || '').trim();
+    const specRecRes = ((getField('editSpecRecRes') || {}).value || '').trim();
 
     const sysSpecMin = (specMinCpu || specMinGpu || specMinRam || specMinRes)
         ? { cpu: specMinCpu, gpu: specMinGpu, ram: specMinRam, resolution: specMinRes }
@@ -3529,8 +3552,8 @@ async function handleAdminEditSave() {
         ? { cpu: specRecCpu, gpu: specRecGpu, ram: specRecRam, resolution: specRecRes }
         : null;
 
-    const achievementsUrl = ((document.getElementById('editAchievementsUrl') || {}).value || '').trim();
-    const exophaseUrl     = ((document.getElementById('editExophaseUrl')     || {}).value || '').trim();
+    const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
@@ -4037,16 +4060,21 @@ async function handleAddPcGameToDb() {
     }
 
     const title       = ((document.getElementById('pcGameTitle')      || {}).value || '').trim();
-    const titleId     = ((document.getElementById('editTitleId')      || {}).value || '').trim();
+    // Scope all remaining field lookups to this form so they don't accidentally read
+    // values from the co-existing "Edit Game" modal which shares the same element IDs.
+    const form        = document.getElementById('addPcGameForm') || document;
+    const getField    = id  => form.querySelector('#' + id);
+    const getFields   = sel => form.querySelectorAll(sel);
+    const titleId     = ((getField('editTitleId')      || {}).value || '').trim();
     const description = ((document.getElementById('pcGameDesc')       || {}).value || '').trim();
-    const coverUrl    = ((document.getElementById('editCoverUrl')      || {}).value || '').trim();
-    const trailerRaw  = ((document.getElementById('editTrailerUrl')    || {}).value || '').trim();
+    const coverUrl    = ((getField('editCoverUrl')      || {}).value || '').trim();
+    const trailerRaw  = ((getField('editTrailerUrl')    || {}).value || '').trim();
     const trailers    = trailerRaw ? [trailerRaw] : [];
 
-    const bgInputs = document.querySelectorAll('#adminBgList .admin-bg-input');
+    const bgInputs = getFields('#adminBgList .admin-bg-input');
     const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
 
-    const modFields = document.querySelectorAll('#adminModList .admin-mod-field');
+    const modFields = getFields('#adminModList .admin-mod-field');
     const mods = Array.from(modFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
@@ -4055,7 +4083,7 @@ async function handleAddPcGameToDb() {
     }, []);
 
     // Collect store links
-    const pcStoreFields = document.querySelectorAll('#adminStoreList .admin-store-field');
+    const pcStoreFields = getFields('#adminStoreList .admin-store-field');
     const stores = Array.from(pcStoreFields).reduce((acc, row) => {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
@@ -4063,14 +4091,14 @@ async function handleAddPcGameToDb() {
         return acc;
     }, []);
 
-    const specMinCpu = ((document.getElementById('editSpecMinCpu') || {}).value || '').trim();
-    const specMinGpu = ((document.getElementById('editSpecMinGpu') || {}).value || '').trim();
-    const specMinRam = ((document.getElementById('editSpecMinRam') || {}).value || '').trim();
-    const specMinRes = ((document.getElementById('editSpecMinRes') || {}).value || '').trim();
-    const specRecCpu = ((document.getElementById('editSpecRecCpu') || {}).value || '').trim();
-    const specRecGpu = ((document.getElementById('editSpecRecGpu') || {}).value || '').trim();
-    const specRecRam = ((document.getElementById('editSpecRecRam') || {}).value || '').trim();
-    const specRecRes = ((document.getElementById('editSpecRecRes') || {}).value || '').trim();
+    const specMinCpu = ((getField('editSpecMinCpu') || {}).value || '').trim();
+    const specMinGpu = ((getField('editSpecMinGpu') || {}).value || '').trim();
+    const specMinRam = ((getField('editSpecMinRam') || {}).value || '').trim();
+    const specMinRes = ((getField('editSpecMinRes') || {}).value || '').trim();
+    const specRecCpu = ((getField('editSpecRecCpu') || {}).value || '').trim();
+    const specRecGpu = ((getField('editSpecRecGpu') || {}).value || '').trim();
+    const specRecRam = ((getField('editSpecRecRam') || {}).value || '').trim();
+    const specRecRes = ((getField('editSpecRecRes') || {}).value || '').trim();
 
     const sysSpecMin = (specMinCpu || specMinGpu || specMinRam || specMinRes)
         ? { cpu: specMinCpu, gpu: specMinGpu, ram: specMinRam, resolution: specMinRes }
@@ -4079,8 +4107,8 @@ async function handleAddPcGameToDb() {
         ? { cpu: specRecCpu, gpu: specRecGpu, ram: specRecRam, resolution: specRecRes }
         : null;
 
-    const achievementsUrl = ((document.getElementById('editAchievementsUrl') || {}).value || '').trim();
-    const exophaseUrl     = ((document.getElementById('editExophaseUrl')     || {}).value || '').trim();
+    const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Checking…'; }
@@ -4230,11 +4258,14 @@ async function _adminScrapeExophaseNow() {
 
     const btn     = document.getElementById('adminScrapeExophaseBtn');
     const msgEl   = document.getElementById('adminScrapeMsg');
-    const urlVal  = ((document.getElementById('editExophaseUrl') || {}).value || '').trim();
-    const titleInput = document.getElementById('editTitle');
+    // Scope lookups to the edit form to avoid reading from the co-existing "Add PC Game" modal.
+    const editForm   = document.getElementById('adminEditForm') || document;
+    const getField   = id => editForm.querySelector('#' + id);
+    const urlVal  = ((getField('editExophaseUrl') || {}).value || '').trim();
+    const titleInput = getField('editTitle');
     const title   = (titleInput ? titleInput.value.trim() : '')
                     || (_currentModalGame ? (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '') : '');
-    const titleId = ((document.getElementById('editTitleId')     || {}).value || '').trim();
+    const titleId = ((getField('editTitleId')     || {}).value || '').trim();
     const platform = _currentModalPlatform || '';
 
     const showScrapeMsg = (text, ok) => {
