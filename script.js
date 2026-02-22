@@ -3470,8 +3470,10 @@ async function handleAdminEditSave() {
         msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
     };
 
-    if (!GAMES_DB_TOKEN) {
-        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+    const backendBase = getBackendBase();
+
+    if (!backendBase && !GAMES_DB_TOKEN) {
+        showMsg('⚠️ No write method available. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret and re-deploy to enable editing.', 'error');
         return;
     }
     if (!_currentModalGame || !_currentModalPlatform) {
@@ -3531,87 +3533,85 @@ async function handleAdminEditSave() {
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
     if (msgEl)   { msgEl.style.display = 'none'; }
 
+    // Extract original identifiers before any modification
+    const origTitle = (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
+    const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+
     try {
-        // Re-fetch the latest platform JSON from raw GitHub to get the most up-to-date data
-        const resp = await fetch(
-            `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json?t=${Date.now()}`,
-            { cache: 'no-store' }
-        );
-        if (!resp.ok) throw new Error(`Failed to fetch ${_currentModalPlatform} games (HTTP ${resp.status})`);
-        const fileData = await resp.json();
+        let updated;
 
-        // Normalise – some files use { Games: [...] }, some use a bare array
-        let gamesArr;
-        let topKey = null;
-        if (fileData && Array.isArray(fileData.Games)) {
-            gamesArr = fileData.Games;  topKey = 'Games';
-        } else if (fileData && Array.isArray(fileData.games)) {
-            gamesArr = fileData.games;  topKey = 'games';
-        } else if (Array.isArray(fileData)) {
-            gamesArr = fileData;
+        if (backendBase) {
+            // ── Backend path: server fetches, patches, and writes to Games.Database ──
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+
+            // Build the updated entry once; send it to the backend and reuse for the cache
+            updated = _buildUpdatedGameEntry(_currentModalGame, {
+                title, titleId, description, coverUrl, bgUrls, trailers,
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+            });
+
+            const updateResp = await fetch(`${backendBase}/api/admin/update-game`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                },
+                body: JSON.stringify({
+                    platform: _currentModalPlatform,
+                    originalTitle: _currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '',
+                    originalId:    origId,
+                    game: updated
+                })
+            });
+            const updateData = await updateResp.json();
+            if (!updateData.success) throw new Error(updateData.message || 'Failed to update game.');
         } else {
-            throw new Error('Unexpected games JSON format');
+            // ── Client-side path: fetch platform JSON, patch, and write via GAMES_DB_TOKEN ──
+            const resp = await fetch(
+                `${GAMES_DB_RAW_BASE}/${encodeURIComponent(_currentModalPlatform)}.Games.json?t=${Date.now()}`,
+                { cache: 'no-store' }
+            );
+            if (!resp.ok) throw new Error(`Failed to fetch ${_currentModalPlatform} games (HTTP ${resp.status})`);
+            const fileData = await resp.json();
+
+            // Normalise – some files use { Games: [...] }, some use a bare array
+            let gamesArr;
+            let topKey = null;
+            if (fileData && Array.isArray(fileData.Games)) {
+                gamesArr = fileData.Games;  topKey = 'Games';
+            } else if (fileData && Array.isArray(fileData.games)) {
+                gamesArr = fileData.games;  topKey = 'games';
+            } else if (Array.isArray(fileData)) {
+                gamesArr = fileData;
+            } else {
+                throw new Error('Unexpected games JSON format');
+            }
+
+            const idx = gamesArr.findIndex(g => {
+                const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
+                const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+                return gt === origTitle || (origId && gid === origId);
+            });
+
+            if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
+
+            updated = _buildUpdatedGameEntry(gamesArr[idx], {
+                title, titleId, description, coverUrl, bgUrls, trailers,
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+            });
+            gamesArr[idx] = updated;
+
+            const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
+            await _gamesDbWriteFile(
+                _currentModalPlatform,
+                newContent,
+                `Update game: ${title} (${_currentModalPlatform})`
+            );
         }
-
-        // Locate the game by original title or title ID
-        const origTitle = (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
-        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
-
-        const idx = gamesArr.findIndex(g => {
-            const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
-            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
-            return gt === origTitle || (origId && gid === origId);
-        });
-
-        if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
-
-        // Build the updated entry, preserving all fields the database already has
-        const existing = gamesArr[idx];
-        const updated  = { ...existing };
-
-        // Update title (preserve original field name)
-        if      ('Title'     in updated) updated.Title       = title;
-        else if ('game_name' in updated) updated.game_name   = title;
-        else                             updated.Title        = title;
-
-        // Update title ID (preserve original field name)
-        if      ('TitleID'   in updated) updated.TitleID     = titleId;
-        else if ('title_id'  in updated) updated.title_id    = titleId;
-
-        // Update description (preserve original field name)
-        if ('Description' in updated) updated.Description = description;
-        else                          updated.description  = description;
-
-        // Always use 'image' for cover URL across all platforms
-        if (coverUrl) updated.image = coverUrl;
-        else          delete updated.image;
-
-        updated.background_images = bgUrls;
-        updated.trailers           = trailers;
-
-        // Persist new structured fields
-        if (mods.length)           updated.mods                = mods;
-        else                       delete updated.mods;
-        if (stores.length)         updated.stores              = stores;
-        else                       delete updated.stores;
-        if (sysSpecMin)            updated.sysSpecMin          = sysSpecMin;
-        else                       delete updated.sysSpecMin;
-        if (sysSpecRecommended)    updated.sysSpecRecommended  = sysSpecRecommended;
-        else                       delete updated.sysSpecRecommended;
-        if (achievementsUrl)       updated.achievementsUrl     = achievementsUrl;
-        else                       delete updated.achievementsUrl;
-        if (exophaseUrl)           updated.exophaseUrl         = exophaseUrl;
-        else                       delete updated.exophaseUrl;
-
-        gamesArr[idx] = updated;
-
-        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
-
-        await _gamesDbWriteFile(
-            _currentModalPlatform,
-            newContent,
-            `Update game: ${title} (${_currentModalPlatform})`
-        );
 
         // Update the in-memory browse cache so the page reflects the change immediately
         if (typeof _allBrowseGames !== 'undefined') {
@@ -3641,16 +3641,16 @@ async function handleAdminEditSave() {
         _currentModalGame = updated;
 
         // If an Exophase URL was provided, trigger scraping via backend or client-side
-        if (exophaseUrl && (getBackendBase() || GAMES_DB_TOKEN)) {
+        if (exophaseUrl && (backendBase || GAMES_DB_TOKEN)) {
             showMsg('⏳ Scraping achievements from Exophase…', 'success');
             try {
-                if (getBackendBase()) {
+                if (backendBase) {
                     const user = getCurrentUser();
                     const storedToken = user
                         ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
                            localStorage.getItem('gameOS_apiToken_pending') || '')
                         : '';
-                    const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                    const scrapeResp = await fetch(`${backendBase}/api/admin/scrape-exophase`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3696,6 +3696,51 @@ async function handleAdminEditSave() {
     } finally {
         if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
     }
+}
+
+/**
+ * Build an updated game entry by merging the form values into the existing entry,
+ * preserving all original field names and any fields not touched by the form.
+ */
+function _buildUpdatedGameEntry(existing, fields) {
+    const { title, titleId, description, coverUrl, bgUrls, trailers,
+            mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl } = fields;
+    const updated = { ...existing };
+
+    // Update title (preserve original field name)
+    if      ('Title'     in updated) updated.Title       = title;
+    else if ('game_name' in updated) updated.game_name   = title;
+    else                             updated.Title        = title;
+
+    // Update title ID (preserve original field name)
+    if      ('TitleID'  in updated) updated.TitleID  = titleId;
+    else if ('title_id' in updated) updated.title_id = titleId;
+
+    // Update description (preserve original field name)
+    if ('Description' in updated) updated.Description = description;
+    else                          updated.description  = description;
+
+    // Always use 'image' for cover URL across all platforms
+    if (coverUrl) updated.image = coverUrl;
+    else          delete updated.image;
+
+    updated.background_images = bgUrls;
+    updated.trailers           = trailers;
+
+    if (mods.length)           updated.mods               = mods;
+    else                       delete updated.mods;
+    if (stores.length)         updated.stores             = stores;
+    else                       delete updated.stores;
+    if (sysSpecMin)            updated.sysSpecMin         = sysSpecMin;
+    else                       delete updated.sysSpecMin;
+    if (sysSpecRecommended)    updated.sysSpecRecommended = sysSpecRecommended;
+    else                       delete updated.sysSpecRecommended;
+    if (achievementsUrl)       updated.achievementsUrl    = achievementsUrl;
+    else                       delete updated.achievementsUrl;
+    if (exophaseUrl)           updated.exophaseUrl        = exophaseUrl;
+    else                       delete updated.exophaseUrl;
+
+    return updated;
 }
 
 // ============================================================

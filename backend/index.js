@@ -105,6 +105,52 @@ async function putGamesDbFile(path, content, message, sha) {
     await octokitGamesDb.repos.createOrUpdateFileContents(params);
 }
 
+/**
+ * Write a (potentially large) JSON file to the Games.Database repository using
+ * the Git Data API (blobs → trees → commits → ref update).  This avoids the
+ * 1 MB Contents-API limit that affects Switch.Games.json and PS3.Games.json.
+ */
+async function putGamesDbFileLarge(path, content, message) {
+    if (!octokitGamesDb) throw new Error('GAMES_DB_TOKEN is not configured.');
+    const owner = GAMES_DB_REPO_OWNER;
+    const repo  = GAMES_DB_REPO_NAME;
+
+    // 1. Get current branch tip SHA
+    const { data: ref } = await octokitGamesDb.git.getRef({ owner, repo, ref: 'heads/main' });
+    const latestSha = ref.object.sha;
+
+    // 2. Get the commit's tree SHA
+    const { data: commit } = await octokitGamesDb.git.getCommit({ owner, repo, commit_sha: latestSha });
+    const treeSha = commit.tree.sha;
+
+    // 3. Create a new blob with the updated content
+    const { data: blob } = await octokitGamesDb.git.createBlob({
+        owner, repo,
+        content: Buffer.from(JSON.stringify(content, null, 2)).toString('base64'),
+        encoding: 'base64'
+    });
+
+    // 4. Create a new tree that replaces only this file
+    const { data: tree } = await octokitGamesDb.git.createTree({
+        owner, repo,
+        base_tree: treeSha,
+        tree: [{ path, mode: '100644', type: 'blob', sha: blob.sha }]
+    });
+
+    // 5. Create the commit
+    const { data: newCommit } = await octokitGamesDb.git.createCommit({
+        owner, repo,
+        message,
+        tree: tree.sha,
+        parents: [latestSha],
+        author: { name: 'Game.OS Admin', email: ADMIN_EMAIL, date: new Date().toISOString() }
+    });
+
+    // 6. Update the branch ref
+    await octokitGamesDb.git.updateRef({ owner, repo, ref: 'heads/main', sha: newCommit.sha });
+    return newCommit;
+}
+
 // ── Game OS API token system ──────────────────────────────────────────────────
 
 const TOKEN_PREFIX = 'gos_';
@@ -2307,6 +2353,89 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
         });
     } catch (err) {
         console.error('POST /api/admin/scrape-exophase error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/admin/update-game ───────────────────────────────────────────────
+// Admin-only endpoint: update a game entry in a Games.Database platform JSON.
+// Authentication: the caller must be the Admin.GameOS account (checked via token).
+// Body: { platform, game (updated game object), originalTitle, originalId }
+app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
+    try {
+        // Admin-only guard
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+
+        const { platform, game, originalTitle, originalId } = req.body;
+
+        if (!platform || !game || typeof game !== 'object' || Array.isArray(game)) {
+            return res.status(400).json({ success: false, message: 'platform and game (object) are required.' });
+        }
+        if (!originalTitle && !originalId) {
+            return res.status(400).json({ success: false, message: 'At least one of originalTitle or originalId is required.' });
+        }
+
+        if (!octokitGamesDb) {
+            return res.status(503).json({ success: false, message: 'GAMES_DB_TOKEN is not configured on the server.' });
+        }
+
+        // Validate that the platform is known
+        if (!Object.prototype.hasOwnProperty.call(PLATFORM_TO_GAMES_DB_FOLDER, platform)) {
+            return res.status(400).json({ success: false, message: `Unknown platform: ${platform}` });
+        }
+
+        // Fetch the current platform JSON from raw GitHub (avoids size limits on the Contents API)
+        const platformFile = `${platform}.Games.json`;
+        const rawUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${encodeURIComponent(platformFile)}`;
+        const rawResp = await fetch(rawUrl, { cache: 'no-store' });
+        if (!rawResp.ok) {
+            if (rawResp.status === 404) {
+                return res.status(404).json({ success: false, message: `Platform file not found: ${platformFile}` });
+            }
+            throw new Error(`Failed to fetch platform JSON: HTTP ${rawResp.status}`);
+        }
+        const fileData = await rawResp.json();
+
+        // Normalise – some files use { Games: [...] }, some use a bare array
+        let gamesArr;
+        let topKey = null;
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games;  topKey = 'Games';
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games;  topKey = 'games';
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        } else {
+            return res.status(422).json({ success: false, message: 'Unexpected games JSON format.' });
+        }
+
+        // Locate the game by original title or title ID
+        const origTitleLower = String(originalTitle || '').toLowerCase();
+        const origIdStr      = String(originalId    || '');
+
+        const idx = gamesArr.findIndex(g => {
+            const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
+            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+            return (origTitleLower && gt === origTitleLower) || (origIdStr && gid === origIdStr);
+        });
+
+        if (idx === -1) {
+            return res.status(404).json({ success: false, message: 'Game not found in database.' });
+        }
+
+        // Replace the entry and write back using the Git Data API (supports large files)
+        gamesArr[idx] = game;
+        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
+        const safeTitle    = String(game.Title || game.game_name || game.title || '').replace(/[\r\n]/g, ' ').slice(0, 80);
+        const safePlatform = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+
+        await putGamesDbFileLarge(platformFile, newContent, `Update game: ${safeTitle} (${safePlatform})`);
+
+        res.json({ success: true, message: `Game updated successfully: ${safeTitle}` });
+    } catch (err) {
+        console.error('POST /api/admin/update-game error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
