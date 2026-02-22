@@ -2386,17 +2386,33 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, message: `Unknown platform: ${platform}` });
         }
 
-        // Fetch the current platform JSON from raw GitHub (avoids size limits on the Contents API)
+        // Fetch the current platform JSON via the authenticated GitHub Contents API so we
+        // always read the latest committed version.  The CDN-cached raw URL can lag behind
+        // by several minutes, causing a second save to overwrite fields set by a recent
+        // first save that is still propagating through the CDN cache.
         const platformFile = `${platform}.Games.json`;
-        const rawUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${encodeURIComponent(platformFile)}`;
-        const rawResp = await fetch(rawUrl, { cache: 'no-store' });
-        if (!rawResp.ok) {
-            if (rawResp.status === 404) {
+        let fileData;
+        try {
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER,
+                repo:  GAMES_DB_REPO_NAME,
+                path:  platformFile
+            });
+            if (fileMeta.content) {
+                // Content returned inline (files < 1 MB)
+                fileData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                // File > 1 MB – download_url points at the current blob (no CDN staleness)
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`Failed to fetch large platform JSON: HTTP ${dlResp.status}`);
+                fileData = await dlResp.json();
+            }
+        } catch (err) {
+            if (err.status === 404) {
                 return res.status(404).json({ success: false, message: `Platform file not found: ${platformFile}` });
             }
-            throw new Error(`Failed to fetch platform JSON: HTTP ${rawResp.status}`);
+            throw err;
         }
-        const fileData = await rawResp.json();
 
         // Normalise – some files use { Games: [...] }, some use a bare array
         let gamesArr;
