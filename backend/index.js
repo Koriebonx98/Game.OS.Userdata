@@ -2425,13 +2425,39 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
             return res.status(404).json({ success: false, message: 'Game not found in database.' });
         }
 
-        // Replace the entry and write back using the Git Data API (supports large files)
-        gamesArr[idx] = game;
+        // Merge the incoming fields over the existing entry (preserves any fields not
+        // touched by the edit form – e.g. fields added by earlier saves or other tools).
+        gamesArr[idx] = { ...gamesArr[idx], ...game };
         const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
         const safeTitle    = String(game.Title || game.game_name || game.title || '').replace(/[\r\n]/g, ' ').slice(0, 80);
         const safePlatform = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
 
         await putGamesDbFileLarge(platformFile, newContent, `Update game: ${safeTitle} (${safePlatform})`);
+
+        // Write game data to Data/{platformFolder}/Games/{title}/info.json
+        const platformFolder = platformToGamesDbFolder(platform);
+        if (platformFolder) {
+            const titleForPath = String(game.Title || game.game_name || game.title || '')
+                .replace(/\.\./g, '').replace(/[/\\]/g, '-')
+                .replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100);
+            if (titleForPath) {
+                const infoPath = `Data/${platformFolder}/Games/${titleForPath}/info.json`;
+                try {
+                    // getGamesDbFile returns null for 404 (file not yet created) — passing
+                    // undefined as sha to putGamesDbFile correctly triggers a new-file create.
+                    const existingInfo = await getGamesDbFile(infoPath);
+                    await putGamesDbFile(
+                        infoPath,
+                        gamesArr[idx],
+                        `Update game info: ${safeTitle} (${safePlatform})`,
+                        existingInfo ? existingInfo.sha : undefined
+                    );
+                } catch (infoErr) {
+                    // Non-fatal: log but don't fail the main update
+                    console.error('update-game: failed to write info.json:', infoErr.message);
+                }
+            }
+        }
 
         res.json({ success: true, message: `Game updated successfully: ${safeTitle}` });
     } catch (err) {
