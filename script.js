@@ -2958,6 +2958,130 @@ async function _gamesDbWriteFile(platform, content, message) {
     return newCommit;
 }
 
+/**
+ * Maps a platform name to the folder name used inside Data/ in Games.Database.
+ * Must be kept in sync with the backend's PLATFORM_TO_GAMES_DB_FOLDER map.
+ */
+const _PLATFORM_TO_GAMES_DB_FOLDER = {
+    'Switch':   'Nintendo - Switch',
+    'Xbox 360': 'Microsoft - Xbox 360',
+    'PS3':      'Sony - PlayStation 3',
+    'PS4':      'Sony - PlayStation 4',
+    'PS5':      'Sony - PlayStation 5',
+    'Xbox One': 'Microsoft - Xbox One',
+    'PC':       'PC'
+};
+
+/**
+ * Write a small JSON file to an arbitrary path in Koriebonx98/Games.Database
+ * using the GitHub Contents API (suitable for files well under 1 MB, e.g. achievements.json).
+ */
+async function _gamesDbWriteAchievementsFile(path, content, message) {
+    if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.');
+
+    const owner = 'Koriebonx98';
+    const repo  = 'Games.Database';
+    const h     = _gamesDbHeaders();
+
+    // Check if the file already exists so we can pass its SHA for updates
+    const existingResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+        { headers: h }
+    );
+    let existingSha;
+    if (existingResp.ok) {
+        const existing = await existingResp.json();
+        existingSha = existing.sha;
+    } else if (existingResp.status !== 404) {
+        throw new Error(`Cannot read existing file: ${existingResp.status}`);
+    }
+
+    const json   = JSON.stringify(content, null, 2);
+    const bytes  = new TextEncoder().encode(json);
+    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+
+    const body = { message, content: base64, committer: { name: 'Game.OS Admin', email: ADMIN_EMAIL } };
+    if (existingSha) body.sha = existingSha;
+
+    const writeResp = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+        { method: 'PUT', headers: h, body: JSON.stringify(body) }
+    );
+    if (!writeResp.ok) {
+        if (writeResp.status === 401 || writeResp.status === 403)
+            throw new Error('GAMES_DB_TOKEN is invalid, expired, or lacks write permission. Update the repository secret and re-deploy.');
+        const err = await writeResp.json().catch(() => ({}));
+        throw new Error(err.message || `Cannot write file: ${writeResp.status}`);
+    }
+}
+
+/**
+ * Fetch and parse an Exophase achievements page client-side.
+ * Returns an array of achievement objects, or throws on error.
+ */
+async function _scrapeExophaseClientSide(exophaseUrl) {
+    // Validate URL: only allow https://exophase.com (mirrors backend SSRF protection)
+    let parsedUrl;
+    try { parsedUrl = new URL(exophaseUrl); } catch (_) { throw new Error('Invalid URL.'); }
+    if (parsedUrl.protocol !== 'https:' ||
+        (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
+        throw new Error('Only https://exophase.com URLs are allowed.');
+    }
+
+    let html;
+    try {
+        const resp = await fetch(exophaseUrl, { mode: 'cors' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        html = await resp.text();
+    } catch (fetchErr) {
+        throw new Error(
+            `Could not fetch the Exophase page: ${fetchErr.message}. ` +
+            'This may be a CORS restriction — try deploying the backend server for server-side scraping.'
+        );
+    }
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(html, 'text/html');
+    const items = Array.from(doc.querySelectorAll('ul.achievement > li, ul.trophy > li, ul.challenge > li'));
+    const scraped = [];
+    items.forEach((el, i) => {
+        const nameEl = el.querySelector('a');
+        const name = (nameEl ? nameEl.textContent : '').trim();
+        if (!name) return;
+
+        const descEl = el.querySelector('div.award-description p');
+        const description = (descEl ? descEl.textContent : '').trim();
+
+        const imgEl = el.querySelector('img');
+        const rawIconUrl = imgEl ? (imgEl.getAttribute('src') || '') : '';
+        let iconUrl;
+        if (rawIconUrl) {
+            try {
+                const iconParsed = new URL(rawIconUrl);
+                if (iconParsed.protocol === 'https:' &&
+                    (iconParsed.hostname === 'exophase.com' || iconParsed.hostname.endsWith('.exophase.com'))) {
+                    iconUrl = rawIconUrl;
+                }
+            } catch (_) { /* ignore malformed URLs */ }
+        }
+
+        const isHidden = (el.getAttribute('class') || '').split(/\s+/).includes('secret');
+        const avgRaw   = el.getAttribute('data-average');
+        const percent  = avgRaw !== undefined && avgRaw !== null ? parseFloat(avgRaw) : undefined;
+
+        const entry = { achievementId: String(i + 1), name, description };
+        if (iconUrl)                                  entry.iconUrl = iconUrl;
+        if (isHidden)                                 entry.hidden  = true;
+        if (percent !== undefined && !isNaN(percent)) entry.percent = percent;
+        scraped.push(entry);
+    });
+
+    if (!scraped.length) {
+        throw new Error('No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.');
+    }
+    return scraped;
+}
+
 // ============================================================
 // ADMIN – STEAMGRIDDB INTEGRATION
 // ============================================================
@@ -3469,28 +3593,46 @@ async function handleAdminEditSave() {
         }
         _currentModalGame = updated;
 
-        // If an Exophase URL was provided and a backend is configured, trigger scraping
-        if (exophaseUrl && getBackendBase()) {
+        // If an Exophase URL was provided, trigger scraping via backend or client-side
+        if (exophaseUrl && (getBackendBase() || GAMES_DB_TOKEN)) {
             showMsg('⏳ Scraping achievements from Exophase…', 'success');
             try {
-                const user = getCurrentUser();
-                const storedToken = user
-                    ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                       localStorage.getItem('gameOS_apiToken_pending') || '')
-                    : '';
-                const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
-                    },
-                    body: JSON.stringify({ exophaseUrl, platform: _currentModalPlatform, gameTitle: title, titleId })
-                });
-                const scrapeData = await scrapeResp.json();
-                if (scrapeData.success) {
-                    showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                if (getBackendBase()) {
+                    const user = getCurrentUser();
+                    const storedToken = user
+                        ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                           localStorage.getItem('gameOS_apiToken_pending') || '')
+                        : '';
+                    const scrapeResp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                        },
+                        body: JSON.stringify({ exophaseUrl, platform: _currentModalPlatform, gameTitle: title, titleId })
+                    });
+                    const scrapeData = await scrapeResp.json();
+                    if (scrapeData.success) {
+                        showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                    } else {
+                        showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                    }
                 } else {
-                    showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                    // No-backend path: client-side scrape + direct write via GAMES_DB_TOKEN
+                    const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
+                    if (platformFolder && /^[a-zA-Z0-9_-]+$/.test(String(titleId))) {
+                        const achievements = await _scrapeExophaseClientSide(exophaseUrl);
+                        const gamesDbPath  = `Data/${platformFolder}/Games/${String(titleId).trim()}/achievements.json`;
+                        const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
+                        await _gamesDbWriteAchievementsFile(
+                            gamesDbPath,
+                            achievements,
+                            `Add achievements for ${safeTitle} (${_currentModalPlatform}) from Exophase`
+                        );
+                        showMsg(`✅ Game updated and ${achievements.length} achievements scraped from Exophase!`, 'success');
+                    } else {
+                        showMsg('✅ Game updated successfully!', 'success');
+                    }
                 }
             } catch (scrapeErr) {
                 showMsg(`✅ Game updated. ⚠️ Exophase scrape failed: ${scrapeErr.message}`, 'success');
@@ -3536,37 +3678,73 @@ async function _adminScrapeExophaseNow() {
     if (!title)    { showScrapeMsg('⚠️ Enter the game title first.', false); return; }
     if (!titleId)  { showScrapeMsg('⚠️ Enter the Title ID first.', false); return; }
     if (!platform) { showScrapeMsg('⚠️ No platform selected for this game.', false); return; }
-    if (!getBackendBase()) { showScrapeMsg('⚠️ No backend configured.', false); return; }
+    if (!getBackendBase() && !GAMES_DB_TOKEN) {
+        showScrapeMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable scraping.', false);
+        return;
+    }
 
     if (btn)   { btn.disabled = true; btn.textContent = '⏳ Scraping…'; }
     if (msgEl) { msgEl.style.display = 'none'; }
 
     try {
-        const user  = getCurrentUser();
-        const token = user
-            ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-               localStorage.getItem('gameOS_apiToken_pending') || '')
-            : '';
-        const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-            },
-            body: JSON.stringify({ exophaseUrl: urlVal, platform, gameTitle: title, titleId })
-        });
-        const data = await resp.json();
-        if (data.success) {
+        if (getBackendBase()) {
+            // Backend path: delegate to the server-side scrape endpoint
+            const user  = getCurrentUser();
+            const token = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({ exophaseUrl: urlVal, platform, gameTitle: title, titleId })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                let downloadLink = '';
+                if (Array.isArray(data.achievements) && data.achievements.length) {
+                    const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
+                    const objUrl  = URL.createObjectURL(blob);
+                    const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                    downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+                }
+                showScrapeMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
+            } else {
+                showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
+            }
+        } else {
+            // No-backend path: fetch & parse client-side, write directly via GAMES_DB_TOKEN
+            const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[platform];
+            if (!platformFolder) {
+                showScrapeMsg(`⚠️ Unsupported platform for client-side scraping: ${escapeHtml(platform)}`, false);
+                return;
+            }
+            const safeTitleId = String(titleId).trim();
+            if (!/^[a-zA-Z0-9_-]+$/.test(safeTitleId)) {
+                showScrapeMsg('⚠️ Title ID may only contain alphanumeric characters, underscores, and hyphens.', false);
+                return;
+            }
+
+            const achievements = await _scrapeExophaseClientSide(urlVal);
+            const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+            const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
+            await _gamesDbWriteAchievementsFile(
+                gamesDbPath,
+                achievements,
+                `Add achievements for ${safeTitle} (${platform}) from Exophase`
+            );
+
             let downloadLink = '';
-            if (Array.isArray(data.achievements) && data.achievements.length) {
-                const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
+            if (achievements.length) {
+                const blob    = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
                 const objUrl  = URL.createObjectURL(blob);
                 const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
                 downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
             }
-            showScrapeMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
-        } else {
-            showScrapeMsg(`❌ ${escapeHtml(data.message)}`, false);
+            showScrapeMsg(`✅ Scraped and saved ${achievements.length} achievements to Games.Database.${downloadLink}`, true);
         }
     } catch (err) {
         showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
