@@ -3113,6 +3113,7 @@ let _currentModalGame     = null;
 let _currentModalPlatform = null;
 let _modalOnlineAchievements = [];
 let _adminEditSgdbGameId  = null;
+let _adminEditIsNewGame   = false; // true when adding a brand-new game to the database
 
 function _ensureAdminEditModal() {
     let modal = document.getElementById('adminEditModal');
@@ -3125,7 +3126,7 @@ function _ensureAdminEditModal() {
             <div class="game-modal admin-edit-modal">
                 <div class="game-modal-header">
                     <div style="flex:1;min-width:0;">
-                        <h3 class="game-modal-title">✏️ Edit Game</h3>
+                        <h3 class="game-modal-title" id="adminEditModalTitle">✏️ Edit Game</h3>
                         <p class="game-modal-platform" id="adminEditPlatform"></p>
                     </div>
                     <button class="game-modal-close" onclick="closeAdminEditModal()">✕</button>
@@ -3141,6 +3142,20 @@ function _ensureAdminEditModal() {
 function closeAdminEditModal() {
     const modal = document.getElementById('adminEditModal');
     if (modal) modal.style.display = 'none';
+    _adminEditIsNewGame = false;
+}
+
+/**
+ * Open the admin edit form in "add new game" mode.
+ * @param {string} platform  Platform name (e.g. "Switch", "PS4").
+ */
+function openAdminAddGameModal(platform) {
+    if (!isAdminUser()) return;
+    if (!platform) return;
+    _adminEditIsNewGame   = true;
+    _currentModalGame     = {};
+    _currentModalPlatform = platform;
+    openAdminEditModal({}, platform);
 }
 
 /** Returns HTML for a single background-image URL row. */
@@ -3279,18 +3294,28 @@ function openAdminEditModal(game, platform) {
     if (!isAdminUser()) return;
     game     = game     || _currentModalGame;
     platform = platform || _currentModalPlatform;
-    if (!game || !platform) return;
+    if (!platform) return;
+    // Allow game to be null/empty when adding a new game
+    if (!game && !_adminEditIsNewGame) return;
+    game = game || {};
+
+    // If called directly (not via openAdminAddGameModal), reset the new-game flag
+    if (game && Object.keys(game).length > 0) {
+        _adminEditIsNewGame = false;
+    }
 
     _adminEditSgdbGameId = null;
     const modal  = _ensureAdminEditModal();
     const bodyEl = document.getElementById('adminEditBody');
     const platEl = document.getElementById('adminEditPlatform');
+    const titleEl = document.getElementById('adminEditModalTitle');
     platEl.textContent = platform;
+    if (titleEl) titleEl.textContent = _adminEditIsNewGame ? '➕ Add New Game' : '✏️ Edit Game';
 
     const title           = game.Title       || game.game_name   || game.title       || '';
     const titleId         = game.TitleID     || game.title_id    || game.titleid     || game.id  || '';
     const description     = game.Description || game.description || '';
-    const coverUrl        = game.image       || game.cover_url   || '';
+    const coverUrl        = game.image       || game.cover_url   || game.coverUrl || '';
     const bgUrls          = (game.background_images || []).filter(Boolean);
     const trailers        = game.trailers    || [];
     const trailerUrl      = trailers.length  ? (trailers[0] || '') : '';
@@ -3412,7 +3437,7 @@ function openAdminEditModal(game, platform) {
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
             <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
-            <button type="button" class="btn" style="padding:10px 22px;" id="adminSaveBtn" onclick="handleAdminEditSave()">💾 Save Changes</button>
+            <button type="button" class="btn" style="padding:10px 22px;" id="adminSaveBtn" onclick="handleAdminEditSave()">${_adminEditIsNewGame ? '➕ Add Game' : '💾 Save Changes'}</button>
         </div>
     </form>`;
 
@@ -3438,7 +3463,11 @@ async function handleAdminEditSave() {
         showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
         return;
     }
-    if (!_currentModalGame || !_currentModalPlatform) {
+    if (!_currentModalPlatform) {
+        showMsg('❌ No platform selected.', 'error');
+        return;
+    }
+    if (!_adminEditIsNewGame && !_currentModalGame) {
         showMsg('❌ No game loaded.', 'error');
         return;
     }
@@ -3508,20 +3537,30 @@ async function handleAdminEditSave() {
             throw new Error('Unexpected games JSON format');
         }
 
-        // Locate the game by original title or title ID
-        const origTitle = (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
-        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+        // Locate the game by original title or title ID (not needed when adding a new game)
+        const origTitle = _adminEditIsNewGame ? '' : (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
+        const origId    = _adminEditIsNewGame ? '' : String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
 
-        const idx = gamesArr.findIndex(g => {
-            const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
-            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
-            return gt === origTitle || (origId && gid === origId);
-        });
+        let idx = -1;
+        let existing = {};
+        if (_adminEditIsNewGame) {
+            // Check that the new game title doesn't already exist in the platform
+            const dupIdx = gamesArr.findIndex(g => {
+                const gt = (g.Title || g.game_name || g.title || '').toLowerCase();
+                return gt === title.toLowerCase();
+            });
+            if (dupIdx !== -1) throw new Error(`A game named "${title}" already exists in the ${_currentModalPlatform} database.`);
+        } else {
+            idx = gamesArr.findIndex(g => {
+                const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
+                const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+                return gt === origTitle || (origId && gid === origId);
+            });
+            if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
+            existing = gamesArr[idx];
+        }
 
-        if (idx === -1) throw new Error('Game not found in database – it may have been renamed or removed.');
-
-        // Build the updated entry, preserving all fields the database already has
-        const existing = gamesArr[idx];
+        // Build the updated (or new) entry, preserving all fields the database already has
         const updated  = { ...existing };
 
         // Update title (preserve original field name)
@@ -3532,14 +3571,19 @@ async function handleAdminEditSave() {
         // Update title ID (preserve original field name)
         if      ('TitleID'   in updated) updated.TitleID     = titleId;
         else if ('title_id'  in updated) updated.title_id    = titleId;
+        else if (titleId && titleId.trim()) updated.TitleID = titleId;
 
         // Update description (preserve original field name)
         if ('Description' in updated) updated.Description = description;
         else                          updated.description  = description;
 
-        // Always use 'image' for cover URL across all platforms
-        if (coverUrl) updated.image = coverUrl;
-        else          delete updated.image;
+        // Always use 'image' for cover URL across all platforms.
+        // When the field is non-empty, update it.  When it is empty, preserve
+        // whatever value was already stored (prevents accidental image removal
+        // when the admin only changes the title / description).
+        if (coverUrl) {
+            updated.image = coverUrl;
+        }
 
         updated.background_images = bgUrls;
         updated.trailers           = trailers;
@@ -3556,29 +3600,43 @@ async function handleAdminEditSave() {
         if (exophaseUrl)           updated.exophaseUrl         = exophaseUrl;
         else                       delete updated.exophaseUrl;
 
-        gamesArr[idx] = updated;
+        if (_adminEditIsNewGame) {
+            gamesArr.push(updated);
+        } else {
+            gamesArr[idx] = updated;
+        }
 
         const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : gamesArr;
 
         await _gamesDbWriteFile(
             _currentModalPlatform,
             newContent,
-            `Update game: ${title} (${_currentModalPlatform})`
+            _adminEditIsNewGame
+                ? `Add game: ${title} (${_currentModalPlatform})`
+                : `Update game: ${title} (${_currentModalPlatform})`
         );
 
         // Update the in-memory browse cache so the page reflects the change immediately
         if (typeof _allBrowseGames !== 'undefined') {
-            const li = _allBrowseGames.findIndex(g =>
-                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
-            );
-            if (li !== -1) _allBrowseGames[li] = updated;
+            if (_adminEditIsNewGame) {
+                _allBrowseGames.push(updated);
+            } else {
+                const li = _allBrowseGames.findIndex(g =>
+                    (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+                );
+                if (li !== -1) _allBrowseGames[li] = updated;
+            }
         }
         if (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_currentModalPlatform]) {
             const arr = _allPlatformGames[_currentModalPlatform];
-            const li  = arr.findIndex(g =>
-                (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
-            );
-            if (li !== -1) arr[li] = updated;
+            if (_adminEditIsNewGame) {
+                arr.push(updated);
+            } else {
+                const li  = arr.findIndex(g =>
+                    (g.Title || g.game_name || g.title || '').toLowerCase() === origTitle
+                );
+                if (li !== -1) arr[li] = updated;
+            }
         }
         // Re-render the browse list so the baked-in game JSON in card onclick attributes
         // reflects the updated data (prevents showing stale game details on next card click)
@@ -3613,9 +3671,9 @@ async function handleAdminEditSave() {
                     });
                     const scrapeData = await scrapeResp.json();
                     if (scrapeData.success) {
-                        showMsg(`✅ Game updated and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
+                        showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'} and ${scrapeData.total} achievements scraped from Exophase!`, 'success');
                     } else {
-                        showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
+                        showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'}. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
                     }
                 } else {
                     // No-backend path: client-side scrape + direct write via GAMES_DB_TOKEN
@@ -3629,25 +3687,25 @@ async function handleAdminEditSave() {
                             achievements,
                             `Add achievements for ${safeTitle} (${_currentModalPlatform}) from Exophase`
                         );
-                        showMsg(`✅ Game updated and ${achievements.length} achievements scraped from Exophase!`, 'success');
+                        showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'} and ${achievements.length} achievements scraped from Exophase!`, 'success');
                     } else {
-                        showMsg('✅ Game updated successfully!', 'success');
+                        showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'} successfully!`, 'success');
                     }
                 }
             } catch (scrapeErr) {
-                showMsg(`✅ Game updated. ⚠️ Exophase scrape failed: ${scrapeErr.message}`, 'success');
+                showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'}. ⚠️ Exophase scrape failed: ${scrapeErr.message}`, 'success');
             }
         } else {
-            showMsg('✅ Game updated successfully!', 'success');
+            showMsg(`✅ Game ${_adminEditIsNewGame ? 'added' : 'updated'} successfully!`, 'success');
         }
         setTimeout(() => {
             closeAdminEditModal();
-            openGameModal(updated, _currentModalPlatform);
+            if (!_adminEditIsNewGame) openGameModal(updated, _currentModalPlatform);
         }, 1500);
     } catch (e) {
         showMsg(`❌ ${e.message}`, 'error');
     } finally {
-        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Save Changes'; }
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = _adminEditIsNewGame ? '➕ Add Game' : '💾 Save Changes'; }
     }
 }
 

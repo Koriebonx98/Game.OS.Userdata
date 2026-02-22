@@ -53,6 +53,9 @@
                         <option value="">Loading platforms…</option>
                     </select>
                     <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;margin-left:12px;"></span>
+                    <!-- Admin: Add New Game button (shown dynamically via JS) -->
+                    <button id="adminAddGameBtn" style="display:none;margin-left:14px;" class="btn"
+                        onclick="adminAddGameFromBrowse()">➕ Add New Game</button>
                 </div>
 
                 <!-- Search -->
@@ -124,6 +127,11 @@
             if (notice) notice.style.display = 'flex';
         }
         await initGamesPage();
+        // Show "Add New Game" button for admin users
+        if (typeof isAdminUser === 'function' && isAdminUser()) {
+            const addBtn = document.getElementById('adminAddGameBtn');
+            if (addBtn) addBtn.style.display = '';
+        }
         // Check URL param to open the correct tab (only for logged-in users)
         const params = new URLSearchParams(window.location.search);
         if (loggedIn && params.get('tab') === 'library') {
@@ -178,6 +186,13 @@
         const searchRow = document.getElementById('browseSearchRow');
         const msg       = document.getElementById('browseLoadingMsg');
         document.getElementById('browseSearch').value = '';
+
+        // Enable "Add New Game" only when a specific platform is selected
+        const addBtn = document.getElementById('adminAddGameBtn');
+        if (addBtn && addBtn.style.display !== 'none') {
+            addBtn.disabled = (!platform || platform === 'ALL');
+            addBtn.title    = (!platform || platform === 'ALL') ? 'Select a specific platform to add a game' : '';
+        }
 
         if (!platform) {
             listEl.innerHTML    = '';
@@ -650,6 +665,16 @@
         document.getElementById('wishlistPanelWrap').style.display = tab === 'wishlist' ? '' : 'none';
         if (tab === 'owned')    refreshOwnedGames();
         if (tab === 'wishlist') refreshWishlist();
+    }
+
+    // ── Admin: Add New Game to database ───────────────────────
+    function adminAddGameFromBrowse() {
+        if (typeof isAdminUser !== 'function' || !isAdminUser()) return;
+        const platform = _currentPlatform && _currentPlatform !== 'ALL' ? _currentPlatform : '';
+        if (!platform) return; // button is disabled in this state; nothing to do
+        if (typeof openAdminAddGameModal === 'function') {
+            openAdminAddGameModal(platform);
+        }
     }
     </script>
 </body>
