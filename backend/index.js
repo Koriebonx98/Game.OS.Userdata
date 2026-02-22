@@ -105,6 +105,50 @@ async function putGamesDbFile(path, content, message, sha) {
     await octokitGamesDb.repos.createOrUpdateFileContents(params);
 }
 
+/**
+ * Upsert a game into the platform's Games.json in Games.Database.
+ * Only runs when octokitGamesDb is configured. Errors are non-fatal.
+ */
+async function upsertGamesDbEntry(platform, title, coverUrl) {
+    if (!octokitGamesDb) return;
+    try {
+        const filePath = `${platform}.Games.json`;
+        const existing = await getGamesDbFile(filePath);
+        let gamesArr = [];
+        let topKey   = null;
+        let fileObj  = null;
+        let sha;
+        if (existing) {
+            sha = existing.sha;
+            try {
+                fileObj = JSON.parse(existing.content);
+                if (fileObj && Array.isArray(fileObj.Games)) {
+                    gamesArr = fileObj.Games; topKey = 'Games';
+                } else if (fileObj && Array.isArray(fileObj.games)) {
+                    gamesArr = fileObj.games; topKey = 'games';
+                } else if (Array.isArray(fileObj)) {
+                    gamesArr = fileObj;
+                }
+            } catch (_) {
+                // Invalid JSON in existing file; treat as empty and overwrite
+            }
+        }
+        const titleLower = title.toLowerCase();
+        const inDb = gamesArr.some(g =>
+            (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+        );
+        if (!inDb) {
+            const newGame = { Title: title };
+            if (coverUrl) newGame.image = coverUrl;
+            gamesArr.push(newGame);
+            const newContent = topKey ? { ...fileObj, [topKey]: gamesArr } : { Games: gamesArr };
+            await putGamesDbFile(filePath, newContent, `Add ${platform} game: ${title}`, sha);
+        }
+    } catch (err) {
+        console.warn(`upsertGamesDbEntry (${platform} / ${title}): non-fatal: ${err.message}`);
+    }
+}
+
 // ── Game OS API token system ──────────────────────────────────────────────────
 
 const TOKEN_PREFIX = 'gos_';
@@ -523,6 +567,12 @@ app.post('/api/game-library/add', async (req, res) => {
         library.push(entry);
 
         await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
+
+        // When admin adds a PC game, also upsert it into the Games.Database platform JSON
+        if (usernameLower === ADMIN_USERNAME_LOWER && PLATFORM_TO_GAMES_DB_FOLDER[platform]) {
+            await upsertGamesDbEntry(platform, title, coverUrl || null);
+        }
+
         res.json({ success: true, message: 'Game added to your library!' });
     } catch (err) {
         console.error('POST /api/game-library/add error:', err);
@@ -1678,6 +1728,13 @@ app.post('/api/me/games', authenticateToken, async (req, res) => {
         });
 
         await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
+
+        // When admin adds a PC game, also upsert it into the Games.Database platform JSON.
+        // /api/me/games does not accept coverUrl, so none is passed.
+        if (usernameLower === ADMIN_USERNAME_LOWER && PLATFORM_TO_GAMES_DB_FOLDER[platform]) {
+            await upsertGamesDbEntry(platform, title, null);
+        }
+
         res.json({ success: true, message: 'Game added to library.', games: library });
     } catch (err) {
         console.error('POST /api/me/games error:', err);
