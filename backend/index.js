@@ -2437,7 +2437,11 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
         await putGamesDbFileLarge(platformFile, newContent, `Add game: ${safeTitle} (${safePlatform})`);
 
         // Write game data to Data/{platformFolder}/Games/{title}/info.json
-        const platformFolder = platformToGamesDbFolder(platform);
+        // Skip PC: PC.Games.json is the source of truth (populated from the Steam
+        // catalogue).  Writing info.json under Data/PC/Games/ triggers the
+        // compile_pc_games.yml workflow which re-generates PC.Games.json from only
+        // the individual info.json files, discarding the entire Steam catalogue.
+        const platformFolder = platform !== 'PC' ? platformToGamesDbFolder(platform) : null;
         if (platformFolder) {
             const titleForPath = safeTitle
                 .replace(/\.\./g, '').replace(/[/\\]/g, '-')
@@ -2560,7 +2564,11 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
         await putGamesDbFileLarge(platformFile, newContent, `Update game: ${safeTitle} (${safePlatform})`);
 
         // Write game data to Data/{platformFolder}/Games/{title}/info.json
-        const platformFolder = platformToGamesDbFolder(platform);
+        // Skip PC: PC.Games.json is the source of truth (populated from the Steam
+        // catalogue).  Writing info.json under Data/PC/Games/ triggers the
+        // compile_pc_games.yml workflow which re-generates PC.Games.json from only
+        // the individual info.json files, discarding the entire Steam catalogue.
+        const platformFolder = platform !== 'PC' ? platformToGamesDbFolder(platform) : null;
         if (platformFolder) {
             const titleForPath = String(game.Title || game.game_name || game.title || '')
                 .replace(/\.\./g, '').replace(/[/\\]/g, '-')
