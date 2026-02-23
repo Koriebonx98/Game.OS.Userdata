@@ -3667,7 +3667,7 @@ async function handleAdminEditSave() {
             if (_platFolder) {
                 const _infoTitle = title
                     .replace(/\.\./g, '').replace(/[/\\]/g, '-')
-                    .replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100);
+                    .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
                 if (_infoTitle) {
                     try {
                         await _gamesDbWriteAchievementsFile(
@@ -4068,8 +4068,10 @@ async function handleAddPcGameToDb() {
         msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
     };
 
-    if (!GAMES_DB_TOKEN) {
-        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+    const backendBase = getBackendBase();
+
+    if (!backendBase && !GAMES_DB_TOKEN) {
+        showMsg('⚠️ No write method available. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret and re-deploy to enable editing.', 'error');
         return;
     }
 
@@ -4126,74 +4128,105 @@ async function handleAddPcGameToDb() {
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Checking…'; }
+    const newGame = { Title: title };
+    if (titleId)            newGame.TitleID            = titleId;
+    if (description)        newGame.description        = description;
+    if (coverUrl)           newGame.image              = coverUrl;
+    if (bgUrls.length)      newGame.background_images  = bgUrls;
+    if (trailers.length)    newGame.trailers            = trailers;
+    if (mods.length)        newGame.mods               = mods;
+    if (stores.length)      newGame.stores             = stores;
+    if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
+    if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
+    if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
+    if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
     try {
-        // Fetch current PC.Games.json (or start with empty array if it doesn't exist yet)
-        let gamesArr = [];
-        let topKey   = null;
-        let fileData = null;
+        if (backendBase) {
+            // ── Backend path: server fetches, de-duplicates, and writes to Games.Database ──
+            if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
 
-        const resp = await fetch(
-            `${GAMES_DB_RAW_BASE}/PC.Games.json?t=${Date.now()}`,
-            { cache: 'no-store' }
-        );
-        if (resp.ok) {
-            fileData = await resp.json();
-            if (fileData && Array.isArray(fileData.Games)) {
-                gamesArr = fileData.Games; topKey = 'Games';
-            } else if (fileData && Array.isArray(fileData.games)) {
-                gamesArr = fileData.games; topKey = 'games';
-            } else if (Array.isArray(fileData)) {
-                gamesArr = fileData;
+            const addResp = await fetch(`${backendBase}/api/admin/add-game`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                },
+                body: JSON.stringify({ platform: 'PC', game: newGame })
+            });
+            const addData = await addResp.json();
+            if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
+        } else {
+            // ── Client-side path: fetch platform JSON via Contents API and write via GAMES_DB_TOKEN ──
+            // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
+            const contentsResp = await fetch(
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+                { headers: _gamesDbHeaders() }
+            );
+            let gamesArr = [];
+            let topKey   = null;
+            let fileData = null;
+
+            if (contentsResp.ok) {
+                const fileMeta = await contentsResp.json();
+                fileData = fileMeta.content
+                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                    : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
+
+                if (fileData && Array.isArray(fileData.Games)) {
+                    gamesArr = fileData.Games; topKey = 'Games';
+                } else if (fileData && Array.isArray(fileData.games)) {
+                    gamesArr = fileData.games; topKey = 'games';
+                } else if (Array.isArray(fileData)) {
+                    gamesArr = fileData;
+                }
+            } else if (contentsResp.status !== 404) {
+                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
             }
+
+            // Check for duplicate (case-insensitive title match)
+            const titleLower = title.toLowerCase();
+            const duplicate  = gamesArr.some(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+            );
+            if (duplicate) {
+                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+                return;
+            }
+
+            gamesArr.push(newGame);
+            const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+            if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+            await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
         }
-
-        // Check for duplicate (case-insensitive title match)
-        const titleLower = title.toLowerCase();
-        const duplicate  = gamesArr.some(g =>
-            (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
-        );
-        if (duplicate) {
-            showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
-            if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
-            return;
-        }
-
-        // Build new game entry using the standard template
-        const newGame = { Title: title };
-        if (titleId)            newGame.TitleID            = titleId;
-        if (description)        newGame.description        = description;
-        if (coverUrl)           newGame.image              = coverUrl;
-        if (bgUrls.length)      newGame.background_images  = bgUrls;
-        if (trailers.length)    newGame.trailers            = trailers;
-        if (mods.length)        newGame.mods               = mods;
-        if (stores.length)      newGame.stores             = stores;
-        if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
-        if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
-        if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
-        if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
-
-        gamesArr.push(newGame);
-        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
-
-        if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-
-        await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
 
         showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
 
         // Update in-memory browse cache
-        const sorted = [...gamesArr].sort((a, b) => {
-            const na = (a.Title || a.game_name || a.title || '').toLowerCase();
-            const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
-            return na.localeCompare(nb);
-        });
-        if (typeof _allBrowseGames !== 'undefined' &&
-            (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
-            _allBrowseGames = sorted;
-        }
-        if (typeof _allPlatformGames !== 'undefined') {
-            _allPlatformGames['PC'] = sorted;
+        const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
+            ? [..._allPlatformGames['PC'], newGame]
+            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+                ? [..._allBrowseGames, newGame]
+                : null;
+        if (cachedPcGames) {
+            const sorted = cachedPcGames.sort((a, b) => {
+                const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+                const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+                return na.localeCompare(nb);
+            });
+            if (typeof _allBrowseGames !== 'undefined' &&
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+                _allBrowseGames = sorted;
+            }
+            if (typeof _allPlatformGames !== 'undefined') {
+                _allPlatformGames['PC'] = sorted;
+            }
         }
 
         setTimeout(() => {

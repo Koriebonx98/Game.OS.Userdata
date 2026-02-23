@@ -2357,6 +2357,115 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
     }
 });
 
+// ── POST /api/admin/add-game ──────────────────────────────────────────────────
+// Admin-only endpoint: add a new game entry to a Games.Database platform JSON.
+// Authentication: the caller must be the Admin.GameOS account (checked via token).
+// Body: { platform, game (new game object) }
+app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
+    try {
+        // Admin-only guard
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+
+        const { platform, game } = req.body;
+
+        if (!platform || !game || typeof game !== 'object' || Array.isArray(game)) {
+            return res.status(400).json({ success: false, message: 'platform and game (object) are required.' });
+        }
+
+        if (!octokitGamesDb) {
+            return res.status(503).json({ success: false, message: 'GAMES_DB_TOKEN is not configured on the server.' });
+        }
+
+        // Validate that the platform is known
+        if (!Object.prototype.hasOwnProperty.call(PLATFORM_TO_GAMES_DB_FOLDER, platform)) {
+            return res.status(400).json({ success: false, message: `Unknown platform: ${platform}` });
+        }
+
+        const platformFile = `${platform}.Games.json`;
+        let fileData;
+        try {
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER,
+                repo:  GAMES_DB_REPO_NAME,
+                path:  platformFile
+            });
+            if (fileMeta.content) {
+                fileData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`Failed to fetch large platform JSON: HTTP ${dlResp.status}`);
+                fileData = await dlResp.json();
+            }
+        } catch (err) {
+            if (err.status === 404) {
+                // File doesn't exist yet — start with an empty array
+                fileData = [];
+            } else {
+                throw err;
+            }
+        }
+
+        // Normalise – some files use { Games: [...] }, some use a bare array
+        let gamesArr;
+        let topKey = null;
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games;  topKey = 'Games';
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games;  topKey = 'games';
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        } else {
+            return res.status(422).json({ success: false, message: 'Unexpected games JSON format.' });
+        }
+
+        // Check for duplicate (case-insensitive title match)
+        const newTitle = String(game.Title || game.game_name || game.title || '').toLowerCase();
+        const duplicate = gamesArr.some(
+            g => (g.Title || g.game_name || g.title || '').toLowerCase() === newTitle
+        );
+        if (duplicate) {
+            return res.status(409).json({ success: false, message: `"${game.Title || game.title}" already exists in ${platformFile}.` });
+        }
+
+        gamesArr.push(game);
+        const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+        const safeTitle    = String(game.Title || game.game_name || game.title || '').replace(/[\r\n]/g, ' ').slice(0, 80);
+        const safePlatform = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+
+        await putGamesDbFileLarge(platformFile, newContent, `Add game: ${safeTitle} (${safePlatform})`);
+
+        // Write game data to Data/{platformFolder}/Games/{title}/info.json
+        const platformFolder = platformToGamesDbFolder(platform);
+        if (platformFolder) {
+            const titleForPath = safeTitle
+                .replace(/\.\./g, '').replace(/[/\\]/g, '-')
+                .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
+            if (titleForPath) {
+                const infoPath = `Data/${platformFolder}/Games/${titleForPath}/info.json`;
+                try {
+                    const existingInfo = await getGamesDbFile(infoPath);
+                    await putGamesDbFile(
+                        infoPath,
+                        game,
+                        `Add game info: ${safeTitle} (${safePlatform})`,
+                        existingInfo ? existingInfo.sha : undefined
+                    );
+                } catch (infoErr) {
+                    // Non-fatal: log but don't fail the main add
+                    console.error('add-game: failed to write info.json:', infoErr.message);
+                }
+            }
+        }
+
+        res.json({ success: true, message: `Game added successfully: ${safeTitle}` });
+    } catch (err) {
+        console.error('POST /api/admin/add-game error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── POST /api/admin/update-game ───────────────────────────────────────────────
 // Admin-only endpoint: update a game entry in a Games.Database platform JSON.
 // Authentication: the caller must be the Admin.GameOS account (checked via token).
@@ -2455,7 +2564,7 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
         if (platformFolder) {
             const titleForPath = String(game.Title || game.game_name || game.title || '')
                 .replace(/\.\./g, '').replace(/[/\\]/g, '-')
-                .replace(/[\x00-\x1f\x7f]/g, '').trim().slice(0, 100);
+                .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
             if (titleForPath) {
                 const infoPath = `Data/${platformFolder}/Games/${titleForPath}/info.json`;
                 try {
