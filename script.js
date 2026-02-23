@@ -2934,7 +2934,13 @@ async function _gamesDbWriteFile(platform, content, message) {
     // 3. Create a new blob with the updated content
     const json   = JSON.stringify(content, null, 2);
     const bytes  = new TextEncoder().encode(json);
-    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+    // Use chunked encoding to avoid creating a massive intermediate array for large files
+    // (e.g. PC.Games.json ≈33 MB).  Processing 8 KB at a time keeps peak memory low.
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    const base64 = btoa(binary);
 
     const blobResp = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
@@ -3022,7 +3028,11 @@ async function _gamesDbWriteAchievementsFile(path, content, message) {
 
     const json   = JSON.stringify(content, null, 2);
     const bytes  = new TextEncoder().encode(json);
-    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    const base64 = btoa(binary);
 
     const body = { message, content: base64, committer: { name: 'Game.OS Admin', email: ADMIN_EMAIL } };
     if (existingSha) body.sha = existingSha;
@@ -4056,14 +4066,98 @@ function closeAddPcGameModal() {
     if (modal) modal.style.display = 'none';
 }
 
+/**
+ * Client-side fallback: fetch PC.Games.json, check for duplicates, append the
+ * new game, and write back via the Git Data API.  Called by handleAddPcGameToDb
+ * when neither a backend server nor a GAMES_DB_TOKEN with Actions permission is
+ * available.  For the 33 MB PC.Games.json this approach requires downloading
+ * and uploading the full file in the browser, so it may be slow.
+ */
+async function _addPcGameClientSide(newGame, title, showMsg, saveBtn) {
+    // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
+    const contentsResp = await fetch(
+        `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+        { headers: _gamesDbHeaders() }
+    );
+    let gamesArr = [];
+    let topKey   = null;
+    let fileData = null;
+
+    if (contentsResp.ok) {
+        const fileMeta = await contentsResp.json();
+        fileData = fileMeta.content
+            ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+            : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
+
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games; topKey = 'Games';
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games; topKey = 'games';
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        }
+    } else if (contentsResp.status !== 404) {
+        throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+    }
+
+    // Check for duplicate (case-insensitive title match)
+    const titleLower = title.toLowerCase();
+    const duplicate  = gamesArr.some(g =>
+        (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+    );
+    if (duplicate) {
+        showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+        return;
+    }
+
+    gamesArr.push(newGame);
+    const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+    await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+    showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+
+    // Update in-memory browse cache
+    const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
+        ? [..._allPlatformGames['PC'], newGame]
+        : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+            ? [..._allBrowseGames, newGame]
+            : null;
+    if (cachedPcGames) {
+        const sorted = cachedPcGames.sort((a, b) => {
+            const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+            const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+            return na.localeCompare(nb);
+        });
+        if (typeof _allBrowseGames !== 'undefined' &&
+            (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+            _allBrowseGames = sorted;
+        }
+        if (typeof _allPlatformGames !== 'undefined') {
+            _allPlatformGames['PC'] = sorted;
+        }
+    }
+
+    setTimeout(() => {
+        closeAddPcGameModal();
+        if (typeof _currentPlatform !== 'undefined') {
+            if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                renderBrowseGamesGrouped(_allPlatformGames,
+                    (document.getElementById('browseSearch') || {}).value || '');
+            } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                renderBrowseGames(_allBrowseGames);
+            }
+        }
+    }, 1500);
+}
+
 async function handleAddPcGameToDb() {
-    if (!isAdminUser()) return;
 
     const saveBtn = document.getElementById('addPcGameSaveBtn');
     const msgEl   = document.getElementById('addPcGameMsg');
-    const showMsg = (text, type) => {
+    const showMsg = (text, type, isHtml) => {
         if (!msgEl) return;
-        msgEl.textContent = text;
+        if (isHtml) msgEl.innerHTML = text;
+        else msgEl.textContent = text;
         msgEl.style.display = '';
         msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
     };
@@ -4161,49 +4255,48 @@ async function handleAddPcGameToDb() {
             });
             const addData = await addResp.json();
             if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
-        } else {
-            // ── Client-side path: fetch platform JSON via Contents API and write via GAMES_DB_TOKEN ──
-            // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
-            const contentsResp = await fetch(
-                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
-                { headers: _gamesDbHeaders() }
-            );
-            let gamesArr = [];
-            let topKey   = null;
-            let fileData = null;
+        } else if (GAMES_DB_TOKEN) {
+            // ── Workflow dispatch path (preferred when no backend) ──────────────────
+            // Dispatches a GitHub Actions workflow that runs server-side, avoiding the
+            // unreliable client-side approach of downloading and re-uploading the full
+            // 33 MB PC.Games.json in the browser.  Falls back to the direct client-side
+            // path only when the token lacks the required Actions write permission.
+            if (saveBtn) saveBtn.textContent = '⏳ Dispatching workflow…';
+            const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/add-pc-game.yml/dispatches`;
+            const dispatchResp = await fetch(dispatchUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ref: 'main', inputs: { game_json: JSON.stringify(newGame) } })
+            });
 
-            if (contentsResp.ok) {
-                const fileMeta = await contentsResp.json();
-                fileData = fileMeta.content
-                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
-                    : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
-
-                if (fileData && Array.isArray(fileData.Games)) {
-                    gamesArr = fileData.Games; topKey = 'Games';
-                } else if (fileData && Array.isArray(fileData.games)) {
-                    gamesArr = fileData.games; topKey = 'games';
-                } else if (Array.isArray(fileData)) {
-                    gamesArr = fileData;
-                }
-            } else if (contentsResp.status !== 404) {
-                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
-            }
-
-            // Check for duplicate (case-insensitive title match)
-            const titleLower = title.toLowerCase();
-            const duplicate  = gamesArr.some(g =>
-                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
-            );
-            if (duplicate) {
-                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+            if (dispatchResp.status === 204) {
+                // Workflow accepted – show a link to the Actions run page
+                const actionsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/add-pc-game.yml`;
+                showMsg(
+                    `✅ "${escapeHtml(title)}" is being added via a GitHub Actions workflow. ` +
+                    `<a href="${escapeHtml(actionsUrl)}" target="_blank" rel="noopener" style="color:inherit;text-decoration:underline;">View progress →</a>`,
+                    'success', true
+                );
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
                 return;
             }
 
-            gamesArr.push(newGame);
-            const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+            // Token lacks Actions permission (403/404) – fall back to the direct client-side path.
+            // 422 or other errors are treated as unrecoverable.
+            if (dispatchResp.status !== 403 && dispatchResp.status !== 404) {
+                const errData = await dispatchResp.json().catch(() => ({}));
+                throw new Error(errData.message || `Workflow dispatch failed (HTTP ${dispatchResp.status}).`);
+            }
+            // 403/404 fall-through: token only has Contents permission, not Actions.
+            // Use the direct client-side path as a fallback.
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-            await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+            await _addPcGameClientSide(newGame, title, showMsg, saveBtn);
+            return;
         }
 
         showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
