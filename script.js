@@ -2589,18 +2589,49 @@ function _isNonGame(title) {
 }
 
 async function fetchGamesDbPlatform(platform) {
-    const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
-    if (!resp.ok) {
-        if (resp.status === 404) return [];
-        throw new Error(`Failed to load ${platform} games`);
+    let games = [];
+    try {
+        const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
+        if (!resp.ok) {
+            if (resp.status !== 404) {
+                const err = new Error(`Failed to load ${platform} games`);
+                err._gamesDbFetchError = true;
+                throw err;
+            }
+        } else {
+            const data = await resp.json();
+            if (data.Games && Array.isArray(data.Games)) games = data.Games;
+            else if (Array.isArray(data.games)) games = data.games;
+            else if (Array.isArray(data)) games = data;
+            else { const err = new Error('Invalid games JSON format'); err._gamesDbFetchError = true; throw err; }
+        }
+    } catch (e) {
+        // If remote fetch fails, fall through with empty list so custom games still show.
+        // Re-throw unexpected errors (e.g. network issues that are not our tagged errors).
+        if (!e._gamesDbFetchError) throw e;
     }
-    const data = await resp.json();
-    let games;
-    if (data.Games && Array.isArray(data.Games)) games = data.Games;
-    else if (Array.isArray(data.games)) games = data.games;
-    else if (Array.isArray(data)) games = data;
-    else throw new Error('Invalid games JSON format');
+    // Merge in locally-added (demo-mode) custom games, avoiding duplicates with remote entries
+    const customGames = getCustomGamesDb(platform);
+    if (customGames.length) {
+        const remoteSet = new Set(games.map(g => (g.Title || g.game_name || g.title || '').toLowerCase()));
+        games = [...games, ...customGames.filter(g => !remoteSet.has((g.Title || g.title || '').toLowerCase()))];
+    }
     return games.filter(g => !_isNonGame(g.Title || g.game_name || g.title || ''));
+}
+
+// ── Custom games database (localStorage, used in demo mode / when GAMES_DB_TOKEN is absent) ──
+
+function _customGamesDbKey(platform) {
+    return `gameOS_customGames_${platform}`;
+}
+
+function getCustomGamesDb(platform) {
+    try { return JSON.parse(localStorage.getItem(_customGamesDbKey(platform)) || '[]'); }
+    catch { return []; }
+}
+
+function saveCustomGamesDb(platform, games) {
+    localStorage.setItem(_customGamesDbKey(platform), JSON.stringify(games));
 }
 
 // ============================================================
@@ -3137,6 +3168,7 @@ let _currentModalGame     = null;
 let _currentModalPlatform = null;
 let _modalOnlineAchievements = [];
 let _adminEditSgdbGameId  = null;
+let _addGamePlatform      = 'PC'; // Platform selected when opening the Add Game modal
 
 function _ensureAdminEditModal() {
     let modal = document.getElementById('adminEditModal');
@@ -3507,8 +3539,14 @@ async function handleAdminEditSave() {
     const backendBase = getBackendBase();
 
     if (!backendBase && !GAMES_DB_TOKEN) {
-        showMsg('⚠️ No write method available. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret and re-deploy to enable editing.', 'error');
-        return;
+        if (!_currentModalGame || !_currentModalPlatform) {
+            showMsg('❌ No game loaded.', 'error');
+            return;
+        }
+        if (!_currentModalGame._custom) {
+            showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to edit remote games.', 'error');
+            return;
+        }
     }
     if (!_currentModalGame || !_currentModalPlatform) {
         showMsg('❌ No game loaded.', 'error');
@@ -3580,7 +3618,18 @@ async function handleAdminEditSave() {
     try {
         let updated;
 
-        if (backendBase) {
+        if (!backendBase && !GAMES_DB_TOKEN) {
+            // ── Demo / offline path: update the locally-stored custom game entry ──
+            updated = _buildUpdatedGameEntry(_currentModalGame, {
+                title, titleId, description, coverUrl, bgUrls, trailers,
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+            });
+            updated._custom = true;
+            const custom = getCustomGamesDb(_currentModalPlatform);
+            const idx = custom.findIndex(g => (g.Title || g.title || '').toLowerCase() === origTitle);
+            if (idx !== -1) custom[idx] = updated; else custom.push(updated);
+            saveCustomGamesDb(_currentModalPlatform, custom);
+        } else if (backendBase) {
             // ── Backend path: server fetches, patches, and writes to Games.Database ──
             const user = getCurrentUser();
             const storedToken = user
@@ -3787,7 +3836,44 @@ async function handleAdminDeleteGame() {
     };
 
     if (!GAMES_DB_TOKEN) {
-        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.', 'error');
+        // Demo/offline mode: only custom (locally-added) games can be deleted
+        if (_currentModalGame._custom) {
+            const custom     = getCustomGamesDb(_currentModalPlatform);
+            const titleLower = title.toLowerCase();
+            const updated    = custom.filter(g => (g.Title || g.title || '').toLowerCase() !== titleLower);
+            saveCustomGamesDb(_currentModalPlatform, updated);
+            // Update in-memory cache
+            if (typeof _allBrowseGames !== 'undefined') {
+                _allBrowseGames = _allBrowseGames.filter(
+                    g => (g.Title || g.game_name || g.title || '').toLowerCase() !== titleLower
+                );
+            }
+            if (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_currentModalPlatform]) {
+                _allPlatformGames[_currentModalPlatform] = _allPlatformGames[_currentModalPlatform].filter(
+                    g => (g.Title || g.game_name || g.title || '').toLowerCase() !== titleLower
+                );
+            }
+            const msgEl2 = document.getElementById('adminEditMsg');
+            if (msgEl2) {
+                msgEl2.textContent = `✅ "${title}" removed locally.`;
+                msgEl2.style.display = '';
+                msgEl2.className = 'admin-edit-msg admin-edit-msg--success';
+            }
+            setTimeout(() => {
+                closeAdminEditModal();
+                closeGameModal();
+                if (typeof _currentPlatform !== 'undefined') {
+                    if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                        renderBrowseGamesGrouped(_allPlatformGames,
+                            (document.getElementById('browseSearch') || {}).value || '');
+                    } else if (typeof renderBrowseGames === 'function') {
+                        renderBrowseGames(_allBrowseGames);
+                    }
+                }
+            }, 1200);
+            return;
+        }
+        showMsg('⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to delete remote games.', 'error');
         return;
     }
 
@@ -3917,7 +4003,7 @@ function _buildUpdatedGameEntry(existing, fields) {
 }
 
 // ============================================================
-// ADD PC GAME TO DATABASE
+// ADD GAME TO DATABASE (any platform)
 // ============================================================
 
 function _ensureAddPcGameModal() {
@@ -3931,8 +4017,8 @@ function _ensureAddPcGameModal() {
             <div class="game-modal admin-edit-modal">
                 <div class="game-modal-header">
                     <div style="flex:1;min-width:0;">
-                        <h3 class="game-modal-title">🖥️ Add PC Game</h3>
-                        <p class="game-modal-platform">PC</p>
+                        <h3 class="game-modal-title" id="addPcGameModalTitle">➕ Add Game</h3>
+                        <p class="game-modal-platform" id="addPcGameModalPlatform"></p>
                     </div>
                     <button class="game-modal-close" onclick="closeAddPcGameModal()" aria-label="Close dialog">✕</button>
                 </div>
@@ -3944,9 +4030,15 @@ function _ensureAddPcGameModal() {
     return modal;
 }
 
-function openAddPcGameModal() {
+function openAddPcGameModal(platform) {
     if (!isAdminUser()) return;
+    _addGamePlatform = platform || 'PC';
     const modal  = _ensureAddPcGameModal();
+    // Update modal title and platform label dynamically
+    const titleEl = document.getElementById('addPcGameModalTitle');
+    const platEl  = document.getElementById('addPcGameModalPlatform');
+    if (titleEl) titleEl.textContent = `➕ Add ${_addGamePlatform} Game`;
+    if (platEl)  platEl.textContent  = _addGamePlatform;
     const bodyEl = document.getElementById('addPcGameBody');
     const hasSgdb = !!STEAMGRID_KEY;
 
@@ -4070,11 +4162,6 @@ async function handleAddPcGameToDb() {
 
     const backendBase = getBackendBase();
 
-    if (!backendBase && !GAMES_DB_TOKEN) {
-        showMsg('⚠️ No write method available. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret and re-deploy to enable editing.', 'error');
-        return;
-    }
-
     const title       = ((document.getElementById('pcGameTitle')      || {}).value || '').trim();
     // Scope all remaining field lookups to this form so they don't accidentally read
     // values from the co-existing "Edit Game" modal which shares the same element IDs.
@@ -4142,7 +4229,43 @@ async function handleAddPcGameToDb() {
     if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
     try {
-        if (backendBase) {
+        if (!backendBase && !GAMES_DB_TOKEN) {
+            // ── Demo / offline path: save to localStorage so the game appears immediately ──
+            if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+            const existing  = getCustomGamesDb(_addGamePlatform);
+            const titleLower = title.toLowerCase();
+            const duplicate  = existing.some(g => (g.Title || g.title || '').toLowerCase() === titleLower);
+            if (duplicate) {
+                showMsg(`⚠️ "${title}" already exists locally for ${_addGamePlatform}.`, 'error');
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+                return;
+            }
+            newGame._custom = true; // flag so edit/delete know it's a local entry
+            existing.push(newGame);
+            saveCustomGamesDb(_addGamePlatform, existing);
+            showMsg(`✅ "${title}" added locally (demo mode – not saved to Games.Database).`, 'success');
+            // Update in-memory cache
+            if (typeof _allPlatformGames !== 'undefined') {
+                const byPlatform = [...(_allPlatformGames[_addGamePlatform] || []), newGame];
+                byPlatform.sort((a, b) => (a.Title || a.title || '').localeCompare(b.Title || b.title || ''));
+                _allPlatformGames[_addGamePlatform] = byPlatform;
+            }
+            if (typeof _allBrowseGames !== 'undefined' &&
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform)) {
+                _allBrowseGames = [..._allBrowseGames, newGame];
+                _allBrowseGames.sort((a, b) => (a.Title || a.title || '').localeCompare(b.Title || b.title || ''));
+            }
+            setTimeout(() => {
+                closeAddPcGameModal();
+                if (typeof _currentPlatform !== 'undefined') {
+                    if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                        renderBrowseGamesGrouped(_allPlatformGames, (document.getElementById('browseSearch') || {}).value || '');
+                    } else if (_currentPlatform === _addGamePlatform && typeof renderBrowseGames === 'function') {
+                        renderBrowseGames(_allBrowseGames);
+                    }
+                }
+            }, 1500);
+        } else if (backendBase) {
             // ── Backend path: server fetches, de-duplicates, and writes to Games.Database ──
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
             const user = getCurrentUser();
@@ -4157,15 +4280,16 @@ async function handleAddPcGameToDb() {
                     'Content-Type': 'application/json',
                     ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
                 },
-                body: JSON.stringify({ platform: 'PC', game: newGame })
+                body: JSON.stringify({ platform: _addGamePlatform, game: newGame })
             });
             const addData = await addResp.json();
             if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
         } else {
             // ── Client-side path: fetch platform JSON via Contents API and write via GAMES_DB_TOKEN ──
             // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
+            const platformJsonFile = `${_addGamePlatform}.Games.json`;
             const contentsResp = await fetch(
-                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent(platformJsonFile)}`,
                 { headers: _gamesDbHeaders() }
             );
             let gamesArr = [];
@@ -4186,7 +4310,7 @@ async function handleAddPcGameToDb() {
                     gamesArr = fileData;
                 }
             } else if (contentsResp.status !== 404) {
-                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+                throw new Error(`Failed to fetch ${platformJsonFile} (HTTP ${contentsResp.status})`);
             }
 
             // Check for duplicate (case-insensitive title match)
@@ -4195,7 +4319,7 @@ async function handleAddPcGameToDb() {
                 (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
             );
             if (duplicate) {
-                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+                showMsg(`⚠️ "${title}" already exists in ${platformJsonFile}.`, 'error');
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
                 return;
             }
@@ -4203,29 +4327,29 @@ async function handleAddPcGameToDb() {
             gamesArr.push(newGame);
             const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-            await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+            await _gamesDbWriteFile(_addGamePlatform, newContent, `Add ${_addGamePlatform} game: ${title}`);
         }
 
-        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+        showMsg(`✅ "${title}" added to ${_addGamePlatform}.Games.json!`, 'success');
 
         // Update in-memory browse cache
-        const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
-            ? [..._allPlatformGames['PC'], newGame]
-            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+        const cachedGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_addGamePlatform])
+            ? [..._allPlatformGames[_addGamePlatform], newGame]
+            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform))
                 ? [..._allBrowseGames, newGame]
                 : null;
-        if (cachedPcGames) {
-            const sorted = cachedPcGames.sort((a, b) => {
+        if (cachedGames) {
+            const sorted = cachedGames.sort((a, b) => {
                 const na = (a.Title || a.game_name || a.title || '').toLowerCase();
                 const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
                 return na.localeCompare(nb);
             });
             if (typeof _allBrowseGames !== 'undefined' &&
-                (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform)) {
                 _allBrowseGames = sorted;
             }
             if (typeof _allPlatformGames !== 'undefined') {
-                _allPlatformGames['PC'] = sorted;
+                _allPlatformGames[_addGamePlatform] = sorted;
             }
         }
 
@@ -4235,7 +4359,7 @@ async function handleAddPcGameToDb() {
                 if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
                     renderBrowseGamesGrouped(_allPlatformGames,
                         (document.getElementById('browseSearch') || {}).value || '');
-                } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                } else if (_currentPlatform === _addGamePlatform && typeof renderBrowseGames === 'function') {
                     renderBrowseGames(_allBrowseGames);
                 }
             }
