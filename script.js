@@ -2578,13 +2578,14 @@ async function fetchGamesDbPlatforms() {
 
 /**
  * Returns true if the given title represents a non-game entry such as a demo,
- * trailer, DLC, season pass, artbook, wallpaper, or dedicated server tool.
+ * trailer, DLC, season pass, artbook, wallpaper, dedicated server tool,
+ * macOS/OSX release, personalization pack, or content/map pack.
  * Uses whole-word matching to avoid false positives (e.g. "Demoman", "Democracy").
  */
 function _isNonGame(title) {
     if (!title) return false;
     const t = title.toLowerCase();
-    return /\b(demo|trailer|dlc|playtest|season pass|downloadable content|artbook|art book|wallpaper|dedicated server|server tool)\b/.test(t);
+    return /\b(demo|trailer|playtest|season pass|downloadable content|artbook|art book|wallpaper|dedicated server|server tool|osx|os x|personalization|pack)\b|\bdlc/.test(t);
 }
 
 async function fetchGamesDbPlatform(platform) {
