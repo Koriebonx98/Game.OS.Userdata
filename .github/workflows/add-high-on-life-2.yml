@@ -1,0 +1,176 @@
+# Add "High on Life 2" to PC.Games.json in Koriebonx98/Games.Database
+#
+# Runs immediately on push to the branch that introduces this file, and can
+# also be triggered manually via workflow_dispatch.
+#
+# Required secret:
+#   GAMES_DB_TOKEN  – fine-grained PAT with Contents: Read and write on
+#                     Koriebonx98/Games.Database.
+
+name: Add High on Life 2 to PC.Games.json
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/add-high-on-life-2.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  add-game:
+    name: Add "High on Life 2" to PC.Games.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check for GAMES_DB_TOKEN
+        run: |
+          if [ -z "${{ secrets.GAMES_DB_TOKEN }}" ]; then
+            echo "❌ GAMES_DB_TOKEN secret is not set."
+            echo "   Add a fine-grained PAT with Contents: Read and write on"
+            echo "   Koriebonx98/Games.Database as the GAMES_DB_TOKEN secret."
+            exit 1
+          fi
+          echo "✅ GAMES_DB_TOKEN is present."
+
+      - name: Add game to PC.Games.json
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, sys
+          import urllib.request, urllib.error
+
+          TOKEN  = os.environ['GAMES_DB_TOKEN']
+          OWNER  = 'Koriebonx98'
+          REPO   = 'Games.Database'
+          PATH   = 'PC.Games.json'
+          API    = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/{PATH}'
+
+          NEW_GAME = {
+              'Title':  'High on Life 2',
+              'appid':  2069250,
+              'stores': [
+                  {
+                      'name': 'Steam',
+                      'url':  'https://store.steampowered.com/app/2069250/',
+                  }
+              ],
+          }
+
+          HEADERS = {
+              'Authorization':        f'Bearer {TOKEN}',
+              'Accept':               'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type':         'application/json',
+          }
+
+          # ── 1. Fetch current PC.Games.json ────────────────────────────────────
+          print(f'⬇️  Fetching {PATH} metadata …')
+          req = urllib.request.Request(API, headers=HEADERS)
+          try:
+              with urllib.request.urlopen(req) as resp:
+                  meta = json.loads(resp.read())
+              if meta.get('content'):
+                  raw = base64.b64decode(meta['content'].replace('\n', ''))
+                  data = json.loads(raw)
+              else:
+                  print(f'   File is large — fetching via download_url …')
+                  with urllib.request.urlopen(meta['download_url']) as resp:
+                      data = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              print(f'❌ Failed to fetch {PATH}: HTTP {e.code}')
+              sys.exit(1)
+
+          # ── 2. Locate games array ─────────────────────────────────────────────
+          if isinstance(data, dict) and isinstance(data.get('Games'), list):
+              games = data['Games']
+              top_key = 'Games'
+          elif isinstance(data, dict) and isinstance(data.get('games'), list):
+              games = data['games']
+              top_key = 'games'
+          elif isinstance(data, list):
+              games = data
+              top_key = None
+          else:
+              print('❌ Unexpected PC.Games.json format.')
+              sys.exit(1)
+
+          print(f'   Current game count: {len(games)}')
+
+          # ── 3. Duplicate check ────────────────────────────────────────────────
+          target = NEW_GAME['Title'].lower()
+          for g in games:
+              existing = (g.get('Title') or g.get('game_name') or g.get('title') or '').lower()
+              if existing == target:
+                  print(f'ℹ️  "{NEW_GAME["Title"]}" already exists in {PATH} — nothing to do.')
+                  sys.exit(0)
+
+          # ── 4. Append the new game ────────────────────────────────────────────
+          games.append(NEW_GAME)
+          if top_key:
+              data[top_key] = games
+          # else: data IS games (bare list) — already updated in-place via append
+          print(f'   Added "{NEW_GAME["Title"]}" (appid {NEW_GAME["appid"]})')
+
+          # ── 5. Get current branch tip SHA ─────────────────────────────────────
+          ref_url = f'https://api.github.com/repos/{OWNER}/{REPO}/git/ref/heads/main'
+          with urllib.request.urlopen(
+                  urllib.request.Request(ref_url, headers=HEADERS)) as r:
+              latest_sha = json.loads(r.read())['object']['sha']
+
+          # ── 6. Get the commit's tree SHA ──────────────────────────────────────
+          commit_url = f'https://api.github.com/repos/{OWNER}/{REPO}/git/commits/{latest_sha}'
+          with urllib.request.urlopen(
+                  urllib.request.Request(commit_url, headers=HEADERS)) as r:
+              tree_sha = json.loads(r.read())['tree']['sha']
+
+          # ── 7. Create a blob with the updated content ─────────────────────────
+          print('⬆️  Creating blob …')
+          content_bytes = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
+          encoded = base64.b64encode(content_bytes).decode('ascii')
+          blob_body = json.dumps({'content': encoded, 'encoding': 'base64'}).encode('utf-8')
+          blob_req = urllib.request.Request(
+              f'https://api.github.com/repos/{OWNER}/{REPO}/git/blobs',
+              data=blob_body, headers=HEADERS, method='POST')
+          with urllib.request.urlopen(blob_req) as r:
+              blob_sha = json.loads(r.read())['sha']
+
+          # ── 8. Create a new tree ──────────────────────────────────────────────
+          tree_body = json.dumps({
+              'base_tree': tree_sha,
+              'tree': [{'path': PATH, 'mode': '100644', 'type': 'blob', 'sha': blob_sha}],
+          }).encode('utf-8')
+          tree_req = urllib.request.Request(
+              f'https://api.github.com/repos/{OWNER}/{REPO}/git/trees',
+              data=tree_body, headers=HEADERS, method='POST')
+          with urllib.request.urlopen(tree_req) as r:
+              new_tree_sha = json.loads(r.read())['sha']
+
+          # ── 9. Create the commit ──────────────────────────────────────────────
+          commit_body = json.dumps({
+              'message':  f'Add PC game: High on Life 2',
+              'tree':     new_tree_sha,
+              'parents':  [latest_sha],
+              'author':   {'name': 'Game.OS Admin', 'email': 'admin@gameos.local'},
+          }).encode('utf-8')
+          commit_req = urllib.request.Request(
+              f'https://api.github.com/repos/{OWNER}/{REPO}/git/commits',
+              data=commit_body, headers=HEADERS, method='POST')
+          with urllib.request.urlopen(commit_req) as r:
+              new_commit_sha = json.loads(r.read())['sha']
+
+          # ── 10. Update the branch ref ─────────────────────────────────────────
+          update_body = json.dumps({'sha': new_commit_sha}).encode('utf-8')
+          update_req = urllib.request.Request(
+              f'https://api.github.com/repos/{OWNER}/{REPO}/git/refs/heads/main',
+              data=update_body, headers=HEADERS, method='PATCH')
+          with urllib.request.urlopen(update_req) as r:
+              result = json.loads(r.read())
+
+          print(f'✅ "{NEW_GAME["Title"]}" added to {OWNER}/{REPO}/{PATH}')
+          print(f'   Commit: {new_commit_sha[:7]}')
+          print(f'   Total games: {len(games)}')
+          PYEOF
