@@ -2576,6 +2576,17 @@ async function fetchGamesDbPlatforms() {
     return [...GAMES_DB_PLATFORMS];
 }
 
+/**
+ * Returns true if the given title represents a non-game entry such as a demo,
+ * trailer, DLC, season pass, artbook, wallpaper, or dedicated server tool.
+ * Uses whole-word matching to avoid false positives (e.g. "Demoman", "Democracy").
+ */
+function _isNonGame(title) {
+    if (!title) return false;
+    const t = title.toLowerCase();
+    return /\b(demo|trailer|dlc|playtest|season pass|downloadable content|artbook|art book|wallpaper|dedicated server|server tool)\b/.test(t);
+}
+
 async function fetchGamesDbPlatform(platform) {
     const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
     if (!resp.ok) {
@@ -2583,10 +2594,12 @@ async function fetchGamesDbPlatform(platform) {
         throw new Error(`Failed to load ${platform} games`);
     }
     const data = await resp.json();
-    if (data.Games && Array.isArray(data.Games)) return data.Games;
-    if (Array.isArray(data.games)) return data.games;
-    if (Array.isArray(data)) return data;
-    throw new Error('Invalid games JSON format');
+    let games;
+    if (data.Games && Array.isArray(data.Games)) games = data.Games;
+    else if (Array.isArray(data.games)) games = data.games;
+    else if (Array.isArray(data)) games = data;
+    else throw new Error('Invalid games JSON format');
+    return games.filter(g => !_isNonGame(g.Title || g.game_name || g.title || ''));
 }
 
 // ============================================================
