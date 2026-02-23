@@ -276,7 +276,11 @@
             w => w.platform === platform &&
                  (w.title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()
         );
-        const gameJsonAttr = escapeHtml(JSON.stringify(g).replace(/'/g, '&#39;'));
+        // Store game JSON in a data attribute to avoid inline-onclick escaping issues.
+        // Using data-* with escapeHtml is safe: the browser decodes HTML entities when
+        // accessing dataset.gameJson, so JSON.parse always receives valid JSON even for
+        // game titles that contain single quotes, double quotes, or other special chars.
+        const gameJsonAttr = escapeHtml(JSON.stringify(g));
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
         const coverIcon    = getPlatformIcon(platform);
@@ -287,7 +291,7 @@
 
         const addBtnHtml = _isLoggedIn
             ? `<button class="btn-add-game ${owned ? 'btn-owned' : ''}"
-                onclick="event.stopPropagation(); handleAddGame(this, '${gameJsonAttr}', '${platEsc}')"
+                onclick="event.stopPropagation(); handleAddGame(this, this.closest('.games-browse-item').dataset.gameJson, this.closest('.games-browse-item').dataset.platform)"
                 ${owned ? 'disabled' : ''}>
                 ${owned ? '✅ Owned' : '+ Add'}
             </button>`
@@ -296,13 +300,13 @@
         const wishlistBtnHtml = _isLoggedIn
             ? `<button class="btn-wishlist ${wishlisted ? 'btn-wishlisted' : ''}"
                 title="${wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}"
-                onclick="event.stopPropagation(); handleToggleWishlist(this, '${gameJsonAttr}', '${platEsc}')">
+                onclick="event.stopPropagation(); handleToggleWishlist(this, this.closest('.games-browse-item').dataset.gameJson, this.closest('.games-browse-item').dataset.platform)">
                 ${wishlisted ? '⭐' : '☆'}
             </button>`
             : '';
 
         return `
-        <div class="games-browse-item clickable" onclick="openGameModal('${gameJsonAttr}', '${platEsc}')">
+        <div class="games-browse-item clickable" data-game-json="${gameJsonAttr}" data-platform="${platEsc}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
             ${coverHtml}
             <div class="games-browse-info">
                 <span class="games-browse-title">${title}</span>

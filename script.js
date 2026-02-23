@@ -2934,7 +2934,13 @@ async function _gamesDbWriteFile(platform, content, message) {
     // 3. Create a new blob with the updated content
     const json   = JSON.stringify(content, null, 2);
     const bytes  = new TextEncoder().encode(json);
-    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+    // Use chunked encoding to avoid a massive intermediate string for large files
+    // (e.g. PC.Games.json ≈33 MB).  Processing 8 KB at a time keeps peak memory low.
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    const base64 = btoa(binary);
 
     const blobResp = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
@@ -3022,7 +3028,12 @@ async function _gamesDbWriteAchievementsFile(path, content, message) {
 
     const json   = JSON.stringify(content, null, 2);
     const bytes  = new TextEncoder().encode(json);
-    const base64 = btoa(Array.from(bytes, b => String.fromCharCode(b)).join(''));
+    // Use chunked encoding to avoid a massive intermediate string for large files.
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 8192));
+    }
+    const base64 = btoa(binary);
 
     const body = { message, content: base64, committer: { name: 'Game.OS Admin', email: ADMIN_EMAIL } };
     if (existingSha) body.sha = existingSha;
