@@ -3137,6 +3137,7 @@ let _currentModalGame     = null;
 let _currentModalPlatform = null;
 let _modalOnlineAchievements = [];
 let _adminEditSgdbGameId  = null;
+let _addGamePlatform      = 'PC'; // Platform selected when opening the Add Game modal
 
 function _ensureAdminEditModal() {
     let modal = document.getElementById('adminEditModal');
@@ -3917,7 +3918,7 @@ function _buildUpdatedGameEntry(existing, fields) {
 }
 
 // ============================================================
-// ADD PC GAME TO DATABASE
+// ADD GAME TO DATABASE (any platform)
 // ============================================================
 
 function _ensureAddPcGameModal() {
@@ -3931,8 +3932,8 @@ function _ensureAddPcGameModal() {
             <div class="game-modal admin-edit-modal">
                 <div class="game-modal-header">
                     <div style="flex:1;min-width:0;">
-                        <h3 class="game-modal-title">🖥️ Add PC Game</h3>
-                        <p class="game-modal-platform">PC</p>
+                        <h3 class="game-modal-title" id="addPcGameModalTitle">➕ Add Game</h3>
+                        <p class="game-modal-platform" id="addPcGameModalPlatform"></p>
                     </div>
                     <button class="game-modal-close" onclick="closeAddPcGameModal()" aria-label="Close dialog">✕</button>
                 </div>
@@ -3944,9 +3945,15 @@ function _ensureAddPcGameModal() {
     return modal;
 }
 
-function openAddPcGameModal() {
+function openAddPcGameModal(platform) {
     if (!isAdminUser()) return;
+    _addGamePlatform = platform || 'PC';
     const modal  = _ensureAddPcGameModal();
+    // Update modal title and platform label dynamically
+    const titleEl = document.getElementById('addPcGameModalTitle');
+    const platEl  = document.getElementById('addPcGameModalPlatform');
+    if (titleEl) titleEl.textContent = `➕ Add ${_addGamePlatform} Game`;
+    if (platEl)  platEl.textContent  = _addGamePlatform;
     const bodyEl = document.getElementById('addPcGameBody');
     const hasSgdb = !!STEAMGRID_KEY;
 
@@ -4157,15 +4164,16 @@ async function handleAddPcGameToDb() {
                     'Content-Type': 'application/json',
                     ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
                 },
-                body: JSON.stringify({ platform: 'PC', game: newGame })
+                body: JSON.stringify({ platform: _addGamePlatform, game: newGame })
             });
             const addData = await addResp.json();
             if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
         } else {
             // ── Client-side path: fetch platform JSON via Contents API and write via GAMES_DB_TOKEN ──
             // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
+            const platformJsonFile = `${_addGamePlatform}.Games.json`;
             const contentsResp = await fetch(
-                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent(platformJsonFile)}`,
                 { headers: _gamesDbHeaders() }
             );
             let gamesArr = [];
@@ -4186,7 +4194,7 @@ async function handleAddPcGameToDb() {
                     gamesArr = fileData;
                 }
             } else if (contentsResp.status !== 404) {
-                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+                throw new Error(`Failed to fetch ${platformJsonFile} (HTTP ${contentsResp.status})`);
             }
 
             // Check for duplicate (case-insensitive title match)
@@ -4195,7 +4203,7 @@ async function handleAddPcGameToDb() {
                 (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
             );
             if (duplicate) {
-                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+                showMsg(`⚠️ "${title}" already exists in ${platformJsonFile}.`, 'error');
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
                 return;
             }
@@ -4203,29 +4211,29 @@ async function handleAddPcGameToDb() {
             gamesArr.push(newGame);
             const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-            await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+            await _gamesDbWriteFile(_addGamePlatform, newContent, `Add ${_addGamePlatform} game: ${title}`);
         }
 
-        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+        showMsg(`✅ "${title}" added to ${_addGamePlatform}.Games.json!`, 'success');
 
         // Update in-memory browse cache
-        const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
-            ? [..._allPlatformGames['PC'], newGame]
-            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+        const cachedGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_addGamePlatform])
+            ? [..._allPlatformGames[_addGamePlatform], newGame]
+            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform))
                 ? [..._allBrowseGames, newGame]
                 : null;
-        if (cachedPcGames) {
-            const sorted = cachedPcGames.sort((a, b) => {
+        if (cachedGames) {
+            const sorted = cachedGames.sort((a, b) => {
                 const na = (a.Title || a.game_name || a.title || '').toLowerCase();
                 const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
                 return na.localeCompare(nb);
             });
             if (typeof _allBrowseGames !== 'undefined' &&
-                (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform)) {
                 _allBrowseGames = sorted;
             }
             if (typeof _allPlatformGames !== 'undefined') {
-                _allPlatformGames['PC'] = sorted;
+                _allPlatformGames[_addGamePlatform] = sorted;
             }
         }
 
@@ -4235,7 +4243,7 @@ async function handleAddPcGameToDb() {
                 if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
                     renderBrowseGamesGrouped(_allPlatformGames,
                         (document.getElementById('browseSearch') || {}).value || '');
-                } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                } else if (_currentPlatform === _addGamePlatform && typeof renderBrowseGames === 'function') {
                     renderBrowseGames(_allBrowseGames);
                 }
             }
