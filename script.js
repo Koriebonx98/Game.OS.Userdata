@@ -4151,6 +4151,7 @@ async function _addPcGameClientSide(newGame, title, showMsg, saveBtn) {
 }
 
 async function handleAddPcGameToDb() {
+    if (!isAdminUser()) return;
 
     const saveBtn = document.getElementById('addPcGameSaveBtn');
     const msgEl   = document.getElementById('addPcGameMsg');
