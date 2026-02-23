@@ -3380,7 +3380,7 @@ function openAdminEditModal(game, platform) {
     const sgdbQuery   = encodeURIComponent(title);
 
     bodyEl.innerHTML = `
-    <form id="adminEditForm" autocomplete="off">
+    <form id="adminEditForm" autocomplete="off" onsubmit="return false;">
         <div class="admin-form-group">
             <label class="admin-form-label" for="editTitle">Title</label>
             <input type="text" id="editTitle" class="admin-form-input" value="${titleEnc}">
@@ -3951,7 +3951,7 @@ function openAddPcGameModal() {
     const hasSgdb = !!STEAMGRID_KEY;
 
     bodyEl.innerHTML = `
-    <form id="addPcGameForm" autocomplete="off">
+    <form id="addPcGameForm" autocomplete="off" onsubmit="return false;">
         <div class="admin-form-group">
             <label class="admin-form-label" for="pcGameTitle">Title *</label>
             <input type="text" id="pcGameTitle" class="admin-form-input" placeholder="Game title…" required>
