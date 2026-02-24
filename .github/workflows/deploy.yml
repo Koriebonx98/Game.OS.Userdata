@@ -261,12 +261,12 @@ jobs:
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "✅ GAMES_DB_TOKEN has Actions permission on ${OWNER}/${REPO} — workflow dispatch will work"
           elif [ "$HTTP_STATUS" = "403" ] || [ "$HTTP_STATUS" = "401" ]; then
-            echo "❌ GAMES_DB_TOKEN lacks Actions permission on ${OWNER}/${REPO} (HTTP ${HTTP_STATUS})."
+            echo "⚠️  GAMES_DB_TOKEN lacks Actions permission on ${OWNER}/${REPO} (HTTP ${HTTP_STATUS})."
             echo "   The admin-panel 'Scrape JSON' and 'Update Steam Games' buttons will show:"
             echo "   \"Token lacks Actions write permission on this repository.\""
             echo "   To fix: regenerate GAMES_DB_TOKEN and add Actions: Read and write on ${OWNER}/${REPO}."
-            echo "   Update the GAMES_DB_TOKEN repository secret and re-run this workflow."
-            exit 1
+            echo "   Update the GAMES_DB_TOKEN repository secret and re-deploy."
+            echo "   Deployment will continue — other admin features (cover/trailer editing) are unaffected."
           elif [ "$HTTP_STATUS" = "000" ]; then
             echo "⚠️  Could not reach GitHub API (network/timeout). Skipping Actions permission check."
           else
