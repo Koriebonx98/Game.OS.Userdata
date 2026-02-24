@@ -2546,7 +2546,7 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
 
         const idx = gamesArr.findIndex(g => {
             const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
-            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || (g.appid != null ? g.appid : ''));
             return (origTitleLower && gt === origTitleLower) || (origIdStr && gid === origIdStr);
         });
 

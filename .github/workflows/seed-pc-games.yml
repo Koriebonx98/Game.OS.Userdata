@@ -110,6 +110,7 @@ jobs:
               seen_names.add(name_lower)
               games.append({
                   'Title': name,
+                  'TitleID': str(appid),
                   'appid': appid,
                   'stores': [
                       {
