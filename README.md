@@ -375,7 +375,7 @@ This is a private repository. For contributions or issues, please contact the re
 
 ## 📄 License
 
-© 2026 Game OS Userdata. All rights reserved.
+© 2026 Game OS. All rights reserved.
 
 ## 📞 Support
 
