@@ -2932,7 +2932,10 @@ async function _gamesDbWriteFile(platform, content, message) {
     const treeSha    = commitData.tree.sha;
 
     // 3. Create a new blob with the updated content
-    const json   = JSON.stringify(content, null, 2);
+    // Use compact JSON (no indentation) to minimise payload size and avoid GitHub's
+    // blob API size limit.  Pretty-printing PC.Games.json (≈33 MB) inflates the
+    // base64-encoded payload above the threshold and causes a 422 response.
+    const json   = JSON.stringify(content);
     const bytes  = new TextEncoder().encode(json);
     // Use chunked encoding to avoid a massive intermediate string for large files
     // (e.g. PC.Games.json ≈33 MB).  Processing 8 KB at a time keeps peak memory low.
@@ -2946,7 +2949,10 @@ async function _gamesDbWriteFile(platform, content, message) {
         `https://api.github.com/repos/${owner}/${repo}/git/blobs`,
         { method: 'POST', headers: h, body: JSON.stringify({ content: base64, encoding: 'base64' }) }
     );
-    if (!blobResp.ok) throw new Error(`Cannot create blob: ${blobResp.status}`);
+    if (!blobResp.ok) {
+        const errData = await blobResp.json().catch(() => ({}));
+        throw new Error(`Cannot create blob: ${blobResp.status}${errData.message ? ` – ${errData.message}` : ''}`);
+    }
     const blob = await blobResp.json();
 
     // 4. Create a new tree that replaces only this file

@@ -124,9 +124,11 @@ async function putGamesDbFileLarge(path, content, message) {
     const treeSha = commit.tree.sha;
 
     // 3. Create a new blob with the updated content
+    // Use compact JSON (no indentation) to minimise payload size and avoid the
+    // blob API size limit that causes 422 for large files like PC.Games.json.
     const { data: blob } = await octokitGamesDb.git.createBlob({
         owner, repo,
-        content: Buffer.from(JSON.stringify(content, null, 2)).toString('base64'),
+        content: Buffer.from(JSON.stringify(content)).toString('base64'),
         encoding: 'base64'
     });
 
