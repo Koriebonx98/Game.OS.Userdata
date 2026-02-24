@@ -2436,12 +2436,12 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
 
         await putGamesDbFileLarge(platformFile, newContent, `Add game: ${safeTitle} (${safePlatform})`);
 
-        // Write game data to Data/{platformFolder}/Games/{title}/info.json
-        // Skip PC: PC.Games.json is the source of truth (populated from the Steam
-        // catalogue).  Writing info.json under Data/PC/Games/ triggers the
-        // compile_pc_games.yml workflow which re-generates PC.Games.json from only
-        // the individual info.json files, discarding the entire Steam catalogue.
-        const platformFolder = platform !== 'PC' ? platformToGamesDbFolder(platform) : null;
+        // Write game data to Data/{platformFolder}/Games/{title}/info.json.
+        // compile_pc_games.py uses a merge-based approach: it overlays curated
+        // info.json fields onto the existing PC.Games.json (which holds the full
+        // Steam catalogue) rather than replacing the entire file, so writing
+        // info.json for PC games is safe.
+        const platformFolder = platformToGamesDbFolder(platform);
         if (platformFolder) {
             const titleForPath = safeTitle
                 .replace(/\.\./g, '').replace(/[/\\]/g, '-')
@@ -2563,12 +2563,12 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
 
         await putGamesDbFileLarge(platformFile, newContent, `Update game: ${safeTitle} (${safePlatform})`);
 
-        // Write game data to Data/{platformFolder}/Games/{title}/info.json
-        // Skip PC: PC.Games.json is the source of truth (populated from the Steam
-        // catalogue).  Writing info.json under Data/PC/Games/ triggers the
-        // compile_pc_games.yml workflow which re-generates PC.Games.json from only
-        // the individual info.json files, discarding the entire Steam catalogue.
-        const platformFolder = platform !== 'PC' ? platformToGamesDbFolder(platform) : null;
+        // Write game data to Data/{platformFolder}/Games/{title}/info.json.
+        // compile_pc_games.py uses a merge-based approach: it overlays curated
+        // info.json fields onto the existing PC.Games.json (which holds the full
+        // Steam catalogue) rather than replacing the entire file, so writing
+        // info.json for PC games is safe.
+        const platformFolder = platformToGamesDbFolder(platform);
         if (platformFolder) {
             const titleForPath = String(game.Title || game.game_name || game.title || '')
                 .replace(/\.\./g, '').replace(/[/\\]/g, '-')
