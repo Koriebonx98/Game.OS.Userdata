@@ -229,30 +229,46 @@ jobs:
           )
           payload_data['Games'] = updated_arr
 
-          commit_payload = {
-              'message': (
-                  f'Add {len(new_games)} new Steam game(s) to PC.Games.json '
-                  f'(total: {len(updated_arr)})'
-              ),
-              'content': base64.b64encode(
-                  json.dumps(payload_data, indent=2, ensure_ascii=False).encode('utf-8')
-              ).decode('ascii'),
-              'committer': {
-                  'name':  'Game.OS Admin',
-                  'email': 'admin@gameos.local',
-              },
-          }
-          if existing_sha:
-              commit_payload['sha'] = existing_sha
+          commit_msg = (
+              f'Add {len(new_games)} new Steam game(s) to PC.Games.json '
+              f'(total: {len(updated_arr)})'
+          )
 
-          # ── 8. Write updated PC.Games.json ────────────────────────────────
-          body = json.dumps(commit_payload).encode('utf-8')
-          req  = urllib.request.Request(api, data=body, headers=headers, method='PUT')
-          try:
+          # ── 8. Write updated PC.Games.json via Git Data API ───────────────
+          # PC.Games.json grows to ~33 MB compact (~50 MB pretty-printed); the
+          # Contents API has a 1 MB limit so we use the Git Data API
+          # (blob → tree → commit → ref). Compact JSON keeps the payload within
+          # the blob API size limit.
+          file_bytes = json.dumps(payload_data, separators=(',', ':'), ensure_ascii=False).encode('utf-8')
+          file_b64   = base64.b64encode(file_bytes).decode('ascii')
+          git_api    = f'https://api.github.com/repos/{owner}/{repo}'
+
+          def git_request(url, method='GET', data_dict=None):
+              data = json.dumps(data_dict).encode('utf-8') if data_dict is not None else None
+              req  = urllib.request.Request(url, data=data, headers=headers, method=method)
               with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-                  result = json.loads(resp.read())
-              sha    = result.get('content', {}).get('sha', '')[:7]
-              print(f'✅ PC.Games.json updated (sha: {sha})')
+                  return json.loads(resp.read())
+
+          try:
+              print(f'   Creating blob ({len(file_bytes):,} bytes) …')
+              blob        = git_request(f'{git_api}/git/blobs', 'POST', {'content': file_b64, 'encoding': 'base64'})
+              blob_sha    = blob['sha']
+              ref_data    = git_request(f'{git_api}/git/ref/heads/main')
+              current_sha = ref_data['object']['sha']
+              commit_data = git_request(f'{git_api}/git/commits/{current_sha}')
+              base_tree   = commit_data['tree']['sha']
+              new_tree    = git_request(f'{git_api}/git/trees', 'POST', {
+                  'base_tree': base_tree,
+                  'tree': [{'path': path, 'mode': '100644', 'type': 'blob', 'sha': blob_sha}],
+              })
+              new_commit  = git_request(f'{git_api}/git/commits', 'POST', {
+                  'message':   commit_msg,
+                  'tree':      new_tree['sha'],
+                  'parents':   [current_sha],
+                  'committer': {'name': 'Game.OS Admin', 'email': 'admin@gameos.local'},
+              })
+              git_request(f'{git_api}/git/refs/heads/main', 'PATCH', {'sha': new_commit['sha']})
+              print(f'✅ PC.Games.json updated (commit: {new_commit["sha"][:7]})')
               print(f'   {len(new_games)} new game(s) added; {len(updated_arr)} total in {owner}/{repo}/{path}')
               for g in new_games[:10]:
                   print(f'   + [{g["appid"]}] {g["Title"]}')
