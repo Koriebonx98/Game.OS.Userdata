@@ -115,6 +115,7 @@ jobs:
                   'Title':   name,
                   'TitleID': str(appid),
                   'appid':   appid,
+                  'image':   f'https://cdn.akamai.steamstatic.com/steam/apps/{appid}/header.jpg',
                   'stores':  [{'name': 'Steam', 'url': f'https://store.steampowered.com/app/{appid}/'}],
               }
               steam_by_name[name_lower] = len(steam_games)
@@ -180,7 +181,7 @@ jobs:
           # (Title, TitleID, appid, stores), OR is missing the 'appid' field
           # entirely (meaning it was never written by this seed workflow).
           # These entries must be preserved across seed runs.
-          SEED_ONLY_FIELDS = {'Title', 'TitleID', 'appid', 'stores'}
+          SEED_ONLY_FIELDS = {'Title', 'TitleID', 'appid', 'image', 'stores'}
 
           existing_sha  = None
           curated_games = []
@@ -252,6 +253,7 @@ jobs:
                       'Title':   steam_entry['Title'],
                       'TitleID': steam_entry['TitleID'],
                       'appid':   steam_entry['appid'],
+                      'image':   steam_entry['image'],
                       'stores':  steam_entry['stores'],
                   }
               else:
