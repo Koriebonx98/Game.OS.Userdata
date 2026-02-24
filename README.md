@@ -192,24 +192,34 @@ Your site is now live with real accounts! ✅
 
 **Step 7 – (Optional) Enable Admin game editing (covers & trailers)**
 
-The `Admin.GameOS` account can update game covers and trailers directly from the browser.
-This requires a second PAT with write access to the **`Koriebonx98/Games.Database`** repository.
+The `Admin.GameOS` account can update game covers and trailers directly from the browser,
+and can dispatch server-side workflows ("🔄 Scrape JSON", "🔄 Update Steam Games").
+This requires a second PAT with write access to **`Koriebonx98/Games.Database`** and
+Actions access to **`Koriebonx98/Game.OS.Userdata`**.
 
 1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
 2. Click **Generate new token**
 3. Give it a name (e.g. `Game OS Games DB`)
-4. Under **Repository access**, select **Only select repositories** → `Koriebonx98/Games.Database`
-5. Under **Repository permissions → Contents**, set to **Read and write**
-6. Click **Generate token** and **copy it**
-7. In this repository go to **Settings → Secrets and variables → Actions**
-8. Click **New repository secret**
-9. Name: `GAMES_DB_TOKEN`
-10. Value: the PAT you just copied
-11. Click **Add secret**
-12. Re-run (or push to `main`) to trigger a fresh deploy
+4. Under **Repository access**, select **Only select repositories** →
+   add both `Koriebonx98/Games.Database` **and** `Koriebonx98/Game.OS.Userdata`
+5. Under **Repository permissions → Contents** (for `Games.Database`), set to **Read and write**
+6. Under **Repository permissions → Actions** (for `Game.OS.Userdata`), set to **Read and write**
+   *(required so the admin panel can dispatch the "Scrape JSON" and "Update Steam Games" workflows)*
+7. Click **Generate token** and **copy it**
+8. In this repository go to **Settings → Secrets and variables → Actions**
+9. Click **New repository secret**
+10. Name: `GAMES_DB_TOKEN`
+11. Value: the PAT you just copied
+12. Click **Add secret**
+13. Re-run (or push to `main`) to trigger a fresh deploy
 
 > Without this secret the admin game-editing panel will show:
 > *"⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing."*
+>
+> If the token is set but **Actions: Read and write** is missing on `Game.OS.Userdata`, the
+> "🔄 Scrape JSON" and "🔄 Update Steam Games" buttons will show:
+> *"Token lacks Actions write permission on this repository. Update GAMES_DB_TOKEN to include
+> Actions: Read and write on Koriebonx98/Game.OS.Userdata, then re-deploy."*
 
 ### How it works (architecture)
 
