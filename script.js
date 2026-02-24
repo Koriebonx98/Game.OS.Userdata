@@ -45,6 +45,7 @@ const GITHUB_TOKEN = (() => {
 // The defaults below are used only when running locally.
 const DATA_REPO_OWNER = 'Koriebonx98'; // ← injected at deploy time
 const DATA_REPO_NAME  = 'Game.OS.Private.Data'; // ← injected at deploy time
+const USERDATA_REPO_NAME = 'Game.OS.Userdata'; // this repository (used for workflow dispatches)
 
 // Developer override: type this in the browser console to use a local backend for testing
 //   localStorage.setItem('gameOS_devBackendUrl', 'http://localhost:3001')
@@ -1003,8 +1004,60 @@ function populateAccountDetails() {
     // Show the Danger Zone only for the admin account
     const dangerZone = document.getElementById('dangerZone');
     if (dangerZone) {
-        dangerZone.style.display =
-            user.username.toLowerCase() === ADMIN_USERNAME_LOWER ? '' : 'none';
+        const isAdmin = user.username.toLowerCase() === ADMIN_USERNAME_LOWER;
+        dangerZone.style.display = isAdmin ? '' : 'none';
+        if (isAdmin) _checkAndRenderGamesDbStatus();
+    }
+}
+
+/**
+ * Performs a lightweight API check and renders token-status feedback in the
+ * Danger Zone's "gamesDbTokenStatus" element so the admin can see at a glance
+ * whether GAMES_DB_TOKEN has the Actions write permission needed to dispatch
+ * the "Check Steam for New Games" workflow.
+ */
+async function _checkAndRenderGamesDbStatus() {
+    const el = document.getElementById('gamesDbTokenStatus');
+    if (!el) return;
+
+    if (!GAMES_DB_TOKEN) {
+        el.innerHTML =
+            '⚠️ <strong>GAMES_DB_TOKEN is not configured.</strong> ' +
+            'Add it as a repository secret (see README Step 7) and re-deploy to enable this feature. ' +
+            '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style="color:#f59e0b;">Manage tokens →</a>';
+        el.style.color = '#f59e0b';
+        return;
+    }
+
+    el.textContent = '⏳ Checking token permissions…';
+    el.style.color = '#888';
+    try {
+        const resp = await fetch(
+            `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                    'Accept':        'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28'
+                }
+            }
+        );
+        if (resp.status === 200) {
+            el.innerHTML = '✅ <strong>GAMES_DB_TOKEN</strong> has Actions permission — "Check Steam for New Games" is ready.';
+            el.style.color = '#22c55e';
+        } else if (resp.status === 403 || resp.status === 401) {
+            el.innerHTML =
+                '❌ <strong>GAMES_DB_TOKEN lacks Actions: Read and write</strong> on ' +
+                `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}. ` +
+                'Regenerate the token with that permission, update the GAMES_DB_TOKEN secret, then re-deploy. ' +
+                '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style="color:#ef4444;font-weight:600;">Manage tokens →</a>';
+            el.style.color = '#ef4444';
+        } else {
+            el.textContent = '';
+        }
+    } catch (_) {
+        el.innerHTML = '⚠️ Unable to check token status (network error).';
+        el.style.color = '#888';
     }
 }
 
@@ -2529,7 +2582,7 @@ async function handleCheckSteamNewGames() {
     if (btn)   btn.disabled = true;
 
     try {
-        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
+        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml/dispatches`;
         const resp = await fetch(dispatchUrl, {
             method: 'POST',
             headers: {
@@ -2542,15 +2595,18 @@ async function handleCheckSteamNewGames() {
         });
 
         if (resp.status === 204) {
-            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
+            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml`;
             if (msgEl) msgEl.innerHTML =
                 `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
                 `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
         } else if (resp.status === 403 || resp.status === 401) {
-            if (msgEl) showMessage(msgEl,
-                'Token lacks Actions write permission on this repository. ' +
-                'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-                `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+            if (msgEl) msgEl.innerHTML =
+                '<span class="message error">❌ GAMES_DB_TOKEN lacks Actions: Read and write on ' +
+                `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}. ` +
+                'Regenerate the token with that permission, update the GAMES_DB_TOKEN secret, then re-deploy. ' +
+                '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage tokens →</a></span>';
+            // Refresh the status indicator so it also reflects the failure
+            _checkAndRenderGamesDbStatus();
         } else {
             const body = await resp.json().catch(() => ({}));
             if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
@@ -4339,7 +4395,7 @@ async function _dispatchScrapeWorkflow(exophaseUrl, platform, gameTitle, titleId
     if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured.');
 
     // DATA_REPO_OWNER is the same GitHub user who owns this (Game.OS.Userdata) repo.
-    const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml/dispatches`;
+    const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml/dispatches`;
     const resp = await fetch(dispatchUrl, {
         method: 'POST',
         headers: {
@@ -4361,13 +4417,13 @@ async function _dispatchScrapeWorkflow(exophaseUrl, platform, gameTitle, titleId
 
     if (resp.status === 204) {
         // Success – return a link to the workflow runs page
-        return `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml`;
+        return `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml`;
     }
     if (resp.status === 403 || resp.status === 401) {
         throw new Error(
             'Token lacks Actions write permission on this repository. ' +
             'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-            `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`
+            `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}, then re-deploy.`
         );
     }
     const body = await resp.json().catch(() => ({}));
