@@ -2503,6 +2503,67 @@ async function handleResetAllAccounts() {
 }
 
 // ============================================================
+// ADMIN – CHECK STEAM FOR NEW GAMES
+// ============================================================
+
+/**
+ * UI handler – dispatches the update-steam-new-games GitHub Actions workflow so
+ * any Steam games not already in PC.Games.json are appended.
+ * Only the Admin.GameOS account may trigger this.
+ */
+async function handleCheckSteamNewGames() {
+    const msgEl = document.getElementById('steamCheckMessage');
+    const btn   = document.getElementById('checkSteamBtn');
+
+    if (!isAdminUser()) {
+        if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
+        return;
+    }
+
+    if (!GAMES_DB_TOKEN) {
+        if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable this feature.', 'error');
+        return;
+    }
+
+    if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+    if (btn)   btn.disabled = true;
+
+    try {
+        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
+        const resp = await fetch(dispatchUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ref: 'main' })
+        });
+
+        if (resp.status === 204) {
+            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
+            if (msgEl) msgEl.innerHTML =
+                `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
+                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
+        } else if (resp.status === 403 || resp.status === 401) {
+            if (msgEl) showMessage(msgEl,
+                'Token lacks Actions write permission on this repository. ' +
+                'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
+                `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+        } else {
+            const body = await resp.json().catch(() => ({}));
+            if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+        }
+    } catch (err) {
+        console.error('Steam check error:', err);
+        if (msgEl) showMessage(msgEl, `❌ Failed to trigger workflow: ${err.message}`, 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+    }
+}
+
+// ============================================================
 // TOTAL USER COUNT
 // ============================================================
 

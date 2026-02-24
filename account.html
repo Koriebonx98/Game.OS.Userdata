@@ -210,6 +210,15 @@ var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;
                         🗑️ Remove All Accounts
                     </button>
                     <div id="resetMessage" class="message"></div>
+
+                    <hr style="margin:20px 0;border-color:#e74c3c44;">
+
+                    <h4 style="color:#c0392b;margin-bottom:8px;">🎮 Steam Game Database</h4>
+                    <p style="margin-bottom:12px;">Check Steam for new games and add any that are missing from PC.Games.json in Games.Database.</p>
+                    <button id="checkSteamBtn" class="btn btn-primary" onclick="handleCheckSteamNewGames()">
+                        🔄 Check Steam for New Games
+                    </button>
+                    <div id="steamCheckMessage" class="message"></div>
                 </div>
             </div>
         </main>
