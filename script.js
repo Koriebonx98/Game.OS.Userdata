@@ -2627,7 +2627,7 @@ async function addGameGitHub(username, game, platform) {
     library.push({
         platform,
         title:    game.Title || game.game_name || game.title,
-        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || (game.appid != null ? String(game.appid) : null),
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2714,7 +2714,7 @@ function addGameDemo(username, game, platform) {
     library.push({
         platform,
         title,
-        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || (game.appid != null ? String(game.appid) : null),
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2754,7 +2754,7 @@ async function addToWishlistGitHub(username, game, platform) {
     wishlist.push({
         platform,
         title:    game.Title || game.game_name || game.title,
-        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || (game.appid != null ? String(game.appid) : null),
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -2801,7 +2801,7 @@ function addToWishlistDemo(username, game, platform) {
     wishlist.push({
         platform,
         title,
-        titleId:  game.TitleID || game.title_id || game.titleid || game.id || null,
+        titleId:  game.TitleID || game.title_id || game.titleid || game.id || (game.appid != null ? String(game.appid) : null),
         coverUrl: getGameCoverUrl(game) || undefined,
         addedAt:  new Date().toISOString()
     });
@@ -3356,7 +3356,7 @@ function openAdminEditModal(game, platform) {
     platEl.textContent = platform;
 
     const title           = game.Title       || game.game_name   || game.title       || '';
-    const titleId         = game.TitleID     || game.title_id    || game.titleid     || game.id  || '';
+    const titleId         = game.TitleID     || game.title_id    || game.titleid     || game.id  || (game.appid != null ? String(game.appid) : '');
     const description     = game.Description || game.description || '';
     const coverUrl        = game.image       || game.cover_url   || '';
     const bgUrls          = (game.background_images || []).filter(Boolean);
@@ -3586,7 +3586,7 @@ async function handleAdminEditSave() {
 
     // Extract original identifiers before any modification
     const origTitle = (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '').toLowerCase();
-    const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+    const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || (_currentModalGame.appid != null ? _currentModalGame.appid : ''));
 
     try {
         let updated;
@@ -3653,7 +3653,7 @@ async function handleAdminEditSave() {
 
             const idx = gamesArr.findIndex(g => {
                 const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
-                const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+                const gid = String(g.TitleID || g.title_id || g.titleid || g.id || (g.appid != null ? g.appid : ''));
                 return gt === origTitle || (origId && gid === origId);
             });
 
@@ -3829,10 +3829,10 @@ async function handleAdminDeleteGame() {
         }
 
         const origTitle = title.toLowerCase();
-        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || '');
+        const origId    = String(_currentModalGame.TitleID || _currentModalGame.title_id || _currentModalGame.titleid || _currentModalGame.id || (_currentModalGame.appid != null ? _currentModalGame.appid : ''));
         const idx = gamesArr.findIndex(g => {
             const gt  = (g.Title || g.game_name || g.title || '').toLowerCase();
-            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || '');
+            const gid = String(g.TitleID || g.title_id || g.titleid || g.id || (g.appid != null ? g.appid : ''));
             return gt === origTitle || (origId && gid === origId);
         });
 
@@ -4936,7 +4936,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         const titleLower = title.toLowerCase();
         const game = games.find(g =>
             (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower ||
-            (titleId && String(g.TitleID || g.title_id || g.titleid || g.id || '') === String(titleId))
+            (titleId && String(g.TitleID || g.title_id || g.titleid || g.id || (g.appid != null ? g.appid : '')) === String(titleId))
         );
 
         if (game) {
