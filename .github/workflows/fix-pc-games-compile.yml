@@ -291,11 +291,10 @@ if __name__ == "__main__":
           # restore the Steam catalogue.  This prevents a race where the compile
           # job's commit lands after seed-pc-games has already read the current
           # HEAD SHA, which would cause seed's non-fast-forward PATCH to fail.
-          # 120 s is ample: the compile job only reads ~6 small JSON files and
-          # writes one output file, so it typically completes in under 60 s
-          # (including GitHub Actions queue and checkout overhead).
-          echo "⏳ Waiting 120 s for Games.Database compile workflow to settle…"
-          sleep 120
+          # 180 s accounts for queue latency on busy GitHub Actions runners;
+          # the compile job itself typically completes in under 60 s.
+          echo "⏳ Waiting 180 s for Games.Database compile workflow to settle…"
+          sleep 180
           echo "✅ Continuing."
 
       - name: Trigger Seed PC Games Database to restore full catalog
