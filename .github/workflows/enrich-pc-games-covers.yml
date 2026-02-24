@@ -1,0 +1,250 @@
+# Enrich PC.Games.json with Cover Images and TitleIDs
+#
+# Reads the current PC.Games.json from Koriebonx98/Games.Database and, for
+# every entry that already has an `appid` (Steam AppID), fills in any missing:
+#
+#   • TitleID  – set to str(appid) when absent
+#   • image    – Steam CDN library_600x900 portrait cover when absent
+#                (falls back to header.jpg for non-standard appids)
+#
+# Entries that already have both fields are left untouched.
+# If no changes are needed the workflow exits cleanly without committing.
+#
+# Triggers:
+#   • Manual – workflow_dispatch (run on demand)
+#
+# Required secret:
+#   GAMES_DB_TOKEN  – fine-grained PAT with Contents: Read and write on
+#                     Koriebonx98/Games.Database
+
+name: Enrich PC Games Covers and TitleIDs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  enrich:
+    name: Fill missing cover images and TitleIDs in PC.Games.json
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate GAMES_DB_TOKEN is configured
+        run: |
+          if [ -z "$GAMES_DB_TOKEN" ]; then
+            echo "❌ GAMES_DB_TOKEN is not set."
+            echo "   Add it as a repository secret: Settings → Secrets and variables → Actions → New repository secret"
+            echo "   The token must be a fine-grained PAT with Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          fi
+          echo "✅ GAMES_DB_TOKEN is configured"
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Test GAMES_DB_TOKEN access to Games.Database
+        run: |
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 \
+            -H "Authorization: Bearer ${GAMES_DB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Koriebonx98/Games.Database" || echo "000")
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "✅ GAMES_DB_TOKEN is valid – Games.Database is accessible"
+          elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "❌ GAMES_DB_TOKEN is invalid or expired (HTTP 401)."
+            echo "   Generate a new fine-grained PAT and update the GAMES_DB_TOKEN secret."
+            exit 1
+          elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "❌ GAMES_DB_TOKEN lacks permission (HTTP 403)."
+            echo "   Ensure the PAT has Contents: Read and write on Koriebonx98/Games.Database."
+            exit 1
+          else
+            echo "❌ Unexpected response from GitHub API: HTTP ${HTTP_STATUS}"
+            exit 1
+          fi
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+
+      - name: Enrich cover images and TitleIDs in PC.Games.json
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, sys
+          import urllib.request, urllib.parse, urllib.error
+
+          REQUEST_TIMEOUT = 60
+
+          OWNER = 'Koriebonx98'
+          REPO  = 'Games.Database'
+          TOKEN = os.environ['GAMES_DB_TOKEN']
+
+          path    = 'PC.Games.json'
+          api_url = f'https://api.github.com/repos/{OWNER}/{REPO}/contents/{urllib.parse.quote(path)}'
+          raw_url = f'https://raw.githubusercontent.com/{OWNER}/{REPO}/main/{path}'
+          headers = {
+              'Authorization':        f'Bearer {TOKEN}',
+              'Accept':               'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'Content-Type':         'application/json',
+          }
+
+          # ── Helper: get blob SHA when file is too large for Contents API ─────
+          def get_blob_sha_via_tree(owner, repo, path, headers):
+              ref_url = f'https://api.github.com/repos/{owner}/{repo}/git/ref/heads/main'
+              with urllib.request.urlopen(
+                      urllib.request.Request(ref_url, headers=headers),
+                      timeout=REQUEST_TIMEOUT) as r:
+                  commit_sha = json.loads(r.read())['object']['sha']
+              commit_url = (
+                  f'https://api.github.com/repos/{owner}/{repo}/git/commits/{commit_sha}'
+              )
+              with urllib.request.urlopen(
+                      urllib.request.Request(commit_url, headers=headers),
+                      timeout=REQUEST_TIMEOUT) as r:
+                  tree_sha = json.loads(r.read())['tree']['sha']
+              tree_url = (
+                  f'https://api.github.com/repos/{owner}/{repo}'
+                  f'/git/trees/{tree_sha}?recursive=true'
+              )
+              with urllib.request.urlopen(
+                      urllib.request.Request(tree_url, headers=headers),
+                      timeout=REQUEST_TIMEOUT) as r:
+                  tree = json.loads(r.read())
+              for item in tree.get('tree', []):
+                  if item.get('path') == path:
+                      return item['sha']
+              return None
+
+          # ── 1. Fetch current PC.Games.json ────────────────────────────────────
+          print(f'⬇️  Fetching {path} …')
+          file_sha = None
+          content  = None
+
+          req = urllib.request.Request(api_url, headers=headers)
+          try:
+              with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+                  meta = json.loads(resp.read())
+              file_sha = meta['sha']
+              if meta.get('content'):
+                  content = json.loads(
+                      base64.b64decode(meta['content'].replace('\n', '')).decode('utf-8')
+                  )
+              else:
+                  # File too large for inline content – use download_url
+                  print('   File is large – fetching via download_url …')
+                  with urllib.request.urlopen(
+                          meta['download_url'], timeout=REQUEST_TIMEOUT) as r:
+                      content = json.loads(r.read())
+          except urllib.error.HTTPError as e:
+              if e.code == 403:
+                  # Very large file – read raw and get SHA via tree API
+                  print('   File exceeds Contents API limit – reading via raw URL …')
+                  try:
+                      with urllib.request.urlopen(raw_url, timeout=REQUEST_TIMEOUT) as r:
+                          content = json.loads(r.read())
+                  except Exception as exc:
+                      print(f'❌ Could not read {path}: {exc}')
+                      sys.exit(1)
+                  try:
+                      file_sha = get_blob_sha_via_tree(OWNER, REPO, path, headers)
+                      if file_sha:
+                          print(f'   SHA via tree: {file_sha[:7]}')
+                  except Exception as exc:
+                      print(f'⚠️  Could not look up blob SHA via tree API: {exc}')
+              elif e.code == 404:
+                  print(f'❌ {path} not found in {OWNER}/{REPO}.')
+                  print('   Run the "Seed PC Games Database" workflow first.')
+                  sys.exit(1)
+              else:
+                  print(f'❌ Failed to fetch {path}: HTTP {e.code}')
+                  sys.exit(1)
+
+          # ── 2. Locate the games array ─────────────────────────────────────────
+          if isinstance(content, dict):
+              games   = content.get('Games') or content.get('games') or []
+              top_key = 'Games' if 'Games' in content else 'games'
+          elif isinstance(content, list):
+              games   = content
+              top_key = None
+          else:
+              print('❌ Unexpected PC.Games.json format.')
+              sys.exit(1)
+
+          print(f'   {len(games)} games loaded.')
+
+          # ── 3. Fill in missing TitleID and image for each Steam entry ─────────
+          # Steam CDN pattern:
+          #   library_600x900.jpg – portrait cover card (600×900 px)
+          #   header.jpg          – landscape store header (460×215 px)
+          #
+          # We use library_600x900 as the primary cover image because it is the
+          # most suitable for portrait game-card grids used in the Game.OS UI.
+          CDN_BASE = 'https://cdn.akamai.steamstatic.com/steam/apps'
+
+          patched_count = 0
+          for game in games:
+              appid = game.get('appid')
+              if appid is None:
+                  # Not a Steam game – skip
+                  continue
+
+              changed = False
+
+              # Fill TitleID
+              if not game.get('TitleID'):
+                  game['TitleID'] = str(appid)
+                  changed = True
+
+              # Fill image (portrait cover)
+              if not game.get('image'):
+                  game['image'] = f'{CDN_BASE}/{appid}/library_600x900.jpg'
+                  changed = True
+
+              if changed:
+                  patched_count += 1
+
+          if patched_count == 0:
+              print('✅ All Steam entries already have TitleID and image set — nothing to do.')
+              sys.exit(0)
+
+          print(f'🖼️  Enriched {patched_count} game(s) with missing cover images / TitleIDs.')
+
+          # ── 4. Write the updated file back ────────────────────────────────────
+          if top_key:
+              content[top_key] = games
+          # else: content IS games (bare list) – updated in-place
+
+          new_json = json.dumps(content, indent=2, ensure_ascii=False)
+          encoded  = base64.b64encode(new_json.encode('utf-8')).decode('utf-8')
+
+          body = {
+              'message':   f'Enrich PC.Games.json: add cover images and TitleIDs ({patched_count} games updated)',
+              'content':   encoded,
+              'committer': {
+                  'name':  'Game.OS Admin',
+                  'email': 'admin@gameos.local',
+              },
+          }
+          if file_sha:
+              body['sha'] = file_sha
+
+          put_req = urllib.request.Request(
+              api_url,
+              data=json.dumps(body).encode('utf-8'),
+              headers=headers,
+              method='PUT',
+          )
+          try:
+              with urllib.request.urlopen(put_req, timeout=REQUEST_TIMEOUT) as resp:
+                  result = json.loads(resp.read())
+          except urllib.error.HTTPError as e:
+              body_text = e.read().decode('utf-8', errors='replace')
+              print(f'❌ Failed to write {path}: HTTP {e.code} – {body_text}')
+              sys.exit(1)
+
+          commit_sha = result.get('commit', {}).get('sha', 'unknown')[:7]
+          print(f'✅ PC.Games.json updated successfully (commit: {commit_sha})')
+          print(f'   {patched_count} game(s) enriched in {OWNER}/{REPO}/{path}')
+          PYEOF
+        env:
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
