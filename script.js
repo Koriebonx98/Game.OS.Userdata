@@ -2513,51 +2513,82 @@ async function handleResetAllAccounts() {
  */
 async function handleCheckSteamNewGames() {
     const msgEl = document.getElementById('steamCheckMessage');
-    const btn   = document.getElementById('checkSteamBtn');
+    const btn   = document.getElementById('checkSteamBtn') || document.getElementById('addSteamGameBtn');
 
     if (!isAdminUser()) {
         if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
         return;
     }
 
-    if (!GAMES_DB_TOKEN) {
-        if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable this feature.', 'error');
-        return;
-    }
-
-    if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+    if (msgEl) showMessage(msgEl, '⏳ Syncing Steam games… This may take a minute.', 'info');
     if (btn)   btn.disabled = true;
 
-    try {
-        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
-        const resp = await fetch(dispatchUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': '2022-11-28',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ ref: 'main' })
-        });
+    const backendBase = getBackendBase();
 
-        if (resp.status === 204) {
-            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
-            if (msgEl) msgEl.innerHTML =
-                `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
-                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
-        } else if (resp.status === 403 || resp.status === 401) {
-            if (msgEl) showMessage(msgEl,
-                'Token lacks Actions write permission on this repository. ' +
-                'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-                `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+    try {
+        if (backendBase) {
+            // ── Backend path: fetch, diff, and write directly ──────────────
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+
+            const resp = await fetch(`${backendBase}/api/admin/sync-steam-games`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                }
+            });
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Sync failed.');
+
+            if (msgEl) {
+                const sample = (data.sample && data.sample.length)
+                    ? ` (e.g. ${data.sample.join(', ')})`
+                    : '';
+                msgEl.innerHTML = `<span class="message success">✅ ${data.added} new Steam game(s) added to PC.Games.json${sample}. Total: ${data.total}.</span>`;
+            }
         } else {
-            const body = await resp.json().catch(() => ({}));
-            if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+            // ── Fallback: dispatch the GitHub Actions workflow ─────────────
+            if (!GAMES_DB_TOKEN) {
+                if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret to enable this feature.', 'error');
+                return;
+            }
+
+            if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+
+            const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
+            const resp = await fetch(dispatchUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ref: 'main' })
+            });
+
+            if (resp.status === 204) {
+                const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
+                if (msgEl) msgEl.innerHTML =
+                    `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
+                    `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
+            } else if (resp.status === 403 || resp.status === 401) {
+                if (msgEl) showMessage(msgEl,
+                    'Token lacks Actions write permission on this repository. ' +
+                    'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
+                    `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+            } else {
+                const body = await resp.json().catch(() => ({}));
+                if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+            }
         }
     } catch (err) {
-        console.error('Steam check error:', err);
-        if (msgEl) showMessage(msgEl, `❌ Failed to trigger workflow: ${err.message}`, 'error');
+        console.error('Steam sync error:', err);
+        if (msgEl) showMessage(msgEl, `❌ ${err.message}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
     }

@@ -2409,6 +2409,144 @@ app.get('/api/admin/steam-appdetails', authenticateToken, async (req, res) => {
     }
 });
 
+// ── POST /api/admin/sync-steam-games ─────────────────────────────────────────
+// Admin-only endpoint: fetches the full Steam app catalogue, diffs it against
+// the existing PC.Games.json in Games.Database, and directly appends any new
+// games — exactly the same write path as the manual "Add PC Game" form.
+// No GitHub Actions workflow dispatch required.
+// Authentication: the caller must be the Admin.GameOS account (checked via token).
+app.post('/api/admin/sync-steam-games', authenticateToken, async (req, res) => {
+    try {
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+
+        if (!octokitGamesDb) {
+            return res.status(503).json({ success: false, message: 'GAMES_DB_TOKEN is not configured on the server.' });
+        }
+
+        // ── 1. Fetch the Steam app list ────────────────────────────────────
+        const STEAM_LIST_URL = 'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List/main/steamcmd_appid.json';
+        const steamListResp = await fetch(STEAM_LIST_URL);
+        if (!steamListResp.ok) {
+            return res.status(502).json({ success: false, message: `Failed to fetch Steam app list (HTTP ${steamListResp.status}).` });
+        }
+        const steamData = await steamListResp.json();
+        const allApps = (steamData && steamData.applist && Array.isArray(steamData.applist.apps))
+            ? steamData.applist.apps : [];
+
+        // ── 2. Filter to actual games ──────────────────────────────────────
+        const SKIP_KEYWORDS = [
+            'dedicated server', ' sdk', 'source sdk', 'soundtrack', ' ost',
+            'playtest', 'press review', 'linux client', 'winui', 'steamcmd',
+            'steam client', 'tool ', ' tool', 'beta test', 'server beta',
+            'dev kit', 'devkit',
+        ];
+        const steamByAppId = {};
+        const seenNames = new Set();
+        for (const app of allApps) {
+            const appid = app.appid;
+            const name  = (app.name || '').trim();
+            if (!name || appid == null) continue;
+            const nameLower = name.toLowerCase();
+            if (SKIP_KEYWORDS.some(kw => nameLower.includes(kw))) continue;
+            if (seenNames.has(nameLower)) continue;
+            seenNames.add(nameLower);
+            steamByAppId[appid] = {
+                Title:   name,
+                TitleID: String(appid),
+                appid:   appid,
+                image:   `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+                stores:  [{ name: 'Steam', url: `https://store.steampowered.com/app/${appid}/` }],
+            };
+        }
+
+        // ── 3. Read existing PC.Games.json ─────────────────────────────────
+        const platformFile = 'PC.Games.json';
+        let fileData;
+        try {
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER,
+                repo:  GAMES_DB_REPO_NAME,
+                path:  platformFile
+            });
+            if (fileMeta.content) {
+                fileData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`Failed to fetch large platform JSON: HTTP ${dlResp.status}`);
+                fileData = await dlResp.json();
+            }
+        } catch (err) {
+            if (err.status === 404) {
+                fileData = [];
+            } else if (err.status === 403 || (err.message && err.message.includes('too large'))) {
+                // File too large for Contents API — fetch via raw URL
+                const rawUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${platformFile}`;
+                const rawResp = await fetch(rawUrl);
+                if (!rawResp.ok) throw new Error(`Failed to fetch PC.Games.json via raw URL: HTTP ${rawResp.status}`);
+                fileData = await rawResp.json();
+            } else {
+                throw err;
+            }
+        }
+
+        // ── 4. Normalise the games array ───────────────────────────────────
+        let gamesArr;
+        let topKey = null;
+        let fileMeta = {};
+        if (fileData && Array.isArray(fileData.Games)) {
+            gamesArr = fileData.Games;  topKey = 'Games';
+            fileMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games' && k !== 'games'));
+        } else if (fileData && Array.isArray(fileData.games)) {
+            gamesArr = fileData.games;  topKey = 'games';
+            fileMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games' && k !== 'games'));
+        } else if (Array.isArray(fileData)) {
+            gamesArr = fileData;
+        } else {
+            return res.status(422).json({ success: false, message: 'Unexpected PC.Games.json format.' });
+        }
+
+        // ── 5. Diff: find Steam games not already present ──────────────────
+        const existingAppIds = new Set();
+        for (const g of gamesArr) {
+            if (g.appid != null) existingAppIds.add(Number(g.appid));
+        }
+
+        const newGames = Object.entries(steamByAppId)
+            .filter(([appid]) => !existingAppIds.has(Number(appid)))
+            .map(([, entry]) => entry)
+            .sort((a, b) => a.appid - b.appid);
+
+        if (!newGames.length) {
+            return res.json({ success: true, added: 0, total: gamesArr.length, message: 'PC.Games.json is already up to date — no new Steam games found.' });
+        }
+
+        // ── 6. Append new games and write back ─────────────────────────────
+        const updatedArr = [...gamesArr, ...newGames];
+        const newContent = topKey
+            ? { ...fileMeta, Platform: fileMeta.Platform || 'PC', source: fileMeta.source || 'https://github.com/dgibbs64/SteamCMD-AppID-List', [topKey]: updatedArr }
+            : { Platform: 'PC', source: 'https://github.com/dgibbs64/SteamCMD-AppID-List', Games: updatedArr };
+
+        await putGamesDbFileLarge(
+            platformFile,
+            newContent,
+            `Add ${newGames.length} new Steam game(s) to PC.Games.json (total: ${updatedArr.length})`
+        );
+
+        res.json({
+            success: true,
+            added:   newGames.length,
+            total:   updatedArr.length,
+            message: `✅ Added ${newGames.length} new Steam game(s) to PC.Games.json (${updatedArr.length} total).`,
+            sample:  newGames.slice(0, 5).map(g => g.Title),
+        });
+    } catch (err) {
+        console.error('POST /api/admin/sync-steam-games error:', err);
+        res.status(500).json({ success: false, message: `Server error: ${err.message}` });
+    }
+});
+
 // ── POST /api/admin/add-game ──────────────────────────────────────────────────
 // Admin-only endpoint: add a new game entry to a Games.Database platform JSON.
 // Authentication: the caller must be the Admin.GameOS account (checked via token).
