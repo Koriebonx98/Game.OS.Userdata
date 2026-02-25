@@ -2513,7 +2513,7 @@ async function handleResetAllAccounts() {
  */
 async function handleCheckSteamNewGames() {
     const msgEl = document.getElementById('steamCheckMessage');
-    const btn   = document.getElementById('checkSteamBtn') || document.getElementById('addSteamGameBtn');
+    const btn   = document.getElementById('checkSteamBtn');
 
     if (!isAdminUser()) {
         if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
