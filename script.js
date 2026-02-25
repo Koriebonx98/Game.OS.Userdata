@@ -3306,6 +3306,8 @@ function _getActiveAdminModal() {
     if (editModal && editModal.style.display !== 'none') return editModal;
     const addModal  = document.getElementById('addPcGameModal');
     if (addModal  && addModal.style.display  !== 'none') return addModal;
+    const addSteamModal = document.getElementById('addSteamGameModal');
+    if (addSteamModal && addSteamModal.style.display !== 'none') return addSteamModal;
     return document;
 }
 
@@ -3342,17 +3344,18 @@ function _adminPreviewTrailer() {
 }
 
 async function _adminSgdbSearch(type) {
-    const searchInput = document.getElementById('sgdbSearchInput');
+    const activeModal = _getActiveAdminModal();
+    const searchInput = activeModal.querySelector('#sgdbSearchInput');
     if (!searchInput) return;
     const term = searchInput.value.trim();
     if (!term) return;
 
     const resultsEl = type === 'cover'
-        ? document.getElementById('sgdbCoverResults')
-        : document.getElementById('sgdbHeroResults');
+        ? activeModal.querySelector('#sgdbCoverResults')
+        : activeModal.querySelector('#sgdbHeroResults');
     if (!resultsEl) return;
 
-    const btn = type === 'cover' ? document.getElementById('sgdbSearchBtn') : null;
+    const btn = type === 'cover' ? activeModal.querySelector('#sgdbSearchBtn') : null;
     if (btn) { btn.disabled = true; btn.textContent = '…'; }
     resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:4px 0;">Searching…</p>';
 
@@ -4325,8 +4328,473 @@ async function handleAddPcGameToDb() {
     }
 }
 
+// ============================================================
+// ADD STEAM GAME TO DATABASE
+// ============================================================
+
+/** Cached Steam store search results for the current Add Steam Game modal session. */
+let _steamSearchResults = [];
+
+function _ensureAddSteamGameModal() {
+    let modal = document.getElementById('addSteamGameModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id        = 'addSteamGameModal';
+        modal.className = 'game-modal-overlay';
+        modal.style.cssText = 'z-index:10000;display:none;';
+        modal.innerHTML = `
+            <div class="game-modal admin-edit-modal">
+                <div class="game-modal-header">
+                    <div style="flex:1;min-width:0;">
+                        <h3 class="game-modal-title">🎮 Add Steam Game</h3>
+                        <p class="game-modal-platform">PC (Steam)</p>
+                    </div>
+                    <button class="game-modal-close" onclick="closeAddSteamGameModal()" aria-label="Close dialog">✕</button>
+                </div>
+                <div class="game-modal-body" id="addSteamGameBody"></div>
+            </div>`;
+        document.body.appendChild(modal);
+        modal.addEventListener('click', e => { if (e.target === modal) closeAddSteamGameModal(); });
+    }
+    return modal;
+}
+
+function openAddSteamGameModal() {
+    if (!isAdminUser()) return;
+    _steamSearchResults = [];
+    const modal  = _ensureAddSteamGameModal();
+    const bodyEl = document.getElementById('addSteamGameBody');
+    const hasSgdb = !!STEAMGRID_KEY;
+
+    bodyEl.innerHTML = `
+    <form id="addSteamGameForm" autocomplete="off" onsubmit="return false;">
+        <div class="admin-form-group">
+            <label class="admin-form-label">🔍 Search Steam Store</label>
+            <div class="admin-sgdb-row">
+                <input type="text" id="steamSearchInput" class="admin-form-input" placeholder="Search Steam for a game…">
+                <button type="button" class="admin-btn-outline" id="steamSearchBtn" onclick="_searchSteamStore()">🔍 Search</button>
+            </div>
+            <div id="steamSearchResults" style="margin-top:8px;max-height:260px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;display:none;"></div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="steamGameTitle">Title *</label>
+            <input type="text" id="steamGameTitle" class="admin-form-input" placeholder="Game title…" required>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="steamGameTitleId">Steam App ID</label>
+            <input type="text" id="steamGameTitleId" class="admin-form-input" placeholder="Steam App ID (optional)…" value="">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label" for="steamGameDesc">Description</label>
+            <textarea id="steamGameDesc" class="admin-form-input admin-form-textarea" rows="4" placeholder="Short description…"></textarea>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Cover Image</label>
+            <div class="admin-cover-row">
+                <div class="admin-cover-preview" id="adminCoverPreview">
+                    <span style="opacity:.5;font-size:.8em;">No image</span>
+                </div>
+                <div style="flex:1;min-width:0;">
+                    <input type="url" id="editCoverUrl" class="admin-form-input" placeholder="https://…" value="">
+                    <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                        <button type="button" class="admin-btn-outline" onclick="_adminPreviewCover()">🖼️ Preview</button>
+                        <a href="https://www.steamgriddb.com/search/grids" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🎨 Browse SteamGridDB</a>
+                    </div>
+                    ${hasSgdb ? `
+                    <div class="admin-sgdb-row" style="margin-top:8px;">
+                        <input type="text" id="sgdbSearchInput" class="admin-form-input" placeholder="Search SteamGridDB…">
+                        <button type="button" class="admin-btn-outline" id="sgdbSearchBtn" onclick="_adminSgdbSearch('cover')">🔍</button>
+                    </div>
+                    <div id="sgdbCoverResults" class="admin-img-picker"></div>` : ''}
+                </div>
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Background Images</label>
+            <div id="adminBgList">${_adminBgFieldHtml('')}</div>
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminAddBgField()">+ Add Background URL</button>
+                ${hasSgdb ? `<button type="button" class="admin-btn-outline" onclick="_adminSgdbSearch('hero')">🎨 SGDB Heroes</button>` : ''}
+            </div>
+            ${hasSgdb ? `<div id="sgdbHeroResults" class="admin-img-picker" style="margin-top:6px;"></div>` : ''}
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">Trailer (YouTube)</label>
+            <input type="text" id="editTrailerUrl" class="admin-form-input" placeholder="YouTube URL or video ID…" value="">
+            <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap;">
+                <button type="button" class="admin-btn-outline" onclick="_adminPreviewTrailer()">▶ Preview</button>
+                <a href="https://www.youtube.com/results?search_query=" target="_blank" rel="noopener" class="admin-btn-outline" style="text-decoration:none;">🔍 Search YouTube</a>
+            </div>
+            <div id="adminTrailerPreview" class="admin-trailer-preview"></div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🧩 Mods</label>
+            <div id="adminModList">${_adminModFieldHtml('', '')}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🛒 Stores</label>
+            <div id="adminStoreList">${_adminStoreFieldHtml('Steam', '')}</div>
+            <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddStoreField()">+ Add Store Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Minimum System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecMinCpu" class="admin-form-input" placeholder="CPU" value="">
+                <input type="text" id="editSpecMinGpu" class="admin-form-input" placeholder="GPU" value="">
+                <input type="text" id="editSpecMinRam" class="admin-form-input" placeholder="RAM" value="">
+                <input type="text" id="editSpecMinRes" class="admin-form-input" placeholder="Resolution" value="">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">⚙️ Recommended System Requirements</label>
+            <div class="admin-spec-grid">
+                <input type="text" id="editSpecRecCpu" class="admin-form-input" placeholder="CPU" value="">
+                <input type="text" id="editSpecRecGpu" class="admin-form-input" placeholder="GPU" value="">
+                <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="">
+                <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="">
+            </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🏆 Achievements JSON URL</label>
+            <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="">
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🔗 Exophase URL</label>
+            <input type="url" id="editExophaseUrl" class="admin-form-input" placeholder="https://www.exophase.com/game/…/achievements/" value="">
+        </div>
+        <div class="admin-form-actions">
+            <div id="addSteamGameMsg" class="admin-edit-msg" style="display:none;"></div>
+            <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAddSteamGameModal()">Cancel</button>
+            <button type="button" class="btn" style="padding:10px 22px;" id="addSteamGameSaveBtn" onclick="handleAddSteamGameToDb()">💾 Add Game</button>
+        </div>
+    </form>`;
+
+    modal.style.display = 'flex';
+    const searchInput = document.getElementById('steamSearchInput');
+    if (searchInput) {
+        searchInput.focus();
+        searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); _searchSteamStore(); } });
+    }
+}
+
+function closeAddSteamGameModal() {
+    const modal = document.getElementById('addSteamGameModal');
+    if (modal) modal.style.display = 'none';
+    _steamSearchResults = [];
+}
+
 /**
- * Dispatch the scrape-exophase GitHub Actions workflow to scrape an Exophase
+ * Search the Steam store for games matching the query in #steamSearchInput.
+ * Populates #steamSearchResults with clickable result rows.
+ *
+ * Uses the public Steam Store search API (store.steampowered.com/api/storesearch),
+ * which supports cross-origin requests from browsers.  If Steam changes their
+ * CORS policy, this call may fail – in that case the admin can still fill in
+ * the title and App ID manually.
+ */
+async function _searchSteamStore() {
+    const input     = document.getElementById('steamSearchInput');
+    const resultsEl = document.getElementById('steamSearchResults');
+    const btn       = document.getElementById('steamSearchBtn');
+    if (!input || !resultsEl) return;
+
+    const query = input.value.trim();
+    if (!query) return;
+
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    resultsEl.style.display = 'block';
+    resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">Searching Steam…</p>';
+
+    try {
+        const resp = await fetch(
+            `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`
+        );
+        if (!resp.ok) throw new Error(`Steam API returned HTTP ${resp.status}`);
+        const data  = await resp.json();
+        const items = (data && Array.isArray(data.items)) ? data.items.slice(0, 10) : [];
+
+        if (!items.length) {
+            resultsEl.innerHTML = '<p style="color:#c00;font-size:.85em;padding:8px;">No results found on Steam. Try a different search term.</p>';
+            _steamSearchResults = [];
+            return;
+        }
+
+        _steamSearchResults = items;
+        resultsEl.innerHTML = items.map((item, i) => {
+            const nameEsc  = escapeHtml(item.name || '');
+            const imgHtml  = item.tiny_image
+                ? `<img src="${escapeHtml(item.tiny_image)}" alt="" style="width:60px;height:28px;object-fit:cover;border-radius:3px;flex-shrink:0;">`
+                : '<div style="width:60px;height:28px;background:#e2e8f0;border-radius:3px;flex-shrink:0;"></div>';
+            return `<div class="steam-search-item" onclick="_selectSteamGame(${i})"
+                style="display:flex;align-items:center;gap:10px;padding:8px 10px;cursor:pointer;border-bottom:1px solid #e2e8f0;"
+                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background=''">
+                ${imgHtml}
+                <div>
+                    <div style="font-weight:600;font-size:.88em;">${nameEsc}</div>
+                    <div style="color:#64748b;font-size:.78em;">App ID: ${item.id}</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch (err) {
+        resultsEl.innerHTML = `<p style="color:#c00;font-size:.85em;padding:8px;">Steam search failed: ${escapeHtml(err.message)}</p>`;
+        _steamSearchResults = [];
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🔍 Search'; }
+    }
+}
+
+/**
+ * Called when the user clicks a Steam search result row.
+ * Fetches the app's details from Steam and pre-fills the form fields.
+ */
+async function _selectSteamGame(index) {
+    const item = _steamSearchResults[index];
+    if (!item) return;
+
+    const resultsEl    = document.getElementById('steamSearchResults');
+    const titleInput   = document.getElementById('steamGameTitle');
+    const titleIdInput = document.getElementById('steamGameTitleId');
+    const descInput    = document.getElementById('steamGameDesc');
+    const coverInput   = document.getElementById('editCoverUrl');
+    const storeList    = document.getElementById('adminStoreList');
+
+    // Immediately fill title and App ID from the search result
+    if (titleInput)   titleInput.value   = item.name || '';
+    if (titleIdInput) titleIdInput.value = String(item.id);
+
+    // Pre-fill the Steam store URL in the first store row
+    const storeUrl = `https://store.steampowered.com/app/${item.id}/`;
+    if (storeList) {
+        const firstNameInput = storeList.querySelector('.admin-store-name');
+        const firstUrlInput  = storeList.querySelector('.admin-store-url');
+        if (firstNameInput) firstNameInput.value = 'Steam';
+        if (firstUrlInput)  firstUrlInput.value  = storeUrl;
+    }
+
+    if (resultsEl) resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">⏳ Loading game details from Steam…</p>';
+
+    try {
+        const resp = await fetch(
+            `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(item.id)}&l=en`
+        );
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data     = await resp.json();
+        const gameData = data && data[item.id] && data[item.id].success ? data[item.id].data : null;
+
+        if (gameData) {
+            if (titleInput  && gameData.name)              titleInput.value  = gameData.name;
+            if (descInput   && gameData.short_description) descInput.value   = gameData.short_description;
+            if (coverInput  && gameData.header_image) {
+                coverInput.value = gameData.header_image;
+                _adminPreviewCover();
+            }
+        }
+
+        const selectedName = escapeHtml((gameData && gameData.name) || item.name || '');
+        if (resultsEl) resultsEl.innerHTML =
+            `<p style="color:#0f766e;font-size:.85em;padding:8px;">✅ "${selectedName}" selected. Edit details below, then click Add Game.</p>`;
+    } catch (err) {
+        if (resultsEl) resultsEl.innerHTML =
+            `<p style="color:#c00;font-size:.85em;padding:8px;">Could not load full details: ${escapeHtml(err.message)} — title and App ID pre-filled from search.</p>`;
+    }
+
+    if (titleInput) titleInput.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Save handler for the Add Steam Game modal.
+ * Collects form values and appends the new game to PC.Games.json via
+ * the backend API (if available) or the GitHub Contents API directly.
+ */
+async function handleAddSteamGameToDb() {
+    if (!isAdminUser()) return;
+
+    const saveBtn = document.getElementById('addSteamGameSaveBtn');
+    const msgEl   = document.getElementById('addSteamGameMsg');
+    const showMsg = (text, type) => {
+        if (!msgEl) return;
+        msgEl.textContent = text;
+        msgEl.style.display = '';
+        msgEl.className = `admin-edit-msg admin-edit-msg--${type}`;
+    };
+
+    const backendBase = getBackendBase();
+    if (!backendBase && !GAMES_DB_TOKEN) {
+        showMsg('⚠️ No write method available. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret and re-deploy to enable editing.', 'error');
+        return;
+    }
+
+    const title       = ((document.getElementById('steamGameTitle')   || {}).value || '').trim();
+    const form        = document.getElementById('addSteamGameForm') || document;
+    const getField    = id  => form.querySelector('#' + id);
+    const getFields   = sel => form.querySelectorAll(sel);
+    const titleId     = ((document.getElementById('steamGameTitleId') || {}).value || '').trim();
+    const description = ((document.getElementById('steamGameDesc')    || {}).value || '').trim();
+    const coverUrl    = ((getField('editCoverUrl')    || {}).value || '').trim();
+    const trailerRaw  = ((getField('editTrailerUrl')  || {}).value || '').trim();
+    const trailers    = trailerRaw ? [trailerRaw] : [];
+
+    const bgInputs = getFields('#adminBgList .admin-bg-input');
+    const bgUrls   = Array.from(bgInputs).map(i => i.value.trim()).filter(Boolean);
+
+    const modFields = getFields('#adminModList .admin-mod-field');
+    const mods = Array.from(modFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-mod-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
+
+    const pcStoreFields = getFields('#adminStoreList .admin-store-field');
+    const stores = Array.from(pcStoreFields).reduce((acc, row) => {
+        const name = (row.querySelector('.admin-store-name') || {}).value || '';
+        const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim() });
+        return acc;
+    }, []);
+
+    const specMinCpu = ((getField('editSpecMinCpu') || {}).value || '').trim();
+    const specMinGpu = ((getField('editSpecMinGpu') || {}).value || '').trim();
+    const specMinRam = ((getField('editSpecMinRam') || {}).value || '').trim();
+    const specMinRes = ((getField('editSpecMinRes') || {}).value || '').trim();
+    const specRecCpu = ((getField('editSpecRecCpu') || {}).value || '').trim();
+    const specRecGpu = ((getField('editSpecRecGpu') || {}).value || '').trim();
+    const specRecRam = ((getField('editSpecRecRam') || {}).value || '').trim();
+    const specRecRes = ((getField('editSpecRecRes') || {}).value || '').trim();
+
+    const sysSpecMin = (specMinCpu || specMinGpu || specMinRam || specMinRes)
+        ? { cpu: specMinCpu, gpu: specMinGpu, ram: specMinRam, resolution: specMinRes }
+        : null;
+    const sysSpecRecommended = (specRecCpu || specRecGpu || specRecRam || specRecRes)
+        ? { cpu: specRecCpu, gpu: specRecGpu, ram: specRecRam, resolution: specRecRes }
+        : null;
+
+    const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
+
+    if (!title) { showMsg('❌ Title is required.', 'error'); return; }
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Checking…'; }
+
+    const newGame = { Title: title };
+    if (titleId)            newGame.TitleID            = titleId;
+    if (description)        newGame.description        = description;
+    if (coverUrl)           newGame.image              = coverUrl;
+    if (bgUrls.length)      newGame.background_images  = bgUrls;
+    if (trailers.length)    newGame.trailers            = trailers;
+    if (mods.length)        newGame.mods               = mods;
+    if (stores.length)      newGame.stores             = stores;
+    if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
+    if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
+    if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
+    if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
+
+    try {
+        if (backendBase) {
+            // ── Backend path ──
+            if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+
+            const addResp = await fetch(`${backendBase}/api/admin/add-game`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                },
+                body: JSON.stringify({ platform: 'PC', game: newGame })
+            });
+            const addData = await addResp.json();
+            if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
+        } else {
+            // ── Client-side path: GitHub Contents API ──
+            const contentsResp = await fetch(
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+                { headers: _gamesDbHeaders() }
+            );
+            let gamesArr = [];
+            let topKey   = null;
+            let fileData = null;
+
+            if (contentsResp.ok) {
+                const fileMeta = await contentsResp.json();
+                fileData = fileMeta.content
+                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                    : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
+
+                if (fileData && Array.isArray(fileData.Games)) {
+                    gamesArr = fileData.Games; topKey = 'Games';
+                } else if (fileData && Array.isArray(fileData.games)) {
+                    gamesArr = fileData.games; topKey = 'games';
+                } else if (Array.isArray(fileData)) {
+                    gamesArr = fileData;
+                }
+            } else if (contentsResp.status !== 404) {
+                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+            }
+
+            // Check for duplicate (case-insensitive title match)
+            const titleLower = title.toLowerCase();
+            const duplicate  = gamesArr.some(g =>
+                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+            );
+            if (duplicate) {
+                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+                return;
+            }
+
+            gamesArr.push(newGame);
+            const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
+            if (saveBtn) saveBtn.textContent = '⏳ Saving…';
+            await _gamesDbWriteFile('PC', newContent, `Add Steam game: ${title}`);
+        }
+
+        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+
+        // Update in-memory browse cache
+        const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
+            ? [..._allPlatformGames['PC'], newGame]
+            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+                ? [..._allBrowseGames, newGame]
+                : null;
+        if (cachedPcGames) {
+            const sorted = cachedPcGames.sort((a, b) => {
+                const na = (a.Title || a.game_name || a.title || '').toLowerCase();
+                const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
+                return na.localeCompare(nb);
+            });
+            if (typeof _allBrowseGames !== 'undefined' &&
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+                _allBrowseGames = sorted;
+            }
+            if (typeof _allPlatformGames !== 'undefined') {
+                _allPlatformGames['PC'] = sorted;
+            }
+        }
+
+        setTimeout(() => {
+            closeAddSteamGameModal();
+            if (typeof _currentPlatform !== 'undefined') {
+                if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
+                    renderBrowseGamesGrouped(_allPlatformGames,
+                        (document.getElementById('browseSearch') || {}).value || '');
+                } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                    renderBrowseGames(_allBrowseGames);
+                }
+            }
+        }, 1500);
+    } catch (e) {
+        showMsg(`❌ ${e.message}`, 'error');
+    } finally {
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
+    }
+}
+
+/**
  * page server-side and write achievements.json to Games.Database.
  *
  * Requires GAMES_DB_TOKEN to have:

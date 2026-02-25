@@ -54,6 +54,7 @@
                     </select>
                     <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;margin-left:12px;"></span>
                     <button id="addPcGameBtn" class="btn" style="display:none;margin-left:12px;" onclick="openAddPcGameModal()">🖥️ Add PC Game</button>
+                    <button id="addSteamGameBtn" class="btn" style="display:none;margin-left:8px;" onclick="openAddSteamGameModal()">🎮 Add Steam Game</button>
                 </div>
 
                 <!-- Search -->
@@ -180,24 +181,29 @@
         const countEl   = document.getElementById('browseCount');
         const searchRow = document.getElementById('browseSearchRow');
         const msg       = document.getElementById('browseLoadingMsg');
-        const addPcBtn  = document.getElementById('addPcGameBtn');
+        const addPcBtn    = document.getElementById('addPcGameBtn');
+        const addSteamBtn = document.getElementById('addSteamGameBtn');
         document.getElementById('browseSearch').value = '';
 
         if (!platform) {
             listEl.innerHTML    = '';
             countEl.textContent = '';
             searchRow.style.display = 'none';
-            if (addPcBtn) addPcBtn.style.display = 'none';
+            if (addPcBtn)    addPcBtn.style.display    = 'none';
+            if (addSteamBtn) addSteamBtn.style.display = 'none';
             return;
         }
 
         if (platform === 'ALL') {
-            if (addPcBtn) addPcBtn.style.display = 'none';
+            if (addPcBtn)    addPcBtn.style.display    = 'none';
+            if (addSteamBtn) addSteamBtn.style.display = 'none';
             await loadAllPlatforms();
             return;
         }
 
-        if (addPcBtn) addPcBtn.style.display = (platform === 'PC' && isAdminUser()) ? '' : 'none';
+        const showAdminPcBtns = platform === 'PC' && isAdminUser();
+        if (addPcBtn)    addPcBtn.style.display    = showAdminPcBtns ? '' : 'none';
+        if (addSteamBtn) addSteamBtn.style.display = showAdminPcBtns ? '' : 'none';
 
         _currentPlatform = platform;
         listEl.innerHTML    = '<p style="color:#666;">Loading games…</p>';
