@@ -2359,6 +2359,56 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
     }
 });
 
+// ── GET /api/admin/steam-search ───────────────────────────────────────────────
+// Admin-only proxy: forwards a search query to the Steam Store search API and
+// returns the raw JSON response.  Avoids CORS restrictions in the browser.
+app.get('/api/admin/steam-search', authenticateToken, async (req, res) => {
+    try {
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+        const query = String(req.query.query || '').trim();
+        if (!query) return res.status(400).json({ success: false, message: 'query parameter is required.' });
+
+        const steamUrl = `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`;
+        const steamResp = await fetch(steamUrl);
+        if (!steamResp.ok) {
+            return res.status(502).json({ success: false, message: `Steam API returned HTTP ${steamResp.status}` });
+        }
+        const data = await steamResp.json();
+        res.json(data);
+    } catch (err) {
+        console.error('GET /api/admin/steam-search error:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching Steam search results.' });
+    }
+});
+
+// ── GET /api/admin/steam-appdetails ──────────────────────────────────────────
+// Admin-only proxy: fetches app details from the Steam Store API for a given
+// appid and returns the raw JSON response.
+app.get('/api/admin/steam-appdetails', authenticateToken, async (req, res) => {
+    try {
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+        const appid = String(req.query.appid || '').trim();
+        if (!appid || !/^\d+$/.test(appid)) {
+            return res.status(400).json({ success: false, message: 'Valid numeric appid parameter is required.' });
+        }
+
+        const steamUrl = `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appid)}&l=en`;
+        const steamResp = await fetch(steamUrl);
+        if (!steamResp.ok) {
+            return res.status(502).json({ success: false, message: `Steam API returned HTTP ${steamResp.status}` });
+        }
+        const data = await steamResp.json();
+        res.json(data);
+    } catch (err) {
+        console.error('GET /api/admin/steam-appdetails error:', err);
+        res.status(500).json({ success: false, message: 'Server error fetching Steam app details.' });
+    }
+});
+
 // ── POST /api/admin/add-game ──────────────────────────────────────────────────
 // Admin-only endpoint: add a new game entry to a Games.Database platform JSON.
 // Authentication: the caller must be the Admin.GameOS account (checked via token).

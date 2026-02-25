@@ -4503,10 +4503,9 @@ function closeAddSteamGameModal() {
  * Search the Steam store for games matching the query in #steamSearchInput.
  * Populates #steamSearchResults with clickable result rows.
  *
- * Uses the public Steam Store search API (store.steampowered.com/api/storesearch),
- * which supports cross-origin requests from browsers.  If Steam changes their
- * CORS policy, this call may fail – in that case the admin can still fill in
- * the title and App ID manually.
+ * When the backend is available the request is routed through the server-side
+ * proxy (/api/admin/steam-search) to avoid browser CORS restrictions.
+ * Falls back to calling the Steam API directly for client-only deployments.
  */
 async function _searchSteamStore() {
     const input     = document.getElementById('steamSearchInput');
@@ -4522,9 +4521,24 @@ async function _searchSteamStore() {
     resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">Searching Steam…</p>';
 
     try {
-        const resp = await fetch(
-            `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`
-        );
+        const backendBase = getBackendBase();
+        let resp;
+        if (backendBase) {
+            // Use the server-side proxy to avoid CORS restrictions
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            resp = await fetch(
+                `${backendBase}/api/admin/steam-search?query=${encodeURIComponent(query)}`,
+                { headers: storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {} }
+            );
+        } else {
+            resp = await fetch(
+                `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`
+            );
+        }
         if (!resp.ok) throw new Error(`Steam API returned HTTP ${resp.status}`);
         const data  = await resp.json();
         const items = (data && Array.isArray(data.items)) ? data.items.slice(0, 10) : [];
@@ -4590,9 +4604,23 @@ async function _selectSteamGame(index) {
     if (resultsEl) resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">⏳ Loading game details from Steam…</p>';
 
     try {
-        const resp = await fetch(
-            `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(item.id)}&l=en`
-        );
+        const backendBase = getBackendBase();
+        let resp;
+        if (backendBase) {
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            resp = await fetch(
+                `${backendBase}/api/admin/steam-appdetails?appid=${encodeURIComponent(item.id)}`,
+                { headers: storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {} }
+            );
+        } else {
+            resp = await fetch(
+                `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(item.id)}&l=en`
+            );
+        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data     = await resp.json();
         const gameData = data && data[item.id] && data[item.id].success ? data[item.id].data : null;
