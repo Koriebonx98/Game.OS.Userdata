@@ -2565,8 +2565,10 @@ async function handleResetAllAccounts() {
  * Only the Admin.GameOS account may trigger this.
  */
 async function handleCheckSteamNewGames() {
-    const msgEl = document.getElementById('steamCheckMessage');
-    const btn   = document.getElementById('checkSteamBtn');
+    const msgEl      = document.getElementById('steamCheckMessage');
+    const btn        = document.getElementById('checkSteamBtn');
+    const statsPanel = document.getElementById('steamStatsPanel');
+    const statsEl    = document.getElementById('steamStatsContent');
 
     if (!isAdminUser()) {
         if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
@@ -2579,7 +2581,10 @@ async function handleCheckSteamNewGames() {
     }
 
     if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
-    if (btn)   btn.disabled = true;
+    if (statsPanel) statsPanel.style.display = 'none';
+    if (btn) btn.disabled = true;
+
+    const triggerTime = Date.now();
 
     try {
         const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml/dispatches`;
@@ -2597,8 +2602,15 @@ async function handleCheckSteamNewGames() {
         if (resp.status === 204) {
             const runsUrl = `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml`;
             if (msgEl) msgEl.innerHTML =
-                `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
-                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
+                `<span class="message success">✅ Workflow triggered! Checking Steam catalogue for new games… ` +
+                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View run →</a></span>`;
+
+            if (statsPanel && statsEl) {
+                statsEl.innerHTML = _renderSteamStatsLoading();
+                statsPanel.style.display = '';
+                // Poll for results in the background (does not block UI)
+                _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl);
+            }
         } else if (resp.status === 403 || resp.status === 401) {
             if (msgEl) msgEl.innerHTML =
                 '<span class="message error">❌ GAMES_DB_TOKEN lacks Actions: Read and write on ' +
@@ -2616,6 +2628,173 @@ async function handleCheckSteamNewGames() {
     } finally {
         if (btn) btn.disabled = false;
     }
+}
+
+/** Returns HTML for the "polling in progress" state of the stats panel. */
+function _renderSteamStatsLoading() {
+    return `<div style="display:flex;align-items:center;gap:8px;color:#555;">
+        <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span>
+        <span>Workflow running — polling for results…</span>
+    </div>`;
+}
+
+/**
+ * Renders a stats card from a parsed stats object returned by _parseSteamRunStats().
+ * Fields: steamTotal, steamFiltered, existingCount, newGames, totalAfter, conclusion.
+ */
+function _renderSteamStatsCard(stats, runsUrl) {
+    const fmt = n => (n != null ? n.toLocaleString() : '—');
+
+    const inDb   = stats.existingCount != null ? stats.existingCount : null;
+    const after  = stats.totalAfter    != null ? stats.totalAfter    : (inDb != null && stats.newGames != null ? inDb + stats.newGames : null);
+    const added  = stats.newGames      != null ? stats.newGames      : null;
+    const total  = stats.steamFiltered != null ? stats.steamFiltered : null;
+
+    // Progress bar: (games in DB after run) / steamFiltered
+    let barHtml = '';
+    if (after != null && total != null && total > 0) {
+        const pct    = Math.min(100, (after / total * 100));
+        const pctStr = pct.toFixed(1);
+        barHtml = `
+        <div style="margin-top:10px;">
+            <div style="display:flex;justify-content:space-between;font-size:0.82em;color:#64748b;margin-bottom:4px;">
+                <span>📈 Coverage of Steam catalogue</span>
+                <span><strong>${pctStr}%</strong></span>
+            </div>
+            <div style="background:#e2e8f0;border-radius:999px;height:10px;overflow:hidden;">
+                <div style="width:${pctStr}%;height:100%;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:999px;transition:width .4s ease;"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;font-size:0.78em;color:#94a3b8;margin-top:3px;">
+                <span>${fmt(after)} in database</span>
+                <span>${fmt(total)} on Steam</span>
+            </div>
+        </div>`;
+    }
+
+    const addedLine = added === 0
+        ? `<span style="color:#22c55e;">✅ Already up to date — no new games found</span>`
+        : added > 0
+            ? `<span style="color:#22c55e;">➕ <strong>${fmt(added)}</strong> new game${added === 1 ? '' : 's'} added to database</span>`
+            : `<span style="color:#64748b;">— Result not available</span>`;
+
+    const conclusionBadge = stats.conclusion === 'success'
+        ? `<span style="color:#22c55e;font-weight:600;">✅ Success</span>`
+        : stats.conclusion === 'failure'
+            ? `<span style="color:#ef4444;font-weight:600;">❌ Failed</span>`
+            : stats.conclusion
+                ? `<span style="color:#f59e0b;font-weight:600;">⚠️ ${stats.conclusion}</span>`
+                : '';
+
+    return `<div style="color:#1e293b;">
+        <div style="font-weight:600;margin-bottom:8px;font-size:0.95em;">🎮 Steam Game Check Results ${conclusionBadge}</div>
+        <table style="border-collapse:collapse;width:100%;">
+            <tr><td style="padding:2px 8px 2px 0;color:#64748b;">🔢 Steam catalogue (filtered)</td><td style="font-weight:600;">${fmt(stats.steamFiltered)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;color:#64748b;">📦 Games in database before</td><td style="font-weight:600;">${fmt(inDb)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;color:#64748b;">📦 Games in database after</td><td style="font-weight:600;">${fmt(after)}</td></tr>
+            <tr><td style="padding:2px 8px 2px 0;color:#64748b;">🆕 New games found</td><td>${addedLine}</td></tr>
+        </table>
+        ${barHtml}
+        <div style="margin-top:10px;font-size:0.8em;color:#94a3b8;">
+            <a href="${runsUrl}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;">View full run log →</a>
+        </div>
+    </div>`;
+}
+
+/**
+ * Polls the update-steam-new-games workflow runs API after a manual dispatch,
+ * waits for the run to complete, fetches the job logs, parses game stats,
+ * and updates the stats panel element in place.
+ */
+async function _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl) {
+    const ghHeaders = {
+        'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
+    const runsApiUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml/runs?per_page=10`;
+
+    let runId = null;
+    // Poll up to ~10 minutes (60 × 10 s) for the run to appear and complete
+    for (let attempt = 0; attempt < 60; attempt++) {
+        await new Promise(r => setTimeout(r, 10000));
+        try {
+            const resp = await fetch(runsApiUrl, { headers: ghHeaders });
+            if (!resp.ok) continue;
+            const data = await resp.json();
+            const runs = (data.workflow_runs || []);
+            // Find a run created within 60 s before or after our trigger
+            const run = runs.find(r => Math.abs(new Date(r.created_at).getTime() - triggerTime) < 60000);
+            if (!run) continue;
+            runId = run.id;
+
+            if (run.status !== 'completed') {
+                // Update loading indicator with elapsed time
+                const elapsed = Math.round((Date.now() - triggerTime) / 1000);
+                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading() +
+                    `<div style="color:#94a3b8;font-size:0.82em;margin-top:6px;">Elapsed: ${elapsed}s — run is ${run.status}…</div>`;
+                continue;
+            }
+
+            // Run is complete — fetch job logs and parse
+            const stats = await _parseSteamRunStats(runId, run.conclusion, ghHeaders);
+            if (statsEl) statsEl.innerHTML = _renderSteamStatsCard(stats, runsUrl);
+            return;
+        } catch (err) {
+            console.warn('Steam stats poll error:', err);
+        }
+    }
+
+    // Timed out
+    if (statsEl) statsEl.innerHTML =
+        `<div style="color:#f59e0b;">⚠️ Timed out waiting for workflow to complete. ` +
+        `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;">Check run manually →</a></div>`;
+}
+
+/**
+ * Fetches the job logs for a completed workflow run and parses Steam game counts.
+ * Returns an object with: steamTotal, steamFiltered, existingCount, newGames, totalAfter, conclusion.
+ */
+async function _parseSteamRunStats(runId, conclusion, ghHeaders) {
+    const stats = { conclusion, runId };
+    try {
+        const jobsResp = await fetch(
+            `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/runs/${runId}/jobs`,
+            { headers: ghHeaders }
+        );
+        if (!jobsResp.ok) return stats;
+        const jobsData = await jobsResp.json();
+        const jobs = jobsData.jobs || [];
+        if (!jobs.length) return stats;
+
+        const logResp = await fetch(
+            `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/jobs/${jobs[0].id}/logs`,
+            { headers: ghHeaders }
+        );
+        if (!logResp.ok) return stats;
+        const logText = await logResp.text();
+
+        const parseNum = s => parseInt(s.replace(/,/g, ''), 10);
+
+        const m1 = logText.match(/Total entries in source list:\s*([\d,]+)/);
+        if (m1) stats.steamTotal = parseNum(m1[1]);
+
+        const m2 = logText.match(/Steam games after filtering:\s*([\d,]+)/);
+        if (m2) stats.steamFiltered = parseNum(m2[1]);
+
+        const m3 = logText.match(/([\d,]+) games currently stored/);
+        if (m3) stats.existingCount = parseNum(m3[1]);
+
+        const m4 = logText.match(/(\d+) new game\(?s?\)? added;\s*(\d+) total/);
+        if (m4) { stats.newGames = parseNum(m4[1]); stats.totalAfter = parseNum(m4[2]); }
+        else if (/No new Steam games found/.test(logText)) stats.newGames = 0;
+        else {
+            const m5 = logText.match(/(\d+) new Steam game\(?s?\)? to append/);
+            if (m5) stats.newGames = parseNum(m5[1]);
+        }
+    } catch (err) {
+        console.warn('Steam log parse error:', err);
+    }
+    return stats;
 }
 
 
