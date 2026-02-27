@@ -2560,7 +2560,7 @@ async function handleCheckSteamNewGames() {
             if (msgEl) showMessage(msgEl, '⏳ Fetching Steam catalogue… This may take a minute.', 'info');
 
             // 1. Fetch Steam app list
-            const STEAM_LIST_URL = 'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List/main/steamcmd_appid.json';
+            const STEAM_LIST_URL = 'https://api.steampowered.com/ISteamApps/GetAppList/v2/';
             const steamResp = await fetch(STEAM_LIST_URL);
             if (!steamResp.ok) throw new Error(`Failed to fetch Steam app list (HTTP ${steamResp.status})`);
             const steamData = await steamResp.json();
@@ -2648,12 +2648,17 @@ async function handleCheckSteamNewGames() {
                 throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
             }
 
-            // 4. Diff: find games not already present by appid
+            // 4. Diff: find games not already present by appid or title
             const existingAppids = new Set(
                 existingArr.map(g => (g.appid !== null && g.appid !== undefined) ? parseInt(g.appid, 10) : null).filter(id => id !== null)
             );
+            const existingTitles = new Set(
+                existingArr.map(g => String(g.Title || g.title || '').trim().toLowerCase()).filter(Boolean)
+            );
             const newGames = Object.entries(steamByAppid)
-                .filter(([appid]) => !existingAppids.has(parseInt(appid, 10)))
+                .filter(([appid, entry]) =>
+                    !existingAppids.has(parseInt(appid, 10)) &&
+                    !existingTitles.has(entry.Title.trim().toLowerCase()))
                 .map(([, entry]) => entry)
                 .sort((a, b) => a.appid - b.appid);
 

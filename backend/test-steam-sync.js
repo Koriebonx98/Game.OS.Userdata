@@ -50,11 +50,16 @@ function buildSteamByAppId(allApps) {
 
 function diffAndAppend(steamByAppId, existingGamesArr) {
     const existingAppIds = new Set();
+    const existingTitles = new Set();
     for (const g of existingGamesArr) {
         if (g.appid != null) existingAppIds.add(Number(g.appid));
+        const t = String(g.Title || g.title || '').trim().toLowerCase();
+        if (t) existingTitles.add(t);
     }
     const newGames = Object.entries(steamByAppId)
-        .filter(([appid]) => !existingAppIds.has(Number(appid)))
+        .filter(([appid, entry]) =>
+            !existingAppIds.has(Number(appid)) &&
+            !existingTitles.has(entry.Title.trim().toLowerCase()))
         .map(([, entry]) => entry)
         .sort((a, b) => a.appid - b.appid);
     return newGames;
@@ -271,6 +276,32 @@ suite('7. Manual add-game write path – same shape as Steam sync', () => {
     assertEqual(manualGame.appid,         steamEntry.appid,          'appid matches');
     assertEqual(manualGame.image,         steamEntry.image,          'image URL matches');
     assertEqual(manualGame.stores[0].url, steamEntry.stores[0].url,  'Steam store URL matches');
+});
+
+suite('8. diffAndAppend – title-based dedup prevents re-adding by title', () => {
+    // Simulate a game that exists in PC.Games.json by title but with a different
+    // (or older) appid.  The sync must NOT create a duplicate entry.
+    const existingWithDifferentAppid = [
+        { Title: 'Dead Island 2', TitleID: '99999', appid: 99999 },
+    ];
+    const map      = buildSteamByAppId(STEAM_FIXTURE_APPS);
+    const newGames = diffAndAppend(map, existingWithDifferentAppid);
+
+    const titles = newGames.map(g => g.Title);
+    assert(!titles.includes('Dead Island 2'),
+        'does not re-add "Dead Island 2" when title already exists (even if appid differs)');
+    assert(titles.includes('Valheim'),                   'still adds other new games');
+    assert(titles.includes('Sekiro: Shadows Die Twice'), 'still adds other new games');
+});
+
+suite('9. diffAndAppend – adds game when absent by both appid and title', () => {
+    // "Dead Island 2" is completely absent from PC.Games.json → must be added.
+    const map      = buildSteamByAppId(STEAM_FIXTURE_APPS);
+    const newGames = diffAndAppend(map, []);   // empty existing list
+
+    const titles = newGames.map(g => g.Title);
+    assert(titles.includes('Dead Island 2'),
+        'adds "Dead Island 2" when it is absent from PC.Games.json');
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -56,10 +56,7 @@ jobs:
           REQUEST_TIMEOUT = 120   # seconds for all outbound HTTP calls
 
           # ── 1. Fetch the SteamCMD app-ID list ─────────────────────────────
-          STEAM_LIST_URL = (
-              'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List'
-              '/main/steamcmd_appid.json'
-          )
+          STEAM_LIST_URL = 'https://api.steampowered.com/ISteamApps/GetAppList/v2/'
           print(f'⬇️  Fetching Steam app list from {STEAM_LIST_URL} …')
           try:
               with urllib.request.urlopen(STEAM_LIST_URL, timeout=REQUEST_TIMEOUT) as resp:
@@ -266,7 +263,7 @@ jobs:
           # ── 6. Build the payload ───────────────────────────────────────────
           pc_games_data = {
               'Platform': 'PC',
-              'source': 'https://github.com/dgibbs64/SteamCMD-AppID-List',
+              'source': 'https://api.steampowered.com/ISteamApps/GetAppList/v2/',
               'Games': games,
           }
 
