@@ -76,7 +76,7 @@ function buildFinalPayload(existingFileData, newGames) {
     const updatedArr = [...gamesArr, ...newGames];
     const newContent = topKey
         ? { ...fileMeta, Platform: fileMeta.Platform || 'PC', source: fileMeta.source || 'https://github.com/dgibbs64/SteamCMD-AppID-List', [topKey]: updatedArr }
-        : { Platform: 'PC', source: 'https://github.com/dgibbs64/SteamCMD-AppID-List', Games: updatedArr };
+        : { Platform: 'PC', source: 'https://api.steampowered.com/ISteamApps/GetAppList/v2/', Games: updatedArr };
     return { newContent, updatedArr };
 }
 
