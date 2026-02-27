@@ -2631,11 +2631,14 @@ async function handleCheckSteamNewGames() {
 }
 
 /** Returns HTML for the "polling in progress" state of the stats panel. */
-function _renderSteamStatsLoading() {
+function _renderSteamStatsLoading(statusMsg) {
+    const line = statusMsg
+        ? `<div style="color:#94a3b8;font-size:0.82em;margin-top:6px;">${statusMsg}</div>`
+        : '';
     return `<div style="display:flex;align-items:center;gap:8px;color:#555;">
         <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span>
         <span>Workflow running — polling for results…</span>
-    </div>`;
+    </div>${line}`;
 }
 
 /**
@@ -2717,21 +2720,31 @@ async function _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl) {
     // Poll up to ~10 minutes (60 × 10 s) for the run to appear and complete
     for (let attempt = 0; attempt < 60; attempt++) {
         await new Promise(r => setTimeout(r, 10000));
+        const elapsed = Math.round((Date.now() - triggerTime) / 1000);
         try {
             const resp = await fetch(runsApiUrl, { headers: ghHeaders });
-            if (!resp.ok) continue;
+            if (!resp.ok) {
+                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — waiting for run…`);
+                continue;
+            }
             const data = await resp.json();
             const runs = (data.workflow_runs || []);
-            // Find a run created within 60 s before or after our trigger
-            const run = runs.find(r => Math.abs(new Date(r.created_at).getTime() - triggerTime) < 60000);
-            if (!run) continue;
+            // Find a run created within 5 s before or 90 s after our trigger
+            const run = runs.find(r => {
+                const created = new Date(r.created_at).getTime();
+                return created >= triggerTime - 5000 && created <= triggerTime + 90000;
+            });
+            if (!run) {
+                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — waiting for workflow to start…`);
+                continue;
+            }
             runId = run.id;
 
             if (run.status !== 'completed') {
-                // Update loading indicator with elapsed time
-                const elapsed = Math.round((Date.now() - triggerTime) / 1000);
-                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading() +
-                    `<div style="color:#94a3b8;font-size:0.82em;margin-top:6px;">Elapsed: ${elapsed}s — run is ${run.status}…</div>`;
+                // Show elapsed time and live job-step progress
+                const stepsHtml = await _fetchSteamJobStepsHtml(runId, ghHeaders);
+                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(
+                    `Elapsed: ${elapsed}s — run is ${run.status}…`) + stepsHtml;
                 continue;
             }
 
@@ -2741,6 +2754,7 @@ async function _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl) {
             return;
         } catch (err) {
             console.warn('Steam stats poll error:', err);
+            if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — retrying…`);
         }
     }
 
@@ -2748,6 +2762,50 @@ async function _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl) {
     if (statsEl) statsEl.innerHTML =
         `<div style="color:#f59e0b;">⚠️ Timed out waiting for workflow to complete. ` +
         `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;">Check run manually →</a></div>`;
+}
+
+/**
+ * Fetches the jobs/steps for a running workflow run and returns HTML showing
+ * each step's current status for real-time progress feedback.
+ */
+async function _fetchSteamJobStepsHtml(runId, ghHeaders) {
+    try {
+        const resp = await fetch(
+            `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/runs/${runId}/jobs`,
+            { headers: ghHeaders }
+        );
+        if (!resp.ok) return '';
+        const data = await resp.json();
+        const jobs = data.jobs || [];
+        if (!jobs.length) return '';
+
+        const job = jobs[0];
+        // Show steps that have started, plus the first few queued (upcoming) steps
+        const steps = (job.steps || []).filter(s => s.status !== 'queued' || s.number <= 3);
+        if (!steps.length) return '';
+
+        const stepLines = steps.map(step => {
+            let icon;
+            if (step.status === 'completed') {
+                if (step.conclusion === 'success') icon = '✅';
+                else if (step.conclusion === 'skipped') icon = '⏭️';
+                else icon = '❌';
+            } else if (step.status === 'in_progress') {
+                icon = '🔄';
+            } else {
+                icon = '⏳';
+            }
+            const color = step.status === 'in_progress' ? '#1e293b' : '#64748b';
+            return `<div style="padding:2px 0;font-size:0.8em;color:${color};">${icon} ${escapeHtml(step.name)}</div>`;
+        }).join('');
+
+        return `<div style="margin-top:10px;border-top:1px solid #e2e8f0;padding-top:8px;">
+            <div style="font-size:0.8em;color:#64748b;margin-bottom:4px;">📋 ${escapeHtml(job.name)}</div>
+            ${stepLines}
+        </div>`;
+    } catch (err) {
+        return '';
+    }
 }
 
 /**
