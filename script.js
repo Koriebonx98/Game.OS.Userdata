@@ -2878,6 +2878,96 @@ async function _parseSteamRunStats(runId, conclusion, ghHeaders) {
 }
 
 
+/**
+ * Polls the scrape-exophase workflow run after a manual dispatch,
+ * shows live step progress, and updates the progress panel element in place.
+ */
+async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl) {
+    const ghHeaders = {
+        'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+        'Accept': 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28'
+    };
+    const runsApiUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml/runs?per_page=10`;
+
+    let _statusPhrase = 'waiting for workflow to start…';
+    const ticker = setInterval(() => {
+        const elapsed = Math.round((Date.now() - triggerTime) / 1000);
+        const statusEl = progressEl && progressEl.querySelector('#scrapePollStatus');
+        if (statusEl) statusEl.textContent = `Elapsed: ${elapsed}s — ${_statusPhrase}`;
+    }, 1000);
+
+    // Render the loading state into the panel
+    if (progressEl) {
+        progressEl.innerHTML = `<div>
+            <div style="display:flex;align-items:center;gap:8px;color:#555;margin-bottom:8px;">
+                <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span>
+                <span>Workflow running — polling for results…</span>
+            </div>
+            <div style="background:#e2e8f0;border-radius:999px;height:8px;overflow:hidden;margin-bottom:6px;">
+                <div class="steam-progress-bar"></div>
+            </div>
+            <div id="scrapePollStatus" style="color:#94a3b8;font-size:0.82em;">Starting…</div>
+            <div id="scrapePollSteps"></div>
+        </div>`;
+    }
+
+    let runId = null;
+    try {
+        for (let attempt = 0; attempt < 60; attempt++) {
+            await new Promise(r => setTimeout(r, 10000));
+            try {
+                const resp = await fetch(runsApiUrl, { headers: ghHeaders });
+                if (!resp.ok) { _statusPhrase = 'waiting for run…'; continue; }
+                const data = await resp.json();
+                const runs = (data.workflow_runs || []);
+                const run = runs.find(r => {
+                    const created = new Date(r.created_at).getTime();
+                    return created >= triggerTime - 5000 && created <= triggerTime + 90000;
+                });
+                if (!run) { _statusPhrase = 'waiting for workflow to start…'; continue; }
+                runId = run.id;
+
+                if (run.status !== 'completed') {
+                    _statusPhrase = `run is ${run.status}…`;
+                    const stepsHtml = await _fetchSteamJobStepsHtml(runId, ghHeaders);
+                    const stepsContainer = progressEl && progressEl.querySelector('#scrapePollSteps');
+                    if (stepsContainer) stepsContainer.innerHTML = stepsHtml;
+                    continue;
+                }
+
+                // Run complete
+                clearInterval(ticker);
+                const conclusion = run.conclusion;
+                if (progressEl) {
+                    if (conclusion === 'success') {
+                        progressEl.innerHTML =
+                            `<div style="color:#22c55e;font-weight:600;">✅ Achievements scraped and saved to Games.Database successfully! ` +
+                            `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;font-weight:normal;">View run →</a></div>`;
+                    } else {
+                        progressEl.innerHTML =
+                            `<div style="color:#ef4444;">❌ Workflow finished with status: <strong>${escapeHtml(conclusion || 'unknown')}</strong>. ` +
+                            `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;">View run →</a></div>`;
+                    }
+                }
+                return;
+            } catch (err) {
+                console.warn('Scrape progress poll error:', err);
+                _statusPhrase = 'retrying…';
+            }
+        }
+    } finally {
+        clearInterval(ticker);
+    }
+
+    // Timed out
+    if (progressEl) {
+        progressEl.innerHTML =
+            `<div style="color:#f59e0b;">⚠️ Timed out waiting for workflow to complete. ` +
+            `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;">Check run manually →</a></div>`;
+    }
+}
+
 // ============================================================
 // TOTAL USER COUNT
 // ============================================================
@@ -3871,6 +3961,9 @@ function openAdminEditModal(game, platform) {
                 <button type="button" class="btn" style="padding:8px 14px;white-space:nowrap;flex-shrink:0;" id="adminScrapeExophaseBtn" onclick="_adminScrapeExophaseNow()" title="Scrape achievements from Exophase now and save JSON to Games.Database">🔄 Scrape JSON</button>
             </div>
             <div id="adminScrapeMsg" style="display:none;margin-top:6px;font-size:0.85em;"></div>
+            <div id="scrapeProgressPanel" style="display:none;margin-top:8px;padding:10px 12px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.82em;line-height:1.6;">
+                <div id="scrapeProgressContent"></div>
+            </div>
         </div>
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
@@ -5250,6 +5343,8 @@ async function _adminScrapeExophaseNow() {
 
     const btn     = document.getElementById('adminScrapeExophaseBtn');
     const msgEl   = document.getElementById('adminScrapeMsg');
+    const progressPanel   = document.getElementById('scrapeProgressPanel');
+    const progressContent = document.getElementById('scrapeProgressContent');
     // Scope lookups to the edit form to avoid reading from the co-existing "Add PC Game" modal.
     const editForm   = document.getElementById('adminEditForm') || document;
     const getField   = id => editForm.querySelector('#' + id);
@@ -5278,6 +5373,7 @@ async function _adminScrapeExophaseNow() {
 
     if (btn)   { btn.disabled = true; btn.textContent = '⏳ Scraping…'; }
     if (msgEl) { msgEl.style.display = 'none'; }
+    if (progressPanel) { progressPanel.style.display = 'none'; }
 
     try {
         if (getBackendBase()) {
@@ -5326,13 +5422,19 @@ async function _adminScrapeExophaseNow() {
             try {
                 // Preferred path: dispatch the scrape-exophase workflow so scraping
                 // runs server-side on GitHub Actions (avoids CORS entirely).
+                const triggerTime = Date.now();
                 const runsUrl = await _dispatchScrapeWorkflow(urlVal, platform, title, safeTitleId);
                 workflowDispatched = true;
                 showScrapeMsg(
-                    `✅ Scraping workflow started — achievements will be written to Games.Database in ~1 minute. ` +
-                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View progress →</a>`,
+                    `✅ Scraping workflow started. ` +
+                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>`,
                     true
                 );
+                if (progressPanel && progressContent) {
+                    progressPanel.style.display = '';
+                    // Poll for live progress in the background
+                    _pollAndDisplayScrapeProgress(triggerTime, progressContent, runsUrl);
+                }
             } catch (_) {
                 // Workflow dispatch failed (token may lack Actions write permission).
                 // Fall back to direct client-side scrape + write via GAMES_DB_TOKEN.
