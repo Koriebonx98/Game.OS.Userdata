@@ -2513,51 +2513,82 @@ async function handleResetAllAccounts() {
  */
 async function handleCheckSteamNewGames() {
     const msgEl = document.getElementById('steamCheckMessage');
-    const btn   = document.getElementById('checkSteamBtn');
+    const btn   = document.getElementById('checkSteamBtn') || document.getElementById('addSteamGameBtn');
 
     if (!isAdminUser()) {
         if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
         return;
     }
 
-    if (!GAMES_DB_TOKEN) {
-        if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable this feature.', 'error');
-        return;
-    }
-
-    if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+    if (msgEl) showMessage(msgEl, '⏳ Syncing Steam games… This may take a minute.', 'info');
     if (btn)   btn.disabled = true;
 
-    try {
-        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
-        const resp = await fetch(dispatchUrl, {
-            method: 'POST',
-            headers: {
-                'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': '2022-11-28',
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ ref: 'main' })
-        });
+    const backendBase = getBackendBase();
 
-        if (resp.status === 204) {
-            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
-            if (msgEl) msgEl.innerHTML =
-                `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
-                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
-        } else if (resp.status === 403 || resp.status === 401) {
-            if (msgEl) showMessage(msgEl,
-                'Token lacks Actions write permission on this repository. ' +
-                'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-                `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+    try {
+        if (backendBase) {
+            // ── Backend path: fetch, diff, and write directly ──────────────
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+
+            const resp = await fetch(`${backendBase}/api/admin/sync-steam-games`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                }
+            });
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.message || 'Sync failed.');
+
+            if (msgEl) {
+                const sample = (data.sample && data.sample.length)
+                    ? ` (e.g. ${data.sample.join(', ')})`
+                    : '';
+                msgEl.innerHTML = `<span class="message success">✅ ${data.added} new Steam game(s) added to PC.Games.json${sample}. Total: ${data.total}.</span>`;
+            }
         } else {
-            const body = await resp.json().catch(() => ({}));
-            if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+            // ── Fallback: dispatch the GitHub Actions workflow ─────────────
+            if (!GAMES_DB_TOKEN) {
+                if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret to enable this feature.', 'error');
+                return;
+            }
+
+            if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+
+            const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
+            const resp = await fetch(dispatchUrl, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ ref: 'main' })
+            });
+
+            if (resp.status === 204) {
+                const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
+                if (msgEl) msgEl.innerHTML =
+                    `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
+                    `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
+            } else if (resp.status === 403 || resp.status === 401) {
+                if (msgEl) showMessage(msgEl,
+                    'Token lacks Actions write permission on this repository. ' +
+                    'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
+                    `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
+            } else {
+                const body = await resp.json().catch(() => ({}));
+                if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+            }
         }
     } catch (err) {
-        console.error('Steam check error:', err);
-        if (msgEl) showMessage(msgEl, `❌ Failed to trigger workflow: ${err.message}`, 'error');
+        console.error('Steam sync error:', err);
+        if (msgEl) showMessage(msgEl, `❌ ${err.message}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
@@ -3998,8 +4029,11 @@ function _buildUpdatedGameEntry(existing, fields) {
 }
 
 // ============================================================
-// ADD PC GAME TO DATABASE
+// ADD GAME TO DATABASE (all platforms)
 // ============================================================
+
+/** Platform currently targeted by the Add Game modal. */
+let _addGamePlatform = 'PC';
 
 function _ensureAddPcGameModal() {
     let modal = document.getElementById('addPcGameModal');
@@ -4025,9 +4059,18 @@ function _ensureAddPcGameModal() {
     return modal;
 }
 
-function openAddPcGameModal() {
+function openAddPcGameModal(platform) {
     if (!isAdminUser()) return;
+    _addGamePlatform = platform || 'PC';
     const modal  = _ensureAddPcGameModal();
+
+    // Update modal header to reflect the chosen platform
+    const titleEl = modal.querySelector('.game-modal-title');
+    const platEl  = modal.querySelector('.game-modal-platform');
+    const isPc = _addGamePlatform === 'PC';
+    if (titleEl) titleEl.textContent = `➕ Add ${_addGamePlatform} Game`;
+    if (platEl)  platEl.textContent  = _addGamePlatform;
+
     const bodyEl = document.getElementById('addPcGameBody');
     const hasSgdb = !!STEAMGRID_KEY;
 
@@ -4084,6 +4127,7 @@ function openAddPcGameModal() {
             </div>
             <div id="adminTrailerPreview" class="admin-trailer-preview"></div>
         </div>
+        ${isPc ? `
         <div class="admin-form-group">
             <label class="admin-form-label">🧩 Mods</label>
             <div id="adminModList">${_adminModFieldHtml('', '')}</div>
@@ -4111,7 +4155,7 @@ function openAddPcGameModal() {
                 <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="">
                 <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="">
             </div>
-        </div>
+        </div>` : ''}
         <div class="admin-form-group">
             <label class="admin-form-label">🏆 Achievements JSON URL</label>
             <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="">
@@ -4238,15 +4282,16 @@ async function handleAddPcGameToDb() {
                     'Content-Type': 'application/json',
                     ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
                 },
-                body: JSON.stringify({ platform: 'PC', game: newGame })
+                body: JSON.stringify({ platform: _addGamePlatform, game: newGame })
             });
             const addData = await addResp.json();
             if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
         } else {
             // ── Client-side path: fetch platform JSON via Contents API and write via GAMES_DB_TOKEN ──
             // Use the authenticated Contents API (not raw.githubusercontent.com) to avoid CDN staleness.
+            const platformFile = `${_addGamePlatform}.Games.json`;
             const contentsResp = await fetch(
-                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent('PC.Games.json')}`,
+                `https://api.github.com/repos/Koriebonx98/Games.Database/contents/${encodeURIComponent(platformFile)}`,
                 { headers: _gamesDbHeaders() }
             );
             let gamesArr = [];
@@ -4267,7 +4312,7 @@ async function handleAddPcGameToDb() {
                     gamesArr = fileData;
                 }
             } else if (contentsResp.status !== 404) {
-                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+                throw new Error(`Failed to fetch ${platformFile} (HTTP ${contentsResp.status})`);
             }
 
             // Check for duplicate (case-insensitive title match)
@@ -4276,7 +4321,7 @@ async function handleAddPcGameToDb() {
                 (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
             );
             if (duplicate) {
-                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
+                showMsg(`⚠️ "${title}" already exists in ${platformFile}.`, 'error');
                 if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
                 return;
             }
@@ -4284,29 +4329,30 @@ async function handleAddPcGameToDb() {
             gamesArr.push(newGame);
             const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-            await _gamesDbWriteFile('PC', newContent, `Add PC game: ${title}`);
+            await _gamesDbWriteFile(_addGamePlatform, newContent, `Add ${_addGamePlatform} game: ${title}`);
         }
 
-        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+        const platformFile = `${_addGamePlatform}.Games.json`;
+        showMsg(`✅ "${title}" added to ${platformFile}!`, 'success');
 
         // Update in-memory browse cache
-        const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
-            ? [..._allPlatformGames['PC'], newGame]
-            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
+        const cachedGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_addGamePlatform])
+            ? [..._allPlatformGames[_addGamePlatform], newGame]
+            : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform))
                 ? [..._allBrowseGames, newGame]
                 : null;
-        if (cachedPcGames) {
-            const sorted = cachedPcGames.sort((a, b) => {
+        if (cachedGames) {
+            const sorted = cachedGames.sort((a, b) => {
                 const na = (a.Title || a.game_name || a.title || '').toLowerCase();
                 const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
                 return na.localeCompare(nb);
             });
             if (typeof _allBrowseGames !== 'undefined' &&
-                (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC')) {
+                (typeof _currentPlatform === 'undefined' || _currentPlatform === _addGamePlatform)) {
                 _allBrowseGames = sorted;
             }
             if (typeof _allPlatformGames !== 'undefined') {
-                _allPlatformGames['PC'] = sorted;
+                _allPlatformGames[_addGamePlatform] = sorted;
             }
         }
 
@@ -4316,7 +4362,7 @@ async function handleAddPcGameToDb() {
                 if (_currentPlatform === 'ALL' && typeof renderBrowseGamesGrouped === 'function') {
                     renderBrowseGamesGrouped(_allPlatformGames,
                         (document.getElementById('browseSearch') || {}).value || '');
-                } else if (_currentPlatform === 'PC' && typeof renderBrowseGames === 'function') {
+                } else if (_currentPlatform === _addGamePlatform && typeof renderBrowseGames === 'function') {
                     renderBrowseGames(_allBrowseGames);
                 }
             }
@@ -4488,10 +4534,9 @@ function closeAddSteamGameModal() {
  * Search the Steam store for games matching the query in #steamSearchInput.
  * Populates #steamSearchResults with clickable result rows.
  *
- * Uses the public Steam Store search API (store.steampowered.com/api/storesearch),
- * which supports cross-origin requests from browsers.  If Steam changes their
- * CORS policy, this call may fail – in that case the admin can still fill in
- * the title and App ID manually.
+ * When the backend is available the request is routed through the server-side
+ * proxy (/api/admin/steam-search) to avoid browser CORS restrictions.
+ * Falls back to calling the Steam API directly for client-only deployments.
  */
 async function _searchSteamStore() {
     const input     = document.getElementById('steamSearchInput');
@@ -4507,9 +4552,24 @@ async function _searchSteamStore() {
     resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">Searching Steam…</p>';
 
     try {
-        const resp = await fetch(
-            `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`
-        );
+        const backendBase = getBackendBase();
+        let resp;
+        if (backendBase) {
+            // Use the server-side proxy to avoid CORS restrictions
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            resp = await fetch(
+                `${backendBase}/api/admin/steam-search?query=${encodeURIComponent(query)}`,
+                { headers: storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {} }
+            );
+        } else {
+            resp = await fetch(
+                `https://store.steampowered.com/api/storesearch/?term=${encodeURIComponent(query)}&l=en&cc=us`
+            );
+        }
         if (!resp.ok) throw new Error(`Steam API returned HTTP ${resp.status}`);
         const data  = await resp.json();
         const items = (data && Array.isArray(data.items)) ? data.items.slice(0, 10) : [];
@@ -4575,9 +4635,23 @@ async function _selectSteamGame(index) {
     if (resultsEl) resultsEl.innerHTML = '<p style="color:#666;font-size:.85em;padding:8px;">⏳ Loading game details from Steam…</p>';
 
     try {
-        const resp = await fetch(
-            `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(item.id)}&l=en`
-        );
+        const backendBase = getBackendBase();
+        let resp;
+        if (backendBase) {
+            const user = getCurrentUser();
+            const storedToken = user
+                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                : '';
+            resp = await fetch(
+                `${backendBase}/api/admin/steam-appdetails?appid=${encodeURIComponent(item.id)}`,
+                { headers: storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {} }
+            );
+        } else {
+            resp = await fetch(
+                `https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(item.id)}&l=en`
+            );
+        }
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data     = await resp.json();
         const gameData = data && data[item.id] && data[item.id].success ? data[item.id].data : null;
