@@ -2509,12 +2509,17 @@ app.post('/api/admin/sync-steam-games', authenticateToken, async (req, res) => {
 
         // ── 5. Diff: find Steam games not already present ──────────────────
         const existingAppIds = new Set();
+        const existingTitles = new Set();
         for (const g of gamesArr) {
             if (g.appid != null) existingAppIds.add(Number(g.appid));
+            const t = String(g.Title || g.title || '').trim().toLowerCase();
+            if (t) existingTitles.add(t);
         }
 
         const newGames = Object.entries(steamByAppId)
-            .filter(([appid]) => !existingAppIds.has(Number(appid)))
+            .filter(([appid, entry]) =>
+                !existingAppIds.has(Number(appid)) &&
+                !existingTitles.has(entry.Title.trim().toLowerCase()))
             .map(([, entry]) => entry)
             .sort((a, b) => a.appid - b.appid);
 
