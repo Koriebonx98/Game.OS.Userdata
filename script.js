@@ -45,6 +45,7 @@ const GITHUB_TOKEN = (() => {
 // The defaults below are used only when running locally.
 const DATA_REPO_OWNER = 'Koriebonx98'; // ← injected at deploy time
 const DATA_REPO_NAME  = 'Game.OS.Private.Data'; // ← injected at deploy time
+const USERDATA_REPO_NAME = 'Game.OS.Userdata'; // this repository (used for workflow dispatches)
 
 // Developer override: type this in the browser console to use a local backend for testing
 //   localStorage.setItem('gameOS_devBackendUrl', 'http://localhost:3001')
@@ -1003,8 +1004,60 @@ function populateAccountDetails() {
     // Show the Danger Zone only for the admin account
     const dangerZone = document.getElementById('dangerZone');
     if (dangerZone) {
-        dangerZone.style.display =
-            user.username.toLowerCase() === ADMIN_USERNAME_LOWER ? '' : 'none';
+        const isAdmin = user.username.toLowerCase() === ADMIN_USERNAME_LOWER;
+        dangerZone.style.display = isAdmin ? '' : 'none';
+        if (isAdmin) _checkAndRenderGamesDbStatus();
+    }
+}
+
+/**
+ * Performs a lightweight API check and renders token-status feedback in the
+ * Danger Zone's "gamesDbTokenStatus" element so the admin can see at a glance
+ * whether GAMES_DB_TOKEN has the Actions write permission needed to dispatch
+ * the "Check Steam for New Games" workflow.
+ */
+async function _checkAndRenderGamesDbStatus() {
+    const el = document.getElementById('gamesDbTokenStatus');
+    if (!el) return;
+
+    if (!GAMES_DB_TOKEN) {
+        el.innerHTML =
+            '⚠️ <strong>GAMES_DB_TOKEN is not configured.</strong> ' +
+            'Add it as a repository secret (see README Step 7) and re-deploy to enable this feature. ' +
+            '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style="color:#f59e0b;">Manage tokens →</a>';
+        el.style.color = '#f59e0b';
+        return;
+    }
+
+    el.textContent = '⏳ Checking token permissions…';
+    el.style.color = '#888';
+    try {
+        const resp = await fetch(
+            `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows`,
+            {
+                headers: {
+                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                    'Accept':        'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2022-11-28'
+                }
+            }
+        );
+        if (resp.status === 200) {
+            el.innerHTML = '✅ <strong>GAMES_DB_TOKEN</strong> has Actions permission — "Check Steam for New Games" is ready.';
+            el.style.color = '#22c55e';
+        } else if (resp.status === 403 || resp.status === 401) {
+            el.innerHTML =
+                '❌ <strong>GAMES_DB_TOKEN lacks Actions: Read and write</strong> on ' +
+                `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}. ` +
+                'Regenerate the token with that permission, update the GAMES_DB_TOKEN secret, then re-deploy. ' +
+                '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer" style="color:#ef4444;font-weight:600;">Manage tokens →</a>';
+            el.style.color = '#ef4444';
+        } else {
+            el.textContent = '';
+        }
+    } catch (err) {
+        el.innerHTML = '⚠️ Unable to check token status (network error).';
+        el.style.color = '#888';
     }
 }
 
@@ -2513,182 +2566,58 @@ async function handleResetAllAccounts() {
  */
 async function handleCheckSteamNewGames() {
     const msgEl = document.getElementById('steamCheckMessage');
-    const btn   = document.getElementById('checkSteamBtn') || document.getElementById('addSteamGameBtn');
+    const btn   = document.getElementById('checkSteamBtn');
 
     if (!isAdminUser()) {
         if (msgEl) showMessage(msgEl, '❌ Access denied. Only Admin.GameOS can trigger this.', 'error');
         return;
     }
 
-    if (msgEl) showMessage(msgEl, '⏳ Syncing Steam games… This may take a minute.', 'info');
+    if (!GAMES_DB_TOKEN) {
+        if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable this feature.', 'error');
+        return;
+    }
+
+    if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
     if (btn)   btn.disabled = true;
 
-    const backendBase = getBackendBase();
-
     try {
-        if (backendBase) {
-            // ── Backend path: fetch, diff, and write directly ──────────────
-            const user = getCurrentUser();
-            const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
-                : '';
+        const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml/dispatches`;
+        const resp = await fetch(dispatchUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2022-11-28',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ ref: 'main' })
+        });
 
-            const resp = await fetch(`${backendBase}/api/admin/sync-steam-games`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
-                }
-            });
-            const data = await resp.json();
-            if (!data.success) throw new Error(data.message || 'Sync failed.');
-
-            if (msgEl) {
-                const sample = (data.sample && data.sample.length)
-                    ? ` (e.g. ${data.sample.join(', ')})`
-                    : '';
-                msgEl.innerHTML = `<span class="message success">✅ ${data.added} new Steam game(s) added to PC.Games.json${sample}. Total: ${data.total}.</span>`;
-            }
-        } else {
-            // ── Fallback: fetch Steam list and write directly to Games.Database ──
-            if (!GAMES_DB_TOKEN) {
-                if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret to enable this feature.', 'error');
-                return;
-            }
-
-            if (msgEl) showMessage(msgEl, '⏳ Fetching Steam catalogue… This may take a minute.', 'info');
-
-            // 1. Fetch Steam app list
-            const STEAM_LIST_URL = 'https://api.steampowered.com/ISteamApps/GetAppList/v2/';
-            const steamResp = await fetch(STEAM_LIST_URL);
-            if (!steamResp.ok) throw new Error(`Failed to fetch Steam app list (HTTP ${steamResp.status})`);
-            const steamData = await steamResp.json();
-            const allApps   = (steamData.applist || {}).apps || [];
-
-            // 2. Filter to actual games (same rules as the workflow)
-            const SKIP_KEYWORDS = [
-                'dedicated server', ' sdk', 'source sdk', 'soundtrack', ' ost',
-                'playtest', 'press review', 'linux client', 'winui', 'steamcmd',
-                'steam client', 'tool ', ' tool', 'beta test', 'server beta',
-                'dev kit', 'devkit',
-            ];
-            const steamByAppid = {};
-            const seenNames    = new Set();
-            for (const app of allApps) {
-                const appid = app.appid;
-                const name  = (app.name || '').trim();
-                if (!name || appid === null || appid === undefined) continue;
-                const nameLower = name.toLowerCase();
-                if (SKIP_KEYWORDS.some(kw => nameLower.includes(kw))) continue;
-                if (seenNames.has(nameLower)) continue;
-                seenNames.add(nameLower);
-                steamByAppid[appid] = {
-                    Title:   name,
-                    TitleID: String(appid),
-                    appid:   appid,
-                    image:   `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
-                    stores:  [{ name: 'Steam', url: `https://store.steampowered.com/app/${appid}/` }],
-                };
-            }
-
-            // 3. Read existing PC.Games.json
-            if (msgEl) showMessage(msgEl, '⏳ Reading existing PC.Games.json…', 'info');
-            const owner = 'Koriebonx98';
-            const repo  = 'Games.Database';
-            const path  = 'PC.Games.json';
-            const h     = _gamesDbHeaders();
-
-            let existingArr  = [];
-            let existingMeta = {};
-            let topKey       = 'Games';
-
-            const contentsResp = await fetch(
-                `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
-                { headers: h }
-            );
-            if (contentsResp.ok) {
-                const fileMeta   = await contentsResp.json();
-                const fileData   = fileMeta.content
-                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
-                    : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
-                if (fileData && Array.isArray(fileData.Games)) {
-                    existingArr  = fileData.Games;
-                    topKey       = 'Games';
-                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games'));
-                } else if (fileData && Array.isArray(fileData.games)) {
-                    existingArr  = fileData.games;
-                    topKey       = 'games';
-                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'games'));
-                } else if (Array.isArray(fileData)) {
-                    existingArr  = fileData;
-                    topKey       = null;
-                }
-            } else if (contentsResp.status === 403) {
-                // File too large for Contents API – read via raw URL
-                const rawResp = await fetch(
-                    `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${Date.now()}`,
-                    { cache: 'no-store' }
-                );
-                if (!rawResp.ok) throw new Error(`Failed to read PC.Games.json (HTTP ${rawResp.status})`);
-                const fileData = await rawResp.json();
-                if (fileData && Array.isArray(fileData.Games)) {
-                    existingArr  = fileData.Games;
-                    topKey       = 'Games';
-                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games'));
-                } else if (fileData && Array.isArray(fileData.games)) {
-                    existingArr  = fileData.games;
-                    topKey       = 'games';
-                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'games'));
-                } else if (Array.isArray(fileData)) {
-                    existingArr  = fileData;
-                    topKey       = null;
-                }
-            } else if (contentsResp.status !== 404) {
-                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
-            }
-
-            // 4. Diff: find games not already present by appid or title
-            const existingAppids = new Set(
-                existingArr.map(g => (g.appid !== null && g.appid !== undefined) ? parseInt(g.appid, 10) : null).filter(id => id !== null)
-            );
-            const existingTitles = new Set(
-                existingArr.map(g => String(g.Title || g.title || '').trim().toLowerCase()).filter(Boolean)
-            );
-            const newGames = Object.entries(steamByAppid)
-                .filter(([appid, entry]) =>
-                    !existingAppids.has(parseInt(appid, 10)) &&
-                    !existingTitles.has(entry.Title.trim().toLowerCase()))
-                .map(([, entry]) => entry)
-                .sort((a, b) => a.appid - b.appid);
-
-            if (newGames.length === 0) {
-                if (msgEl) showMessage(msgEl, '✅ No new Steam games found — PC.Games.json is already up to date.', 'success');
-                return;
-            }
-
-            if (msgEl) showMessage(msgEl, `⏳ Writing ${newGames.length} new game(s) to PC.Games.json…`, 'info');
-
-            // 5. Write updated PC.Games.json using the same Git Data API as manual adds
-            const updatedArr = [...existingArr, ...newGames];
-            const newContent = topKey
-                ? { ...existingMeta, Platform: existingMeta.Platform || 'PC', [topKey]: updatedArr }
-                : { Platform: 'PC', Games: updatedArr };
-            await _gamesDbWriteFile('PC', newContent,
-                `Add ${newGames.length} new Steam game(s) to PC.Games.json (total: ${updatedArr.length})`);
-
-            const sample = newGames.slice(0, 3).map(g => g.Title).join(', ');
+        if (resp.status === 204) {
+            const runsUrl = `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml`;
             if (msgEl) msgEl.innerHTML =
-                `<span class="message success">✅ ${newGames.length} new Steam game(s) added to PC.Games.json` +
-                `${sample ? ` (e.g. ${sample}${newGames.length > 3 ? '…' : ''})` : ''}. Total: ${updatedArr.length}.</span>`;
+                `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
+                `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
+        } else if (resp.status === 403 || resp.status === 401) {
+            if (msgEl) msgEl.innerHTML =
+                '<span class="message error">❌ GAMES_DB_TOKEN lacks Actions: Read and write on ' +
+                `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}. ` +
+                'Regenerate the token with that permission, update the GAMES_DB_TOKEN secret, then re-deploy. ' +
+                '<a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Manage tokens →</a></span>';
+            _checkAndRenderGamesDbStatus();
+        } else {
+            const body = await resp.json().catch(e => { console.warn('Could not parse error response body:', e); return {}; });
+            if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
         }
     } catch (err) {
-        console.error('Steam sync error:', err);
-        if (msgEl) showMessage(msgEl, `❌ ${err.message}`, 'error');
+        console.error('Steam check error:', err);
+        if (msgEl) showMessage(msgEl, `❌ Failed to trigger workflow: ${err.message}`, 'error');
     } finally {
         if (btn) btn.disabled = false;
     }
 }
+
 
 // ============================================================
 // TOTAL USER COUNT
@@ -5018,7 +4947,7 @@ async function _dispatchScrapeWorkflow(exophaseUrl, platform, gameTitle, titleId
     if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured.');
 
     // DATA_REPO_OWNER is the same GitHub user who owns this (Game.OS.Userdata) repo.
-    const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml/dispatches`;
+    const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml/dispatches`;
     const resp = await fetch(dispatchUrl, {
         method: 'POST',
         headers: {
@@ -5040,13 +4969,13 @@ async function _dispatchScrapeWorkflow(exophaseUrl, platform, gameTitle, titleId
 
     if (resp.status === 204) {
         // Success – return a link to the workflow runs page
-        return `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/scrape-exophase.yml`;
+        return `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml`;
     }
     if (resp.status === 403 || resp.status === 401) {
         throw new Error(
             'Token lacks Actions write permission on this repository. ' +
             'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-            `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`
+            `${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}, then re-deploy.`
         );
     }
     const body = await resp.json().catch(() => ({}));
