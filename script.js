@@ -4859,6 +4859,7 @@ async function handleAddSteamGameToDb() {
     if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
     if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
+    let isUpdate = false;
     try {
         if (backendBase) {
             // ── Backend path ──
@@ -4878,7 +4879,25 @@ async function handleAddSteamGameToDb() {
                 body: JSON.stringify({ platform: 'PC', game: newGame })
             });
             const addData = await addResp.json();
-            if (!addData.success) throw new Error(addData.message || 'Failed to add game.');
+            if (!addData.success) {
+                if (addResp.status === 409) {
+                    // Game already exists in catalogue — update it instead (upsert)
+                    if (saveBtn) saveBtn.textContent = '⏳ Updating…';
+                    const updateResp = await fetch(`${backendBase}/api/admin/update-game`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            ...(storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {})
+                        },
+                        body: JSON.stringify({ platform: 'PC', game: newGame, originalTitle: title, originalId: titleId })
+                    });
+                    const updateData = await updateResp.json();
+                    if (!updateData.success) throw new Error(updateData.message || 'Failed to update game.');
+                    isUpdate = true;
+                } else {
+                    throw new Error(addData.message || 'Failed to add game.');
+                }
+            }
         } else {
             // ── Client-side path: GitHub Contents API ──
             const contentsResp = await fetch(
@@ -4906,30 +4925,52 @@ async function handleAddSteamGameToDb() {
                 throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
             }
 
-            // Check for duplicate (case-insensitive title match)
+            // Look up existing entry: match by Steam App ID (TitleID) first, then by title.
+            // Steam games are already in PC.Games.json as part of the automated catalogue;
+            // matching by App ID allows curated data to be merged onto the existing entry.
             const titleLower = title.toLowerCase();
-            const duplicate  = gamesArr.some(g =>
-                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
-            );
-            if (duplicate) {
-                showMsg(`⚠️ "${title}" already exists in PC.Games.json.`, 'error');
-                if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = '💾 Add Game'; }
-                return;
+            let existingIdx  = titleId
+                ? gamesArr.findIndex(g => String(g.TitleID || g.appid || '') === titleId)
+                : -1;
+            if (existingIdx === -1) {
+                existingIdx = gamesArr.findIndex(g =>
+                    (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+                );
             }
+            isUpdate = existingIdx !== -1;
 
-            gamesArr.push(newGame);
+            if (isUpdate) {
+                // Merge curated form data onto the existing Steam catalogue entry
+                gamesArr[existingIdx] = _buildUpdatedGameEntry(gamesArr[existingIdx], {
+                    title, titleId, description, coverUrl, bgUrls, trailers,
+                    mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+                });
+            } else {
+                gamesArr.push(newGame);
+            }
             const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
-            await _gamesDbWriteFile('PC', newContent, `Add Steam game: ${title}`);
+            await _gamesDbWriteFile('PC', newContent, `${isUpdate ? 'Update' : 'Add'} Steam game: ${title}`);
         }
 
-        showMsg(`✅ "${title}" added to PC.Games.json!`, 'success');
+        showMsg(`✅ "${title}" ${isUpdate ? 'updated in' : 'added to'} PC.Games.json!`, 'success');
 
         // Update in-memory browse cache
+        const titleLowerCache = title.toLowerCase();
         const cachedPcGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames['PC'])
-            ? [..._allPlatformGames['PC'], newGame]
+            ? (isUpdate
+                ? _allPlatformGames['PC'].map(g =>
+                    (g.Title || g.game_name || g.title || '').toLowerCase() === titleLowerCache
+                    || (titleId && String(g.TitleID || g.appid || '') === titleId)
+                      ? newGame : g)
+                : [..._allPlatformGames['PC'], newGame])
             : (typeof _allBrowseGames !== 'undefined' && (typeof _currentPlatform === 'undefined' || _currentPlatform === 'PC'))
-                ? [..._allBrowseGames, newGame]
+                ? (isUpdate
+                    ? _allBrowseGames.map(g =>
+                        (g.Title || g.game_name || g.title || '').toLowerCase() === titleLowerCache
+                        || (titleId && String(g.TitleID || g.appid || '') === titleId)
+                          ? newGame : g)
+                    : [..._allBrowseGames, newGame])
                 : null;
         if (cachedPcGames) {
             const sorted = cachedPcGames.sort((a, b) => {
