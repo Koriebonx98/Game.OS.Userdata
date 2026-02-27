@@ -2426,7 +2426,7 @@ app.post('/api/admin/sync-steam-games', authenticateToken, async (req, res) => {
         }
 
         // ── 1. Fetch the Steam app list ────────────────────────────────────
-        const STEAM_LIST_URL = 'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List/main/steamcmd_appid.json';
+        const STEAM_LIST_URL = 'https://api.steampowered.com/ISteamApps/GetAppList/v2/';
         const steamListResp = await fetch(STEAM_LIST_URL);
         if (!steamListResp.ok) {
             return res.status(502).json({ success: false, message: `Failed to fetch Steam app list (HTTP ${steamListResp.status}).` });
@@ -2525,8 +2525,8 @@ app.post('/api/admin/sync-steam-games', authenticateToken, async (req, res) => {
         // ── 6. Append new games and write back ─────────────────────────────
         const updatedArr = [...gamesArr, ...newGames];
         const newContent = topKey
-            ? { ...fileMeta, Platform: fileMeta.Platform || 'PC', source: fileMeta.source || 'https://github.com/dgibbs64/SteamCMD-AppID-List', [topKey]: updatedArr }
-            : { Platform: 'PC', source: 'https://github.com/dgibbs64/SteamCMD-AppID-List', Games: updatedArr };
+            ? { ...fileMeta, Platform: fileMeta.Platform || 'PC', source: fileMeta.source || 'https://api.steampowered.com/ISteamApps/GetAppList/v2/', [topKey]: updatedArr }
+            : { Platform: 'PC', source: 'https://api.steampowered.com/ISteamApps/GetAppList/v2/', Games: updatedArr };
 
         await putGamesDbFileLarge(
             platformFile,
