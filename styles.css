@@ -496,6 +496,18 @@ footer {
     to { transform: rotate(360deg); }
 }
 
+@keyframes steam-indeterminate {
+    0%   { transform: translateX(-150%); }
+    100% { transform: translateX(350%); }
+}
+.steam-progress-bar {
+    height: 100%;
+    width: 40%;
+    background: linear-gradient(90deg, #3b82f6, #2563eb);
+    border-radius: 999px;
+    animation: steam-indeterminate 1.4s ease-in-out infinite;
+}
+
 /* Nav button (styled like nav-link but as a <button>) */
 .nav-btn {
     background: none;
