@@ -220,6 +220,9 @@ var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;
                         🔄 Check Steam for New Games
                     </button>
                     <div id="steamCheckMessage" class="message"></div>
+                    <div id="steamStatsPanel" style="display:none;margin-top:14px;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:0.875em;line-height:1.7;">
+                        <div id="steamStatsContent"></div>
+                    </div>
                 </div>
             </div>
         </main>
