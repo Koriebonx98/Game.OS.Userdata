@@ -2632,13 +2632,18 @@ async function handleCheckSteamNewGames() {
 
 /** Returns HTML for the "polling in progress" state of the stats panel. */
 function _renderSteamStatsLoading(statusMsg) {
-    const line = statusMsg
-        ? `<div style="color:#94a3b8;font-size:0.82em;margin-top:6px;">${statusMsg}</div>`
-        : '';
-    return `<div style="display:flex;align-items:center;gap:8px;color:#555;">
-        <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span>
-        <span>Workflow running — polling for results…</span>
-    </div>${line}`;
+    const msg = statusMsg || 'Starting workflow…';
+    return `<div>
+        <div style="display:flex;align-items:center;gap:8px;color:#555;margin-bottom:8px;">
+            <span style="display:inline-block;animation:spin 1s linear infinite;">🔄</span>
+            <span>Workflow running — polling for results…</span>
+        </div>
+        <div style="background:#e2e8f0;border-radius:999px;height:8px;overflow:hidden;margin-bottom:6px;">
+            <div class="steam-progress-bar"></div>
+        </div>
+        <div id="steamPollStatus" style="color:#94a3b8;font-size:0.82em;">${msg}</div>
+        <div id="steamPollSteps"></div>
+    </div>`;
 }
 
 /**
@@ -2716,46 +2721,63 @@ async function _pollAndDisplaySteamStats(triggerTime, statsEl, runsUrl) {
     };
     const runsApiUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/update-steam-new-games.yml/runs?per_page=10`;
 
-    let runId = null;
-    // Poll up to ~10 minutes (60 × 10 s) for the run to appear and complete
-    for (let attempt = 0; attempt < 60; attempt++) {
-        await new Promise(r => setTimeout(r, 10000));
+    // Live 1-second ticker: updates only the status text so the progress bar
+    // animation is never interrupted by a full innerHTML replacement.
+    let _statusPhrase = 'waiting for workflow to start…';
+    const ticker = setInterval(() => {
         const elapsed = Math.round((Date.now() - triggerTime) / 1000);
-        try {
-            const resp = await fetch(runsApiUrl, { headers: ghHeaders });
-            if (!resp.ok) {
-                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — waiting for run…`);
-                continue;
-            }
-            const data = await resp.json();
-            const runs = (data.workflow_runs || []);
-            // Find a run created within 5 s before or 90 s after our trigger
-            const run = runs.find(r => {
-                const created = new Date(r.created_at).getTime();
-                return created >= triggerTime - 5000 && created <= triggerTime + 90000;
-            });
-            if (!run) {
-                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — waiting for workflow to start…`);
-                continue;
-            }
-            runId = run.id;
+        const statusEl = statsEl && statsEl.querySelector('#steamPollStatus');
+        if (statusEl) statusEl.textContent = `Elapsed: ${elapsed}s — ${_statusPhrase}`;
+    }, 1000);
 
-            if (run.status !== 'completed') {
-                // Show elapsed time and live job-step progress
-                const stepsHtml = await _fetchSteamJobStepsHtml(runId, ghHeaders);
-                if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(
-                    `Elapsed: ${elapsed}s — run is ${run.status}…`) + stepsHtml;
-                continue;
-            }
+    let runId = null;
+    try {
+        // Poll up to ~10 minutes (60 × 10 s) for the run to appear and complete
+        for (let attempt = 0; attempt < 60; attempt++) {
+            await new Promise(r => setTimeout(r, 10000));
+            const elapsed = Math.round((Date.now() - triggerTime) / 1000);
+            try {
+                const resp = await fetch(runsApiUrl, { headers: ghHeaders });
+                if (!resp.ok) {
+                    _statusPhrase = 'waiting for run…';
+                    continue;
+                }
+                const data = await resp.json();
+                const runs = (data.workflow_runs || []);
+                // Find a run created within 5 s before or 90 s after our trigger
+                const run = runs.find(r => {
+                    const created = new Date(r.created_at).getTime();
+                    return created >= triggerTime - 5000 && created <= triggerTime + 90000;
+                });
+                if (!run) {
+                    _statusPhrase = 'waiting for workflow to start…';
+                    continue;
+                }
+                runId = run.id;
 
-            // Run is complete — fetch job logs and parse
-            const stats = await _parseSteamRunStats(runId, run.conclusion, ghHeaders);
-            if (statsEl) statsEl.innerHTML = _renderSteamStatsCard(stats, runsUrl);
-            return;
-        } catch (err) {
-            console.warn('Steam stats poll error:', err);
-            if (statsEl) statsEl.innerHTML = _renderSteamStatsLoading(`Elapsed: ${elapsed}s — retrying…`);
+                if (run.status !== 'completed') {
+                    _statusPhrase = `run is ${run.status}…`;
+                    // Update the steps container in-place so the progress bar
+                    // animation keeps running without a full re-render.
+                    const stepsHtml = await _fetchSteamJobStepsHtml(runId, ghHeaders);
+                    const stepsContainer = statsEl && statsEl.querySelector('#steamPollSteps');
+                    if (stepsContainer) {
+                        stepsContainer.innerHTML = stepsHtml;
+                    }
+                    continue;
+                }
+
+                // Run is complete — fetch job logs and parse
+                const stats = await _parseSteamRunStats(runId, run.conclusion, ghHeaders);
+                if (statsEl) statsEl.innerHTML = _renderSteamStatsCard(stats, runsUrl);
+                return;
+            } catch (err) {
+                console.warn('Steam stats poll error:', err);
+                _statusPhrase = 'retrying…';
+            }
         }
+    } finally {
+        clearInterval(ticker);
     }
 
     // Timed out
