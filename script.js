@@ -2551,40 +2551,131 @@ async function handleCheckSteamNewGames() {
                 msgEl.innerHTML = `<span class="message success">✅ ${data.added} new Steam game(s) added to PC.Games.json${sample}. Total: ${data.total}.</span>`;
             }
         } else {
-            // ── Fallback: dispatch the GitHub Actions workflow ─────────────
+            // ── Fallback: fetch Steam list and write directly to Games.Database ──
             if (!GAMES_DB_TOKEN) {
                 if (msgEl) showMessage(msgEl, '⚠️ GAMES_DB_TOKEN is not configured. Deploy the backend server or add GAMES_DB_TOKEN as a repository secret to enable this feature.', 'error');
                 return;
             }
 
-            if (msgEl) showMessage(msgEl, '⏳ Dispatching workflow… Please wait.', 'info');
+            if (msgEl) showMessage(msgEl, '⏳ Fetching Steam catalogue… This may take a minute.', 'info');
 
-            const dispatchUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml/dispatches`;
-            const resp = await fetch(dispatchUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
-                    'Accept': 'application/vnd.github+json',
-                    'X-GitHub-Api-Version': '2022-11-28',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ ref: 'main' })
-            });
+            // 1. Fetch Steam app list
+            const STEAM_LIST_URL = 'https://raw.githubusercontent.com/dgibbs64/SteamCMD-AppID-List/main/steamcmd_appid.json';
+            const steamResp = await fetch(STEAM_LIST_URL);
+            if (!steamResp.ok) throw new Error(`Failed to fetch Steam app list (HTTP ${steamResp.status})`);
+            const steamData = await steamResp.json();
+            const allApps   = (steamData.applist || {}).apps || [];
 
-            if (resp.status === 204) {
-                const runsUrl = `https://github.com/${DATA_REPO_OWNER}/Game.OS.Userdata/actions/workflows/update-steam-new-games.yml`;
-                if (msgEl) msgEl.innerHTML =
-                    `<span class="message success">✅ Workflow triggered! New Steam games will be added to PC.Games.json shortly. ` +
-                    `<a href="${runsUrl}" target="_blank" rel="noopener noreferrer">View progress →</a></span>`;
-            } else if (resp.status === 403 || resp.status === 401) {
-                if (msgEl) showMessage(msgEl,
-                    'Token lacks Actions write permission on this repository. ' +
-                    'Update GAMES_DB_TOKEN to include Actions: Read and write on ' +
-                    `${DATA_REPO_OWNER}/Game.OS.Userdata, then re-deploy.`, 'error');
-            } else {
-                const body = await resp.json().catch(() => ({}));
-                if (msgEl) showMessage(msgEl, `❌ Workflow dispatch failed (HTTP ${resp.status}): ${body.message || 'Unknown error'}`, 'error');
+            // 2. Filter to actual games (same rules as the workflow)
+            const SKIP_KEYWORDS = [
+                'dedicated server', ' sdk', 'source sdk', 'soundtrack', ' ost',
+                'playtest', 'press review', 'linux client', 'winui', 'steamcmd',
+                'steam client', 'tool ', ' tool', 'beta test', 'server beta',
+                'dev kit', 'devkit',
+            ];
+            const steamByAppid = {};
+            const seenNames    = new Set();
+            for (const app of allApps) {
+                const appid = app.appid;
+                const name  = (app.name || '').trim();
+                if (!name || appid === null || appid === undefined) continue;
+                const nameLower = name.toLowerCase();
+                if (SKIP_KEYWORDS.some(kw => nameLower.includes(kw))) continue;
+                if (seenNames.has(nameLower)) continue;
+                seenNames.add(nameLower);
+                steamByAppid[appid] = {
+                    Title:   name,
+                    TitleID: String(appid),
+                    appid:   appid,
+                    image:   `https://cdn.akamai.steamstatic.com/steam/apps/${appid}/header.jpg`,
+                    stores:  [{ name: 'Steam', url: `https://store.steampowered.com/app/${appid}/` }],
+                };
             }
+
+            // 3. Read existing PC.Games.json
+            if (msgEl) showMessage(msgEl, '⏳ Reading existing PC.Games.json…', 'info');
+            const owner = 'Koriebonx98';
+            const repo  = 'Games.Database';
+            const path  = 'PC.Games.json';
+            const h     = _gamesDbHeaders();
+
+            let existingArr  = [];
+            let existingMeta = {};
+            let topKey       = 'Games';
+
+            const contentsResp = await fetch(
+                `https://api.github.com/repos/${owner}/${repo}/contents/${encodeURIComponent(path)}`,
+                { headers: h }
+            );
+            if (contentsResp.ok) {
+                const fileMeta   = await contentsResp.json();
+                const fileData   = fileMeta.content
+                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                    : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
+                if (fileData && Array.isArray(fileData.Games)) {
+                    existingArr  = fileData.Games;
+                    topKey       = 'Games';
+                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games'));
+                } else if (fileData && Array.isArray(fileData.games)) {
+                    existingArr  = fileData.games;
+                    topKey       = 'games';
+                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'games'));
+                } else if (Array.isArray(fileData)) {
+                    existingArr  = fileData;
+                    topKey       = null;
+                }
+            } else if (contentsResp.status === 403) {
+                // File too large for Contents API – read via raw URL
+                const rawResp = await fetch(
+                    `https://raw.githubusercontent.com/${owner}/${repo}/main/${path}?t=${Date.now()}`,
+                    { cache: 'no-store' }
+                );
+                if (!rawResp.ok) throw new Error(`Failed to read PC.Games.json (HTTP ${rawResp.status})`);
+                const fileData = await rawResp.json();
+                if (fileData && Array.isArray(fileData.Games)) {
+                    existingArr  = fileData.Games;
+                    topKey       = 'Games';
+                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'Games'));
+                } else if (fileData && Array.isArray(fileData.games)) {
+                    existingArr  = fileData.games;
+                    topKey       = 'games';
+                    existingMeta = Object.fromEntries(Object.entries(fileData).filter(([k]) => k !== 'games'));
+                } else if (Array.isArray(fileData)) {
+                    existingArr  = fileData;
+                    topKey       = null;
+                }
+            } else if (contentsResp.status !== 404) {
+                throw new Error(`Failed to fetch PC.Games.json (HTTP ${contentsResp.status})`);
+            }
+
+            // 4. Diff: find games not already present by appid
+            const existingAppids = new Set(
+                existingArr.map(g => (g.appid !== null && g.appid !== undefined) ? parseInt(g.appid, 10) : null).filter(id => id !== null)
+            );
+            const newGames = Object.entries(steamByAppid)
+                .filter(([appid]) => !existingAppids.has(parseInt(appid, 10)))
+                .map(([, entry]) => entry)
+                .sort((a, b) => a.appid - b.appid);
+
+            if (newGames.length === 0) {
+                if (msgEl) showMessage(msgEl, '✅ No new Steam games found — PC.Games.json is already up to date.', 'success');
+                return;
+            }
+
+            if (msgEl) showMessage(msgEl, `⏳ Writing ${newGames.length} new game(s) to PC.Games.json…`, 'info');
+
+            // 5. Write updated PC.Games.json using the same Git Data API as manual adds
+            const updatedArr = [...existingArr, ...newGames];
+            const newContent = topKey
+                ? { ...existingMeta, Platform: existingMeta.Platform || 'PC', [topKey]: updatedArr }
+                : { Platform: 'PC', Games: updatedArr };
+            await _gamesDbWriteFile('PC', newContent,
+                `Add ${newGames.length} new Steam game(s) to PC.Games.json (total: ${updatedArr.length})`);
+
+            const sample = newGames.slice(0, 3).map(g => g.Title).join(', ');
+            if (msgEl) msgEl.innerHTML =
+                `<span class="message success">✅ ${newGames.length} new Steam game(s) added to PC.Games.json` +
+                `${sample ? ` (e.g. ${sample}${newGames.length > 3 ? '…' : ''})` : ''}. Total: ${updatedArr.length}.</span>`;
         }
     } catch (err) {
         console.error('Steam sync error:', err);
