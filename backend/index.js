@@ -2097,21 +2097,33 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             clearTimeout(fetchTimeout);
         }
 
-        // Parse achievements using Exophase's confirmed HTML structure.
-        // The page has one or more <ul class="achievement|trophy|challenge"> sections,
-        // each containing <li> elements with the award data.
+        // Parse achievements — selector cascade handles both /achievements/ and /trophies/ pages.
         const $ = cheerio.load(html);
-        const scraped = [];
+        let syncItems = $('ul.achievement > li, ul.trophy > li, ul.challenge > li');
+        if (!syncItems.length) syncItems = $('ul.achievements > li, ul.trophies > li, ul.challenges > li');
+        if (!syncItems.length) syncItems = $('li[data-average]').filter((_, el) =>
+            $(el).find('a, h4, h5, .title, .award-title').length > 0);
 
-        // Primary selectors — match the real Exophase page structure
-        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+        const scraped = [];
+        syncItems.each((i, el) => {
             const $el = $(el);
 
-            const name = ($el.find('a').first().text() || '').trim();
+            const name = ($el.find('a').first().text() ||
+                          $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
             if (!name) return; // skip items with no name
 
-            const description = ($el.find('div.award-description p').first().text() || '').trim();
-            const iconUrl     = $el.find('img').first().attr('src') || undefined;
+            const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
+            const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
+            let iconUrl;
+            if (rawIconUrl) {
+                try {
+                    const iconParsed = new URL(rawIconUrl);
+                    if (iconParsed.protocol === 'https:' &&
+                        (iconParsed.hostname === 'exophase.com' || iconParsed.hostname.endsWith('.exophase.com'))) {
+                        iconUrl = rawIconUrl;
+                    }
+                } catch { /* ignore malformed icon URLs */ }
+            }
             const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
 
             // Rarity: data-average attribute (0–100 float, percentage of players who earned it)
@@ -2387,16 +2399,40 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
                 (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
             );
             if (toUpdate.length) {
-                toUpdate.forEach(g => { g.achievementsUrl = achievementsUrl; });
-                const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
-                await putGamesDbFileLarge(
-                    platformFile, updated,
-                    `Set achievementsUrl for ${safeGameTitle} (${safePlatform})`
-                );
+                toUpdate.forEach(g => {
+                    g.achievementsUrl = achievementsUrl;
+                    // Also update exophaseUrl to the URL that was just successfully used;
+                    // this auto-corrects any stale or incorrect URL stored previously.
+                    g.exophaseUrl = exophaseUrl;
+                });
+            } else {
+                // Game not yet in the platform JSON — add a minimal entry so the UI
+                // can show it immediately without a separate "Add Game" step.
+                gamesArr.push({ TitleID: safeTitleId, game_name: safeGameTitle, exophaseUrl, achievementsUrl });
             }
+            const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+            await putGamesDbFileLarge(
+                platformFile, updated,
+                `Set achievementsUrl for ${safeGameTitle} (${safePlatform})`
+            );
         } catch (dbErr) {
-            // Non-fatal: achievements.json was already written successfully.
-            console.error('scrape-exophase: failed to update achievementsUrl in platform JSON:', dbErr.message);
+            // If the platform JSON doesn't exist yet (e.g. Xbox 360.Games.json), create it
+            // with a minimal entry so the game immediately appears in the UI.
+            if (dbErr.status === 404) {
+                try {
+                    const newEntry = { TitleID: safeTitleId, game_name: safeGameTitle, exophaseUrl, achievementsUrl };
+                    await putGamesDbFileLarge(
+                        platformFile, [newEntry],
+                        `Create ${platformFile} with ${safeGameTitle}`
+                    );
+                } catch (createErr) {
+                    // Non-fatal: achievements.json was already written successfully.
+                    console.error('scrape-exophase: failed to create platform JSON:', createErr.message);
+                }
+            } else {
+                // Non-fatal: achievements.json was already written successfully.
+                console.error('scrape-exophase: failed to update achievementsUrl in platform JSON:', dbErr.message);
+            }
         }
 
         res.json({
