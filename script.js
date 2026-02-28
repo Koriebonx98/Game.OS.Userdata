@@ -3549,14 +3549,19 @@ async function _scrapeExophaseClientSide(exophaseUrl) {
 
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const items = Array.from(doc.querySelectorAll('ul.achievement > li, ul.trophy > li, ul.challenge > li'));
+    const PRIMARY_SEL   = 'ul.achievement > li, ul.trophy > li, ul.challenge > li';
+    const SECONDARY_SEL = 'ul.achievements > li, ul.trophies > li, ul.challenges > li';
+    let items = Array.from(doc.querySelectorAll(PRIMARY_SEL));
+    if (!items.length) items = Array.from(doc.querySelectorAll(SECONDARY_SEL));
+    if (!items.length) items = Array.from(doc.querySelectorAll('li[data-average]')).filter(el =>
+        el.querySelectorAll('a, h4, h5, .title, .award-title').length > 0);
     const scraped = [];
     items.forEach((el, i) => {
-        const nameEl = el.querySelector('a');
+        const nameEl = el.querySelector('a') || el.querySelector('h4, h5, .title, .award-title');
         const name = (nameEl ? nameEl.textContent : '').trim();
         if (!name) return;
 
-        const descEl = el.querySelector('div.award-description p');
+        const descEl = el.querySelector('div.award-description p, .award-description, .description');
         const description = (descEl ? descEl.textContent : '').trim();
 
         const imgEl = el.querySelector('img');
@@ -5387,6 +5392,12 @@ async function _adminScrapeExophaseNow() {
             });
             const data = await resp.json();
             if (data.success) {
+                // Auto-fill achievementsUrl so the game entry gets linked to the scraped file
+                if (data.achievementsUrl) {
+                    const urlField = (document.getElementById('adminEditForm') || document)
+                        .querySelector('#editAchievementsUrl');
+                    if (urlField && !urlField.value) urlField.value = data.achievementsUrl;
+                }
                 let downloadLink = '';
                 if (Array.isArray(data.achievements) && data.achievements.length) {
                     const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
@@ -5419,9 +5430,20 @@ async function _adminScrapeExophaseNow() {
                 const triggerTime = Date.now();
                 const runsUrl = await _dispatchScrapeWorkflow(urlVal, platform, title, safeTitleId);
                 workflowDispatched = true;
+
+                // Pre-fill achievementsUrl with the expected path – the workflow will
+                // write the file there.  Doing this now lets the user hit "Save Changes"
+                // right away; the game modal will show achievements as soon as the
+                // workflow completes (typically ~30 s).
+                const expectedAchUrl = `${GAMES_DB_RAW_BASE}/Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                const urlField = (document.getElementById('adminEditForm') || document)
+                    .querySelector('#editAchievementsUrl');
+                if (urlField && !urlField.value) urlField.value = expectedAchUrl;
+
                 showScrapeMsg(
                     `✅ Scraping workflow started. ` +
-                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>`,
+                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>` +
+                    (urlField && urlField.value ? `<br><span style="font-size:0.85em;color:#94a3b8;">Achievements URL pre-filled — click <strong style="color:#f1f5f9;">Save Changes</strong> to link it to this game.</span>` : ''),
                     true
                 );
                 if (progressPanel && progressContent) {
@@ -5431,9 +5453,28 @@ async function _adminScrapeExophaseNow() {
                 }
             } catch (dispatchErr) {
                 // Exophase blocks cross-origin requests so client-side scraping cannot
-                // work as a fallback.  Surface the dispatch error so the user knows what
-                // to fix (e.g. grant GAMES_DB_TOKEN the Actions: Read and write permission).
-                throw dispatchErr;
+                // work as a fallback.  Provide a manual-trigger link so the user can
+                // still run the workflow from GitHub Actions directly.
+                const workflowPageUrl = `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml`;
+                const inputsHtml =
+                    `<div style="margin-top:6px;padding:8px 10px;background:#1e293b;border-radius:6px;` +
+                    `font-family:monospace;font-size:0.8em;color:#94a3b8;line-height:1.8;">` +
+                    `<div><span style="color:#64748b">exophase_url:</span> <span style="color:#93c5fd">${escapeHtml(urlVal)}</span></div>` +
+                    `<div><span style="color:#64748b">platform:</span>     <span style="color:#93c5fd">${escapeHtml(platform)}</span></div>` +
+                    `<div><span style="color:#64748b">game_title:</span>   <span style="color:#93c5fd">${escapeHtml(title)}</span></div>` +
+                    `<div><span style="color:#64748b">title_id:</span>     <span style="color:#93c5fd">${escapeHtml(safeTitleId)}</span></div>` +
+                    `</div>`;
+                showScrapeMsg(
+                    `❌ ${escapeHtml(dispatchErr.message)}<br>` +
+                    `<span style="font-size:0.88em;color:#94a3b8;">` +
+                    `You can still run the scrape manually: ` +
+                    `<a href="${escapeHtml(workflowPageUrl)}" target="_blank" rel="noopener" ` +
+                    `style="color:#f97316;font-weight:600;">Open GitHub Actions workflow →</a> ` +
+                    `and click <strong style="color:#f1f5f9;">Run workflow</strong> with these inputs:` +
+                    `</span>` +
+                    inputsHtml,
+                    false
+                );
             }
         }
     } catch (err) {

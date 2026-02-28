@@ -2294,12 +2294,28 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
         const $ = cheerio.load(html);
         const scraped = [];
 
-        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+        // Exophase renders trophies/achievements as:
+        //   <ul class="achievement|trophy|challenge|achievements|trophies">
+        //     <li data-average="45.2" class="[secret]">
+        //       <img src="...icon...">
+        //       <a>Achievement Name</a>
+        //       <div class="award-description"><p>Description</p></div>
+        //     </li>
+        //   </ul>
+        const PRIMARY_SELECTOR   = 'ul.achievement > li, ul.trophy > li, ul.challenge > li';
+        const SECONDARY_SELECTOR = 'ul.achievements > li, ul.trophies > li, ul.challenges > li';
+        let items = $(PRIMARY_SELECTOR);
+        if (!items.length) items = $(SECONDARY_SELECTOR);
+        if (!items.length) items = $('li[data-average]').filter((_, el) =>
+            $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
+        items.each((i, el) => {
             const $el = $(el);
-            const name = ($el.find('a').first().text() || '').trim();
+            const name = ($el.find('a').first().text() ||
+                          $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
             if (!name) return;
 
-            const description = ($el.find('div.award-description p').first().text() || '').trim();
+            const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
             const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
             // Only accept icon URLs served over HTTPS from exophase.com
             let iconUrl;
@@ -2346,11 +2362,75 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
             existing ? existing.sha : undefined
         );
 
+        // ── Also update achievementsUrl in the platform's games JSON ─────────
+        // This ensures the achievements appear in the Game.OS UI without any
+        // manual step — matching the behaviour of the Switch/Mario Kart 8 workflow.
+        const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+        const platformFile    = `${platform}.Games.json`;
+
+        try {
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER,
+                repo:  GAMES_DB_REPO_NAME,
+                path:  platformFile
+            });
+            let platformData;
+            if (fileMeta.content) {
+                platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+                platformData = await dlResp.json();
+            }
+
+            let gamesArr, topKey = null;
+            if (platformData && Array.isArray(platformData.Games)) {
+                gamesArr = platformData.Games; topKey = 'Games';
+            } else if (platformData && Array.isArray(platformData.games)) {
+                gamesArr = platformData.games; topKey = 'games';
+            } else if (Array.isArray(platformData)) {
+                gamesArr = platformData;
+            } else {
+                throw new Error('Unexpected platform JSON format');
+            }
+
+            const titleIdLower   = safeTitleId.toLowerCase();
+            const gameTitleLower = (gameTitle || '').toLowerCase();
+            const byId = gamesArr.filter(g =>
+                String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === titleIdLower
+            );
+            const toUpdate = byId.length > 0 ? byId :
+                gamesArr.filter(g => (g.Title || g.game_name || g.title || '').toLowerCase() === gameTitleLower);
+
+            if (toUpdate.length) {
+                let updatedCount = 0;
+                gamesArr.forEach((g, i) => {
+                    if (toUpdate.includes(g)) {
+                        gamesArr[i] = { ...g, achievementsUrl };
+                        updatedCount++;
+                    }
+                });
+                const newPlatformContent = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+                await putGamesDbFileLarge(
+                    platformFile,
+                    newPlatformContent,
+                    `Set achievementsUrl for ${safeGameTitle} (${safePlatform}) from Exophase`
+                );
+                console.log(`Set achievementsUrl for ${updatedCount} game entr${updatedCount === 1 ? 'y' : 'ies'} in ${platformFile}`);
+            } else {
+                console.warn(`No matching game found in ${platformFile} for title_id "${safeTitleId}" or title "${gameTitle}" – skipping achievementsUrl update.`);
+            }
+        } catch (updateErr) {
+            // Non-fatal: log but don't fail the main scrape response
+            console.error(`Failed to update achievementsUrl in ${platformFile}:`, updateErr.message);
+        }
+
         res.json({
             success: true,
             message: `Scraped and saved ${scraped.length} achievements to Games.Database.`,
             total: scraped.length,
             path: gamesDbPath,
+            achievementsUrl,
             achievements: scraped
         });
     } catch (err) {

@@ -99,21 +99,35 @@ try {
 
 const $ = cheerio.load(html);
 const scraped = [];
+const HTML_SNIPPET_LENGTH = 2048;
 
-// Exophase structure:
-//   <ul class="achievement|trophy|challenge">
+// Exophase renders trophies/achievements as:
+//   <ul class="achievement|trophy|challenge|achievements|trophies">
 //     <li data-average="45.2" class="[secret]">
 //       <img src="...icon...">
 //       <a>Achievement Name</a>
 //       <div class="award-description"><p>Description</p></div>
 //     </li>
 //   </ul>
-$('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+// The selectors below try the known class names first, then fall back to any
+// <li> element that carries a data-average attribute (broader fallback).
+const PRIMARY_SELECTOR   = 'ul.achievement > li, ul.trophy > li, ul.challenge > li';
+const SECONDARY_SELECTOR = 'ul.achievements > li, ul.trophies > li, ul.challenges > li';
+
+let items = $(PRIMARY_SELECTOR);
+if (!items.length) items = $(SECONDARY_SELECTOR);
+// Broadest fallback: any <li> with data-average that contains an <a> link (the name)
+if (!items.length) items = $('li[data-average]').filter((_, el) =>
+    $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
+items.each((i, el) => {
     const $el = $(el);
-    const name = ($el.find('a').first().text() || '').trim();
+    // Name: prefer the first <a> inside the item; fall back to common heading selectors
+    const name = ($el.find('a').first().text() ||
+                  $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
     if (!name) return;
 
-    const description = ($el.find('div.award-description p').first().text() || '').trim();
+    const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
     const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
 
     // Only accept icon URLs served over HTTPS from exophase.com
@@ -147,10 +161,14 @@ $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
 
 if (!scraped.length) {
     console.warn('⚠️  No achievements found. Diagnostics:');
-    console.warn(`   Page title       : ${$('title').text().trim()}`);
-    console.warn(`   ul.achievement   : ${$('ul.achievement').length}`);
-    console.warn(`   ul.trophy        : ${$('ul.trophy').length}`);
-    console.warn(`   ul.challenge     : ${$('ul.challenge').length}`);
+    console.warn(`   Page title         : ${$('title').text().trim()}`);
+    console.warn(`   ul.achievement     : ${$('ul.achievement').length}`);
+    console.warn(`   ul.trophy          : ${$('ul.trophy').length}`);
+    console.warn(`   ul.challenge       : ${$('ul.challenge').length}`);
+    console.warn(`   ul.achievements    : ${$('ul.achievements').length}`);
+    console.warn(`   ul.trophies        : ${$('ul.trophies').length}`);
+    console.warn(`   li[data-average]   : ${$('li[data-average]').length}`);
+    console.warn(`   HTML snippet (first 2048 chars): ${html.slice(0, HTML_SNIPPET_LENGTH)}`);
     fail('No achievements found on the Exophase page. Verify the URL points to an achievement/trophy list.');
 }
 
@@ -196,5 +214,110 @@ await octokit.repos.createOrUpdateFileContents(params);
 console.log(`✅ achievements.json written (${scraped.length} entries)`);
 console.log(`   Path   : ${gamesDbPath}`);
 console.log(`   Commit : ${commitMsg}`);
+
+// ── Update achievementsUrl in platform JSON ───────────────────────────────────
+// Set achievementsUrl on matching game entries in {Platform}.Games.json so the
+// Game.OS UI can load and display the achievements without any manual step.
+
+const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+const platformFile    = `${PLATFORM}.Games.json`;
+
+console.log(`\nUpdating achievementsUrl in ${platformFile}…`);
+
+try {
+    // Fetch the platform JSON (handle both small inline and large download_url cases)
+    let platformData;
+    const { data: fileMeta } = await octokit.repos.getContent({
+        owner: GAMES_DB_REPO_OWNER,
+        repo:  GAMES_DB_REPO_NAME,
+        path:  platformFile
+    });
+    if (fileMeta.content) {
+        platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+    } else {
+        // File > 1 MB – use download_url which always serves the current committed blob
+        const dlResp = await fetch(fileMeta.download_url);
+        if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+        platformData = await dlResp.json();
+    }
+
+    // Normalise – some files wrap the array in { Games: [...] }
+    let gamesArr, topKey = null;
+    if (platformData && Array.isArray(platformData.Games)) {
+        gamesArr = platformData.Games; topKey = 'Games';
+    } else if (platformData && Array.isArray(platformData.games)) {
+        gamesArr = platformData.games; topKey = 'games';
+    } else if (Array.isArray(platformData)) {
+        gamesArr = platformData;
+    } else {
+        throw new Error('Unexpected platform JSON format');
+    }
+
+    // Find matching entries: prefer exact title_id match, fall back to game_name match
+    const titleIdLower   = TITLE_ID.toLowerCase();
+    const gameTitleLower = GAME_TITLE.toLowerCase();
+    const byId = gamesArr.filter(g =>
+        String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === titleIdLower
+    );
+    const toUpdate = byId.length > 0 ? byId :
+        gamesArr.filter(g => (g.Title || g.game_name || g.title || '').toLowerCase() === gameTitleLower);
+
+    if (!toUpdate.length) {
+        console.warn(`   ⚠️  No matching game found for title_id "${TITLE_ID}" or title "${GAME_TITLE}" – skipping achievementsUrl update.`);
+    } else {
+        let updatedCount = 0;
+        gamesArr.forEach((g, i) => {
+            if (toUpdate.includes(g)) {
+                gamesArr[i] = { ...g, achievementsUrl };
+                updatedCount++;
+            }
+        });
+        const newPlatformContent = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+
+        // Write back using the Git Data API to handle files larger than 1 MB
+        const { data: ref } = await octokit.git.getRef({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, ref: 'heads/main'
+        });
+        const latestSha = ref.object.sha;
+
+        const { data: headCommit } = await octokit.git.getCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, commit_sha: latestSha
+        });
+
+        const { data: newBlob } = await octokit.git.createBlob({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            content:  Buffer.from(JSON.stringify(newPlatformContent)).toString('base64'),
+            encoding: 'base64'
+        });
+
+        const { data: newTree } = await octokit.git.createTree({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            base_tree: headCommit.tree.sha,
+            tree: [{ path: platformFile, mode: '100644', type: 'blob', sha: newBlob.sha }]
+        });
+
+        const { data: newCommit } = await octokit.git.createCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            message: `Set achievementsUrl for ${safeTitle} (${safePlatform}) from Exophase`,
+            tree:    newTree.sha,
+            parents: [latestSha],
+            author:  { name: 'Game OS Bot', email: 'bot@gameos.com', date: new Date().toISOString() }
+        });
+
+        await octokit.git.updateRef({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            ref: 'heads/main', sha: newCommit.sha
+        });
+
+        console.log(`✅ achievementsUrl set for ${updatedCount} entr${updatedCount === 1 ? 'y' : 'ies'} in ${platformFile}`);
+        console.log(`   URL: ${achievementsUrl}`);
+    }
+} catch (updateErr) {
+    // Non-fatal: achievements.json was written successfully; only the URL link failed.
+    console.warn(`   ⚠️  Could not update achievementsUrl in ${platformFile}: ${updateErr.message}`);
+    console.warn('   The achievements.json was still written. Set achievementsUrl manually in the admin panel.');
+}
+
+console.log('\n🎉 Done!');
 
 })();
