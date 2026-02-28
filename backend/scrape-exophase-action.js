@@ -215,4 +215,109 @@ console.log(`✅ achievements.json written (${scraped.length} entries)`);
 console.log(`   Path   : ${gamesDbPath}`);
 console.log(`   Commit : ${commitMsg}`);
 
+// ── Update achievementsUrl in platform JSON ───────────────────────────────────
+// Set achievementsUrl on matching game entries in {Platform}.Games.json so the
+// Game.OS UI can load and display the achievements without any manual step.
+
+const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+const platformFile    = `${PLATFORM}.Games.json`;
+
+console.log(`\nUpdating achievementsUrl in ${platformFile}…`);
+
+try {
+    // Fetch the platform JSON (handle both small inline and large download_url cases)
+    let platformData;
+    const { data: fileMeta } = await octokit.repos.getContent({
+        owner: GAMES_DB_REPO_OWNER,
+        repo:  GAMES_DB_REPO_NAME,
+        path:  platformFile
+    });
+    if (fileMeta.content) {
+        platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+    } else {
+        // File > 1 MB – use download_url which always serves the current committed blob
+        const dlResp = await fetch(fileMeta.download_url);
+        if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+        platformData = await dlResp.json();
+    }
+
+    // Normalise – some files wrap the array in { Games: [...] }
+    let gamesArr, topKey = null;
+    if (platformData && Array.isArray(platformData.Games)) {
+        gamesArr = platformData.Games; topKey = 'Games';
+    } else if (platformData && Array.isArray(platformData.games)) {
+        gamesArr = platformData.games; topKey = 'games';
+    } else if (Array.isArray(platformData)) {
+        gamesArr = platformData;
+    } else {
+        throw new Error('Unexpected platform JSON format');
+    }
+
+    // Find matching entries: prefer exact title_id match, fall back to game_name match
+    const titleIdLower   = TITLE_ID.toLowerCase();
+    const gameTitleLower = GAME_TITLE.toLowerCase();
+    const byId = gamesArr.filter(g =>
+        String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === titleIdLower
+    );
+    const toUpdate = byId.length > 0 ? byId :
+        gamesArr.filter(g => (g.Title || g.game_name || g.title || '').toLowerCase() === gameTitleLower);
+
+    if (!toUpdate.length) {
+        console.warn(`   ⚠️  No matching game found for title_id "${TITLE_ID}" or title "${GAME_TITLE}" – skipping achievementsUrl update.`);
+    } else {
+        let updatedCount = 0;
+        gamesArr.forEach((g, i) => {
+            if (toUpdate.includes(g)) {
+                gamesArr[i] = { ...g, achievementsUrl };
+                updatedCount++;
+            }
+        });
+        const newPlatformContent = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+
+        // Write back using the Git Data API to handle files larger than 1 MB
+        const { data: ref } = await octokit.git.getRef({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, ref: 'heads/main'
+        });
+        const latestSha = ref.object.sha;
+
+        const { data: headCommit } = await octokit.git.getCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, commit_sha: latestSha
+        });
+
+        const { data: newBlob } = await octokit.git.createBlob({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            content:  Buffer.from(JSON.stringify(newPlatformContent)).toString('base64'),
+            encoding: 'base64'
+        });
+
+        const { data: newTree } = await octokit.git.createTree({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            base_tree: headCommit.tree.sha,
+            tree: [{ path: platformFile, mode: '100644', type: 'blob', sha: newBlob.sha }]
+        });
+
+        const { data: newCommit } = await octokit.git.createCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            message: `Set achievementsUrl for ${safeTitle} (${safePlatform}) from Exophase`,
+            tree:    newTree.sha,
+            parents: [latestSha],
+            author:  { name: 'Game OS Bot', email: 'bot@gameos.com', date: new Date().toISOString() }
+        });
+
+        await octokit.git.updateRef({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            ref: 'heads/main', sha: newCommit.sha
+        });
+
+        console.log(`✅ achievementsUrl set for ${updatedCount} entr${updatedCount === 1 ? 'y' : 'ies'} in ${platformFile}`);
+        console.log(`   URL: ${achievementsUrl}`);
+    }
+} catch (updateErr) {
+    // Non-fatal: achievements.json was written successfully; only the URL link failed.
+    console.warn(`   ⚠️  Could not update achievementsUrl in ${platformFile}: ${updateErr.message}`);
+    console.warn('   The achievements.json was still written. Set achievementsUrl manually in the admin panel.');
+}
+
+console.log('\n🎉 Done!');
+
 })();

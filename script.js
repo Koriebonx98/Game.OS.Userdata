@@ -5392,6 +5392,12 @@ async function _adminScrapeExophaseNow() {
             });
             const data = await resp.json();
             if (data.success) {
+                // Auto-fill achievementsUrl so the game entry gets linked to the scraped file
+                if (data.achievementsUrl) {
+                    const urlField = (document.getElementById('adminEditForm') || document)
+                        .querySelector('#editAchievementsUrl');
+                    if (urlField && !urlField.value) urlField.value = data.achievementsUrl;
+                }
                 let downloadLink = '';
                 if (Array.isArray(data.achievements) && data.achievements.length) {
                     const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
@@ -5424,9 +5430,20 @@ async function _adminScrapeExophaseNow() {
                 const triggerTime = Date.now();
                 const runsUrl = await _dispatchScrapeWorkflow(urlVal, platform, title, safeTitleId);
                 workflowDispatched = true;
+
+                // Pre-fill achievementsUrl with the expected path – the workflow will
+                // write the file there.  Doing this now lets the user hit "Save Changes"
+                // right away; the game modal will show achievements as soon as the
+                // workflow completes (typically ~30 s).
+                const expectedAchUrl = `${GAMES_DB_RAW_BASE}/Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                const urlField = (document.getElementById('adminEditForm') || document)
+                    .querySelector('#editAchievementsUrl');
+                if (urlField && !urlField.value) urlField.value = expectedAchUrl;
+
                 showScrapeMsg(
                     `✅ Scraping workflow started. ` +
-                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>`,
+                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>` +
+                    (urlField && urlField.value ? `<br><span style="font-size:0.85em;color:#94a3b8;">Achievements URL pre-filled — click <strong style="color:#f1f5f9;">Save Changes</strong> to link it to this game.</span>` : ''),
                     true
                 );
                 if (progressPanel && progressContent) {
