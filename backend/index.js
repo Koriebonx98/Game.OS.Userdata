@@ -2290,16 +2290,21 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
             clearTimeout(fetchTimeout);
         }
 
-        // Parse achievements
+        // Parse achievements — selector cascade handles both /achievements/ and /trophies/ pages.
         const $ = cheerio.load(html);
-        const scraped = [];
+        let items = $('ul.achievement > li, ul.trophy > li, ul.challenge > li');
+        if (!items.length) items = $('ul.achievements > li, ul.trophies > li, ul.challenges > li');
+        if (!items.length) items = $('li[data-average]').filter((_, el) =>
+            $(el).find('a, h4, h5, .title, .award-title').length > 0);
 
-        $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+        const scraped = [];
+        items.each((i, el) => {
             const $el = $(el);
-            const name = ($el.find('a').first().text() || '').trim();
+            const name = ($el.find('a').first().text() ||
+                          $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
             if (!name) return;
 
-            const description = ($el.find('div.award-description p').first().text() || '').trim();
+            const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
             const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
             // Only accept icon URLs served over HTTPS from exophase.com
             let iconUrl;
@@ -2346,11 +2351,60 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
             existing ? existing.sha : undefined
         );
 
+        // Also update achievementsUrl in the platform's games JSON so the Game.OS
+        // modal can fetch achievements without any manual step.
+        const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+        const platformFile    = `${platform}.Games.json`;
+        try {
+            // Use download_url to handle files > 1 MB (e.g. PS3.Games.json is ~1.1 MB).
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, path: platformFile
+            });
+            let platformData;
+            if (fileMeta.content) {
+                platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+                platformData = await dlResp.json();
+            }
+
+            let gamesArr, topKey = null;
+            if (platformData && Array.isArray(platformData.Games)) {
+                gamesArr = platformData.Games; topKey = 'Games';
+            } else if (platformData && Array.isArray(platformData.games)) {
+                gamesArr = platformData.games; topKey = 'games';
+            } else if (Array.isArray(platformData)) {
+                gamesArr = platformData;
+            } else {
+                throw new Error('Unexpected platform JSON format');
+            }
+
+            const tidLower   = safeTitleId.toLowerCase();
+            const titleLower = (gameTitle || '').toLowerCase();
+            const toUpdate   = gamesArr.filter(g =>
+                String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === tidLower ||
+                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+            );
+            if (toUpdate.length) {
+                toUpdate.forEach(g => { g.achievementsUrl = achievementsUrl; });
+                const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+                await putGamesDbFileLarge(
+                    platformFile, updated,
+                    `Set achievementsUrl for ${safeGameTitle} (${safePlatform})`
+                );
+            }
+        } catch (dbErr) {
+            // Non-fatal: achievements.json was already written successfully.
+            console.error('scrape-exophase: failed to update achievementsUrl in platform JSON:', dbErr.message);
+        }
+
         res.json({
             success: true,
             message: `Scraped and saved ${scraped.length} achievements to Games.Database.`,
             total: scraped.length,
             path: gamesDbPath,
+            achievementsUrl,
             achievements: scraped
         });
     } catch (err) {

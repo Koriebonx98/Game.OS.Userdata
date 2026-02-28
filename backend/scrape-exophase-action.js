@@ -98,22 +98,23 @@ try {
 // ── Parse achievements ────────────────────────────────────────────────────────
 
 const $ = cheerio.load(html);
+
+// Selector cascade: handles both /achievements/ and /trophies/ page variants,
+// plus any plural-class variants Exophase may use.
+let items = $('ul.achievement > li, ul.trophy > li, ul.challenge > li');
+if (!items.length) items = $('ul.achievements > li, ul.trophies > li, ul.challenges > li');
+if (!items.length) items = $('li[data-average]').filter((_, el) =>
+    $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
 const scraped = [];
 
-// Exophase structure:
-//   <ul class="achievement|trophy|challenge">
-//     <li data-average="45.2" class="[secret]">
-//       <img src="...icon...">
-//       <a>Achievement Name</a>
-//       <div class="award-description"><p>Description</p></div>
-//     </li>
-//   </ul>
-$('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+items.each((i, el) => {
     const $el = $(el);
-    const name = ($el.find('a').first().text() || '').trim();
+    const name = ($el.find('a').first().text() ||
+                  $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
     if (!name) return;
 
-    const description = ($el.find('div.award-description p').first().text() || '').trim();
+    const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
     const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
 
     // Only accept icon URLs served over HTTPS from exophase.com
@@ -151,6 +152,8 @@ if (!scraped.length) {
     console.warn(`   ul.achievement   : ${$('ul.achievement').length}`);
     console.warn(`   ul.trophy        : ${$('ul.trophy').length}`);
     console.warn(`   ul.challenge     : ${$('ul.challenge').length}`);
+    console.warn(`   ul.trophies      : ${$('ul.trophies').length}`);
+    console.warn(`   ul.achievements  : ${$('ul.achievements').length}`);
     fail('No achievements found on the Exophase page. Verify the URL points to an achievement/trophy list.');
 }
 
@@ -196,5 +199,90 @@ await octokit.repos.createOrUpdateFileContents(params);
 console.log(`✅ achievements.json written (${scraped.length} entries)`);
 console.log(`   Path   : ${gamesDbPath}`);
 console.log(`   Commit : ${commitMsg}`);
+
+// ── Patch achievementsUrl in the platform's games JSON ────────────────────────
+// Without this, the Game.OS UI has no URL to fetch from and achievements never
+// appear even though the file exists.
+
+const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+const platformFile    = `${PLATFORM}.Games.json`;
+
+console.log(`\nPatching achievementsUrl in ${platformFile}…`);
+try {
+    // Fetch the current HEAD commit SHA
+    const { data: refData } = await octokit.git.getRef({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, ref: 'heads/main'
+    });
+    const headSha = refData.object.sha;
+
+    // Get file download URL (handles files > 1 MB that the Contents API can't return inline)
+    const { data: fileMeta } = await octokit.repos.getContent({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, path: platformFile
+    });
+    let platformData;
+    if (fileMeta.content) {
+        platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+    } else {
+        const dlResp = await fetch(fileMeta.download_url);
+        if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+        platformData = await dlResp.json();
+    }
+
+    let gamesArr, topKey = null;
+    if (platformData && Array.isArray(platformData.Games)) {
+        gamesArr = platformData.Games; topKey = 'Games';
+    } else if (platformData && Array.isArray(platformData.games)) {
+        gamesArr = platformData.games; topKey = 'games';
+    } else if (Array.isArray(platformData)) {
+        gamesArr = platformData;
+    } else {
+        throw new Error('Unexpected platform JSON format');
+    }
+
+    const tidLower   = TITLE_ID.toLowerCase();
+    const titleLower = GAME_TITLE.toLowerCase();
+    const toUpdate   = gamesArr.filter(g =>
+        String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === tidLower ||
+        (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+    );
+
+    if (!toUpdate.length) {
+        console.warn(`   ⚠️  No matching game found in ${platformFile} for title_id="${TITLE_ID}" / title="${GAME_TITLE}" — skipping.`);
+    } else {
+        toUpdate.forEach(g => { g.achievementsUrl = achievementsUrl; });
+        console.log(`   Updating ${toUpdate.length} game entry/entries…`);
+
+        // Use Git Data API (blob → tree → commit → ref) to handle large files
+        const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+        const { data: blob } = await octokit.git.createBlob({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            content: Buffer.from(JSON.stringify(updated)).toString('base64'),
+            encoding: 'base64'
+        });
+        const { data: commit } = await octokit.git.getCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, commit_sha: headSha
+        });
+        const { data: tree } = await octokit.git.createTree({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            base_tree: commit.tree.sha,
+            tree: [{ path: platformFile, mode: '100644', type: 'blob', sha: blob.sha }]
+        });
+        const { data: newCommit } = await octokit.git.createCommit({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            message: `Set achievementsUrl for ${safeTitle} (${safePlatform})`,
+            tree: tree.sha,
+            parents: [headSha],
+            author: { name: 'Game OS Bot', email: 'bot@gameos.com', date: new Date().toISOString() }
+        });
+        await octokit.git.updateRef({
+            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+            ref: 'heads/main', sha: newCommit.sha
+        });
+        console.log(`✅ achievementsUrl set in ${platformFile}`);
+    }
+} catch (err) {
+    // Non-fatal: achievements.json was already written.
+    console.warn(`⚠️  Could not update achievementsUrl in ${platformFile}: ${err.message}`);
+}
 
 })();
