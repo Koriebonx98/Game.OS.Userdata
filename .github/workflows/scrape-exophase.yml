@@ -22,7 +22,7 @@ on:
   workflow_dispatch:
     inputs:
       exophase_url:
-        description: 'Exophase achievements page URL (https://www.exophase.com/game/…/achievements/)'
+        description: 'Exophase trophies/achievements page URL (e.g. https://www.exophase.com/game/skate-3/trophies/ for PS3, or https://www.exophase.com/game/…/achievements/ for other platforms)'
         required: true
       platform:
         description: 'Platform (PS4, PS3, Switch, Xbox 360, PS5, Xbox One, PC)'

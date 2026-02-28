@@ -4223,18 +4223,12 @@ async function handleAdminEditSave() {
                         showMsg(`✅ Game updated. ⚠️ Exophase scrape: ${scrapeData.message}`, 'success');
                     }
                 } else {
-                    // No-backend path: client-side scrape + direct write via GAMES_DB_TOKEN
+                    // No-backend path: dispatch the GitHub Actions workflow (server-side,
+                    // avoids CORS) to scrape and write achievements to Games.Database.
                     const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
                     if (platformFolder && /^[a-zA-Z0-9_-]+$/.test(String(titleId))) {
-                        const achievements = await _scrapeExophaseClientSide(exophaseUrl);
-                        const gamesDbPath  = `Data/${platformFolder}/Games/${String(titleId).trim()}/achievements.json`;
-                        const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
-                        await _gamesDbWriteAchievementsFile(
-                            gamesDbPath,
-                            achievements,
-                            `Add achievements for ${safeTitle} (${_currentModalPlatform}) from Exophase`
-                        );
-                        showMsg(`✅ Game updated and ${achievements.length} achievements scraped from Exophase!`, 'success');
+                        await _dispatchScrapeWorkflow(exophaseUrl, _currentModalPlatform, title, String(titleId).trim());
+                        showMsg('✅ Game updated! Achievements scraping workflow started.', 'success');
                     } else {
                         showMsg('✅ Game updated successfully!', 'success');
                     }
@@ -5435,29 +5429,11 @@ async function _adminScrapeExophaseNow() {
                     // Poll for live progress in the background
                     _pollAndDisplayScrapeProgress(triggerTime, progressContent, runsUrl);
                 }
-            } catch (_) {
-                // Workflow dispatch failed (token may lack Actions write permission).
-                // Fall back to direct client-side scrape + write via GAMES_DB_TOKEN.
-            }
-
-            if (!workflowDispatched) {
-                const achievements = await _scrapeExophaseClientSide(urlVal);
-                const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
-                const safeTitle    = String(title).replace(/[\r\n]/g, ' ').slice(0, 80);
-                await _gamesDbWriteAchievementsFile(
-                    gamesDbPath,
-                    achievements,
-                    `Add achievements for ${safeTitle} (${platform}) from Exophase`
-                );
-
-                let downloadLink = '';
-                if (achievements.length) {
-                    const blob    = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
-                    const objUrl  = URL.createObjectURL(blob);
-                    const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
-                    downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
-                }
-                showScrapeMsg(`✅ Scraped and saved ${achievements.length} achievements to Games.Database.${downloadLink}`, true);
+            } catch (dispatchErr) {
+                // Exophase blocks cross-origin requests so client-side scraping cannot
+                // work as a fallback.  Surface the dispatch error so the user knows what
+                // to fix (e.g. grant GAMES_DB_TOKEN the Actions: Read and write permission).
+                throw dispatchErr;
             }
         }
     } catch (err) {
