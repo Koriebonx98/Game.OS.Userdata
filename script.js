@@ -3526,37 +3526,32 @@ async function _gamesDbWriteAchievementsFile(path, content, message) {
  * Fetch and parse an Exophase achievements page client-side.
  * Returns an array of achievement objects, or throws on error.
  */
-async function _scrapeExophaseClientSide(exophaseUrl) {
-    // Validate URL: only allow https://exophase.com (mirrors backend SSRF protection)
-    let parsedUrl;
-    try { parsedUrl = new URL(exophaseUrl); } catch (_) { throw new Error('Invalid URL.'); }
-    if (parsedUrl.protocol !== 'https:' ||
-        (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
-        throw new Error('Only https://exophase.com URLs are allowed.');
-    }
-
-    let html;
-    try {
-        const resp = await fetch(exophaseUrl, { mode: 'cors' });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        html = await resp.text();
-    } catch (fetchErr) {
-        throw new Error(
-            `Could not fetch the Exophase page: ${fetchErr.message}. ` +
-            'This may be a CORS restriction — try deploying the backend server for server-side scraping.'
-        );
-    }
-
+/**
+ * Parse an Exophase achievements/trophies HTML page and return a scraped array.
+ * Selector cascade: ul.achievement|trophy|challenge > li  →
+ *                   ul.achievements|trophies|challenges > li  →
+ *                   li[data-average] containing a link (last-resort).
+ */
+function _parseExophaseHtml(html) {
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const items = Array.from(doc.querySelectorAll('ul.achievement > li, ul.trophy > li, ul.challenge > li'));
+
+    let items = Array.from(doc.querySelectorAll(
+        'ul.achievement > li, ul.trophy > li, ul.challenge > li'
+    ));
+    if (!items.length) items = Array.from(doc.querySelectorAll(
+        'ul.achievements > li, ul.trophies > li, ul.challenges > li'
+    ));
+    if (!items.length) items = Array.from(doc.querySelectorAll('li[data-average]'))
+        .filter(el => el.querySelector('a'));
+
     const scraped = [];
     items.forEach((el, i) => {
-        const nameEl = el.querySelector('a');
+        const nameEl = el.querySelector('a') || el.querySelector('h4, h5, .title, .award-title');
         const name = (nameEl ? nameEl.textContent : '').trim();
         if (!name) return;
 
-        const descEl = el.querySelector('div.award-description p');
+        const descEl = el.querySelector('div.award-description p, .award-description, .description');
         const description = (descEl ? descEl.textContent : '').trim();
 
         const imgEl = el.querySelector('img');
@@ -3583,9 +3578,54 @@ async function _scrapeExophaseClientSide(exophaseUrl) {
         scraped.push(entry);
     });
 
-    if (!scraped.length) {
-        throw new Error('No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.');
+    return scraped;
+}
+
+/**
+ * Fetch and parse an Exophase achievements page client-side.
+ * Tries a direct fetch first; if CORS blocks it, falls back to the
+ * api.allorigins.win public CORS proxy (no auth involved — Exophase pages
+ * are public).  Returns an array of achievement objects, or throws on error.
+ */
+async function _scrapeExophaseClientSide(exophaseUrl) {
+    // Validate URL: only allow https://exophase.com (mirrors backend SSRF protection)
+    let parsedUrl;
+    try { parsedUrl = new URL(exophaseUrl); } catch (_) { throw new Error('Invalid URL.'); }
+    if (parsedUrl.protocol !== 'https:' ||
+        (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
+        throw new Error('Only https://exophase.com URLs are allowed.');
     }
+
+    // Try direct fetch first; Exophase blocks CORS so we expect it to fail and
+    // fall through to the proxy automatically.
+    let html;
+    let usedProxy = false;
+    try {
+        const resp = await fetch(exophaseUrl, { mode: 'cors' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        html = await resp.text();
+    } catch (_directErr) {
+        // Direct fetch blocked by CORS — retry via a public CORS proxy.
+        try {
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(exophaseUrl)}`;
+            const resp = await fetch(proxyUrl);
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            html = await resp.text();
+            usedProxy = true;
+        } catch (proxyErr) {
+            throw new Error(
+                `Could not fetch the Exophase page (direct and proxy both failed): ${proxyErr.message}.`
+            );
+        }
+    }
+
+    const scraped = _parseExophaseHtml(html);
+    if (!scraped.length) {
+        throw new Error(
+            'No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.'
+        );
+    }
+    void usedProxy; // available for debugging if needed
     return scraped;
 }
 
@@ -4227,8 +4267,25 @@ async function handleAdminEditSave() {
                     // avoids CORS) to scrape and write achievements to Games.Database.
                     const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
                     if (platformFolder && /^[a-zA-Z0-9_-]+$/.test(String(titleId))) {
-                        await _dispatchScrapeWorkflow(exophaseUrl, _currentModalPlatform, title, String(titleId).trim());
-                        showMsg('✅ Game updated! Achievements scraping workflow started.', 'success');
+                        const safeTitleId = String(titleId).trim();
+                        try {
+                            await _dispatchScrapeWorkflow(exophaseUrl, _currentModalPlatform, title, safeTitleId);
+                            showMsg('✅ Game updated! Achievements scraping workflow started.', 'success');
+                        } catch (dispatchErr) {
+                            if (dispatchErr.message.includes('Token lacks Actions write permission') && GAMES_DB_TOKEN) {
+                                // Fallback: scrape via CORS proxy and write directly
+                                const achievements = await _scrapeExophaseClientSide(exophaseUrl);
+                                const achPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                                await _gamesDbWriteAchievementsFile(
+                                    achPath,
+                                    achievements,
+                                    `Add achievements for ${title} (${_currentModalPlatform}) from Exophase`
+                                );
+                                showMsg(`✅ Game updated and ${achievements.length} achievements saved!`, 'success');
+                            } else {
+                                showMsg(`✅ Game updated. ⚠️ Exophase scrape failed: ${dispatchErr.message}`, 'success');
+                            }
+                        }
                     } else {
                         showMsg('✅ Game updated successfully!', 'success');
                     }
@@ -4705,6 +4762,30 @@ async function handleAddPcGameToDb() {
 
         const platformFile = `${_addGamePlatform}.Games.json`;
         showMsg(`✅ "${title}" added to ${platformFile}!`, 'success');
+
+        // If an Exophase URL was provided, kick off achievement scraping now.
+        if (exophaseUrl && GAMES_DB_TOKEN && titleId) {
+            const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_addGamePlatform];
+            const safeTitleId    = String(titleId).trim();
+            if (platformFolder && /^[a-zA-Z0-9_-]+$/.test(safeTitleId)) {
+                // Fire-and-forget: scraping failure does not block the success flow.
+                (async () => {
+                    try {
+                        const achievements = await _scrapeExophaseClientSide(exophaseUrl);
+                        const achPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                        await _gamesDbWriteAchievementsFile(
+                            achPath,
+                            achievements,
+                            `Add achievements for ${title} (${_addGamePlatform}) from Exophase`
+                        );
+                        showMsg(
+                            `✅ "${title}" added and ${achievements.length} achievements saved to Games.Database!`,
+                            'success'
+                        );
+                    } catch (_) { /* scraping is best-effort; game was already added */ }
+                })();
+            }
+        }
 
         // Update in-memory browse cache
         const cachedGames = (typeof _allPlatformGames !== 'undefined' && _allPlatformGames[_addGamePlatform])
@@ -5387,6 +5468,13 @@ async function _adminScrapeExophaseNow() {
             });
             const data = await resp.json();
             if (data.success) {
+                // Auto-fill achievementsUrl from the backend response so the user
+                // only needs to click "Save Changes" to link the game.
+                if (data.achievementsUrl) {
+                    const achUrlField = (document.getElementById('adminEditForm') || document)
+                        .querySelector('#editAchievementsUrl');
+                    if (achUrlField && !achUrlField.value) achUrlField.value = data.achievementsUrl;
+                }
                 let downloadLink = '';
                 if (Array.isArray(data.achievements) && data.achievements.length) {
                     const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
@@ -5419,9 +5507,18 @@ async function _adminScrapeExophaseNow() {
                 const triggerTime = Date.now();
                 const runsUrl = await _dispatchScrapeWorkflow(urlVal, platform, title, safeTitleId);
                 workflowDispatched = true;
+
+                // Pre-fill achievementsUrl with the expected path so the user can
+                // click "Save Changes" right away to link it to the game.
+                const expectedAchUrl = `${GAMES_DB_RAW_BASE}/Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                const achUrlField = (document.getElementById('adminEditForm') || document)
+                    .querySelector('#editAchievementsUrl');
+                if (achUrlField && !achUrlField.value) achUrlField.value = expectedAchUrl;
+
                 showScrapeMsg(
                     `✅ Scraping workflow started. ` +
-                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>`,
+                    `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener" style="color:#22c55e;font-weight:600;margin-left:4px;">View on GitHub →</a>` +
+                    (achUrlField ? `<br><span style="font-size:0.85em;color:#94a3b8;">Achievements URL pre-filled — click <strong style="color:#f1f5f9;">Save Changes</strong> to link it.</span>` : ''),
                     true
                 );
                 if (progressPanel && progressContent) {
@@ -5430,10 +5527,38 @@ async function _adminScrapeExophaseNow() {
                     _pollAndDisplayScrapeProgress(triggerTime, progressContent, runsUrl);
                 }
             } catch (dispatchErr) {
-                // Exophase blocks cross-origin requests so client-side scraping cannot
-                // work as a fallback.  Surface the dispatch error so the user knows what
-                // to fix (e.g. grant GAMES_DB_TOKEN the Actions: Read and write permission).
-                throw dispatchErr;
+                // If the token lacks Actions write permission, fall back to a direct
+                // scrape via the allorigins.win CORS proxy + Contents-API write.
+                // The token already has Contents: R/W on Games.Database so no extra
+                // permission is needed for this path.
+                if (dispatchErr.message.includes('Token lacks Actions write permission') && GAMES_DB_TOKEN) {
+                    showScrapeMsg('⏳ Workflow blocked — scraping directly via proxy…', true);
+                    const achievements = await _scrapeExophaseClientSide(urlVal);
+                    const achPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+                    await _gamesDbWriteAchievementsFile(
+                        achPath,
+                        achievements,
+                        `Add achievements for ${escapeHtml(title)} (${escapeHtml(platform)}) from Exophase`
+                    );
+                    const achUrl = `${GAMES_DB_RAW_BASE}/${achPath}`;
+                    // Pre-fill the achievementsUrl field
+                    const achUrlField = (document.getElementById('adminEditForm') || document)
+                        .querySelector('#editAchievementsUrl');
+                    if (achUrlField && !achUrlField.value) achUrlField.value = achUrl;
+
+                    const blob    = new Blob([JSON.stringify(achievements, null, 2)], { type: 'application/json' });
+                    const objUrl  = URL.createObjectURL(blob);
+                    const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                    const dlLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+                    showScrapeMsg(
+                        `✅ Scraped ${achievements.length} achievements and saved to Games.Database!${dlLink}` +
+                        (achUrlField ? `<br><span style="font-size:0.85em;color:#94a3b8;">Click <strong style="color:#f1f5f9;">Save Changes</strong> to link the Achievements URL to this game.</span>` : ''),
+                        true
+                    );
+                } else {
+                    // Unexpected error — surface it.
+                    throw dispatchErr;
+                }
             }
         }
     } catch (err) {

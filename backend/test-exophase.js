@@ -94,26 +94,54 @@ const FIXTURE_HTML = (() => {
 })();
 
 // ---------------------------------------------------------------------------
-// Shared scraping function – same logic as the server-side implementation.
+// PS3 fixture – uses <ul class="trophy"> (the class Exophase uses for PS3).
+// A small representative subset of Skate 3 PS3 trophies is enough to verify
+// the selector handles the trophy variant correctly.
+// ---------------------------------------------------------------------------
+const FIXTURE_PS3_TROPHIES = [
+    { name: 'Skate 3',                    pct:  4.1,  desc: 'Earn all Skate 3 Trophies.', hidden: false },
+    { name: 'Welcome to Port Carverton',  pct: 91.3,  desc: 'Complete the tutorial.', hidden: false },
+    { name: 'Hall of Meat',               pct: 12.5,  desc: 'Wreck yourself for 1,000,000 points of pain.', hidden: true },
+    { name: 'Road to Nowhere',            pct: 79.8,  desc: 'Skate 5 miles total.', hidden: false },
+    { name: 'Legendary',                  pct:  3.8,  desc: 'Complete the entire pro career.', hidden: true },
+];
+
+const FIXTURE_PS3_HTML = (() => {
+    const items = FIXTURE_PS3_TROPHIES.map(a => {
+        const cls = a.hidden ? ' class="secret"' : '';
+        return `  <li data-average="${a.pct}"${cls}>\n` +
+               `    <img src="https://media.exophase.com/trophies/skate3_ps3/${a.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png">\n` +
+               `    <a>${a.name}</a>\n` +
+               `    <div class="award-description"><p>${a.desc}</p></div>\n` +
+               `  </li>`;
+    }).join('\n');
+    return `<!DOCTYPE html>\n<html>\n<head><title>Skate 3 Trophies - PS3 - Exophase.com</title></head>\n<body>\n<ul class="trophy">\n${items}\n</ul>\n</body>\n</html>`;
+})();
+
+// Fixture for the plural-class variant (ul.trophies) used on some Exophase pages.
+const FIXTURE_TROPHIES_PLURAL_HTML = FIXTURE_PS3_HTML.replace('<ul class="trophy">', '<ul class="trophies">');
+
+// ---------------------------------------------------------------------------
+// Shared scraping function – same selector cascade as the server-side implementation.
 // ---------------------------------------------------------------------------
 function scrapeAchievements(html) {
     const $ = cheerio.load(html);
+
+    // Selector cascade: primary → plural fallback → data-average last resort.
+    let items = $('ul.achievement > li, ul.trophy > li, ul.challenge > li');
+    if (!items.length) items = $('ul.achievements > li, ul.trophies > li, ul.challenges > li');
+    if (!items.length) items = $('li[data-average]').filter((_, el) =>
+        $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
     const scraped = [];
 
-    // Exophase structure:
-    //   <ul class="achievement|trophy|challenge">
-    //     <li data-average="45.2" class="[secret]">
-    //       <img src="...icon...">
-    //       <a>Achievement Name</a>
-    //       <div class="award-description"><p>Description</p></div>
-    //     </li>
-    //   </ul>
-    $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+    items.each((i, el) => {
         const $el = $(el);
-        const name = ($el.find('a').first().text() || '').trim();
+        const name = ($el.find('a').first().text() ||
+                      $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
         if (!name) return;
 
-        const description = ($el.find('div.award-description p').first().text() || '').trim();
+        const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
         const iconUrl     = $el.find('img').first().attr('src') || undefined;
         const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
         const avgRaw      = $el.attr('data-average');
@@ -135,6 +163,33 @@ function scrapeAchievements(html) {
     return { scraped, $ };
 }
 
+// ---------------------------------------------------------------------------
+// Self-test: validate the scraper against all fixtures when --fixture is passed.
+// ---------------------------------------------------------------------------
+function runFixtureTests() {
+    const tests = [
+        { label: 'Xbox 360 (ul.achievement)', html: FIXTURE_HTML,                 expected: FIXTURE_ACHIEVEMENTS },
+        { label: 'PS3     (ul.trophy)',        html: FIXTURE_PS3_HTML,             expected: FIXTURE_PS3_TROPHIES },
+        { label: 'plural  (ul.trophies)',      html: FIXTURE_TROPHIES_PLURAL_HTML, expected: FIXTURE_PS3_TROPHIES },
+    ];
+
+    let allPassed = true;
+    for (const t of tests) {
+        const { scraped } = scrapeAchievements(t.html);
+        const pass = scraped.length === t.expected.length &&
+            scraped.every((a, i) => a.name === t.expected[i].name &&
+                (!!a.hidden === !!t.expected[i].hidden));
+        if (pass) {
+            console.log(`  ✅  ${t.label}: ${scraped.length} entries OK`);
+        } else {
+            console.error(`  ❌  ${t.label}: expected ${t.expected.length} entries, got ${scraped.length}`);
+            allPassed = false;
+        }
+    }
+    if (!allPassed) process.exit(1);
+    console.log('\n✅  All fixture tests passed.\n');
+}
+
 const useFixture = process.argv.includes('--fixture');
 const DEFAULT_URL = 'https://www.exophase.com/game/skate-3-xbox-360/achievements/';
 const urlArg = process.argv.slice(2).find(a => a !== '--fixture');
@@ -144,7 +199,10 @@ const url = (!useFixture && urlArg) ? urlArg : DEFAULT_URL;
     let html;
 
     if (useFixture) {
-        console.log('🔧 Using built-in fixture HTML (no network request)\n');
+        // Run all fixture tests first (Xbox 360 + PS3 trophy + plural-class variants)
+        console.log('🔧 Running fixture tests (no network request)\n');
+        runFixtureTests();
+        // Use the Xbox 360 fixture for the visual HTML report
         html = FIXTURE_HTML;
     } else {
         console.log(`Fetching: ${url}\n`);
@@ -201,6 +259,8 @@ const url = (!useFixture && urlArg) ? urlArg : DEFAULT_URL;
         console.log('ul.achievement count:', $('ul.achievement').length);
         console.log('ul.trophy count:', $('ul.trophy').length);
         console.log('ul.challenge count:', $('ul.challenge').length);
+        console.log('ul.trophies count:', $('ul.trophies').length);
+        console.log('ul.achievements count:', $('ul.achievements').length);
         process.exit(1);
     }
 
