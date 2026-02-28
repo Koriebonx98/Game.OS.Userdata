@@ -3625,7 +3625,6 @@ async function _scrapeExophaseClientSide(exophaseUrl) {
             'No achievements found on the Exophase page. Please verify the URL points to an achievement/trophy list.'
         );
     }
-    void usedProxy; // available for debugging if needed
     return scraped;
 }
 
@@ -4272,7 +4271,7 @@ async function handleAdminEditSave() {
                             await _dispatchScrapeWorkflow(exophaseUrl, _currentModalPlatform, title, safeTitleId);
                             showMsg('✅ Game updated! Achievements scraping workflow started.', 'success');
                         } catch (dispatchErr) {
-                            if (dispatchErr.message.includes('Token lacks Actions write permission') && GAMES_DB_TOKEN) {
+                            if (_isActionsPermissionError(dispatchErr) && GAMES_DB_TOKEN) {
                                 // Fallback: scrape via CORS proxy and write directly
                                 const achievements = await _scrapeExophaseClientSide(exophaseUrl);
                                 const achPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
@@ -5362,6 +5361,15 @@ async function handleAddSteamGameToDb() {
 }
 
 /**
+ * Returns true when an error thrown by _dispatchScrapeWorkflow indicates that
+ * the token lacks Actions: write permission.  Centralised here so the two
+ * call-sites that fall back to the CORS-proxy path stay in sync.
+ */
+function _isActionsPermissionError(err) {
+    return err && err.message.includes('Token lacks Actions write permission');
+}
+
+/**
  * page server-side and write achievements.json to Games.Database.
  *
  * Requires GAMES_DB_TOKEN to have:
@@ -5531,7 +5539,7 @@ async function _adminScrapeExophaseNow() {
                 // scrape via the allorigins.win CORS proxy + Contents-API write.
                 // The token already has Contents: R/W on Games.Database so no extra
                 // permission is needed for this path.
-                if (dispatchErr.message.includes('Token lacks Actions write permission') && GAMES_DB_TOKEN) {
+                if (_isActionsPermissionError(dispatchErr) && GAMES_DB_TOKEN) {
                     showScrapeMsg('⏳ Workflow blocked — scraping directly via proxy…', true);
                     const achievements = await _scrapeExophaseClientSide(urlVal);
                     const achPath = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
