@@ -100,20 +100,28 @@ function scrapeAchievements(html) {
     const $ = cheerio.load(html);
     const scraped = [];
 
-    // Exophase structure:
-    //   <ul class="achievement|trophy|challenge">
+    // Exophase renders trophies/achievements as:
+    //   <ul class="achievement|trophy|challenge|achievements|trophies">
     //     <li data-average="45.2" class="[secret]">
     //       <img src="...icon...">
     //       <a>Achievement Name</a>
     //       <div class="award-description"><p>Description</p></div>
     //     </li>
     //   </ul>
-    $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+    const PRIMARY_SELECTOR   = 'ul.achievement > li, ul.trophy > li, ul.challenge > li';
+    const SECONDARY_SELECTOR = 'ul.achievements > li, ul.trophies > li, ul.challenges > li';
+    let items = $(PRIMARY_SELECTOR);
+    if (!items.length) items = $(SECONDARY_SELECTOR);
+    if (!items.length) items = $('li[data-average]').filter((_, el) =>
+        $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
+    items.each((i, el) => {
         const $el = $(el);
-        const name = ($el.find('a').first().text() || '').trim();
+        const name = ($el.find('a').first().text() ||
+                      $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
         if (!name) return;
 
-        const description = ($el.find('div.award-description p').first().text() || '').trim();
+        const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
         const iconUrl     = $el.find('img').first().attr('src') || undefined;
         const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
         const avgRaw      = $el.attr('data-average');

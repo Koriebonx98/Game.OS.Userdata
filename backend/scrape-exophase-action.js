@@ -99,21 +99,35 @@ try {
 
 const $ = cheerio.load(html);
 const scraped = [];
+const HTML_SNIPPET_LENGTH = 2048;
 
-// Exophase structure:
-//   <ul class="achievement|trophy|challenge">
+// Exophase renders trophies/achievements as:
+//   <ul class="achievement|trophy|challenge|achievements|trophies">
 //     <li data-average="45.2" class="[secret]">
 //       <img src="...icon...">
 //       <a>Achievement Name</a>
 //       <div class="award-description"><p>Description</p></div>
 //     </li>
 //   </ul>
-$('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
+// The selectors below try the known class names first, then fall back to any
+// <li> element that carries a data-average attribute (broader fallback).
+const PRIMARY_SELECTOR   = 'ul.achievement > li, ul.trophy > li, ul.challenge > li';
+const SECONDARY_SELECTOR = 'ul.achievements > li, ul.trophies > li, ul.challenges > li';
+
+let items = $(PRIMARY_SELECTOR);
+if (!items.length) items = $(SECONDARY_SELECTOR);
+// Broadest fallback: any <li> with data-average that contains an <a> link (the name)
+if (!items.length) items = $('li[data-average]').filter((_, el) =>
+    $(el).find('a, h4, h5, .title, .award-title').length > 0);
+
+items.each((i, el) => {
     const $el = $(el);
-    const name = ($el.find('a').first().text() || '').trim();
+    // Name: prefer the first <a> inside the item; fall back to common heading selectors
+    const name = ($el.find('a').first().text() ||
+                  $el.find('h4, h5, .title, .award-title').first().text() || '').trim();
     if (!name) return;
 
-    const description = ($el.find('div.award-description p').first().text() || '').trim();
+    const description = ($el.find('div.award-description p, .award-description, .description').first().text() || '').trim();
     const rawIconUrl  = $el.find('img').first().attr('src') || undefined;
 
     // Only accept icon URLs served over HTTPS from exophase.com
@@ -147,10 +161,14 @@ $('ul.achievement > li, ul.trophy > li, ul.challenge > li').each((i, el) => {
 
 if (!scraped.length) {
     console.warn('⚠️  No achievements found. Diagnostics:');
-    console.warn(`   Page title       : ${$('title').text().trim()}`);
-    console.warn(`   ul.achievement   : ${$('ul.achievement').length}`);
-    console.warn(`   ul.trophy        : ${$('ul.trophy').length}`);
-    console.warn(`   ul.challenge     : ${$('ul.challenge').length}`);
+    console.warn(`   Page title         : ${$('title').text().trim()}`);
+    console.warn(`   ul.achievement     : ${$('ul.achievement').length}`);
+    console.warn(`   ul.trophy          : ${$('ul.trophy').length}`);
+    console.warn(`   ul.challenge       : ${$('ul.challenge').length}`);
+    console.warn(`   ul.achievements    : ${$('ul.achievements').length}`);
+    console.warn(`   ul.trophies        : ${$('ul.trophies').length}`);
+    console.warn(`   li[data-average]   : ${$('li[data-average]').length}`);
+    console.warn(`   HTML snippet (first 2048 chars): ${html.slice(0, HTML_SNIPPET_LENGTH)}`);
     fail('No achievements found on the Exophase page. Verify the URL points to an achievement/trophy list.');
 }
 
