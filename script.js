@@ -4190,16 +4190,14 @@ async function handleAdminEditSave() {
                 `Update game: ${title} (${_currentModalPlatform})`
             );
 
-            // Write game data to Data/{platformFolder}/Games/{title}/info.json
+            // Write game data to Data/{platformFolder}/Games/{titleId}/info.json
             const _platFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
             if (_platFolder) {
-                const _infoTitle = title
-                    .replace(/\.\./g, '').replace(/[/\\]/g, '-')
-                    .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
-                if (_infoTitle) {
+                const _infoId = titleId && /^[a-zA-Z0-9_-]+$/.test(titleId) ? titleId : null;
+                if (_infoId) {
                     try {
                         await _gamesDbWriteAchievementsFile(
-                            `Data/${_platFolder}/Games/${_infoTitle}/info.json`,
+                            `Data/${_platFolder}/Games/${_infoId}/info.json`,
                             updated,
                             `Update game info: ${title} (${_currentModalPlatform})`
                         );

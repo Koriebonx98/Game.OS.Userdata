@@ -2685,18 +2685,17 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
 
         await putGamesDbFileLarge(platformFile, newContent, `Add game: ${safeTitle} (${safePlatform})`);
 
-        // Write game data to Data/{platformFolder}/Games/{title}/info.json.
+        // Write game data to Data/{platformFolder}/Games/{titleId}/info.json.
         // compile_pc_games.py uses a merge-based approach: it overlays curated
         // info.json fields onto the existing PC.Games.json (which holds the full
         // Steam catalogue) rather than replacing the entire file, so writing
         // info.json for PC games is safe.
         const platformFolder = platformToGamesDbFolder(platform);
         if (platformFolder) {
-            const titleForPath = safeTitle
-                .replace(/\.\./g, '').replace(/[/\\]/g, '-')
-                .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
-            if (titleForPath) {
-                const infoPath = `Data/${platformFolder}/Games/${titleForPath}/info.json`;
+            const rawId = String(game.TitleID || game.title_id || game.titleid || '').trim();
+            const titleIdForPath = rawId && /^[a-zA-Z0-9_-]+$/.test(rawId) ? rawId : null;
+            if (titleIdForPath) {
+                const infoPath = `Data/${platformFolder}/Games/${titleIdForPath}/info.json`;
                 try {
                     const existingInfo = await getGamesDbFile(infoPath);
                     await putGamesDbFile(
@@ -2812,18 +2811,17 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
 
         await putGamesDbFileLarge(platformFile, newContent, `Update game: ${safeTitle} (${safePlatform})`);
 
-        // Write game data to Data/{platformFolder}/Games/{title}/info.json.
+        // Write game data to Data/{platformFolder}/Games/{titleId}/info.json.
         // compile_pc_games.py uses a merge-based approach: it overlays curated
         // info.json fields onto the existing PC.Games.json (which holds the full
         // Steam catalogue) rather than replacing the entire file, so writing
         // info.json for PC games is safe.
         const platformFolder = platformToGamesDbFolder(platform);
         if (platformFolder) {
-            const titleForPath = String(game.Title || game.game_name || game.title || '')
-                .replace(/\.\./g, '').replace(/[/\\]/g, '-')
-                .replace(/[\x00-\x1f\x7f]/g, '').replace(/^\.+/, '').trim().slice(0, 100);
-            if (titleForPath) {
-                const infoPath = `Data/${platformFolder}/Games/${titleForPath}/info.json`;
+            const rawId = String(game.TitleID || game.title_id || game.titleid || '').trim();
+            const titleIdForPath = rawId && /^[a-zA-Z0-9_-]+$/.test(rawId) ? rawId : null;
+            if (titleIdForPath) {
+                const infoPath = `Data/${platformFolder}/Games/${titleIdForPath}/info.json`;
                 try {
                     // getGamesDbFile returns null for 404 (file not yet created) — passing
                     // undefined as sha to putGamesDbFile correctly triggers a new-file create.
