@@ -2429,10 +2429,6 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
             return res.status(403).json({ success: false, message: 'Admin access required.' });
         }
 
-        if (!STEAM_API_KEY) {
-            return res.status(503).json({ success: false, message: 'STEAM_API_KEY is not configured on the server.' });
-        }
-
         const { appid, platform, gameTitle, titleId } = req.body;
 
         if (!appid || !platform || !gameTitle || !titleId) {
@@ -2459,8 +2455,11 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, message: 'titleId may only contain alphanumeric characters, underscores, and hyphens.' });
         }
 
-        // Fetch the Steam achievement schema
-        const steamUrl = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&appid=${encodeURIComponent(safeAppId)}&l=en`;
+        // Fetch the Steam achievement schema.
+        // The key parameter is optional; many public games return achievements without it.
+        const steamUrl = STEAM_API_KEY
+            ? `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&appid=${encodeURIComponent(safeAppId)}&l=en`
+            : `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=${encodeURIComponent(safeAppId)}&l=en`;
         const controller = new AbortController();
         const fetchTimeout = setTimeout(() => controller.abort(), 15000);
         let steamData;
