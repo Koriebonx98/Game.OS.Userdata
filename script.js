@@ -3883,6 +3883,7 @@ function openAdminEditModal(game, platform) {
     const specRec         = game.sysSpecRecommended || {};
     const achievementsUrl = game.achievementsUrl    || '';
     const exophaseUrl     = game.exophaseUrl        || '';
+    const steamAppId      = game.steamAppId         || String(game.appid || '') || '';
 
     const bgHtml = bgUrls.length
         ? bgUrls.map(u => _adminBgFieldHtml(u)).join('')
@@ -3896,13 +3897,14 @@ function openAdminEditModal(game, platform) {
         ? existingStores.map(s => _adminStoreFieldHtml(s.name || '', s.url || '')).join('')
         : _adminStoreFieldHtml('', '');
 
-    const titleEnc    = escapeHtml(title);
-    const titleIdEnc  = escapeHtml(String(titleId));
-    const descEnc     = escapeHtml(description);
-    const coverEnc    = escapeHtml(coverUrl);
-    const trailerEnc  = escapeHtml(trailerUrl);
-    const ytQuery     = encodeURIComponent(title + ' trailer');
-    const sgdbQuery   = encodeURIComponent(title);
+    const titleEnc      = escapeHtml(title);
+    const titleIdEnc    = escapeHtml(String(titleId));
+    const descEnc       = escapeHtml(description);
+    const coverEnc      = escapeHtml(coverUrl);
+    const trailerEnc    = escapeHtml(trailerUrl);
+    const steamAppIdEnc = escapeHtml(steamAppId);
+    const ytQuery       = encodeURIComponent(title + ' trailer');
+    const sgdbQuery     = encodeURIComponent(title);
 
     bodyEl.innerHTML = `
     <form id="adminEditForm" autocomplete="off" onsubmit="return false;">
@@ -4004,6 +4006,14 @@ function openAdminEditModal(game, platform) {
                 <div id="scrapeProgressContent"></div>
             </div>
         </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🎮 Steam App ID <span style="font-size:.8em;opacity:.7;">(scrape achievements from Steam via appid)</span></label>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <input type="text" id="editSteamAppId" class="admin-form-input" placeholder="e.g. 570" value="${steamAppIdEnc}" style="flex:1;">
+                <button type="button" class="btn" style="padding:8px 14px;white-space:nowrap;flex-shrink:0;" id="adminScrapeSteamBtn" onclick="_adminScrapeSteamNow()" title="Scrape achievements from Steam now and save JSON to Games.Database">🎮 Scrape Steam</button>
+            </div>
+            <div id="adminScrapeSteamMsg" style="display:none;margin-top:6px;font-size:0.85em;"></div>
+        </div>
         <div class="admin-form-actions">
             <div id="adminEditMsg" class="admin-edit-msg" style="display:none;"></div>
             <button type="button" class="btn secondary" style="padding:10px 22px;" onclick="closeAdminEditModal()">Cancel</button>
@@ -4096,6 +4106,7 @@ async function handleAdminEditSave() {
 
     const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
     const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
+    const steamAppId      = ((getField('editSteamAppId')      || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
     if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = '⏳ Saving…'; }
@@ -4119,7 +4130,7 @@ async function handleAdminEditSave() {
             // Build the updated entry once; send it to the backend and reuse for the cache
             updated = _buildUpdatedGameEntry(_currentModalGame, {
                 title, titleId, description, coverUrl, bgUrls, trailers,
-                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId
             });
 
             const updateResp = await fetch(`${backendBase}/api/admin/update-game`, {
@@ -4179,7 +4190,7 @@ async function handleAdminEditSave() {
             // Merge form values over the CURRENT entry (preserves any fields not in the form)
             updated = _buildUpdatedGameEntry(gamesArr[idx], {
                 title, titleId, description, coverUrl, bgUrls, trailers,
-                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId
             });
             gamesArr[idx] = updated;
 
@@ -4414,7 +4425,8 @@ async function handleAdminDeleteGame() {
  */
 function _buildUpdatedGameEntry(existing, fields) {
     const { title, titleId, description, coverUrl, bgUrls, trailers,
-            mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl } = fields;
+            mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl,
+            steamAppId } = fields;
     const updated = { ...existing };
 
     // Update title (preserve original field name)
@@ -4449,6 +4461,8 @@ function _buildUpdatedGameEntry(existing, fields) {
     else                       delete updated.achievementsUrl;
     if (exophaseUrl)           updated.exophaseUrl        = exophaseUrl;
     else                       delete updated.exophaseUrl;
+    if (steamAppId)            updated.steamAppId         = steamAppId;
+    else                       delete updated.steamAppId;
 
     return updated;
 }
@@ -5571,6 +5585,85 @@ async function _adminScrapeExophaseNow() {
         showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
     } finally {
         if (btn) { btn.disabled = false; btn.textContent = '🔄 Scrape JSON'; }
+    }
+}
+
+/**
+ * Immediately scrape achievements for the Steam App ID in the edit form via the
+ * backend Steam API endpoint and save achievements to Games.Database.
+ */
+async function _adminScrapeSteamNow() {
+    if (!isAdminUser()) return;
+
+    const btn    = document.getElementById('adminScrapeSteamBtn');
+    const msgEl  = document.getElementById('adminScrapeSteamMsg');
+    // Scope lookups to the edit form to avoid reading from any co-existing modal.
+    const editForm  = document.getElementById('adminEditForm') || document;
+    const getField  = id => editForm.querySelector('#' + id);
+    const appIdVal  = ((getField('editSteamAppId') || {}).value || '').trim();
+    const titleInput = getField('editTitle');
+    const title     = (titleInput ? titleInput.value.trim() : '')
+                      || (_currentModalGame ? (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title || '') : '');
+    const titleId   = ((getField('editTitleId') || {}).value || '').trim();
+    const platform  = _currentModalPlatform || '';
+
+    const showMsg = (text, ok) => {
+        if (!msgEl) return;
+        msgEl.innerHTML    = text;
+        msgEl.style.display = '';
+        msgEl.style.color  = ok ? '#22c55e' : '#ef4444';
+    };
+
+    if (!appIdVal)  { showMsg('⚠️ Enter a Steam App ID first.', false); return; }
+    if (!/^\d+$/.test(appIdVal)) { showMsg('⚠️ Steam App ID must be numeric.', false); return; }
+    if (!title)     { showMsg('⚠️ Enter the game title first.', false); return; }
+    if (!titleId)   { showMsg('⚠️ Enter the Title ID first.', false); return; }
+    if (!platform)  { showMsg('⚠️ No platform selected for this game.', false); return; }
+    if (!getBackendBase()) {
+        showMsg('⚠️ A backend server with STEAM_API_KEY configured is required for Steam scraping.', false);
+        return;
+    }
+
+    if (btn)   { btn.disabled = true; btn.textContent = '⏳ Scraping…'; }
+    if (msgEl) { msgEl.style.display = 'none'; }
+
+    try {
+        const user  = getCurrentUser();
+        const token = user
+            ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
+               localStorage.getItem('gameOS_apiToken_pending') || '')
+            : '';
+        const resp = await fetch(`${getBackendBase()}/api/admin/scrape-steam`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ appid: appIdVal, platform, gameTitle: title, titleId })
+        });
+        const data = await resp.json();
+        if (data.success) {
+            // Auto-fill achievementsUrl so the user only needs to click "Save Changes"
+            if (data.achievementsUrl) {
+                const achUrlField = (document.getElementById('adminEditForm') || document)
+                    .querySelector('#editAchievementsUrl');
+                if (achUrlField && !achUrlField.value) achUrlField.value = data.achievementsUrl;
+            }
+            let downloadLink = '';
+            if (Array.isArray(data.achievements) && data.achievements.length) {
+                const blob    = new Blob([JSON.stringify(data.achievements, null, 2)], { type: 'application/json' });
+                const objUrl  = URL.createObjectURL(blob);
+                const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+                downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+            }
+            showMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
+        } else {
+            showMsg(`❌ ${escapeHtml(data.message)}`, false);
+        }
+    } catch (err) {
+        showMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '🎮 Scrape Steam'; }
     }
 }
 
