@@ -49,8 +49,9 @@ const octokitGamesDb = GAMES_DB_TOKEN ? new Octokit({ auth: GAMES_DB_TOKEN }) : 
 
 // ── Steam Web API key (optional) ──────────────────────────────────────────────
 // Optional. When provided, it is included in calls to ISteamUserStats/GetSchemaForGame.
-// The endpoint works without a key for most public games — Steam achievement data
-// is publicly accessible. Omitting the key is the recommended configuration.
+// When the Steam API returns no achievements (common without a key for many games),
+// the scraper automatically falls back to HTML scraping of public Steam pages using
+// Cheerio — the same technique used for Exophase scraping — so no API key is required.
 // Generate a key at: https://steamcommunity.com/dev/apikey
 const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 
@@ -2458,7 +2459,9 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
         }
 
         // Fetch the Steam achievement schema.
-        // The key parameter is optional; many public games return achievements without it.
+        // The key parameter is optional; the endpoint works for many public games without it.
+        // When no key is configured Steam frequently returns an empty game object, so we
+        // fall back to HTML scraping of public Steam pages (see below).
         const steamUrl = STEAM_API_KEY
             ? `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&appid=${encodeURIComponent(safeAppId)}&l=en`
             : `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=${encodeURIComponent(safeAppId)}&l=en`;
@@ -2488,25 +2491,123 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
                 ? steamData.game.availableGameStats.achievements
                 : [];
 
+        // ── HTML scraping fallback ────────────────────────────────────────────────
+        // When the Steam Web API returns no achievements (most commonly because
+        // STEAM_API_KEY is not configured), scrape publicly accessible Steam pages
+        // using Cheerio — the same technique used for Exophase scraping.
+        // Sources tried in order:
+        //   1. Steam Community global achievement stats  (full data: name + description + icon + %)
+        //   2. Steam Store app page                      (limited:  name + icon only, ~10 achievements)
+        let htmlScraped = [];
         if (!rawAchievements.length) {
+            const htmlSources = [
+                `https://steamcommunity.com/stats/${safeAppId}/achievements`,
+                `https://store.steampowered.com/app/${safeAppId}/`
+            ];
+            for (const htmlUrl of htmlSources) {
+                if (htmlScraped.length) break;
+                const hCtrl    = new AbortController();
+                const hTimeout = setTimeout(() => hCtrl.abort(), 20000);
+                try {
+                    const hResp = await fetch(htmlUrl, {
+                        signal: hCtrl.signal,
+                        headers: {
+                            'User-Agent':      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+                            'Accept':          'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                            'Accept-Language': 'en-US,en;q=0.9',
+                            // Bypass Steam age-gate for mature-rated games
+                            'Cookie':          'birthtime=631152001; lastagecheckage=1-January-1990; mature_content=1'
+                        }
+                    });
+                    if (!hResp.ok) continue;
+                    const html = await hResp.text();
+                    const $h   = cheerio.load(html);
+
+                    // ── Steam Community stats page selectors ────────────────────
+                    // <div class="achieveRow">
+                    //   <div class="achieveImgHolder"><img src="..."></div>
+                    //   <div class="achieveTxtHolder">
+                    //     <div class="achieveTxt"><h3>Name</h3><h5>Desc</h5></div>
+                    //   </div>
+                    //   <div class="achievePercent"><div ... style="width:62.7%">...
+                    $h('.achieveRow').each((i, el) => {
+                        const $el  = $h(el);
+                        const name = ($el.find('.achieveTxt h3, .achieveTxtHolder h3').first().text() || '').trim();
+                        if (!name) return;
+                        const desc    = ($el.find('.achieveTxt h5, .achieveTxtHolder h5').first().text() || '').trim();
+                        const rawIcon = $el.find('img').first().attr('src') || undefined;
+                        let iconUrl;
+                        if (rawIcon) {
+                            try {
+                                const p = new URL(rawIcon);
+                                if (p.protocol === 'https:') iconUrl = rawIcon;
+                            } catch { /* skip malformed URLs */ }
+                        }
+                        const percentStyle = ($el.find('[style*="width"]').first().attr('style') || '');
+                        const pMatch  = percentStyle.match(/width\s*:\s*([\d.]+)%/);
+                        const percent = pMatch ? parseFloat(pMatch[1]) : undefined;
+
+                        const entry = { achievementId: String(i + 1), name, description: desc };
+                        if (iconUrl)                                  entry.iconUrl = iconUrl;
+                        if (percent !== undefined && !isNaN(percent)) entry.percent = percent;
+                        htmlScraped.push(entry);
+                    });
+
+                    // ── Steam Store page fallback selectors ─────────────────────
+                    // <img class="achieveImg" src="..." title="Achievement Name">
+                    if (!htmlScraped.length) {
+                        $h('img.achieveImg[title]').each((i, el) => {
+                            const name = ($h(el).attr('title') || '').trim();
+                            if (!name) return;
+                            const rawIcon = $h(el).attr('src') || undefined;
+                            let iconUrl;
+                            if (rawIcon) {
+                                try {
+                                    const p = new URL(rawIcon);
+                                    if (p.protocol === 'https:') iconUrl = rawIcon;
+                                } catch { /* skip malformed URLs */ }
+                            }
+                            const entry = { achievementId: String(i + 1), name, description: '' };
+                            if (iconUrl) entry.iconUrl = iconUrl;
+                            htmlScraped.push(entry);
+                        });
+                    }
+                } catch (htmlErr) {
+                    if (htmlErr.name === 'AbortError') {
+                        console.warn(`scrape-steam: HTML fallback timed out for ${htmlUrl}`);
+                    } else {
+                        console.warn(`scrape-steam: HTML fallback failed for ${htmlUrl}:`, htmlErr.message);
+                    }
+                } finally {
+                    clearTimeout(hTimeout);
+                }
+            }
+        }
+
+        if (!rawAchievements.length && !htmlScraped.length) {
             return res.status(422).json({
                 success: false,
-                message: 'No achievements found for this Steam App ID. Verify the appid is correct and the game has achievements.'
+                message: 'No achievements found for this Steam App ID. Verify the appid is correct and the game has achievements. Consider setting STEAM_API_KEY on the server for guaranteed access.'
             });
         }
 
-        // Map to the Games.Database achievements.json format
-        const scraped = rawAchievements.map(ach => {
-            const entry = {
-                achievementId: String(ach.name || ''),
-                name:          String(ach.displayName || ach.name || ''),
-                description:   String(ach.description || '')
-            };
-            if (ach.icon)     entry.iconUrl     = String(ach.icon);
-            if (ach.icongray) entry.iconUrlGray = String(ach.icongray);
-            if (ach.hidden === 1) entry.hidden   = true;
-            return entry;
-        });
+        // Map to the Games.Database achievements.json format.
+        // Use Steam API data when available (includes internal achievement IDs);
+        // otherwise use the HTML-scraped data which already uses sequential IDs.
+        const usedHtmlFallback = rawAchievements.length === 0;
+        const scraped = rawAchievements.length > 0
+            ? rawAchievements.map(ach => {
+                const entry = {
+                    achievementId: String(ach.name || ''),
+                    name:          String(ach.displayName || ach.name || ''),
+                    description:   String(ach.description || '')
+                };
+                if (ach.icon)     entry.iconUrl     = String(ach.icon);
+                if (ach.icongray) entry.iconUrlGray = String(ach.icongray);
+                if (ach.hidden === 1) entry.hidden   = true;
+                return entry;
+            })
+            : htmlScraped;
 
         // Write achievement template to Games.Database
         const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
@@ -2566,12 +2667,14 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
             console.error('scrape-steam: failed to update achievementsUrl in platform JSON:', dbErr.message);
         }
 
+        const sourceLabel = usedHtmlFallback ? 'Steam (web scrape)' : 'Steam API';
         res.json({
             success: true,
-            message: `Scraped and saved ${scraped.length} achievements to Games.Database from Steam.`,
+            message: `Scraped and saved ${scraped.length} achievements to Games.Database from ${sourceLabel}.`,
             total: scraped.length,
             path: gamesDbPath,
             achievementsUrl,
+            source: usedHtmlFallback ? 'html' : 'api',
             achievements: scraped
         });
     } catch (err) {
