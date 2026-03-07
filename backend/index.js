@@ -2471,14 +2471,20 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
         try {
             const response = await fetch(steamUrl, { signal: controller.signal });
             if (!response.ok) {
-                return res.status(502).json({ success: false, message: `Steam API returned HTTP ${response.status}.` });
+                // Non-OK response (e.g. 400, 401, 403) — fall through to HTML scraping below.
+                console.warn(`scrape-steam: Steam API returned HTTP ${response.status}, will try HTML fallback.`);
+                steamData = null;
+            } else {
+                steamData = await response.json();
             }
-            steamData = await response.json();
         } catch (fetchErr) {
             if (fetchErr.name === 'AbortError') {
-                return res.status(504).json({ success: false, message: 'Steam API request timed out.' });
+                // Timeout — fall through to HTML scraping below.
+                console.warn('scrape-steam: Steam API request timed out, will try HTML fallback.');
+                steamData = null;
+            } else {
+                throw fetchErr;
             }
-            throw fetchErr;
         } finally {
             clearTimeout(fetchTimeout);
         }
