@@ -47,6 +47,11 @@ const GAMES_DB_REPO_OWNER = process.env.GAMES_DB_REPO_OWNER || 'Koriebonx98';
 const GAMES_DB_REPO_NAME  = process.env.GAMES_DB_REPO_NAME  || 'Games.Database';
 const octokitGamesDb = GAMES_DB_TOKEN ? new Octokit({ auth: GAMES_DB_TOKEN }) : null;
 
+// ── Steam Web API key (optional) ──────────────────────────────────────────────
+// Required for the /api/admin/scrape-steam endpoint.
+// Generate a key at: https://steamcommunity.com/dev/apikey
+const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
+
 /**
  * Map a platform name (as used in games.json) to its folder name inside
  * Data/ in the Games.Database repository.
@@ -2409,6 +2414,167 @@ app.post('/api/admin/scrape-exophase', authenticateToken, async (req, res) => {
         });
     } catch (err) {
         console.error('POST /api/admin/scrape-exophase error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/admin/scrape-steam ─────────────────────────────────────────────
+// Admin-only endpoint: fetch the achievement schema for a Steam app via the
+// Steam Web API and write achievements.json to Games.Database.
+// Authentication: the caller must be the Admin.GameOS account (checked via token).
+// Body: { appid, platform, gameTitle, titleId }
+app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
+    try {
+        if (req.tokenUser.usernameLower !== ADMIN_USERNAME_LOWER) {
+            return res.status(403).json({ success: false, message: 'Admin access required.' });
+        }
+
+        if (!STEAM_API_KEY) {
+            return res.status(503).json({ success: false, message: 'STEAM_API_KEY is not configured on the server.' });
+        }
+
+        const { appid, platform, gameTitle, titleId } = req.body;
+
+        if (!appid || !platform || !gameTitle || !titleId) {
+            return res.status(400).json({ success: false, message: 'appid, platform, gameTitle, and titleId are required.' });
+        }
+
+        // Validate appid: must be a non-empty string of digits only
+        const safeAppId = String(appid).trim();
+        if (!/^\d+$/.test(safeAppId)) {
+            return res.status(400).json({ success: false, message: 'appid must be a numeric Steam App ID.' });
+        }
+
+        if (!octokitGamesDb) {
+            return res.status(503).json({ success: false, message: 'GAMES_DB_TOKEN is not configured on the server.' });
+        }
+
+        const platformFolder = platformToGamesDbFolder(platform);
+        if (!platformFolder) {
+            return res.status(400).json({ success: false, message: `Unknown platform: ${platform}` });
+        }
+
+        const safeTitleId = String(titleId).trim();
+        if (!/^[a-zA-Z0-9_-]+$/.test(safeTitleId)) {
+            return res.status(400).json({ success: false, message: 'titleId may only contain alphanumeric characters, underscores, and hyphens.' });
+        }
+
+        // Fetch the Steam achievement schema
+        const steamUrl = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?key=${encodeURIComponent(STEAM_API_KEY)}&appid=${encodeURIComponent(safeAppId)}&l=en`;
+        const controller = new AbortController();
+        const fetchTimeout = setTimeout(() => controller.abort(), 15000);
+        let steamData;
+        try {
+            const response = await fetch(steamUrl, { signal: controller.signal });
+            if (!response.ok) {
+                return res.status(502).json({ success: false, message: `Steam API returned HTTP ${response.status}.` });
+            }
+            steamData = await response.json();
+        } catch (fetchErr) {
+            if (fetchErr.name === 'AbortError') {
+                return res.status(504).json({ success: false, message: 'Steam API request timed out.' });
+            }
+            throw fetchErr;
+        } finally {
+            clearTimeout(fetchTimeout);
+        }
+
+        const rawAchievements =
+            steamData &&
+            steamData.game &&
+            steamData.game.availableGameStats &&
+            Array.isArray(steamData.game.availableGameStats.achievements)
+                ? steamData.game.availableGameStats.achievements
+                : [];
+
+        if (!rawAchievements.length) {
+            return res.status(422).json({
+                success: false,
+                message: 'No achievements found for this Steam App ID. Verify the appid is correct and the game has achievements.'
+            });
+        }
+
+        // Map to the Games.Database achievements.json format
+        const scraped = rawAchievements.map(ach => {
+            const entry = {
+                achievementId: String(ach.name || ''),
+                name:          String(ach.displayName || ach.name || ''),
+                description:   String(ach.description || '')
+            };
+            if (ach.icon)     entry.iconUrl     = String(ach.icon);
+            if (ach.icongray) entry.iconUrlGray = String(ach.icongray);
+            if (ach.hidden === 1) entry.hidden   = true;
+            return entry;
+        });
+
+        // Write achievement template to Games.Database
+        const gamesDbPath  = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+        const safeGameTitle = String(gameTitle).replace(/[\r\n]/g, ' ').slice(0, 80);
+        const safePlatform  = String(platform).replace(/[\r\n]/g, ' ').slice(0, 20);
+        const existing = await getGamesDbFile(gamesDbPath);
+        await putGamesDbFile(
+            gamesDbPath,
+            scraped,
+            `Add achievements for ${safeGameTitle} (${safePlatform}) from Steam`,
+            existing ? existing.sha : undefined
+        );
+
+        // Update achievementsUrl in the platform's games JSON
+        const achievementsUrl = `https://raw.githubusercontent.com/${GAMES_DB_REPO_OWNER}/${GAMES_DB_REPO_NAME}/main/${gamesDbPath}`;
+        const platformFile    = `${platform}.Games.json`;
+        try {
+            const { data: fileMeta } = await octokitGamesDb.repos.getContent({
+                owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, path: platformFile
+            });
+            let platformData;
+            if (fileMeta.content) {
+                platformData = JSON.parse(Buffer.from(fileMeta.content, 'base64').toString('utf8'));
+            } else {
+                const dlResp = await fetch(fileMeta.download_url);
+                if (!dlResp.ok) throw new Error(`HTTP ${dlResp.status}`);
+                platformData = await dlResp.json();
+            }
+
+            let gamesArr, topKey = null;
+            if (platformData && Array.isArray(platformData.Games)) {
+                gamesArr = platformData.Games; topKey = 'Games';
+            } else if (platformData && Array.isArray(platformData.games)) {
+                gamesArr = platformData.games; topKey = 'games';
+            } else if (Array.isArray(platformData)) {
+                gamesArr = platformData;
+            } else {
+                throw new Error('Unexpected platform JSON format');
+            }
+
+            const tidLower   = safeTitleId.toLowerCase();
+            const titleLower = (gameTitle || '').toLowerCase();
+            const toUpdate   = gamesArr.filter(g =>
+                String(g.TitleID || g.title_id || g.titleid || '').toLowerCase() === tidLower ||
+                (g.Title || g.game_name || g.title || '').toLowerCase() === titleLower
+            );
+            if (toUpdate.length) {
+                toUpdate.forEach(g => { g.achievementsUrl = achievementsUrl; });
+                const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+                await putGamesDbFileLarge(
+                    platformFile, updated,
+                    `Set achievementsUrl for ${safeGameTitle} (${safePlatform})`
+                );
+            }
+        } catch (dbErr) {
+            // Non-fatal: achievements.json was already written successfully.
+            console.error('scrape-steam: failed to update achievementsUrl in platform JSON:', dbErr.message);
+        }
+
+        res.json({
+            success: true,
+            message: `Scraped and saved ${scraped.length} achievements to Games.Database from Steam.`,
+            total: scraped.length,
+            path: gamesDbPath,
+            achievementsUrl,
+            achievements: scraped
+        });
+    } catch (err) {
+        console.error('POST /api/admin/scrape-steam error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
