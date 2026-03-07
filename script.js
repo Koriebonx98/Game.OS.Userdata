@@ -3643,15 +3643,27 @@ async function _scrapeSteamAchievementsClientSide(appId) {
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         steamData = await resp.json();
     } catch (_directErr) {
-        // Direct fetch blocked by CORS — retry via a public CORS proxy.
-        try {
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(steamUrl)}`;
-            const resp = await fetch(proxyUrl);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            steamData = await resp.json();
-        } catch (proxyErr) {
+        // Direct fetch blocked by CORS — retry via public CORS proxies.
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(steamUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`
+        ];
+        let proxySuccess = false;
+        for (const proxyUrl of proxies) {
+            try {
+                const resp = await fetch(proxyUrl);
+                if (!resp.ok) continue;
+                steamData = await resp.json();
+                proxySuccess = true;
+                break;
+            } catch (_) {
+                // Try next proxy
+            }
+        }
+        if (!proxySuccess) {
             throw new Error(
-                `Could not fetch Steam achievement data (direct and proxy both failed): ${proxyErr.message}.`
+                'Could not fetch Steam achievement data without a backend server. ' +
+                'Deploy the Game OS backend and the scraper will work without a Steam API key.'
             );
         }
     }
@@ -5723,9 +5735,11 @@ async function _adminScrapeSteamNow() {
 
     if (backendBase) {
         // ── Backend path ──
-        // If the backend cannot reach Steam (e.g. STEAM_API_KEY not configured on the
-        // server), fall back to client-side scraping which works without an API key.
+        // The backend handles Steam scraping without an API key by falling back to
+        // HTML scraping of public Steam pages (Steam Community stats page).
+        // Only use client-side if we cannot reach the backend at all (network error).
         let backendSucceeded = false;
+        let backendReturned  = false; // true once we got a response (even an error response)
         try {
             const user  = getCurrentUser();
             const token = user
@@ -5741,6 +5755,7 @@ async function _adminScrapeSteamNow() {
                 body: JSON.stringify({ appid: appIdVal, platform, gameTitle: title, titleId })
             });
             const data = await resp.json();
+            backendReturned = true;
             if (data.success) {
                 backendSucceeded = true;
                 // Auto-fill achievementsUrl so the user only needs to click "Save Changes"
@@ -5757,15 +5772,20 @@ async function _adminScrapeSteamNow() {
                     downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
                 }
                 showMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
+            } else {
+                // Backend returned an error response — show it directly.
+                // Don't fall back to the client-side path (it will fail due to CORS).
+                showMsg(`❌ Scrape failed: ${escapeHtml(data.message || 'Unknown error from server.')}`, false);
             }
-            // If !data.success, fall through to the client-side fallback below.
         } catch (_backendErr) {
-            // Network or parse error — fall through to client-side fallback.
-            console.warn('scrape-steam backend call failed, falling back to client-side:', _backendErr);
+            // Network or parse error — could not reach backend at all.
+            if (!backendReturned) {
+                console.warn('scrape-steam backend unreachable, falling back to client-side:', _backendErr);
+            }
         }
 
-        if (!backendSucceeded) {
-            // Client-side fallback: fetch directly from Steam Web API (no key needed).
+        if (!backendSucceeded && !backendReturned) {
+            // Backend was unreachable (network error) — try client-side as last resort.
             try {
                 await _runClientSideSteamScrape();
             } catch (err) {
