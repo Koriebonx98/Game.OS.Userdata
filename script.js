@@ -5679,8 +5679,53 @@ async function _adminScrapeSteamNow() {
     if (msgEl) { msgEl.style.display = 'none'; }
 
     const backendBase = getBackendBase();
+
+    /**
+     * Shared helper: fetch Steam achievements client-side (no API key required)
+     * and optionally write to Games.Database using the client-side GAMES_DB_TOKEN.
+     * Used both as the primary path (no backend) and as a fallback when the backend
+     * cannot reach Steam (e.g. STEAM_API_KEY not configured on the server).
+     */
+    const _runClientSideSteamScrape = async () => {
+        const scraped = await _scrapeSteamAchievementsClientSide(appIdVal);
+        const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[platform];
+        const safeTitleId    = /^[a-zA-Z0-9_-]+$/.test(titleId) ? titleId : null;
+
+        let downloadLink = '';
+        if (scraped.length) {
+            const blob    = new Blob([JSON.stringify(scraped, null, 2)], { type: 'application/json' });
+            const objUrl  = URL.createObjectURL(blob);
+            const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
+            downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
+        }
+
+        if (GAMES_DB_TOKEN && platformFolder && safeTitleId) {
+            const gamesDbPath    = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
+            const achievementsUrl = `https://raw.githubusercontent.com/Koriebonx98/Games.Database/main/${gamesDbPath}`;
+            await _gamesDbWriteAchievementsFile(
+                gamesDbPath,
+                scraped,
+                `Add achievements for ${title} (${platform}) from Steam`
+            );
+            // Auto-fill achievementsUrl so the user only needs to click "Save Changes"
+            const achUrlField = (document.getElementById('adminEditForm') || document)
+                .querySelector('#editAchievementsUrl');
+            if (achUrlField && !achUrlField.value) achUrlField.value = achievementsUrl;
+            showMsg(`✅ Scraped and saved ${scraped.length} achievements to Games.Database.${downloadLink}`, true);
+        } else {
+            // No GAMES_DB_TOKEN or invalid titleId — offer download only
+            const note = !GAMES_DB_TOKEN
+                ? ' Add GAMES_DB_TOKEN as a repository secret and re-deploy to save automatically.'
+                : (!platformFolder ? ` Unknown platform: ${escapeHtml(platform)}.` : ' Title ID must contain only alphanumeric characters, hyphens, and underscores.');
+            showMsg(`✅ Scraped ${scraped.length} achievements.${note}${downloadLink}`, true);
+        }
+    };
+
     if (backendBase) {
         // ── Backend path ──
+        // If the backend cannot reach Steam (e.g. STEAM_API_KEY not configured on the
+        // server), fall back to client-side scraping which works without an API key.
+        let backendSucceeded = false;
         try {
             const user  = getCurrentUser();
             const token = user
@@ -5697,6 +5742,7 @@ async function _adminScrapeSteamNow() {
             });
             const data = await resp.json();
             if (data.success) {
+                backendSucceeded = true;
                 // Auto-fill achievementsUrl so the user only needs to click "Save Changes"
                 if (data.achievementsUrl) {
                     const achUrlField = (document.getElementById('adminEditForm') || document)
@@ -5711,49 +5757,27 @@ async function _adminScrapeSteamNow() {
                     downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
                 }
                 showMsg(`✅ ${escapeHtml(data.message)}${downloadLink}`, true);
-            } else {
-                showMsg(`❌ ${escapeHtml(data.message)}`, false);
             }
-        } catch (err) {
-            showMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
-        } finally {
-            if (btn) { btn.disabled = false; btn.textContent = '🎮 Scrape Steam'; }
+            // If !data.success, fall through to the client-side fallback below.
+        } catch (_backendErr) {
+            // Network or parse error — fall through to client-side fallback.
+            console.warn('scrape-steam backend call failed, falling back to client-side:', _backendErr);
         }
+
+        if (!backendSucceeded) {
+            // Client-side fallback: fetch directly from Steam Web API (no key needed).
+            try {
+                await _runClientSideSteamScrape();
+            } catch (err) {
+                showMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
+            }
+        }
+
+        if (btn) { btn.disabled = false; btn.textContent = '🎮 Scrape Steam'; }
     } else {
         // ── Client-side path: fetch directly from Steam Web API (no key needed) ──
         try {
-            const scraped = await _scrapeSteamAchievementsClientSide(appIdVal);
-            const platformFolder = _PLATFORM_TO_GAMES_DB_FOLDER[platform];
-            const safeTitleId    = /^[a-zA-Z0-9_-]+$/.test(titleId) ? titleId : null;
-
-            let downloadLink = '';
-            if (scraped.length) {
-                const blob    = new Blob([JSON.stringify(scraped, null, 2)], { type: 'application/json' });
-                const objUrl  = URL.createObjectURL(blob);
-                const safeName = (title.replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'achievements') + '.json';
-                downloadLink  = ` <a href="${escapeHtml(objUrl)}" download="${escapeHtml(safeName)}" style="color:#22c55e;font-weight:600;margin-left:8px;" onclick="setTimeout(()=>URL.revokeObjectURL('${escapeHtml(objUrl)}'),60000)">⬇️ Download JSON</a>`;
-            }
-
-            if (GAMES_DB_TOKEN && platformFolder && safeTitleId) {
-                const gamesDbPath    = `Data/${platformFolder}/Games/${safeTitleId}/achievements.json`;
-                const achievementsUrl = `https://raw.githubusercontent.com/Koriebonx98/Games.Database/main/${gamesDbPath}`;
-                await _gamesDbWriteAchievementsFile(
-                    gamesDbPath,
-                    scraped,
-                    `Add achievements for ${title} (${platform}) from Steam`
-                );
-                // Auto-fill achievementsUrl so the user only needs to click "Save Changes"
-                const achUrlField = (document.getElementById('adminEditForm') || document)
-                    .querySelector('#editAchievementsUrl');
-                if (achUrlField && !achUrlField.value) achUrlField.value = achievementsUrl;
-                showMsg(`✅ Scraped and saved ${scraped.length} achievements to Games.Database.${downloadLink}`, true);
-            } else {
-                // No GAMES_DB_TOKEN or invalid titleId — offer download only
-                const note = !GAMES_DB_TOKEN
-                    ? ' Add GAMES_DB_TOKEN as a repository secret and re-deploy to save automatically.'
-                    : (!platformFolder ? ` Unknown platform: ${escapeHtml(platform)}.` : ' Title ID must contain only alphanumeric characters, hyphens, and underscores.');
-                showMsg(`✅ Scraped ${scraped.length} achievements.${note}${downloadLink}`, true);
-            }
+            await _runClientSideSteamScrape();
         } catch (err) {
             showMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
         } finally {
