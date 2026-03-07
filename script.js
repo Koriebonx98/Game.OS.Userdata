@@ -6081,10 +6081,12 @@ function _buildAchievementsSection(game) {
 function _buildAchCard(ach) {
     const rawName = ach.Name || ach.name || '';
     const rawDesc = ach.Description || ach.description || '';
-    const rawImg  = ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
+    const rawImg  = ach.iconUrl || ach.UrlUnlocked || ach.urlUnlocked || ach.image || ach.Image || '';
     // Only allow https:// image URLs to prevent CSS injection via javascript:/data: schemes
     // Also strip single quotes to prevent breaking out of CSS url('...') context
-    const safeImg = /^https:\/\//i.test(rawImg) ? rawImg.replace(/'/g, '') : '';
+    // Convert GitHub blob URLs (e.g. ?raw=true) to raw.githubusercontent.com URLs so they
+    // load correctly as CSS background-image sources.
+    const safeImg = /^https:\/\//i.test(rawImg) ? _toRawUrl(rawImg).replace(/'/g, '') : '';
     const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
     return `<div class="ach-card" ${bgStyle} title="${escapeHtml(rawName)}"
         data-ach-name="${escapeHtml(rawName)}"
