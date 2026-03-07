@@ -3638,33 +3638,35 @@ async function _scrapeExophaseClientSide(exophaseUrl) {
 async function _scrapeSteamAchievementsClientSide(appId) {
     const steamUrl = `https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v2/?appid=${encodeURIComponent(appId)}&l=en`;
     let steamData;
+    let lastErr;
+    let apiResponded = false;
     try {
         const resp = await fetch(steamUrl);
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         steamData = await resp.json();
-    } catch (_directErr) {
+        apiResponded = true;
+    } catch (directErr) {
+        lastErr = directErr;
         // Direct fetch blocked by CORS — retry via public CORS proxies.
         const proxies = [
             `https://api.allorigins.win/raw?url=${encodeURIComponent(steamUrl)}`,
             `https://corsproxy.io/?${encodeURIComponent(steamUrl)}`
         ];
-        let proxySuccess = false;
         for (const proxyUrl of proxies) {
             try {
                 const resp = await fetch(proxyUrl);
-                if (!resp.ok) continue;
+                if (!resp.ok) { lastErr = new Error(`HTTP ${resp.status}`); continue; }
                 steamData = await resp.json();
-                proxySuccess = true;
+                apiResponded = true;
                 break;
-            } catch (_) {
+            } catch (proxyErr) {
+                lastErr = proxyErr;
                 // Try next proxy
             }
         }
-        if (!proxySuccess) {
-            throw new Error(
-                'Could not fetch Steam achievement data without a backend server. ' +
-                'Deploy the Game OS backend and the scraper will work without a Steam API key.'
-            );
+        if (!apiResponded) {
+            // All JSON API attempts failed — fall through to HTML scraping below.
+            steamData = null;
         }
     }
 
@@ -3676,9 +3678,59 @@ async function _scrapeSteamAchievementsClientSide(appId) {
             ? steamData.game.availableGameStats.achievements
             : [];
 
+    // ── HTML scraping fallback ─────────────────────────────────────────────────
+    // When the Steam Web API returns no achievements (no API key, CORS blocked,
+    // or proxy unavailable), scrape the publicly accessible Steam Community
+    // global achievement stats page via a CORS proxy and parse the HTML with
+    // DOMParser.  This works for any game that has a public stats page —
+    // including Battlefield 4 — without requiring a Steam API key.
     if (!rawAchievements.length) {
+        const statsUrl = `https://steamcommunity.com/stats/${encodeURIComponent(appId)}/achievements`;
+        const htmlProxies = [
+            `https://api.allorigins.win/raw?url=${encodeURIComponent(statsUrl)}`,
+            `https://corsproxy.io/?${encodeURIComponent(statsUrl)}`
+        ];
+        for (const proxyUrl of htmlProxies) {
+            try {
+                const resp = await fetch(proxyUrl);
+                if (!resp.ok) { lastErr = new Error(`HTTP ${resp.status}`); continue; }
+                const html = await resp.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const rows = Array.from(doc.querySelectorAll('.achieveRow'));
+                if (rows.length) {
+                    const htmlAchs = rows.map((el, i) => {
+                        const nameEl = el.querySelector('.achieveTxt h3, .achieveTxtHolder h3');
+                        const descEl = el.querySelector('.achieveTxt h5, .achieveTxtHolder h5');
+                        const name   = nameEl ? nameEl.textContent.trim() : '';
+                        const desc   = descEl ? descEl.textContent.trim() : '';
+                        const imgEl  = el.querySelector('img');
+                        // The Steam Community stats page does not expose the internal
+                        // achievement API name, so we use sequential 1-based indices —
+                        // consistent with the backend HTML scraping path.
+                        const entry  = { achievementId: String(i + 1), name, description: desc };
+                        if (imgEl && imgEl.src) {
+                            try {
+                                const p = new URL(imgEl.src);
+                                if (p.protocol === 'https:') entry.iconUrl = imgEl.src;
+                            } catch (_) { /* ignore malformed icon URLs */ }
+                        }
+                        return entry;
+                    }).filter(e => e.name);
+                    if (htmlAchs.length) return htmlAchs;
+                }
+            } catch (htmlErr) {
+                lastErr = htmlErr;
+            }
+        }
+        if (apiResponded) {
+            throw new Error(
+                'No achievements found for this Steam App ID. Verify the appid is correct and the game has achievements.'
+            );
+        }
+        const reason = lastErr ? lastErr.message : 'Unknown error';
         throw new Error(
-            'No achievements found for this Steam App ID. Verify the appid is correct and the game has achievements.'
+            `Could not fetch Steam achievement data (direct and proxy both failed): ${reason}`
         );
     }
 

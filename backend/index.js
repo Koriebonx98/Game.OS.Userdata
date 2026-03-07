@@ -2498,6 +2498,7 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
         // Sources tried in order:
         //   1. Steam Community global achievement stats  (full data: name + description + icon + %)
         //   2. Steam Store app page                      (limited:  name + icon only, ~10 achievements)
+        //   3. GetGlobalAchievementPercentagesForApp API (no key needed: internal name + percent only)
         let htmlScraped = [];
         if (!rawAchievements.length) {
             const htmlSources = [
@@ -2580,6 +2581,52 @@ app.post('/api/admin/scrape-steam', authenticateToken, async (req, res) => {
                     }
                 } finally {
                     clearTimeout(hTimeout);
+                }
+            }
+
+            // ── GetGlobalAchievementPercentagesForApp fallback ──────────────────
+            // This public Steam API endpoint requires no key and returns all
+            // achievement internal names with their global completion percentages.
+            // Used as a last resort when HTML scraping also yields nothing
+            // (e.g. game stats page not publicly accessible).
+            if (!htmlScraped.length) {
+                const pctUrl    = `https://api.steampowered.com/ISteamUserStats/GetGlobalAchievementPercentagesForApp/v2/?gameid=${encodeURIComponent(safeAppId)}`;
+                const pCtrl     = new AbortController();
+                const pTimeout  = setTimeout(() => pCtrl.abort(), 15000);
+                try {
+                    const pResp = await fetch(pctUrl, { signal: pCtrl.signal });
+                    if (pResp.ok) {
+                        const pData = await pResp.json();
+                        const pList = pData &&
+                            pData.achievementpercentages &&
+                            Array.isArray(pData.achievementpercentages.achievements)
+                                ? pData.achievementpercentages.achievements
+                                : [];
+                        pList.forEach((ach, i) => {
+                            if (!ach.name) return;
+                            // This endpoint returns internal achievement names (e.g. "ACH_KILL_50"),
+                            // not human-readable display names.  achievementId uses the internal name
+                            // for uniqueness; the display name field also stores it as a fallback
+                            // since no display name is available from this endpoint.
+                            const entry = {
+                                achievementId: String(ach.name),
+                                name:          String(ach.name),
+                                description:   ''
+                            };
+                            if (ach.percent !== undefined && !isNaN(ach.percent)) {
+                                entry.percent = ach.percent;
+                            }
+                            htmlScraped.push(entry);
+                        });
+                    }
+                } catch (pctErr) {
+                    if (pctErr.name === 'AbortError') {
+                        console.warn('scrape-steam: GetGlobalAchievementPercentagesForApp timed out');
+                    } else {
+                        console.warn('scrape-steam: GetGlobalAchievementPercentagesForApp failed:', pctErr.message);
+                    }
+                } finally {
+                    clearTimeout(pTimeout);
                 }
             }
         }
