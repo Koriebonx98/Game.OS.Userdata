@@ -48,7 +48,9 @@ const GAMES_DB_REPO_NAME  = process.env.GAMES_DB_REPO_NAME  || 'Games.Database';
 const octokitGamesDb = GAMES_DB_TOKEN ? new Octokit({ auth: GAMES_DB_TOKEN }) : null;
 
 // ── Steam Web API key (optional) ──────────────────────────────────────────────
-// Required for the /api/admin/scrape-steam endpoint.
+// Optional. When provided, it is included in calls to ISteamUserStats/GetSchemaForGame.
+// The endpoint works without a key for most public games — Steam achievement data
+// is publicly accessible. Omitting the key is the recommended configuration.
 // Generate a key at: https://steamcommunity.com/dev/apikey
 const STEAM_API_KEY = process.env.STEAM_API_KEY || null;
 

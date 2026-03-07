@@ -5620,7 +5620,7 @@ async function _adminScrapeSteamNow() {
     if (!titleId)   { showMsg('⚠️ Enter the Title ID first.', false); return; }
     if (!platform)  { showMsg('⚠️ No platform selected for this game.', false); return; }
     if (!getBackendBase()) {
-        showMsg('⚠️ A backend server with STEAM_API_KEY configured is required for Steam scraping.', false);
+        showMsg('⚠️ A backend server is required for Steam scraping. Configure your backend URL in localStorage (gameOS_devBackendUrl) or deploy the backend.', false);
         return;
     }
 
