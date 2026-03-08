@@ -1,21 +1,34 @@
-# Game.OS Launcher — C# Console App
+# Game.OS Launcher — Graphical PC App
 
-A cross-platform console game launcher for **Game.OS** — styled like Xbox / PlayStation / Steam / Playnite.  
-Built with **.NET 8** and [Spectre.Console](https://spectreconsole.net/) for rich terminal UI.
+A **graphical Windows/Linux/macOS PC game launcher** for Game.OS — designed like  
+**Xbox Dashboard / PlayStation 5 / Steam Big Picture / Playnite**.
+
+Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform WPF-style GUI).
+
+---
+
+## Screenshots
+
+| Login | Dashboard |
+|---|---|
+| ![Login](../Design/Screenshots/screenshot_login.png) | ![Dashboard](../Design/Screenshots/screenshot_dashboard.png) |
+
+| My Library | Games Store |
+|---|---|
+| ![Library](../Design/Screenshots/screenshot_library.png) | ![Store](../Design/Screenshots/screenshot_store.png) |
 
 ---
 
 ## Features
 
-| Screen | Description |
+| Screen | What it does |
 |---|---|
-| 🔐 **Sign In / Register** | Login or create an account; PBKDF2 password hashing |
-| 🏠 **Dashboard** | Stats overview, recently-added games, recent achievements |
-| 🎮 **My Library** | Full game list with platform badges, star ratings, filter by platform |
-| 🔍 **Game Details** | Per-game detail panel with description, rating, genre |
-| 🛒 **Games Store** | Featured releases, browse all, search by title, browse by genre, add to library |
-| 🏆 **Achievements** | All unlocked achievements grouped by game |
-| 👤 **Profile** | Account info and library stats |
+| 🔐 **Login / Register** | Dark-themed sign-in form with Game.OS logo; graphical register form with validation |
+| 🏠 **Dashboard / Home** | Stats tiles, featured game hero banner, game card grid, recent achievements |
+| 🎮 **My Library** | Game cover cards, platform filter chips, search, star ratings |
+| 🛒 **Games Store** | Featured titles carousel, browse all, genre filter, search, add to library |
+| 👤 **Profile** | Avatar, stats, all achievements list |
+| 🚀 **Demo Mode** | One click — no GitHub account needed, built-in library of 8 games |
 
 ---
 
@@ -24,42 +37,41 @@ Built with **.NET 8** and [Spectre.Console](https://spectreconsole.net/) for ric
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) or later
 
-### Run in Demo Mode (no GitHub account needed)
+### Run on any platform
+
 ```bash
 cd GameLauncher
-dotnet run
-# → Choose "🚀 Demo Mode" from the login menu
+dotnet run -c Release
 ```
 
-### Run in Live Mode (reads/writes your Game.OS GitHub data)
+> On the login screen choose **🚀 Try Demo Mode** — no setup required.
+
+### Run in Live Mode (reads/writes your real Game.OS data)
+
 ```bash
-# Set your GitHub fine-grained PAT (needs read/write access to the private data repo)
 export GAMEOS_PAT="ghp_yourTokenHere"
-export GAMEOS_OWNER="YourGitHubUsername"
-export GAMEOS_DATA_REPO="Game.OS.Private.Data"
-
 cd GameLauncher
-dotnet run
+dotnet run -c Release
 ```
 
-See **`Game OS API.txt`** (in the repo root) for full setup instructions including how to create a fine-grained PAT.
+See **`Game OS API.txt`** in the repo root for full PAT setup instructions.
 
 ---
 
-## Build a self-contained EXE (Windows / Mac / Linux)
+## Build a standalone EXE
 
 ```bash
-# Windows x64
+# Windows x64 — produces a single .exe file
 dotnet publish -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true
 
-# macOS ARM
+# macOS (Apple Silicon)
 dotnet publish -c Release -r osx-arm64 --self-contained true -p:PublishSingleFile=true
 
 # Linux x64
 dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFile=true
 ```
 
-The published executable is placed in `bin/Release/net8.0/<rid>/publish/`.
+The published executable appears in `bin/Release/net8.0/<rid>/publish/`.
 
 ---
 
@@ -67,41 +79,35 @@ The published executable is placed in `bin/Release/net8.0/<rid>/publish/`.
 
 ```
 GameLauncher/
-├── Program.cs              # Entry point + main navigation loop
-├── GameOsClient.cs         # GitHub REST API client (login, library, store, friends…)
-├── DemoData.cs             # Built-in demo library / store data (no GitHub needed)
-├── Models/
-│   └── Models.cs           # UserProfile, Game, Achievement, StoreGame, …
-└── UI/
-    ├── LoginScreen.cs      # Sign-In / Register / Demo-Mode screens
-    ├── DashboardScreen.cs  # Main hub with stats + recent games/achievements
-    ├── LibraryScreen.cs    # Full game library with filters + game details
-    ├── StoreScreen.cs      # Games store with search, genre browse, add-to-library
-    ├── AchievementsScreen.cs
-    └── ProfileScreen.cs
+├── Program.cs                  # Entry point (Avalonia bootstrap)
+├── App.axaml / App.axaml.cs    # Application-level styles + startup
+├── GameOsClient.cs             # GitHub REST API client (live + demo mode)
+├── DemoData.cs                 # Built-in games, store & achievements (no credentials)
+├── Models/Models.cs            # UserProfile, Game, Achievement, StoreGame, …
+├── Styles/
+│   └── GameOsStyles.axaml      # Dark Xbox/PS5/Steam theme (colours, cards, buttons)
+├── ViewModels/
+│   ├── MainViewModel.cs        # Navigation state + session (MVVM root)
+│   ├── LoginViewModel.cs       # Sign-in / register / demo logic
+│   ├── DashboardViewModel.cs   # Stats, recent games, featured hero
+│   ├── LibraryViewModel.cs     # Filter, search, game collection
+│   ├── StoreViewModel.cs       # Browse, search, genre filter, add to library
+│   └── ProfileViewModel.cs     # Avatar, stats, achievements
+└── Views/
+    ├── MainWindow.axaml        # Window shell with left-sidebar navigation
+    ├── LoginView.axaml         # Graphical login/register screen
+    ├── DashboardView.axaml     # Xbox-style home with hero banner + game tiles
+    ├── LibraryView.axaml       # Game cover card grid
+    ├── StoreView.axaml         # Store with featured carousel + catalogue
+    └── ProfileView.axaml       # Profile card + achievements list
 ```
 
 ---
 
-## Authentication
+## Design
 
-Accounts are stored in your **private** GitHub data repository (see `Game OS API.txt §2`).  
-Passwords are **never stored in plain text** — they are hashed client-side with PBKDF2-SHA256 (100 000 iterations) before being saved to GitHub.
-
-The launcher reads the `GAMEOS_PAT` environment variable at startup.  
-**Never hard-code a token in source code.**
-
----
-
-## Screenshots
-
-| Screen | Preview |
-|---|---|
-| Login | `Design/Screenshots/screen_login.html` |
-| Dashboard | `Design/Screenshots/screen_dashboard.html` |
-| My Library | `Design/Screenshots/screen_library.html` |
-| Games Store | `Design/Screenshots/screen_store.html` |
-| Achievements | `Design/Screenshots/screen_achievements.html` |
-| Profile | `Design/Screenshots/screen_profile.html` |
-
-Open any `.html` file in a browser for a live preview of the terminal UI.
+- **Background**: `#0d1117` (GitHub dark / Xbox One dark)  
+- **Accent**: `#1f6feb` (GitHub blue / Xbox-style blue)  
+- **Success**: `#238636` (green — PS5 / Xbox add-to-library)  
+- **Cards**: Rounded 10-12px, dark `#161b22` with hover lift  
+- **Typography**: Inter / Segoe UI — bold headings, muted metadata

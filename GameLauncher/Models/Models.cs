@@ -27,6 +27,12 @@ namespace GameLauncher.Models
         [JsonPropertyName("sysSpecMin")]         public SystemSpec?   SysSpecMin         { get; set; }
         [JsonPropertyName("sysSpecRecommended")] public SystemSpec?   SysSpecRecommended { get; set; }
         [JsonPropertyName("achievementsUrl")]    public string?       AchievementsUrl    { get; set; }
+        // UI-only (not persisted) – enriched from demo data
+        [JsonIgnore] public string?  CoverColor    { get; set; }
+        [JsonIgnore] public string?  CoverGradient { get; set; }
+        [JsonIgnore] public string   RatingStars   =>
+            Rating.HasValue ? new string('★', (int)System.Math.Round(Rating.Value / 2.0))
+                              + new string('☆', 5 - (int)System.Math.Round(Rating.Value / 2.0)) : "—";
     }
 
     public class ModLink
@@ -96,13 +102,18 @@ namespace GameLauncher.Models
     /// <summary>A store entry shown in the Games Store screen.</summary>
     public class StoreGame
     {
-        public string   Title       { get; set; } = "";
-        public string   Platform    { get; set; } = "";
-        public string   Genre       { get; set; } = "";
-        public string   Price       { get; set; } = "";
-        public double   Rating      { get; set; }
-        public string   Description { get; set; } = "";
-        public bool     IsFeatured  { get; set; }
-        public string   ReleaseYear { get; set; } = "";
+        public string   Title         { get; set; } = "";
+        public string   Platform      { get; set; } = "";
+        public string   Genre         { get; set; } = "";
+        public string   Price         { get; set; } = "";
+        public double   Rating        { get; set; }
+        public string   Description   { get; set; } = "";
+        public bool     IsFeatured    { get; set; }
+        public string   ReleaseYear   { get; set; } = "";
+        public string   CoverColor    { get; set; } = "#1e1b4b";
+        public string   CoverGradient { get; set; } = "#1e1b4b,#312e81";
+        public string   RatingStars   =>
+            new string('★', (int)System.Math.Round(Rating / 2.0))
+            + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));
     }
 }

@@ -1,0 +1,179 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- Greeting -->
+        <TextBlock Text="{Binding Greeting}"
+                   FontSize="30" FontWeight="Bold"
+                   Foreground="White" Margin="0,0,0,4"/>
+        <TextBlock Text="Welcome back to Game.OS"
+                   FontSize="14" Foreground="#8b949e" Margin="0,0,0,24"/>
+
+        <!-- Stats row -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0">
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding GamesCount}" Classes="stat-number"/>
+                    <TextBlock Text="Games" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding AchievementsCount}"
+                               Classes="stat-number" Foreground="#f1c40f"/>
+                    <TextBlock Text="Achievements" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding PlatformsCount}"
+                               Classes="stat-number" Foreground="#3fb950"/>
+                    <TextBlock Text="Platforms" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Hero Featured Game -->
+        <Border Classes="hero-banner" Margin="0,0,0,24"
+                IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#0a1628" Offset="0"/>
+                    <GradientStop Color="#1a3a6e" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,28">
+                <StackPanel Grid.Column="0" Spacing="10" VerticalAlignment="Center">
+                    <Border Background="#1f6feb" CornerRadius="4"
+                            Padding="8,3" HorizontalAlignment="Left">
+                        <TextBlock Text="⭐  FEATURED" FontSize="11"
+                                   FontWeight="Bold" Foreground="White"/>
+                    </Border>
+                    <TextBlock Text="{Binding FeaturedGame.Title}" Classes="hero-title"/>
+                    <TextBlock Text="{Binding FeaturedGame.Description}" Classes="hero-desc"/>
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+                        <TextBlock Text="{Binding FeaturedGame.Price}" Classes="hero-price"/>
+                        <TextBlock Text="{Binding FeaturedGame.RatingStars}"
+                                   FontSize="16" Foreground="#f1c40f"
+                                   VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding FeaturedGame.Genre}"
+                                   FontSize="13" Foreground="#8b949e"
+                                   VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Classes="btn-primary" Width="140"
+                            HorizontalContentAlignment="Center" Margin="0,8,0,0">
+                        View in Store
+                    </Button>
+                </StackPanel>
+                <!-- Cover placeholder -->
+                <Border Grid.Column="1" Width="160" Height="160"
+                        CornerRadius="12" Margin="24,0,0,0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Color="#1f6feb" Offset="0"/>
+                            <GradientStop Color="#0ea5e9" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="{Binding FeaturedGame.Title[0]}"
+                               FontSize="72" FontWeight="Black"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Opacity="0.5"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- Recently Added -->
+        <TextBlock Text="Recently Added" Classes="section-header"/>
+
+        <ItemsControl ItemsSource="{Binding RecentGames}" Margin="0,0,0,24">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:Game">
+                    <Border Classes="game-card">
+                        <StackPanel>
+                            <!-- Cover art gradient -->
+                            <Border Height="110" CornerRadius="10,10,0,0">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                        <GradientStop Color="#1a1a2e" Offset="0"/>
+                                        <GradientStop Color="#16213e" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <TextBlock Text="{Binding Title[0]}"
+                                           FontSize="44" FontWeight="Black"
+                                           Foreground="White" Opacity="0.4"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <!-- Info -->
+                            <Border Padding="10,8,10,10">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding Title}"
+                                               Classes="game-card-title"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding Platform}"
+                                                   Classes="game-card-meta"/>
+                                        <TextBlock Text="•" Classes="game-card-meta"/>
+                                        <TextBlock Text="{Binding Genre}"
+                                                   Classes="game-card-meta"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding RatingStars}"
+                                               FontSize="11" Foreground="#f1c40f"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Recent Achievements -->
+        <TextBlock Text="Recent Achievements" Classes="section-header"
+                   IsVisible="{Binding RecentAchievements.Count}"/>
+
+        <ItemsControl ItemsSource="{Binding RecentAchievements}"
+                      IsVisible="{Binding RecentAchievements.Count}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:Achievement">
+                    <Border Classes="achievement-card">
+                        <Grid ColumnDefinitions="40,*">
+                            <Border Grid.Column="0" Width="36" Height="36"
+                                    CornerRadius="8" Background="#2d2000">
+                                <TextBlock Text="🏆" FontSize="18"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" Margin="12,0,0,0"
+                                        VerticalAlignment="Center" Spacing="2">
+                                <TextBlock Text="{Binding Name}"
+                                           Classes="achievement-title"/>
+                                <TextBlock Text="{Binding Description}"
+                                           Classes="achievement-desc"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding GameTitle}"
+                                               FontSize="10" Foreground="#8b949e"/>
+                                    <TextBlock Text="|" FontSize="10" Foreground="#30363d"/>
+                                    <TextBlock Text="{Binding Platform}"
+                                               FontSize="10" Foreground="#8b949e"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>
