@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -8,9 +9,10 @@ namespace GameLauncher.ViewModels;
 /// <summary>
 /// Root view-model that owns navigation and the shared session state.
 /// </summary>
-public partial class MainViewModel : ViewModelBase
+public partial class MainViewModel : ViewModelBase, IDisposable
 {
-    private readonly GameOsClient _client;
+    private readonly GameOsClient      _client;
+    private readonly GameScannerService _scanner;
 
     // ── Session data ───────────────────────────────────────────────────────
     private UserProfile     _profile      = new();
@@ -56,6 +58,12 @@ public partial class MainViewModel : ViewModelBase
         ProfileVm   = new ProfileViewModel();
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
+
+        // Start background scanner regardless of login state
+        _scanner = new GameScannerService();
+        _scanner.GamesUpdated   += games   => LibraryVm.UpdateLocalGames(games);
+        _scanner.RepacksUpdated += repacks => LibraryVm.UpdateRepacks(repacks);
+        _ = _scanner.StartAsync();
     }
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
@@ -101,5 +109,11 @@ public partial class MainViewModel : ViewModelBase
 
         ShowMain  = false;
         ShowLogin = true;
+    }
+
+    public void Dispose()
+    {
+        _scanner.Dispose();
+        (_client as IDisposable)?.Dispose();
     }
 }

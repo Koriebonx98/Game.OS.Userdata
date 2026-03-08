@@ -99,6 +99,30 @@ namespace GameLauncher.Models
         public string SavedAt     { get; set; } = "";
     }
 
+    /// <summary>A locally installed game detected by scanning drives.</summary>
+    public class LocalGame
+    {
+        public string Title          { get; set; } = "";
+        public string ExecutablePath { get; set; } = "";
+        public string DriveRoot      { get; set; } = "";
+        public string FolderPath     { get; set; } = "";
+        public string ExecutableType { get; set; } = ""; // "exe", "app", "elf"
+    }
+
+    /// <summary>A repack archive found in a Repacks directory, ready to install.</summary>
+    public class LocalRepack
+    {
+        public string Title    { get; set; } = "";
+        public string FilePath { get; set; } = "";
+        public string FileType { get; set; } = ""; // "zip", "rar", "folder"
+        public long   SizeBytes{ get; set; }
+        public string SizeLabel =>
+            SizeBytes >= 1_073_741_824 ? $"{SizeBytes / 1_073_741_824.0:F1} GB" :
+            SizeBytes >= 1_048_576     ? $"{SizeBytes / 1_048_576.0:F0} MB"     :
+            SizeBytes >= 1_024         ? $"{SizeBytes / 1_024.0:F0} KB"         :
+            $"{SizeBytes} B";
+    }
+
     /// <summary>A store entry shown in the Games Store screen.</summary>
     public class StoreGame
     {
