@@ -31,6 +31,8 @@ public class DataService
         {
 #if DEBUG
             System.Diagnostics.Debug.WriteLine($"[DataService] ReadJsonAsync failed for '{path}': {ex.Message}");
+#else
+            _ = ex; // suppress unused variable warning in Release
 #endif
             return default;
         }
