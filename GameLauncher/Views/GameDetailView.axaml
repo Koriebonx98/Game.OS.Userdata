@@ -44,6 +44,8 @@
                         <views:CoverImage
                             ImageUrl="{Binding CoverUrl}"
                             FallbackText="{Binding Title}"
+                            FallbackGradient="{Binding CoverGradient}"
+                            SubText="{Binding Genre}"
                             LetterFontSize="80"
                             ImageCornerRadius="12"
                             Width="220" Height="300"/>

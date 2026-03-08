@@ -68,6 +68,8 @@
                                 <views:CoverImage
                                     ImageUrl="{Binding CoverUrl}"
                                     FallbackText="{Binding Title}"
+                                    FallbackGradient="{Binding CoverGradient}"
+                                    SubText="{Binding Platform}"
                                     LetterFontSize="52"
                                     ImageCornerRadius="10,10,0,0"
                                     Height="130"/>

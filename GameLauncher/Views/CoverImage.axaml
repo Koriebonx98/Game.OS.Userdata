@@ -2,7 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              x:Class="GameLauncher.Views.CoverImage">
     <Panel>
-        <!-- Gradient fallback shown until image loads -->
+        <!-- Gradient fallback shown until/when image not available -->
         <Border Name="GradBorder" ClipToBounds="True">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -10,12 +10,38 @@
                     <GradientStop Color="#16213e" Offset="1"/>
                 </LinearGradientBrush>
             </Border.Background>
-            <TextBlock Name="InitialLetter"
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center"
-                       Foreground="White"
-                       Opacity="0.45"
-                       FontWeight="Black"/>
+            <Grid>
+                <!-- Large initial letter in background -->
+                <TextBlock Name="InitialLetter"
+                           HorizontalAlignment="Center"
+                           VerticalAlignment="Center"
+                           Foreground="White"
+                           Opacity="0.25"
+                           FontWeight="Black"/>
+                <!-- Dark scrim + title at bottom -->
+                <Border Name="TitleScrim"
+                        VerticalAlignment="Bottom"
+                        IsVisible="False">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                            <GradientStop Color="Transparent" Offset="0"/>
+                            <GradientStop Color="#CC000000"   Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <StackPanel Margin="8,16,8,8" Spacing="2">
+                        <TextBlock Name="SubLabel"
+                                   FontSize="9" FontWeight="Bold"
+                                   Foreground="#aaaaaa"
+                                   TextTrimming="CharacterEllipsis"
+                                   IsVisible="False"/>
+                        <TextBlock Name="TitleLabel"
+                                   FontSize="11" FontWeight="Bold"
+                                   Foreground="White"
+                                   TextWrapping="Wrap"
+                                   MaxLines="2"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
         </Border>
         <!-- Actual cover image (shown when loaded) -->
         <Border Name="ImgBorder" ClipToBounds="True" IsVisible="False">

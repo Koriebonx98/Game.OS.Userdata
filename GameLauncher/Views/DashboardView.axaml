@@ -79,6 +79,8 @@
                     <views:CoverImage
                         ImageUrl="{Binding FeaturedGame.CoverUrl}"
                         FallbackText="{Binding FeaturedGame.Title}"
+                        FallbackGradient="{Binding FeaturedGame.CoverGradient}"
+                        SubText="{Binding FeaturedGame.Genre}"
                         LetterFontSize="72"
                         ImageCornerRadius="12"
                         Width="160" Height="160"/>
@@ -106,6 +108,8 @@
                                 <views:CoverImage
                                     ImageUrl="{Binding CoverUrl}"
                                     FallbackText="{Binding Title}"
+                                    FallbackGradient="{Binding CoverGradient}"
+                                    SubText="{Binding Platform}"
                                     LetterFontSize="44"
                                     ImageCornerRadius="10,10,0,0"
                                     Height="110"/>

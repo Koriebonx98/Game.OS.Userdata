@@ -59,6 +59,8 @@
                                     <views:CoverImage
                                         ImageUrl="{Binding CoverUrl}"
                                         FallbackText="{Binding Title}"
+                                        FallbackGradient="{Binding CoverGradient}"
+                                        SubText="{Binding Genre}"
                                         LetterFontSize="64"
                                         ImageCornerRadius="12,12,0,0"
                                         Height="140"/>
@@ -141,6 +143,8 @@
                                 <views:CoverImage
                                     ImageUrl="{Binding CoverUrl}"
                                     FallbackText="{Binding Title}"
+                                    FallbackGradient="{Binding CoverGradient}"
+                                    SubText="{Binding Genre}"
                                     LetterFontSize="56"
                                     ImageCornerRadius="10,10,0,0"
                                     Height="120"/>

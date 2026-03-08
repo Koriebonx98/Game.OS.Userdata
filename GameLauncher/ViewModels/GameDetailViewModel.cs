@@ -21,6 +21,7 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string? _price;
     [ObservableProperty] private string? _releaseYear;
     [ObservableProperty] private string? _coverUrl;
+    [ObservableProperty] private string? _coverGradient;
 
     // ── Screenshots ───────────────────────────────────────────────────────────
     public ObservableCollection<string> Screenshots { get; } = new();
@@ -50,13 +51,14 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromGame(Game game)
     {
-        Title       = game.Title;
-        Platform    = game.Platform;
-        Genre       = game.Genre    ?? "";
-        Description = game.Description ?? "";
-        RatingStars = game.RatingStars;
-        Price       = game.Price;
-        CoverUrl    = game.CoverUrl;
+        Title         = game.Title;
+        Platform      = game.Platform;
+        Genre         = game.Genre    ?? "";
+        Description   = game.Description ?? "";
+        RatingStars   = game.RatingStars;
+        Price         = game.Price;
+        CoverUrl      = game.CoverUrl;
+        CoverGradient = game.CoverGradient;
 
         PopulateScreenshots(game.Screenshots);
         IsLocalGame = false;
@@ -70,14 +72,15 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromStoreGame(StoreGame game)
     {
-        Title       = game.Title;
-        Platform    = game.Platform;
-        Genre       = game.Genre;
-        Description = game.Description;
-        RatingStars = game.RatingStars;
-        Price       = game.Price;
-        ReleaseYear = game.ReleaseYear;
-        CoverUrl    = game.CoverUrl;
+        Title         = game.Title;
+        Platform      = game.Platform;
+        Genre         = game.Genre;
+        Description   = game.Description;
+        RatingStars   = game.RatingStars;
+        Price         = game.Price;
+        ReleaseYear   = game.ReleaseYear;
+        CoverUrl      = game.CoverUrl;
+        CoverGradient = game.CoverGradient;
 
         PopulateScreenshots(game.Screenshots);
         IsLocalGame = false;
@@ -91,12 +94,13 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromLocalGame(LocalGame game)
     {
-        Title       = game.Title;
-        Platform    = "PC";
-        Genre       = "";
-        RatingStars = "—";
-        Price       = null;
-        CoverUrl    = null;
+        Title         = game.Title;
+        Platform      = "PC";
+        Genre         = "";
+        CoverGradient = "#0d2137,#163d5e";
+        RatingStars   = "—";
+        Price         = null;
+        CoverUrl      = null;
 
         Screenshots.Clear();
         HasScreenshots = false;

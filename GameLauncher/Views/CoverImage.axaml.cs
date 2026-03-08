@@ -12,8 +12,9 @@ using Avalonia.Threading;
 namespace GameLauncher.Views;
 
 /// <summary>
-/// Displays a game cover image loaded asynchronously from a URL,
-/// with a gradient fallback showing the game's first letter while loading.
+/// Displays a game cover image loaded asynchronously from a URL.
+/// When offline or before the image loads, shows a per-game gradient with
+/// the title and an optional sub-label (genre/platform).
 /// </summary>
 public partial class CoverImage : UserControl
 {
@@ -24,6 +25,14 @@ public partial class CoverImage : UserControl
 
     public static readonly StyledProperty<string?> FallbackTextProperty =
         AvaloniaProperty.Register<CoverImage, string?>(nameof(FallbackText));
+
+    /// <summary>Comma-separated hex colors used for the fallback gradient, e.g. "#1a1a2e,#16213e".</summary>
+    public static readonly StyledProperty<string?> FallbackGradientProperty =
+        AvaloniaProperty.Register<CoverImage, string?>(nameof(FallbackGradient));
+
+    /// <summary>Optional small label shown above the title on the fallback cover (e.g. genre or platform).</summary>
+    public static readonly StyledProperty<string?> SubTextProperty =
+        AvaloniaProperty.Register<CoverImage, string?>(nameof(SubText));
 
     public static readonly StyledProperty<double> LetterFontSizeProperty =
         AvaloniaProperty.Register<CoverImage, double>(nameof(LetterFontSize), defaultValue: 44.0);
@@ -41,6 +50,18 @@ public partial class CoverImage : UserControl
     {
         get => GetValue(FallbackTextProperty);
         set => SetValue(FallbackTextProperty, value);
+    }
+
+    public string? FallbackGradient
+    {
+        get => GetValue(FallbackGradientProperty);
+        set => SetValue(FallbackGradientProperty, value);
+    }
+
+    public string? SubText
+    {
+        get => GetValue(SubTextProperty);
+        set => SetValue(SubTextProperty, value);
     }
 
     public double LetterFontSize
@@ -76,7 +97,13 @@ public partial class CoverImage : UserControl
             TriggerLoad(change.NewValue as string);
 
         if (change.Property == FallbackTextProperty)
-            UpdateInitialLetter(change.NewValue as string);
+            UpdateFallbackText(change.NewValue as string);
+
+        if (change.Property == FallbackGradientProperty)
+            UpdateFallbackGradient(change.NewValue as string);
+
+        if (change.Property == SubTextProperty)
+            UpdateSubText(change.NewValue as string);
 
         if (change.Property == ImageCornerRadiusProperty)
         {
@@ -92,10 +119,60 @@ public partial class CoverImage : UserControl
         }
     }
 
-    private void UpdateInitialLetter(string? text)
+    private void UpdateFallbackText(string? text)
     {
-        if (this.FindControl<TextBlock>("InitialLetter") is not { } tb) return;
-        tb.Text = string.IsNullOrEmpty(text) ? "" : text[0].ToString().ToUpperInvariant();
+        // Initial letter (large, in background)
+        if (this.FindControl<TextBlock>("InitialLetter") is { } tb)
+            tb.Text = string.IsNullOrEmpty(text) ? "" : text[0].ToString().ToUpperInvariant();
+
+        // Full title label (on the scrim at the bottom)
+        if (this.FindControl<TextBlock>("TitleLabel") is { } tl)
+            tl.Text = text ?? "";
+
+        // Show the scrim whenever we have title text
+        if (this.FindControl<Border>("TitleScrim") is { } scrim)
+            scrim.IsVisible = !string.IsNullOrEmpty(text);
+    }
+
+    private void UpdateSubText(string? sub)
+    {
+        if (this.FindControl<TextBlock>("SubLabel") is { } sl)
+        {
+            sl.Text      = sub ?? "";
+            sl.IsVisible = !string.IsNullOrEmpty(sub);
+        }
+    }
+
+    private void UpdateFallbackGradient(string? gradientString)
+    {
+        if (this.FindControl<Border>("GradBorder") is not { } border) return;
+
+        Color start = Color.Parse("#1a1a2e");
+        Color end   = Color.Parse("#16213e");
+
+        if (!string.IsNullOrWhiteSpace(gradientString))
+        {
+            var parts = gradientString.Split(',', StringSplitOptions.TrimEntries);
+            if (parts.Length >= 1 && TryParseColor(parts[0], out var c0)) start = c0;
+            if (parts.Length >= 2 && TryParseColor(parts[1], out var c1)) end   = c1;
+        }
+
+        border.Background = new LinearGradientBrush
+        {
+            StartPoint = new RelativePoint(0, 0, RelativeUnit.Relative),
+            EndPoint   = new RelativePoint(1, 1, RelativeUnit.Relative),
+            GradientStops = new GradientStops
+            {
+                new GradientStop(start, 0),
+                new GradientStop(end,   1),
+            }
+        };
+    }
+
+    private static bool TryParseColor(string value, out Color color)
+    {
+        try { color = Color.Parse(value.Trim()); return true; }
+        catch { color = default; return false; }
     }
 
     private void TriggerLoad(string? url)
