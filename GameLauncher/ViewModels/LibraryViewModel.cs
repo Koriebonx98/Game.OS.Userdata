@@ -15,8 +15,15 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private int    _totalGames;
 
+    // ── Cloud library ──────────────────────────────────────────────────────
     public ObservableCollection<Game>   FilteredGames { get; } = new();
     public ObservableCollection<string> Platforms     { get; } = new();
+
+    // ── Local drive detection ──────────────────────────────────────────────
+    [ObservableProperty] private bool _hasLocalGames;
+    [ObservableProperty] private bool _hasRepacks;
+    public ObservableCollection<LocalGame>   LocalGames     { get; } = new();
+    public ObservableCollection<LocalRepack> ReadyToInstall { get; } = new();
 
     public void Load(List<Game> games)
     {
@@ -29,6 +36,28 @@ public partial class LibraryViewModel : ViewModelBase
             Platforms.Add(p);
 
         ApplyFilter();
+    }
+
+    /// <summary>Called by MainViewModel when the scanner emits new results.</summary>
+    public void UpdateLocalGames(IReadOnlyList<LocalGame> games)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            LocalGames.Clear();
+            foreach (var g in games) LocalGames.Add(g);
+            HasLocalGames = LocalGames.Count > 0;
+        });
+    }
+
+    /// <summary>Called by MainViewModel when the scanner emits new repacks.</summary>
+    public void UpdateRepacks(IReadOnlyList<LocalRepack> repacks)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            ReadyToInstall.Clear();
+            foreach (var r in repacks) ReadyToInstall.Add(r);
+            HasRepacks = ReadyToInstall.Count > 0;
+        });
     }
 
     partial void OnFilterPlatformChanged(string value) => ApplyFilter();
