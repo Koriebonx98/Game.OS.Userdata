@@ -1,0 +1,25 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="GameLauncher.Views.CoverImage">
+    <Panel>
+        <!-- Gradient fallback shown until image loads -->
+        <Border Name="GradBorder" ClipToBounds="True">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#1a1a2e" Offset="0"/>
+                    <GradientStop Color="#16213e" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <TextBlock Name="InitialLetter"
+                       HorizontalAlignment="Center"
+                       VerticalAlignment="Center"
+                       Foreground="White"
+                       Opacity="0.45"
+                       FontWeight="Black"/>
+        </Border>
+        <!-- Actual cover image (shown when loaded) -->
+        <Border Name="ImgBorder" ClipToBounds="True" IsVisible="False">
+            <Image Name="CoverImg" Stretch="UniformToFill"/>
+        </Border>
+    </Panel>
+</UserControl>

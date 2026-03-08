@@ -18,6 +18,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("title")]              public string        Title              { get; set; } = "";
         [JsonPropertyName("titleId")]            public string?       TitleId            { get; set; }
         [JsonPropertyName("coverUrl")]           public string?       CoverUrl           { get; set; }
+        [JsonPropertyName("screenshots")]        public List<string>? Screenshots        { get; set; }
         [JsonPropertyName("addedAt")]            public string        AddedAt            { get; set; } = "";
         [JsonPropertyName("genre")]              public string?       Genre              { get; set; }
         [JsonPropertyName("description")]        public string?       Description        { get; set; }
@@ -107,6 +108,10 @@ namespace GameLauncher.Models
         public string DriveRoot      { get; set; } = "";
         public string FolderPath     { get; set; } = "";
         public string ExecutableType { get; set; } = ""; // "exe", "app", "elf"
+        /// <summary>All drive locations where this game was found (populated when same title exists on multiple drives).</summary>
+        public List<LocalGameDriveEntry> DriveInstances { get; set; } = new();
+        [JsonIgnore] public bool HasMultipleDrives => DriveInstances.Count > 1;
+        [JsonIgnore] public string DriveCountLabel => $"{DriveInstances.Count} drives";
     }
 
     /// <summary>A repack archive found in a Repacks directory, ready to install.</summary>
@@ -129,18 +134,29 @@ namespace GameLauncher.Models
     /// <summary>A store entry shown in the Games Store screen.</summary>
     public class StoreGame
     {
-        public string   Title         { get; set; } = "";
-        public string   Platform      { get; set; } = "";
-        public string   Genre         { get; set; } = "";
-        public string   Price         { get; set; } = "";
-        public double   Rating        { get; set; }
-        public string   Description   { get; set; } = "";
-        public bool     IsFeatured    { get; set; }
-        public string   ReleaseYear   { get; set; } = "";
-        public string   CoverColor    { get; set; } = "#1e1b4b";
-        public string   CoverGradient { get; set; } = "#1e1b4b,#312e81";
-        public string   RatingStars   =>
+        public string        Title         { get; set; } = "";
+        public string        Platform      { get; set; } = "";
+        public string        Genre         { get; set; } = "";
+        public string        Price         { get; set; } = "";
+        public double        Rating        { get; set; }
+        public string        Description   { get; set; } = "";
+        public bool          IsFeatured    { get; set; }
+        public string        ReleaseYear   { get; set; } = "";
+        public string        CoverColor    { get; set; } = "#1e1b4b";
+        public string        CoverGradient { get; set; } = "#1e1b4b,#312e81";
+        public string?       CoverUrl      { get; set; }
+        public List<string>? Screenshots   { get; set; }
+        public string        RatingStars   =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));
+    }
+
+    /// <summary>One drive location where a LocalGame was found.</summary>
+    public class LocalGameDriveEntry
+    {
+        public string DriveRoot      { get; set; } = "";
+        public string FolderPath     { get; set; } = "";
+        public string ExecutablePath { get; set; } = "";
+        public string ExecutableType { get; set; } = "";
     }
 }

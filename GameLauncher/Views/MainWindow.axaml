@@ -107,23 +107,32 @@
 
             <!-- Content area -->
             <Border Grid.Column="1" Background="#0d1117">
-                <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                              VerticalScrollBarVisibility="Auto">
-                    <Panel>
-                        <Border IsVisible="{Binding IsHome}">
-                            <views:DashboardView DataContext="{Binding DashboardVm}"/>
-                        </Border>
-                        <Border IsVisible="{Binding IsLibrary}">
-                            <views:LibraryView DataContext="{Binding LibraryVm}"/>
-                        </Border>
-                        <Border IsVisible="{Binding IsStore}">
-                            <views:StoreView DataContext="{Binding StoreVm}"/>
-                        </Border>
-                        <Border IsVisible="{Binding IsProfile}">
-                            <views:ProfileView DataContext="{Binding ProfileVm}"/>
-                        </Border>
-                    </Panel>
-                </ScrollViewer>
+                <Panel>
+                    <!-- Main page views -->
+                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                                  VerticalScrollBarVisibility="Auto"
+                                  IsVisible="{Binding !ShowDetail}">
+                        <Panel>
+                            <Border IsVisible="{Binding IsHome}">
+                                <views:DashboardView DataContext="{Binding DashboardVm}"/>
+                            </Border>
+                            <Border IsVisible="{Binding IsLibrary}">
+                                <views:LibraryView DataContext="{Binding LibraryVm}"/>
+                            </Border>
+                            <Border IsVisible="{Binding IsStore}">
+                                <views:StoreView DataContext="{Binding StoreVm}"/>
+                            </Border>
+                            <Border IsVisible="{Binding IsProfile}">
+                                <views:ProfileView DataContext="{Binding ProfileVm}"/>
+                            </Border>
+                        </Panel>
+                    </ScrollViewer>
+
+                    <!-- Game detail overlay -->
+                    <Border IsVisible="{Binding ShowDetail}" Background="#0d1117">
+                        <views:GameDetailView DataContext="{Binding DetailVm}"/>
+                    </Border>
+                </Panel>
             </Border>
 
         </Grid>

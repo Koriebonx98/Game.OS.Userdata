@@ -247,6 +247,50 @@
         <Setter Property="Background" Value="#21262d"/>
     </Style>
 
+    <!-- ─── Game Card Button (clickable version) ─── -->
+    <Style Selector="Button.game-card-btn">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Width" Value="170"/>
+        <Setter Property="Margin" Value="0,0,12,12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="Button.game-card-btn /template/ ContentPresenter">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.game-card-btn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
+    <!-- ─── Store Card Button (clickable version) ─── -->
+    <Style Selector="Button.store-card-btn">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Width" Value="200"/>
+        <Setter Property="Margin" Value="0,0,12,12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+
+    <Style Selector="Button.store-card-btn /template/ ContentPresenter">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.store-card-btn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
     <!-- ─── Error text ─── -->
     <Style Selector="TextBlock.error-text">
         <Setter Property="Foreground" Value="#f85149"/>

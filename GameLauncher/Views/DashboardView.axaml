@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.DashboardView"
              x:DataType="vm:DashboardViewModel"
@@ -40,7 +41,7 @@
         </StackPanel>
 
         <!-- Hero Featured Game -->
-        <Border Classes="hero-banner" Margin="0,0,0,24"
+        <Border Classes="hero-banner" Margin="0,0,0,24" Cursor="Hand"
                 IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
@@ -67,25 +68,20 @@
                                    VerticalAlignment="Center"/>
                     </StackPanel>
                     <Button Classes="btn-primary" Width="140"
-                            HorizontalContentAlignment="Center" Margin="0,8,0,0">
-                        View in Store
+                            HorizontalContentAlignment="Center" Margin="0,8,0,0"
+                            Command="{Binding OpenFeaturedDetailCommand}">
+                        View Details
                     </Button>
                 </StackPanel>
-                <!-- Cover placeholder -->
+                <!-- Cover image -->
                 <Border Grid.Column="1" Width="160" Height="160"
-                        CornerRadius="12" Margin="24,0,0,0">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                            <GradientStop Color="#1f6feb" Offset="0"/>
-                            <GradientStop Color="#0ea5e9" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <TextBlock Text="{Binding FeaturedGame.Title[0]}"
-                               FontSize="72" FontWeight="Black"
-                               Foreground="White"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               Opacity="0.5"/>
+                        CornerRadius="12" Margin="24,0,0,0" ClipToBounds="True">
+                    <views:CoverImage
+                        ImageUrl="{Binding FeaturedGame.CoverUrl}"
+                        FallbackText="{Binding FeaturedGame.Title}"
+                        LetterFontSize="72"
+                        ImageCornerRadius="12"
+                        Width="160" Height="160"/>
                 </Border>
             </Grid>
         </Border>
@@ -101,21 +97,18 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:Game">
-                    <Border Classes="game-card">
+                    <Button Classes="game-card-btn"
+                            Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                            CommandParameter="{Binding}">
                         <StackPanel>
-                            <!-- Cover art gradient -->
-                            <Border Height="110" CornerRadius="10,10,0,0">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                        <GradientStop Color="#1a1a2e" Offset="0"/>
-                                        <GradientStop Color="#16213e" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <TextBlock Text="{Binding Title[0]}"
-                                           FontSize="44" FontWeight="Black"
-                                           Foreground="White" Opacity="0.4"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                            <!-- Cover art -->
+                            <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                <views:CoverImage
+                                    ImageUrl="{Binding CoverUrl}"
+                                    FallbackText="{Binding Title}"
+                                    LetterFontSize="44"
+                                    ImageCornerRadius="10,10,0,0"
+                                    Height="110"/>
                             </Border>
                             <!-- Info -->
                             <Border Padding="10,8,10,10">
@@ -134,7 +127,7 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                    </Border>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

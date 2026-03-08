@@ -26,10 +26,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public LibraryViewModel   LibraryVm   { get; }
     public StoreViewModel     StoreVm     { get; }
     public ProfileViewModel   ProfileVm   { get; }
+    public GameDetailViewModel DetailVm   { get; }
 
     // ── Navigation state ───────────────────────────────────────────────────
     [ObservableProperty] private bool _showLogin    = true;
     [ObservableProperty] private bool _showMain     = false;
+    [ObservableProperty] private bool _showDetail   = false;
     [ObservableProperty] private string _activePage = "dashboard";
 
     public bool IsHome        => ActivePage == "dashboard";
@@ -56,8 +58,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm   = new LibraryViewModel();
         StoreVm     = new StoreViewModel();
         ProfileVm   = new ProfileViewModel();
+        DetailVm    = new GameDetailViewModel();
+
+        DetailVm.OnClose = () => ShowDetail = false;
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
+
+        // Wire up OpenDetail from child VMs
+        DashboardVm.OnOpenDetail      = OpenDetailFromGame;
+        DashboardVm.OnOpenStoreDetail = OpenDetailFromStoreGame;
+        LibraryVm.OnOpenDetail        = OpenDetailFromGame;
+        LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
+        StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
@@ -87,11 +99,30 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void Navigate(string page)
     {
+        ShowDetail = false;
         ActivePage = page;
         if (page == "library")
             LibraryVm.Load(_library);
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _demoMode);
+    }
+
+    private void OpenDetailFromGame(Game game)
+    {
+        DetailVm.LoadFromGame(game);
+        ShowDetail = true;
+    }
+
+    private void OpenDetailFromStoreGame(StoreGame game)
+    {
+        DetailVm.LoadFromStoreGame(game);
+        ShowDetail = true;
+    }
+
+    private void OpenDetailFromLocalGame(LocalGame game)
+    {
+        DetailVm.LoadFromLocalGame(game);
+        ShowDetail = true;
     }
 
     [RelayCommand]
@@ -108,6 +139,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LoginVm.ShowRegister = false;
 
         ShowMain  = false;
+        ShowDetail = false;
         ShowLogin = true;
     }
 

@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.StoreView"
              x:DataType="vm:StoreViewModel"
@@ -45,7 +46,8 @@
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:StoreGame">
-                        <Border Width="240" CornerRadius="12" Cursor="Hand">
+                        <Border Width="240" CornerRadius="12" Cursor="Hand"
+                                Margin="0,0,8,0">
                             <Border.Background>
                                 <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
                                     <GradientStop Color="#0a1628" Offset="0"/>
@@ -53,18 +55,13 @@
                                 </LinearGradientBrush>
                             </Border.Background>
                             <StackPanel>
-                                <Border Height="140" CornerRadius="12,12,0,0">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                            <GradientStop Color="#0a1628" Offset="0"/>
-                                            <GradientStop Color="#1f6feb" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock Text="{Binding Title[0]}"
-                                               FontSize="64" FontWeight="Black"
-                                               Foreground="White" Opacity="0.4"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
+                                <Border Height="140" CornerRadius="12,12,0,0" ClipToBounds="True">
+                                    <views:CoverImage
+                                        ImageUrl="{Binding CoverUrl}"
+                                        FallbackText="{Binding Title}"
+                                        LetterFontSize="64"
+                                        ImageCornerRadius="12,12,0,0"
+                                        Height="140"/>
                                 </Border>
                                 <Border Padding="14,12">
                                     <StackPanel Spacing="6">
@@ -88,13 +85,25 @@
                                                        FontSize="12" Foreground="#f1c40f"
                                                        VerticalAlignment="Center"/>
                                         </Grid>
-                                        <Button Classes="btn-success"
-                                                HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Center"
-                                                Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
-                                                CommandParameter="{Binding}">
-                                            + Add to Library
-                                        </Button>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <Button Grid.Column="0"
+                                                    Classes="btn-success"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Center"
+                                                    Margin="0,0,4,0"
+                                                    Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
+                                                    CommandParameter="{Binding}">
+                                                + Add
+                                            </Button>
+                                            <Button Grid.Column="1"
+                                                    Classes="btn-secondary"
+                                                    Padding="10,8"
+                                                    ToolTip.Tip="View Details"
+                                                    Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                                    CommandParameter="{Binding}">
+                                                ···
+                                            </Button>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                             </StackPanel>
@@ -124,20 +133,17 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:StoreGame">
-                    <Border Classes="store-card">
+                    <Button Classes="store-card-btn"
+                            Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                            CommandParameter="{Binding}">
                         <StackPanel>
-                            <Border Height="120" CornerRadius="10,10,0,0">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                        <GradientStop Color="#1a1a2e" Offset="0"/>
-                                        <GradientStop Color="#312e81" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <TextBlock Text="{Binding Title[0]}"
-                                           FontSize="56" FontWeight="Black"
-                                           Foreground="White" Opacity="0.4"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                            <Border Height="120" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                <views:CoverImage
+                                    ImageUrl="{Binding CoverUrl}"
+                                    FallbackText="{Binding Title}"
+                                    LetterFontSize="56"
+                                    ImageCornerRadius="10,10,0,0"
+                                    Height="120"/>
                             </Border>
                             <Border Padding="12,10">
                                 <StackPanel Spacing="4">
@@ -171,7 +177,7 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                    </Border>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -24,6 +25,10 @@ public partial class DashboardViewModel : ViewModelBase
 
     // Recent achievements
     public ObservableCollection<Achievement> RecentAchievements { get; } = new();
+
+    /// <summary>Invoked when the user clicks a game card to open the detail overlay.</summary>
+    public Action<Game>?      OnOpenDetail      { get; set; }
+    public Action<StoreGame>? OnOpenStoreDetail { get; set; }
 
     public void Load(UserProfile profile, List<Game> library, List<Achievement> achievements)
     {
@@ -52,5 +57,17 @@ public partial class DashboardViewModel : ViewModelBase
         FeaturedGame = DemoData.Store.OrderByDescending(s => s.Rating).FirstOrDefault();
         if (FeaturedGame != null)
             FeaturedGradient = FeaturedGame.CoverGradient;
+    }
+
+    [RelayCommand]
+    private void OpenGameDetail(Game? game)
+    {
+        if (game != null) OnOpenDetail?.Invoke(game);
+    }
+
+    [RelayCommand]
+    private void OpenFeaturedDetail()
+    {
+        if (FeaturedGame != null) OnOpenStoreDetail?.Invoke(FeaturedGame);
     }
 }
