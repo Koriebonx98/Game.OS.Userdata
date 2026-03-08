@@ -38,9 +38,20 @@ public partial class SignupViewModel : ViewModelBase
             var (success, error) = await AuthService.SignupAsync(Username, Email, Password);
             if (!success) { ErrorMessage = error; return; }
 
-            SuccessMessage = "Account created! You can now log in.";
-            await Task.Delay(1500);
-            _main.CurrentView = new LoginViewModel(_main);
+            // Auto-login so the user lands on the dashboard immediately.
+            var (user, loginError) = await AuthService.LoginAsync(Username, Password);
+            if (user != null)
+            {
+                SuccessMessage = "Account created!";
+                _main.SetUser(user);   // SetUser navigates to Dashboard.
+            }
+            else
+            {
+                // Fallback: ask the user to log in manually.
+                SuccessMessage = "Account created! Please sign in.";
+                await Task.Delay(1200);
+                _main.CurrentView = new LoginViewModel(_main);
+            }
         }
         finally
         {

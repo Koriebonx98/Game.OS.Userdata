@@ -16,16 +16,26 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         NavigationService.Initialize(vm => CurrentView = vm);
-        var startView = System.Environment.GetEnvironmentVariable("GAMEOS_START_VIEW") ?? "home";
+        // App always starts on the Login screen; dashboard is shown after auth.
+        var startView = System.Environment.GetEnvironmentVariable("GAMEOS_START_VIEW") ?? "login";
+
+        // Screenshot helper: auto-load a specific user when GAMEOS_DEMO_USER is set.
+        var demoUserName = System.Environment.GetEnvironmentVariable("GAMEOS_DEMO_USER");
+        if (!string.IsNullOrEmpty(demoUserName))
+        {
+            var demoUser = AuthService.GetUserAsync(demoUserName).GetAwaiter().GetResult();
+            if (demoUser != null) { App.CurrentUser = demoUser; IsLoggedIn = true; CurrentUsername = demoUser.Username; }
+        }
+
         _currentView = startView switch
         {
-            "login" => (ViewModelBase)new LoginViewModel(this),
-            "signup" => new SignupViewModel(this),
-            "games" => new GamesViewModel(),
-            "friends" => new FriendsViewModel(this),
-            "inbox" => new InboxViewModel(this),
-            "account" => new AccountViewModel(this),
-            _ => new HomeViewModel(this)
+            "signup"    => (ViewModelBase)new SignupViewModel(this),
+            "games"     => new GamesViewModel(),
+            "friends"   => new FriendsViewModel(this),
+            "inbox"     => new InboxViewModel(this),
+            "account"   => new AccountViewModel(this),
+            "dashboard" => new DashboardViewModel(this),
+            _           => new LoginViewModel(this)   // default = login
         };
         if (_currentView is GamesViewModel gvm) _ = gvm.LoadAsync();
         if (_currentView is FriendsViewModel fvm) _ = fvm.LoadAsync();
@@ -37,7 +47,9 @@ public partial class MainWindowViewModel : ViewModelBase
         App.CurrentUser = user;
         IsLoggedIn = true;
         CurrentUsername = user.Username;
-        _ = RefreshInboxCountAsync();
+        // Navigate straight to the dashboard after a successful login / signup.
+        var dash = new DashboardViewModel(this);
+        CurrentView = dash;
     }
 
     public void ClearUser()
@@ -55,8 +67,17 @@ public partial class MainWindowViewModel : ViewModelBase
         InboxCount = requests.Count;
     }
 
+    // ── Navigation commands ────────────────────────────────────────────────────
+
     [RelayCommand]
-    private void NavigateHome() => CurrentView = new HomeViewModel(this);
+    private void NavigateDashboard()
+    {
+        if (!IsLoggedIn) { CurrentView = new LoginViewModel(this); return; }
+        CurrentView = new DashboardViewModel(this);
+    }
+
+    [RelayCommand]
+    private void NavigateHome() => CurrentView = new LoginViewModel(this);   // Home ≡ Login when logged-out
 
     [RelayCommand]
     private void NavigateGames()
@@ -102,6 +123,7 @@ public partial class MainWindowViewModel : ViewModelBase
     private void Logout()
     {
         ClearUser();
-        CurrentView = new HomeViewModel(this);
+        // After logout always return to the Login screen.
+        CurrentView = new LoginViewModel(this);
     }
 }

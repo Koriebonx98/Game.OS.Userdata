@@ -1,4 +1,5 @@
 ﻿using Avalonia;
+using Avalonia.X11;
 using System;
 
 namespace GameOS.Desktop;
@@ -14,8 +15,22 @@ sealed class Program
 
     // Avalonia configuration, don't remove; also used by visual designer.
     public static AppBuilder BuildAvaloniaApp()
-        => AppBuilder.Configure<App>()
+    {
+        var builder = AppBuilder.Configure<App>()
             .UsePlatformDetect()
             .WithInterFont()
             .LogToTrace();
+
+        // When running under a virtual framebuffer (CI / screenshot mode) force the
+        // software Skia renderer so that xwd/scrot can capture the rendered window.
+        if (Environment.GetEnvironmentVariable("GAMEOS_SOFTWARE_RENDER") == "1")
+        {
+            builder = builder.With(new X11PlatformOptions
+            {
+                RenderingMode = new[] { X11RenderingMode.Software }
+            });
+        }
+
+        return builder;
+    }
 }

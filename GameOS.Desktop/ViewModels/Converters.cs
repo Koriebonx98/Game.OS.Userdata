@@ -52,3 +52,25 @@ public class BoolToColorConverter : IValueConverter
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
         => throw new NotImplementedException();
 }
+
+/// <summary>
+/// Converts a hex colour string (e.g. "#e94560") to a <see cref="SolidColorBrush"/>.
+/// Falls back to a neutral purple if parsing fails.
+/// </summary>
+public class HexColorToBrushConverter : IValueConverter
+{
+    public static readonly HexColorToBrushConverter Instance = new();
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is string hex)
+        {
+            try { return new SolidColorBrush(Color.Parse(hex)); }
+            catch { /* fall through */ }
+        }
+        return new SolidColorBrush(Color.Parse("#533483"));
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture)
+        => throw new NotImplementedException();
+}

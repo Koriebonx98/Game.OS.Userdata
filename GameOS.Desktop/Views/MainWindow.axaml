@@ -23,27 +23,28 @@
                                Foreground="#e94560" VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Nav Links -->
+                <!-- Nav Links — shown only when logged in -->
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Center"
-                            VerticalAlignment="Center" Spacing="4">
-                    <Button Command="{Binding NavigateHomeCommand}"
+                            VerticalAlignment="Center" Spacing="4"
+                            IsVisible="{Binding IsLoggedIn}">
+                    <Button Command="{Binding NavigateDashboardCommand}"
                             Background="Transparent" Foreground="White"
                             BorderThickness="0" Padding="12,8" CornerRadius="6"
-                            Cursor="Hand">Home</Button>
+                            Cursor="Hand" FontWeight="SemiBold">🏠 Dashboard</Button>
                     <Button Command="{Binding NavigateGamesCommand}"
                             Background="Transparent" Foreground="White"
                             BorderThickness="0" Padding="12,8" CornerRadius="6"
-                            Cursor="Hand">Browse Games</Button>
+                            Cursor="Hand">🎮 My Games</Button>
                     <Button Command="{Binding NavigateFriendsCommand}"
                             Background="Transparent" Foreground="White"
                             BorderThickness="0" Padding="12,8" CornerRadius="6"
-                            Cursor="Hand">Friends</Button>
+                            Cursor="Hand">👥 Friends</Button>
                     <!-- Inbox with badge -->
                     <Grid>
                         <Button Command="{Binding NavigateInboxCommand}"
                                 Background="Transparent" Foreground="White"
                                 BorderThickness="0" Padding="12,8" CornerRadius="6"
-                                Cursor="Hand">Inbox</Button>
+                                Cursor="Hand">📬 Inbox</Button>
                         <Border IsVisible="{Binding InboxCount, Converter={x:Static vm:IntToBoolConverter.Instance}}"
                                 Background="#e94560" CornerRadius="8" Padding="4,1"
                                 HorizontalAlignment="Right" VerticalAlignment="Top"
@@ -55,12 +56,12 @@
                     <Button Command="{Binding NavigateAccountCommand}"
                             Background="Transparent" Foreground="White"
                             BorderThickness="0" Padding="12,8" CornerRadius="6"
-                            Cursor="Hand">Account</Button>
+                            Cursor="Hand">⚙️ Account</Button>
                 </StackPanel>
 
                 <!-- Auth section -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center" Spacing="8">
-                    <!-- Logged out -->
+                    <!-- Logged out: Sign In + Sign Up -->
                     <StackPanel Orientation="Horizontal" Spacing="8"
                                 IsVisible="{Binding !IsLoggedIn}">
                         <Button Command="{Binding NavigateLoginCommand}"
@@ -72,7 +73,7 @@
                                 BorderThickness="0" Padding="12,6" CornerRadius="6"
                                 Cursor="Hand">Get Started</Button>
                     </StackPanel>
-                    <!-- Logged in -->
+                    <!-- Logged in: username + Logout -->
                     <StackPanel Orientation="Horizontal" Spacing="8"
                                 IsVisible="{Binding IsLoggedIn}">
                         <TextBlock Text="{Binding CurrentUsername}" Foreground="#8899aa"

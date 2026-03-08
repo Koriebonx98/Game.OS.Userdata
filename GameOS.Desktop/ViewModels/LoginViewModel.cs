@@ -32,8 +32,8 @@ public partial class LoginViewModel : ViewModelBase
                 ErrorMessage = error;
                 return;
             }
+            // SetUser navigates to the Dashboard automatically.
             _main.SetUser(user);
-            _main.CurrentView = new HomeViewModel(_main);
         }
         finally
         {
