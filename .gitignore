@@ -18,3 +18,8 @@ GameLauncher/bin/
 GameLauncher/obj/
 GameScanner.Tests/bin/
 GameScanner.Tests/obj/
+
+# npm/node generated files (screenshots tooling - root level only)
+/package.json
+/package-lock.json
+node_modules/

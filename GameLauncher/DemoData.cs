@@ -8,6 +8,9 @@ namespace GameLauncher
     /// </summary>
     internal static class DemoData
     {
+        private const string MK8CoverUrl =
+            "https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_1.5/c_scale,w_700/" +
+            "ncom/software/switch/70010000000153/c42553b4fd0312c31e70b470534d0535a3318e2b5c83b308b09fd1ee149bedc9";
         public static List<Game> Library { get; } = new()
         {
             new Game { Platform = "PC",    Title = "Cyberpunk 2077",     Genre = "RPG",         Rating = 9.1, AddedAt = "2025-01-10T12:00:00Z", Description = "An open-world action RPG set in the dark future of Night City — a megalopolis obsessed with power, glamour and body modification.",            CoverColor = "#1a1a2e", CoverGradient = "#1a1a2e,#16213e",
@@ -44,6 +47,12 @@ namespace GameLauncher
                 } },
             new Game { Platform = "PC",    Title = "Hogwarts Legacy",    Genre = "RPG",         Rating = 8.7, AddedAt = "2025-04-01T10:00:00Z", Description = "Explore an open-world Hogwarts in this immersive action RPG. Uncover a hidden truth about the wizarding world.",             CoverColor = "#1e0a2a", CoverGradient = "#1e0a2a,#4a0080",
                 CoverUrl    = "https://media.rawg.io/media/games/5ec/5ecac5cb026ec26a56efcc546364e348.jpg" },
+            new Game { Platform = "Switch", Title = "Mario Kart 8 Deluxe", Genre = "Racing",    Rating = 9.2, AddedAt = "2025-01-05T10:00:00Z", Description = "Hit the road with the definitive version of Mario Kart 8, including all 48 original courses plus 48 more via the Booster Course Pass. Race as 48 characters across thrilling tracks.",
+                CoverUrl    = MK8CoverUrl,
+                CoverColor  = "#0028a0", CoverGradient = "#0028a0,#CC0000",
+                Screenshots = new() {
+                    "https://assets.nintendo.com/image/upload/c_fill,w_1920/q_auto:best/f_auto/dpr_1.0/ncom/software/switch/70010000000153/screen01.jpg",
+                } },
             new Game { Platform = "Switch", Title = "Zelda: TOTK",       Genre = "Adventure",   Rating = 9.9, AddedAt = "2025-04-15T14:00:00Z", Description = "Link discovers a mysterious power that lets him explore the skies and depths of Hyrule, encountering a secret in the clouds.",                  CoverColor = "#0a1628", CoverGradient = "#0a1628,#1a4a6e" },
             new Game { Platform = "PC",    Title = "Starfield",          Genre = "RPG",         Rating = 7.9, AddedAt = "2025-05-10T09:00:00Z", Description = "Bethesda Game Studios' first new universe in 25 years. Create any character and explore the vast reaches of the galaxy.",           CoverColor = "#05060f", CoverGradient = "#05060f,#1a1a3e",
                 CoverUrl    = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg" },
@@ -51,6 +60,8 @@ namespace GameLauncher
 
         public static List<Achievement> Achievements { get; } = new()
         {
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Grand Prix Champion", Description = "Win a Grand Prix Cup on any CC setting.", UnlockedAt = "2025-01-08T15:30:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Speed Demon",         Description = "Win a race on 200cc difficulty.",            UnlockedAt = "2025-01-12T19:00:00Z" },
             new Achievement { Platform = "PC",    GameTitle = "Cyberpunk 2077",  Name = "Night City Legend",   Description = "Complete all main missions.",            UnlockedAt = "2025-01-15T14:00:00Z" },
             new Achievement { Platform = "PC",    GameTitle = "Elden Ring",      Name = "Elden Lord",          Description = "Defeat the Elden Beast.",                UnlockedAt = "2025-02-20T18:30:00Z" },
             new Achievement { Platform = "Xbox",  GameTitle = "Halo Infinite",   Name = "Master Chief",        Description = "Complete the campaign on Legendary.",    UnlockedAt = "2025-01-25T20:00:00Z" },
@@ -60,6 +71,9 @@ namespace GameLauncher
 
         public static List<StoreGame> Store { get; } = new()
         {
+            new StoreGame { Title = "Mario Kart 8 Deluxe",           Platform = "Switch", Genre = "Racing",        Price = "£49.99", Rating = 9.2, IsFeatured = true,  ReleaseYear = "2017", Description = "The definitive kart racer on Nintendo Switch. Race with 48 characters across 96 courses including all Booster Course Pass tracks.",
+                CoverUrl = MK8CoverUrl,
+                CoverColor = "#0028a0", CoverGradient = "#0028a0,#CC0000" },
             // Featured
             new StoreGame { Title = "GTA VI",                     Platform = "PC",    Genre = "Open World",   Price = "£69.99", Rating = 9.5, IsFeatured = true,  ReleaseYear = "2026", Description = "Rockstar's long-awaited return to Vice City with Lucia leading an epic crime saga.",
                 CoverUrl = "https://media.rawg.io/media/games/2ad/2ad87a4a69b1104f02435c14c5196095.jpg",

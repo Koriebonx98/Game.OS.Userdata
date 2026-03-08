@@ -298,4 +298,21 @@
         <Setter Property="Margin" Value="0,4,0,0"/>
     </Style>
 
+    <!-- ─── Danger Button ─── -->
+    <Style Selector="Button.btn-danger">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#f85149"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12,6"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderBrush" Value="#f85149"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <Style Selector="Button.btn-danger:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3d0f0f"/>
+    </Style>
+
 </Styles>

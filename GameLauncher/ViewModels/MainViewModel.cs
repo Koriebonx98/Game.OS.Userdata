@@ -26,6 +26,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public LibraryViewModel   LibraryVm   { get; }
     public StoreViewModel     StoreVm     { get; }
     public ProfileViewModel   ProfileVm   { get; }
+    public FriendsViewModel   FriendsVm   { get; }
     public GameDetailViewModel DetailVm   { get; }
 
     // ── Navigation state ───────────────────────────────────────────────────
@@ -38,6 +39,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public bool IsLibrary     => ActivePage == "library";
     public bool IsStore       => ActivePage == "store";
     public bool IsProfile     => ActivePage == "profile";
+    public bool IsFriends     => ActivePage == "friends";
 
     partial void OnActivePageChanged(string value)
     {
@@ -45,6 +47,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsLibrary));
         OnPropertyChanged(nameof(IsStore));
         OnPropertyChanged(nameof(IsProfile));
+        OnPropertyChanged(nameof(IsFriends));
     }
 
     public MainViewModel()
@@ -58,6 +61,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm   = new LibraryViewModel();
         StoreVm     = new StoreViewModel();
         ProfileVm   = new ProfileViewModel();
+        FriendsVm   = new FriendsViewModel();
         DetailVm    = new GameDetailViewModel();
 
         DetailVm.OnClose = () => ShowDetail = false;
