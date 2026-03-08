@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -22,6 +23,9 @@ public partial class StoreViewModel : ViewModelBase
     public ObservableCollection<StoreGame> Featured      { get; } = new();
     public ObservableCollection<StoreGame> FilteredStore { get; } = new();
     public ObservableCollection<string>    Genres        { get; } = new();
+
+    /// <summary>Invoked when the user clicks a store game card.</summary>
+    public Action<StoreGame>? OnOpenDetail { get; set; }
 
     public void Load(List<StoreGame> store, List<Game> library,
                      UserProfile profile, GameOsClient client, bool demoMode)
@@ -68,6 +72,12 @@ public partial class StoreViewModel : ViewModelBase
         _library.Any(g => g.Title.Equals(title, System.StringComparison.OrdinalIgnoreCase));
 
     [RelayCommand]
+    private void OpenGameDetail(StoreGame? game)
+    {
+        if (game != null) OnOpenDetail?.Invoke(game);
+    }
+
+    [RelayCommand]
     private async System.Threading.Tasks.Task AddGameAsync(StoreGame? game)
     {
         if (game == null) return;
@@ -88,6 +98,8 @@ public partial class StoreViewModel : ViewModelBase
                 Genre       = game.Genre,
                 Rating      = game.Rating,
                 Description = game.Description,
+                CoverUrl    = game.CoverUrl,
+                Screenshots = game.Screenshots,
                 CoverColor  = game.CoverColor,
                 CoverGradient = game.CoverGradient,
                 AddedAt     = System.DateTimeOffset.UtcNow.ToString("o")

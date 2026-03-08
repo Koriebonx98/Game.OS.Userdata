@@ -109,18 +109,34 @@ public sealed class GameScannerService : IDisposable
 
     private async Task ScanAllDrivesAsync(CancellationToken ct)
     {
-        var foundGames   = new List<LocalGame>();
-        var foundRepacks = new List<LocalRepack>();
+        var foundGamesRaw = new List<LocalGame>();
+        var foundRepacks  = new List<LocalRepack>();
 
         await Task.Run(() =>
         {
             foreach (var driveRoot in GetDriveRoots())
             {
                 ct.ThrowIfCancellationRequested();
-                ScanGamesDir(driveRoot, foundGames);
+                ScanGamesDir(driveRoot, foundGamesRaw);
                 ScanRepacksDir(driveRoot, foundRepacks);
             }
         }, ct);
+
+        // Group same-title games found on multiple drives into a single LocalGame
+        var foundGames = new List<LocalGame>();
+        foreach (var grp in foundGamesRaw.GroupBy(g => g.Title, System.StringComparer.OrdinalIgnoreCase))
+        {
+            var items = grp.ToList();
+            var primary = items[0];
+            primary.DriveInstances = items.Select(g => new Models.LocalGameDriveEntry
+            {
+                DriveRoot      = g.DriveRoot,
+                FolderPath     = g.FolderPath,
+                ExecutablePath = g.ExecutablePath,
+                ExecutableType = g.ExecutableType,
+            }).ToList();
+            foundGames.Add(primary);
+        }
 
         await _lock.WaitAsync(ct);
         try

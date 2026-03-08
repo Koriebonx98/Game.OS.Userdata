@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.LibraryView"
              x:DataType="vm:LibraryViewModel"
@@ -58,21 +59,20 @@
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:Game">
-                    <Border Classes="game-card">
+                    <Button Classes="game-card-btn"
+                            Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                            CommandParameter="{Binding}">
                         <StackPanel>
                             <!-- Cover art -->
-                            <Border Height="130" CornerRadius="10,10,0,0">
-                                <Border.Background>
-                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                        <GradientStop Color="#1a1a2e" Offset="0"/>
-                                        <GradientStop Color="#16213e" Offset="1"/>
-                                    </LinearGradientBrush>
-                                </Border.Background>
-                                <TextBlock Text="{Binding Title[0]}"
-                                           FontSize="52" FontWeight="Black"
-                                           Foreground="White" Opacity="0.5"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                            <Border Height="130" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                <views:CoverImage
+                                    ImageUrl="{Binding CoverUrl}"
+                                    FallbackText="{Binding Title}"
+                                    FallbackGradient="{Binding CoverGradient}"
+                                    SubText="{Binding Platform}"
+                                    LetterFontSize="52"
+                                    ImageCornerRadius="10,10,0,0"
+                                    Height="130"/>
                             </Border>
                             <!-- Info -->
                             <Border Padding="10,10,10,12">
@@ -95,7 +95,7 @@
                                 </StackPanel>
                             </Border>
                         </StackPanel>
-                    </Border>
+                    </Button>
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
@@ -124,7 +124,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:LocalGame">
-                            <Border Classes="game-card" Width="170" Margin="0,0,10,10">
+                            <Button Classes="game-card-btn"
+                                    Width="170" Margin="0,0,10,10"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
+                                    CommandParameter="{Binding}">
                                 <StackPanel>
                                     <!-- Drive art -->
                                     <Border Height="100" CornerRadius="10,10,0,0">
@@ -138,6 +141,15 @@
                                                     VerticalAlignment="Center" Spacing="4">
                                             <TextBlock Text="💿" FontSize="32"
                                                        HorizontalAlignment="Center"/>
+                                            <!-- Drive count badge -->
+                                            <Border CornerRadius="8" Padding="6,2"
+                                                    Background="#238636"
+                                                    HorizontalAlignment="Center"
+                                                    IsVisible="{Binding HasMultipleDrives}">
+                                                <TextBlock Text="{Binding DriveCountLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="White"/>
+                                            </Border>
                                         </StackPanel>
                                     </Border>
                                     <!-- Info -->
@@ -158,7 +170,7 @@
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
-                            </Border>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>

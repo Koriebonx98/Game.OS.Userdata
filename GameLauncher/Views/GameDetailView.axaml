@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GameDetailView"
+             x:DataType="vm:GameDetailViewModel"
+             Background="#0d1117">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- ── Top bar with back button ── -->
+        <Border Grid.Row="0" Background="#161b22" Padding="20,14">
+            <Grid ColumnDefinitions="Auto,*">
+                <Button Grid.Column="0"
+                        Classes="btn-secondary"
+                        Padding="14,8"
+                        Command="{Binding CloseCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="←" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Back" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock Grid.Column="1"
+                           Text="{Binding Title}"
+                           FontSize="18" FontWeight="Bold"
+                           Foreground="White"
+                           VerticalAlignment="Center"
+                           Margin="16,0,0,0"/>
+            </Grid>
+        </Border>
+
+        <!-- ── Content area ── -->
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="32,24,32,32" Spacing="0">
+
+                <!-- Hero: cover + info side by side -->
+                <Grid ColumnDefinitions="240,*" Margin="0,0,0,28">
+
+                    <!-- Cover image -->
+                    <Border Grid.Column="0" CornerRadius="12" ClipToBounds="True"
+                            Width="220" Height="300" HorizontalAlignment="Left">
+                        <views:CoverImage
+                            ImageUrl="{Binding CoverUrl}"
+                            FallbackText="{Binding Title}"
+                            FallbackGradient="{Binding CoverGradient}"
+                            SubText="{Binding Genre}"
+                            LetterFontSize="80"
+                            ImageCornerRadius="12"
+                            Width="220" Height="300"/>
+                    </Border>
+
+                    <!-- Info panel -->
+                    <StackPanel Grid.Column="1" Margin="28,0,0,0" Spacing="10"
+                                VerticalAlignment="Top">
+
+                        <TextBlock Text="{Binding Title}"
+                                   FontSize="32" FontWeight="Bold"
+                                   Foreground="White" TextWrapping="Wrap"/>
+
+                        <!-- Badges row -->
+                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                            <Border CornerRadius="4" Padding="10,4" Background="#1f6feb">
+                                <TextBlock Text="{Binding Platform}"
+                                           FontSize="12" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                            <Border CornerRadius="4" Padding="10,4" Background="#21262d"
+                                    IsVisible="{Binding Genre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding Genre}"
+                                           FontSize="12" Foreground="#c9d1d9"/>
+                            </Border>
+                            <Border CornerRadius="4" Padding="10,4" Background="#21262d"
+                                    IsVisible="{Binding ReleaseYear, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="{Binding ReleaseYear}"
+                                           FontSize="12" Foreground="#8b949e"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Rating -->
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="{Binding RatingStars}"
+                                       FontSize="20" Foreground="#f1c40f"/>
+                        </StackPanel>
+
+                        <!-- Price -->
+                        <TextBlock Text="{Binding Price}"
+                                   FontSize="24" FontWeight="Bold"
+                                   Foreground="#3fb950"
+                                   IsVisible="{Binding Price, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <!-- Description -->
+                        <TextBlock Text="{Binding Description}"
+                                   FontSize="14" Foreground="#c9d1d9"
+                                   TextWrapping="Wrap" MaxWidth="560"
+                                   IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                   Margin="0,8,0,0"/>
+
+                        <!-- Local game install info -->
+                        <Border IsVisible="{Binding IsLocalGame}"
+                                Background="#0d3d1a" CornerRadius="8"
+                                Padding="14,12" Margin="0,8,0,0">
+                            <StackPanel Spacing="6">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="💿" FontSize="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Installed on Drive"
+                                               FontSize="13" FontWeight="Bold"
+                                               Foreground="#3fb950" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="Drive:" FontSize="12" Foreground="#8b949e"/>
+                                    <TextBlock Text="{Binding ActiveDriveLabel}"
+                                               FontSize="12" Foreground="White" FontWeight="SemiBold"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <TextBlock Text="Type:" FontSize="12" Foreground="#8b949e"/>
+                                    <TextBlock Text="{Binding ActiveExeType}"
+                                               FontSize="12" Foreground="#3fb950" FontWeight="Bold"/>
+                                </StackPanel>
+                                <TextBlock Text="{Binding ActiveDrivePath}"
+                                           FontSize="11" Foreground="#8b949e"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ── Multi-drive switcher ── -->
+                <Border IsVisible="{Binding HasMultipleDrives}"
+                        Background="#161b22" CornerRadius="10"
+                        Padding="20,16" Margin="0,0,0,24">
+                    <StackPanel Spacing="12">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="💾" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="Available on Multiple Drives"
+                                       FontSize="15" FontWeight="Bold"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="Select which drive to use:"
+                                   FontSize="12" Foreground="#8b949e"/>
+                        <ItemsControl ItemsSource="{Binding DriveLabels}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" Spacing="8"/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Padding="16,8"
+                                            CornerRadius="6"
+                                            FontSize="13" FontWeight="SemiBold"
+                                            Foreground="White"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            Command="{Binding $parent[UserControl].DataContext.SelectDriveCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Background>
+                                            <SolidColorBrush Color="#1f6feb"/>
+                                        </Button.Background>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <TextBlock Text="💿" FontSize="13"/>
+                                            <TextBlock Text="{Binding}" FontSize="13"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Screenshots section ── -->
+                <Border IsVisible="{Binding HasScreenshots}"
+                        Margin="0,0,0,0">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="📸  Screenshots"
+                                   Classes="section-header" Margin="0"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                      VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Screenshots}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal" Spacing="12"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border CornerRadius="8" ClipToBounds="True"
+                                                Width="340" Height="192">
+                                            <views:CoverImage
+                                                ImageUrl="{Binding}"
+                                                LetterFontSize="0"
+                                                ImageCornerRadius="8"
+                                                Width="340" Height="192"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>

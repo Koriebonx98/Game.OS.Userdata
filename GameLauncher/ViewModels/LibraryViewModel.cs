@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -24,6 +25,11 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private bool _hasRepacks;
     public ObservableCollection<LocalGame>   LocalGames     { get; } = new();
     public ObservableCollection<LocalRepack> ReadyToInstall { get; } = new();
+
+    /// <summary>Invoked when the user clicks a cloud game card.</summary>
+    public Action<Game>?      OnOpenDetail      { get; set; }
+    /// <summary>Invoked when the user clicks a local/detected game card.</summary>
+    public Action<LocalGame>? OnOpenLocalDetail { get; set; }
 
     public void Load(List<Game> games)
     {
@@ -65,6 +71,18 @@ public partial class LibraryViewModel : ViewModelBase
 
     [RelayCommand]
     private void SetPlatform(string platform) => FilterPlatform = platform;
+
+    [RelayCommand]
+    private void OpenGameDetail(Game? game)
+    {
+        if (game != null) OnOpenDetail?.Invoke(game);
+    }
+
+    [RelayCommand]
+    private void OpenLocalGameDetail(LocalGame? game)
+    {
+        if (game != null) OnOpenLocalDetail?.Invoke(game);
+    }
 
     private void ApplyFilter()
     {
