@@ -1,0 +1,104 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- Header -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="My Library" Classes="page-title"/>
+                <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games in your collection'}"
+                           Classes="page-subtitle"/>
+            </StackPanel>
+            <TextBox Grid.Column="1"
+                     Classes="form-input"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search games…"
+                     Width="240" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Platform filter chips -->
+        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      Margin="0,0,0,20">
+            <ItemsControl ItemsSource="{Binding Platforms}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="6"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Button Content="{Binding}"
+                                Background="#1f6feb"
+                                Foreground="White"
+                                CornerRadius="6"
+                                Padding="14,7"
+                                FontSize="13"
+                                FontWeight="SemiBold"
+                                BorderThickness="0"
+                                Command="{Binding $parent[UserControl].DataContext.SetPlatformCommand}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Game card grid -->
+        <ItemsControl ItemsSource="{Binding FilteredGames}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:Game">
+                    <Border Classes="game-card">
+                        <StackPanel>
+                            <!-- Cover art -->
+                            <Border Height="130" CornerRadius="10,10,0,0">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                        <GradientStop Color="#1a1a2e" Offset="0"/>
+                                        <GradientStop Color="#16213e" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <TextBlock Text="{Binding Title[0]}"
+                                           FontSize="52" FontWeight="Black"
+                                           Foreground="White" Opacity="0.5"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <!-- Info -->
+                            <Border Padding="10,10,10,12">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Title}"
+                                               Classes="game-card-title"/>
+                                    <Border CornerRadius="3" Padding="5,2"
+                                            Background="#1f6feb"
+                                            HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Platform}"
+                                                   FontSize="10" FontWeight="Bold"
+                                                   Foreground="White"/>
+                                    </Border>
+                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                                        <TextBlock Text="{Binding RatingStars}"
+                                                   FontSize="11" Foreground="#f1c40f"/>
+                                        <TextBlock Text="{Binding Genre}"
+                                                   Classes="game-card-meta"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>

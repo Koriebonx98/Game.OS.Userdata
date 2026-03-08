@@ -12,3 +12,7 @@ backend/.env
 # Editor directories
 .vscode/
 .idea/
+
+# .NET build artifacts
+GameLauncher/bin/
+GameLauncher/obj/

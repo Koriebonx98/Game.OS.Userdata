@@ -1,0 +1,134 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.ProfileView"
+             x:DataType="vm:ProfileViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- ── Header ── -->
+        <TextBlock Text="Profile" Classes="page-title" Margin="0,0,0,24"/>
+
+        <!-- ── Profile card ── -->
+        <Border Background="#161b22" CornerRadius="12" Padding="28"
+                Margin="0,0,0,24">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                <!-- Avatar -->
+                <Border Grid.Column="0"
+                        Width="80" Height="80"
+                        CornerRadius="40" Margin="0,0,24,0">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Color="#0ea5e9" Offset="0"/>
+                            <GradientStop Color="#1d4ed8" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="{Binding AvatarInitial}"
+                               FontSize="36" FontWeight="Bold"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- Info -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <TextBlock Text="{Binding Username}"
+                               FontSize="24" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="{Binding Email}"
+                               FontSize="13" Foreground="#8b949e"/>
+                    <TextBlock Classes="page-subtitle">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="Member since {0}">
+                                <Binding Path="MemberSince"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Mode badge -->
+                <Border Grid.Column="2"
+                        CornerRadius="6" Padding="12,6"
+                        VerticalAlignment="Top">
+                    <Border.Background>
+                        <SolidColorBrush Color="#238636"/>
+                    </Border.Background>
+                    <TextBlock Text="{Binding ModeBadge}"
+                               FontSize="12" FontWeight="Bold"
+                               Foreground="White"/>
+                </Border>
+
+            </Grid>
+        </Border>
+
+        <!-- ── Stats row ── -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0">
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding GamesCount}"
+                               Classes="stat-number"/>
+                    <TextBlock Text="Games" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding AchievementsCount}"
+                               Classes="stat-number" Foreground="#f1c40f"/>
+                    <TextBlock Text="Achievements" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ── Achievements ── -->
+        <TextBlock Text="🏆  All Achievements" Classes="section-header"
+                   IsVisible="{Binding AllAchievements.Count}"/>
+
+        <ItemsControl ItemsSource="{Binding AllAchievements}"
+                      IsVisible="{Binding AllAchievements.Count}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:Achievement">
+                    <Border Classes="achievement-card">
+                        <Grid ColumnDefinitions="44,*">
+                            <Border Grid.Column="0" Width="36" Height="36"
+                                    CornerRadius="8" Background="#2d2000">
+                                <TextBlock Text="🏆" FontSize="18"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1"
+                                        Margin="12,0,0,0"
+                                        VerticalAlignment="Center"
+                                        Spacing="2">
+                                <TextBlock Text="{Binding Name}"
+                                           Classes="achievement-title"/>
+                                <TextBlock Text="{Binding Description}"
+                                           Classes="achievement-desc"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="{Binding GameTitle}"
+                                               FontSize="10" Foreground="#8b949e"/>
+                                    <TextBlock Text="|" FontSize="10" Foreground="#30363d"/>
+                                    <TextBlock Text="{Binding Platform}"
+                                               FontSize="10" Foreground="#8b949e"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Empty achievements state -->
+        <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,24,0,0"
+                    IsVisible="{Binding !AllAchievements.Count}">
+            <TextBlock Text="🏆" FontSize="40" HorizontalAlignment="Center"/>
+            <TextBlock Text="No achievements yet" FontSize="15"
+                       Foreground="#8b949e" HorizontalAlignment="Center"/>
+            <TextBlock Text="Keep playing to earn achievements"
+                       FontSize="13" Foreground="#6e7681"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>

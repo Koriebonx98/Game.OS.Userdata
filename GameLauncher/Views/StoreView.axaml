@@ -1,0 +1,180 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.StoreView"
+             x:DataType="vm:StoreViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- Header -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Games Store" Classes="page-title"/>
+                <TextBlock Text="Discover and add games to your library"
+                           Classes="page-subtitle"/>
+            </StackPanel>
+            <TextBox Grid.Column="1"
+                     Classes="form-input"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search store…"
+                     Width="240" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Status message -->
+        <Border Background="#0d3d1a" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,16"
+                IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding StatusMessage}"
+                       Foreground="#3fb950" FontSize="13"/>
+        </Border>
+
+        <!-- Featured banner -->
+        <TextBlock Text="⭐  Featured &amp; New Releases"
+                   Classes="section-header" Margin="0,0,0,12"/>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      Margin="0,0,0,28">
+            <ItemsControl ItemsSource="{Binding Featured}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="16"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:StoreGame">
+                        <Border Width="240" CornerRadius="12" Cursor="Hand">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                    <GradientStop Color="#0a1628" Offset="0"/>
+                                    <GradientStop Color="#1a3a6e" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <StackPanel>
+                                <Border Height="140" CornerRadius="12,12,0,0">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                            <GradientStop Color="#0a1628" Offset="0"/>
+                                            <GradientStop Color="#1f6feb" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <TextBlock Text="{Binding Title[0]}"
+                                               FontSize="64" FontWeight="Black"
+                                               Foreground="White" Opacity="0.4"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <Border Padding="14,12">
+                                    <StackPanel Spacing="6">
+                                        <Border Background="#1f6feb" CornerRadius="3"
+                                                Padding="6,2" HorizontalAlignment="Left">
+                                            <TextBlock Text="NEW" FontSize="10"
+                                                       FontWeight="Bold" Foreground="White"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}"
+                                                   FontSize="15" FontWeight="Bold"
+                                                   Foreground="White" TextWrapping="Wrap"/>
+                                        <TextBlock Text="{Binding Genre}"
+                                                   FontSize="12" Foreground="#8b949e"/>
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding Price}"
+                                                       FontSize="16" FontWeight="Bold"
+                                                       Foreground="#3fb950"/>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding RatingStars}"
+                                                       FontSize="12" Foreground="#f1c40f"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                        <Button Classes="btn-success"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Center"
+                                                Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
+                                                CommandParameter="{Binding}">
+                                            + Add to Library
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Genre filter + heading -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <TextBlock Grid.Column="0"
+                       Text="All Games" Classes="section-header"
+                       VerticalAlignment="Center" Margin="0"/>
+            <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding Genres}"
+                      SelectedItem="{Binding FilterGenre}"
+                      Width="180"/>
+        </Grid>
+
+        <!-- Full catalogue -->
+        <ItemsControl ItemsSource="{Binding FilteredStore}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <WrapPanel/>
+                </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:StoreGame">
+                    <Border Classes="store-card">
+                        <StackPanel>
+                            <Border Height="120" CornerRadius="10,10,0,0">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                        <GradientStop Color="#1a1a2e" Offset="0"/>
+                                        <GradientStop Color="#312e81" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <TextBlock Text="{Binding Title[0]}"
+                                           FontSize="56" FontWeight="Black"
+                                           Foreground="White" Opacity="0.4"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"/>
+                            </Border>
+                            <Border Padding="12,10">
+                                <StackPanel Spacing="4">
+                                    <TextBlock Text="{Binding Title}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="White" TextWrapping="Wrap"
+                                               MaxLines="2"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="{Binding Genre}"
+                                                   FontSize="11" Foreground="#8b949e"/>
+                                        <TextBlock Text="·" FontSize="11" Foreground="#8b949e"/>
+                                        <TextBlock Text="{Binding ReleaseYear}"
+                                                   FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding RatingStars}"
+                                               FontSize="11" Foreground="#f1c40f"/>
+                                    <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding Price}"
+                                                   FontSize="14" FontWeight="Bold"
+                                                   Foreground="#3fb950"
+                                                   VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1"
+                                                Classes="btn-success"
+                                                Padding="8,5"
+                                                Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
+                                                CommandParameter="{Binding}">
+                                            +
+                                        </Button>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+    </StackPanel>
+</UserControl>

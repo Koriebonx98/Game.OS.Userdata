@@ -1,0 +1,188 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.LoginView"
+             x:DataType="vm:LoginViewModel"
+             Background="#0d1117">
+
+    <Grid>
+        <!-- Subtle background gradient -->
+        <Border Background="#0d1117">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#0d1117" Offset="0"/>
+                    <GradientStop Color="#0f2027" Offset="0.5"/>
+                    <GradientStop Color="#0d1117" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <!-- Centered content -->
+        <StackPanel HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="24">
+
+            <!-- Logo / Title -->
+            <StackPanel HorizontalAlignment="Center" Spacing="8">
+                <Border Width="72" Height="72" CornerRadius="16"
+                        HorizontalAlignment="Center">
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                            <GradientStop Color="#0ea5e9" Offset="0"/>
+                            <GradientStop Color="#1d4ed8" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                    <TextBlock Text="G" FontSize="38" FontWeight="Black"
+                               Foreground="White"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"/>
+                </Border>
+                <TextBlock Text="Game.OS" FontSize="32" FontWeight="Black"
+                           Foreground="White" HorizontalAlignment="Center"/>
+                <TextBlock Text="Your games. Your world. Your OS."
+                           FontSize="14" Foreground="#8b949e"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+
+            <!-- Login Card -->
+            <Border Classes="login-card">
+                <StackPanel Spacing="16">
+
+                    <!-- ── SIGN IN FORM ── -->
+                    <StackPanel IsVisible="{Binding !ShowRegister}" Spacing="16">
+
+                        <TextBlock Text="Sign In" FontSize="22" FontWeight="Bold"
+                                   Foreground="White" HorizontalAlignment="Center"/>
+
+                        <!-- Username -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Username or Email" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding Username}"
+                                     Watermark="Enter username or email"/>
+                        </StackPanel>
+
+                        <!-- Password -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Password" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding Password}"
+                                     PasswordChar="●"
+                                     Watermark="Enter password"/>
+                        </StackPanel>
+
+                        <!-- Error -->
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   Classes="error-text"
+                                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <!-- Sign In button -->
+                        <Button Classes="btn-primary"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Command="{Binding SignInCommand}"
+                                IsEnabled="{Binding !IsLoading}">
+                            <Panel>
+                                <TextBlock Text="Sign In"
+                                           IsVisible="{Binding !IsLoading}"/>
+                                <TextBlock Text="Signing in…"
+                                           IsVisible="{Binding IsLoading}"
+                                           Foreground="#8b949e"/>
+                            </Panel>
+                        </Button>
+
+                        <!-- Divider -->
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                            <Rectangle Width="80" Height="1" Fill="#30363d" VerticalAlignment="Center"/>
+                            <TextBlock Text="or" Foreground="#8b949e" FontSize="12"/>
+                            <Rectangle Width="80" Height="1" Fill="#30363d" VerticalAlignment="Center"/>
+                        </StackPanel>
+
+                        <!-- Demo button -->
+                        <Button Classes="btn-secondary"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Command="{Binding DemoModeCommand}">
+                            🚀  Try Demo Mode  (no account needed)
+                        </Button>
+
+                        <!-- Switch to register -->
+                        <Button Background="Transparent" Foreground="#1f6feb"
+                                HorizontalAlignment="Center"
+                                BorderThickness="0" FontSize="13"
+                                Command="{Binding ToggleFormCommand}">
+                            Don't have an account? Create one →
+                        </Button>
+
+                    </StackPanel>
+
+                    <!-- ── REGISTER FORM ── -->
+                    <StackPanel IsVisible="{Binding ShowRegister}" Spacing="14">
+
+                        <TextBlock Text="Create Account" FontSize="22" FontWeight="Bold"
+                                   Foreground="White" HorizontalAlignment="Center"/>
+
+                        <!-- Username -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Username" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding Username}"
+                                     Watermark="Choose a username (3–24 chars)"/>
+                        </StackPanel>
+
+                        <!-- Email -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Email Address" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding Email}"
+                                     Watermark="your@email.com"/>
+                        </StackPanel>
+
+                        <!-- Password -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Password" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding Password}"
+                                     PasswordChar="●"
+                                     Watermark="Min. 8 characters"/>
+                        </StackPanel>
+
+                        <!-- Confirm Password -->
+                        <StackPanel Spacing="0">
+                            <TextBlock Text="Confirm Password" Classes="form-label"/>
+                            <TextBox Classes="form-input"
+                                     Text="{Binding ConfirmPassword}"
+                                     PasswordChar="●"
+                                     Watermark="Repeat password"/>
+                        </StackPanel>
+
+                        <!-- Error -->
+                        <TextBlock Text="{Binding ErrorMessage}"
+                                   Classes="error-text"
+                                   IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <!-- Register button -->
+                        <Button Classes="btn-primary"
+                                HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Center"
+                                Command="{Binding RegisterCommand}"
+                                IsEnabled="{Binding !IsLoading}">
+                            Create Account
+                        </Button>
+
+                        <!-- Back to login -->
+                        <Button Background="Transparent" Foreground="#1f6feb"
+                                HorizontalAlignment="Center"
+                                BorderThickness="0" FontSize="13"
+                                Command="{Binding ToggleFormCommand}">
+                            ← Already have an account? Sign in
+                        </Button>
+
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </Grid>
+</UserControl>

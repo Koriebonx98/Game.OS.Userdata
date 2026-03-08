@@ -1,0 +1,257 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- ══════════════════════════════════════════════════
+         GAME OS — DARK THEME  (Xbox / PS5 / Steam BPM)
+         All class selectors must be prefixed with control type.
+         ══════════════════════════════════════════════════ -->
+
+    <!-- ─── Navigation Sidebar ─── -->
+    <Style Selector="Border.nav-sidebar">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="Width" Value="220"/>
+    </Style>
+
+    <Style Selector="Border.nav-logo-area">
+        <Setter Property="Background" Value="#0ea5e9"/>
+        <Setter Property="Height" Value="80"/>
+    </Style>
+
+    <Style Selector="TextBlock.nav-logo-text">
+        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="Button.nav-item">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+        <Setter Property="Padding" Value="18,14"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Left"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Margin" Value="8,2"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
+    <Style Selector="Button.nav-item.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1f6feb"/>
+    </Style>
+
+    <Style Selector="Button.nav-item.active">
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <!-- ─── Page titles ─── -->
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Margin" Value="0,0,0,4"/>
+    </Style>
+
+    <Style Selector="TextBlock.page-subtitle">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+    </Style>
+
+    <!-- ─── Section headers ─── -->
+    <Style Selector="TextBlock.section-header">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="Margin" Value="0,0,0,12"/>
+    </Style>
+
+    <!-- ─── Game Card ─── -->
+    <Style Selector="Border.game-card">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Width" Value="170"/>
+        <Setter Property="Margin" Value="0,0,12,12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Border.game-card:pointerover">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
+    <Style Selector="TextBlock.game-card-title">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="MaxLines" Value="2"/>
+    </Style>
+
+    <Style Selector="TextBlock.game-card-meta">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+    </Style>
+
+    <!-- ─── Hero ─── -->
+    <Style Selector="Border.hero-banner">
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Margin" Value="0,0,0,24"/>
+    </Style>
+
+    <Style Selector="TextBlock.hero-title">
+        <Setter Property="FontSize" Value="36"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="TextBlock.hero-desc">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="#c9d1d9"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="MaxWidth" Value="420"/>
+    </Style>
+
+    <Style Selector="TextBlock.hero-price">
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#3fb950"/>
+    </Style>
+
+    <!-- ─── Primary Button ─── -->
+    <Style Selector="Button.btn-primary">
+        <Setter Property="Background" Value="#1f6feb"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="20,10"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#388bfd"/>
+    </Style>
+
+    <!-- ─── Secondary Button ─── -->
+    <Style Selector="Button.btn-secondary">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="20,10"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderBrush" Value="#30363d"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
+    <Style Selector="Button.btn-secondary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
+    <!-- ─── Success Button ─── -->
+    <Style Selector="Button.btn-success">
+        <Setter Property="Background" Value="#238636"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="14,8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.btn-success:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2ea043"/>
+    </Style>
+
+    <!-- ─── Form inputs ─── -->
+    <Style Selector="TextBox.form-input">
+        <Setter Property="Background" Value="#21262d"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="#30363d"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="12,10"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="TextBlock.form-label">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="#c9d1d9"/>
+        <Setter Property="Margin" Value="0,0,0,6"/>
+    </Style>
+
+    <!-- ─── Login card ─── -->
+    <Style Selector="Border.login-card">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="14"/>
+        <Setter Property="Width" Value="400"/>
+        <Setter Property="Padding" Value="40"/>
+    </Style>
+
+    <!-- ─── Stat tiles ─── -->
+    <Style Selector="Border.stat-tile">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Padding" Value="20,16"/>
+        <Setter Property="Margin" Value="0,0,12,0"/>
+        <Setter Property="Width" Value="130"/>
+    </Style>
+
+    <Style Selector="TextBlock.stat-number">
+        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="TextBlock.stat-label">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+    </Style>
+
+    <!-- ─── Achievement card ─── -->
+    <Style Selector="Border.achievement-card">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="8"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="Margin" Value="0,0,0,8"/>
+    </Style>
+
+    <Style Selector="TextBlock.achievement-title">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="White"/>
+    </Style>
+
+    <Style Selector="TextBlock.achievement-desc">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+    </Style>
+
+    <!-- ─── Store card ─── -->
+    <Style Selector="Border.store-card">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Width" Value="200"/>
+        <Setter Property="Margin" Value="0,0,12,12"/>
+        <Setter Property="Cursor" Value="Hand"/>
+    </Style>
+
+    <Style Selector="Border.store-card:pointerover">
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
+    <!-- ─── Error text ─── -->
+    <Style Selector="TextBlock.error-text">
+        <Setter Property="Foreground" Value="#f85149"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,4,0,0"/>
+    </Style>
+
+</Styles>
