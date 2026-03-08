@@ -1,0 +1,119 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.FriendsView"
+             x:DataType="vm:FriendsViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- ── Header ── -->
+        <TextBlock Text="👥  Friends" Classes="page-title" Margin="0,0,0,24"/>
+
+        <!-- ── Online stats row ── -->
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,24" Spacing="0">
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding OnlineCount}"
+                               Classes="stat-number" Foreground="#22c55e"/>
+                    <TextBlock Text="Online" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding OfflineCount}"
+                               Classes="stat-number"/>
+                    <TextBlock Text="Offline" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- ── Add friend row ── -->
+        <Border Background="#161b22" CornerRadius="10" Padding="20,16"
+                Margin="0,0,0,24">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Add a Friend" FontSize="14" FontWeight="SemiBold"
+                           Foreground="White"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBox Classes="search-box"
+                             Text="{Binding AddUsername}"
+                             Watermark="Enter username…"
+                             Width="320"/>
+                    <Button Classes="btn-primary"
+                            Content="Send Request"
+                            Command="{Binding AddFriendCommand}"/>
+                </StackPanel>
+                <TextBlock Text="{Binding StatusMessage}"
+                           FontSize="13" Foreground="#22c55e"
+                           IsVisible="{Binding HasStatusMessage}"/>
+            </StackPanel>
+        </Border>
+
+        <!-- ── Search bar ── -->
+        <TextBox Classes="search-box"
+                 Text="{Binding SearchText}"
+                 Watermark="🔍  Search friends…"
+                 Margin="0,0,0,16"/>
+
+        <!-- ── Friends list ── -->
+        <ItemsControl ItemsSource="{Binding FilteredFriends}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:Friend">
+                    <Border Background="#161b22" CornerRadius="10"
+                            Padding="16,12" Margin="0,0,0,8">
+                        <Grid ColumnDefinitions="56,*,Auto">
+
+                            <!-- Avatar with online indicator -->
+                            <Panel Grid.Column="0" Width="44" Height="44">
+                                <Border Width="44" Height="44" CornerRadius="22">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding AvatarColor}"/>
+                                    </Border.Background>
+                                    <TextBlock Text="{Binding AvatarInitial}"
+                                               FontSize="20" FontWeight="Bold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <!-- Online dot -->
+                                <Border Width="12" Height="12" CornerRadius="6"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Bottom"
+                                        BorderThickness="2" BorderBrush="#0d1117">
+                                    <Border.Background>
+                                        <SolidColorBrush Color="{Binding BadgeColor}"/>
+                                    </Border.Background>
+                                </Border>
+                            </Panel>
+
+                            <!-- Username + status -->
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                        Margin="14,0,0,0" Spacing="3">
+                                <TextBlock Text="{Binding Username}"
+                                           FontSize="15" FontWeight="SemiBold"
+                                           Foreground="White"/>
+                                <TextBlock Text="{Binding StatusLabel}"
+                                           FontSize="12">
+                                    <TextBlock.Foreground>
+                                        <SolidColorBrush Color="{Binding StatusColor}"/>
+                                    </TextBlock.Foreground>
+                                </TextBlock>
+                            </StackPanel>
+
+                        </Grid>
+                    </Border>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Empty state -->
+        <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,24,0,0"
+                    IsVisible="{Binding !FilteredFriends.Count}">
+            <TextBlock Text="👥" FontSize="40" HorizontalAlignment="Center"/>
+            <TextBlock Text="No friends found" FontSize="15"
+                       Foreground="#8b949e" HorizontalAlignment="Center"/>
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>

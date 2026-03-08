@@ -58,6 +58,18 @@ namespace GameLauncher
             new Achievement { Platform = "PS5",   GameTitle = "God of War Ragnarök", Name = "Father and Son", Description = "Complete the main story.",               UnlockedAt = "2025-02-10T21:00:00Z" },
         };
 
+        public static List<Friend> Friends { get; } = new()
+        {
+            new Friend { Username = "NightCityV",  IsOnline = true,  CurrentGame = "Cyberpunk 2077",    AvatarColor = "#7c3aed" },
+            new Friend { Username = "EldenLord42",  IsOnline = true,  CurrentGame = "Elden Ring",        AvatarColor = "#dc2626" },
+            new Friend { Username = "SpartanIV",    IsOnline = true,  CurrentGame = "Halo Infinite",     AvatarColor = "#0369a1" },
+            new Friend { Username = "TarnishedOne",  IsOnline = false, CurrentGame = null,                AvatarColor = "#b45309" },
+            new Friend { Username = "BG3Wizard",    IsOnline = true,  CurrentGame = "Baldur's Gate 3",   AvatarColor = "#059669" },
+            new Friend { Username = "GodSlayer",    IsOnline = false, CurrentGame = null,                AvatarColor = "#be123c" },
+            new Friend { Username = "StarfieldXP",  IsOnline = false, CurrentGame = null,                AvatarColor = "#4338ca" },
+            new Friend { Username = "ZeldaFan99",   IsOnline = true,  CurrentGame = "Zelda: TOTK",       AvatarColor = "#0d9488" },
+        };
+
         public static List<StoreGame> Store { get; } = new()
         {
             // Featured
