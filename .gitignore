@@ -16,3 +16,5 @@ backend/.env
 # .NET build artifacts
 GameLauncher/bin/
 GameLauncher/obj/
+GameScanner.Tests/bin/
+GameScanner.Tests/obj/
