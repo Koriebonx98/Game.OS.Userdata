@@ -1,0 +1,179 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.GamesView"
+             x:DataType="vm:GamesViewModel"
+             Background="#1a1a2e">
+
+    <DockPanel Margin="32,24">
+        <!-- Header -->
+        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,20">
+            <TextBlock Text="🎮 Games" FontSize="28" FontWeight="Bold" Foreground="White"/>
+            <TextBlock Text="{Binding StatusMessage}" Foreground="#27ae60" FontSize="13"
+                       IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+        </StackPanel>
+
+        <!-- Guest notice -->
+        <Border DockPanel.Dock="Top" Background="#16213e" CornerRadius="8" Padding="16"
+                IsVisible="{Binding !IsLoggedIn}" Margin="0,0,0,16">
+            <TextBlock Foreground="#8899aa" Text="Sign in to add games to your library and wishlist."/>
+        </Border>
+
+        <!-- TabControl -->
+        <TabControl SelectedIndex="{Binding SelectedTabIndex}">
+            <!-- BROWSE TAB -->
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="🔍 Browse" Foreground="White" Padding="4"/>
+                </TabItem.Header>
+                <DockPanel Margin="0,12">
+                    <!-- Filter Bar -->
+                    <Grid DockPanel.Dock="Top" ColumnDefinitions="200,*" Margin="0,0,0,12">
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding Platforms}"
+                                  SelectedItem="{Binding SelectedPlatform}"
+                                  Background="#16213e" Foreground="White"
+                                  BorderBrush="#533483" Margin="0,0,12,0"
+                                  HorizontalAlignment="Stretch"/>
+                        <TextBox Grid.Column="1" Text="{Binding SearchText}"
+                                 Background="#16213e" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="10,8"
+                                 Watermark="🔍 Search games..."/>
+                    </Grid>
+
+                    <!-- Games List -->
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding BrowseGames}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GameItemViewModel">
+                                    <Border Background="#16213e" CornerRadius="8"
+                                            Width="200" Margin="6" Padding="14">
+                                        <StackPanel Spacing="8">
+                                            <TextBlock Text="🎮" FontSize="28" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Title}" Foreground="White"
+                                                       FontWeight="SemiBold" TextWrapping="Wrap"
+                                                       TextAlignment="Center" FontSize="13"/>
+                                            <Border Background="#0f3460" CornerRadius="4" Padding="6,3"
+                                                    HorizontalAlignment="Center">
+                                                <TextBlock Text="{Binding Platform}" Foreground="#8899aa" FontSize="11"/>
+                                            </Border>
+                                            <!-- Add/In Library button -->
+                                            <Button Command="{Binding AddToLibraryCommand}"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Center"
+                                                    Background="#e94560" Foreground="White"
+                                                    BorderThickness="0" CornerRadius="4"
+                                                    Padding="0,6" FontSize="12" Cursor="Hand"
+                                                    IsVisible="{Binding !IsInLibrary}">+ Library</Button>
+                                            <Border Background="#1a3d1a" CornerRadius="4" Padding="8,6"
+                                                    HorizontalAlignment="Stretch"
+                                                    IsVisible="{Binding IsInLibrary}">
+                                                <TextBlock Text="✓ In Library" Foreground="#27ae60"
+                                                           FontSize="12" HorizontalAlignment="Center"/>
+                                            </Border>
+                                            <!-- Wishlist button -->
+                                            <Button Command="{Binding AddToWishlistCommand}"
+                                                    HorizontalAlignment="Stretch"
+                                                    HorizontalContentAlignment="Center"
+                                                    Background="#533483" Foreground="White"
+                                                    BorderThickness="0" CornerRadius="4"
+                                                    Padding="0,6" FontSize="12" Cursor="Hand"
+                                                    IsVisible="{Binding !IsInWishlist}">♡ Wishlist</Button>
+                                            <Border Background="#2d1a4d" CornerRadius="4" Padding="8,6"
+                                                    HorizontalAlignment="Stretch"
+                                                    IsVisible="{Binding IsInWishlist}">
+                                                <TextBlock Text="♥ Wishlisted" Foreground="#a064e0"
+                                                           FontSize="12" HorizontalAlignment="Center"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+
+            <!-- LIBRARY TAB -->
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="📚 My Library" Foreground="White" Padding="4"/>
+                </TabItem.Header>
+                <DockPanel Margin="0,12">
+                    <TextBlock DockPanel.Dock="Top" Foreground="#8899aa" FontSize="13" Margin="0,0,0,12">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} games in library">
+                                <Binding Path="LibraryGames.Count"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding LibraryGames}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GameItemViewModel">
+                                    <Border Background="#16213e" CornerRadius="6" Margin="0,4" Padding="16,10">
+                                        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                            <TextBlock Grid.Column="0" Text="🎮" FontSize="20" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Platform}" Foreground="#8899aa" FontSize="12"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Command="{Binding RemoveFromLibraryCommand}"
+                                                    Background="#3d1a1a" Foreground="#e94560"
+                                                    BorderThickness="0" CornerRadius="4"
+                                                    Padding="10,6" FontSize="12" Cursor="Hand"
+                                                    Margin="8,0">Remove</Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+
+            <!-- WISHLIST TAB -->
+            <TabItem>
+                <TabItem.Header>
+                    <TextBlock Text="♥ Wishlist" Foreground="White" Padding="4"/>
+                </TabItem.Header>
+                <DockPanel Margin="0,12">
+                    <TextBlock DockPanel.Dock="Top" Foreground="#8899aa" FontSize="13" Margin="0,0,0,12">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="{}{0} games wishlisted">
+                                <Binding Path="WishlistGames.Count"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding WishlistGames}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:GameItemViewModel">
+                                    <Border Background="#16213e" CornerRadius="6" Margin="0,4" Padding="16,10">
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <TextBlock Grid.Column="0" Text="♥" FontSize="20" Foreground="#a064e0"
+                                                       VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Platform}" Foreground="#8899aa" FontSize="12"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="2" Command="{Binding RemoveFromWishlistCommand}"
+                                                    Background="#2d1a4d" Foreground="#a064e0"
+                                                    BorderThickness="0" CornerRadius="4"
+                                                    Padding="10,6" FontSize="12" Cursor="Hand">Remove</Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</UserControl>

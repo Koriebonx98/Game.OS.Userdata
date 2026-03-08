@@ -1,0 +1,152 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.FriendsView"
+             x:DataType="vm:FriendsViewModel"
+             Background="#1a1a2e">
+
+    <ScrollViewer>
+        <StackPanel Margin="32,24" Spacing="24">
+            <!-- Header -->
+            <TextBlock Text="👥 Friends" FontSize="28" FontWeight="Bold" Foreground="White"/>
+
+            <!-- Status Messages -->
+            <Border Background="#1a3d1a" CornerRadius="6" Padding="12,8"
+                    IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding StatusMessage}" Foreground="#27ae60"/>
+            </Border>
+            <Border Background="#3d1a1a" CornerRadius="6" Padding="12,8"
+                    IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding ErrorMessage}" Foreground="#e94560"/>
+            </Border>
+
+            <!-- Add Friend -->
+            <Border Background="#16213e" CornerRadius="10" Padding="20">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Add Friend" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <Grid ColumnDefinitions="*,Auto">
+                        <TextBox Grid.Column="0" Text="{Binding AddFriendUsername}"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="10,8"
+                                 Watermark="Enter username to add..."
+                                 Margin="0,0,8,0"/>
+                        <Button Grid.Column="1" Command="{Binding AddFriendCommand}"
+                                Background="#e94560" Foreground="White"
+                                BorderThickness="0" CornerRadius="6"
+                                Padding="16,8" Cursor="Hand">+ Add Friend</Button>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Incoming Requests -->
+            <Border Background="#16213e" CornerRadius="10" Padding="20"
+                    IsVisible="{Binding IncomingRequests.Count, Converter={x:Static vm:IntToBoolConverter.Instance}}">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="📬 Incoming Requests" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <Border Background="#e94560" CornerRadius="10" Padding="8,2">
+                            <TextBlock Text="{Binding IncomingRequests.Count}" Foreground="White" FontSize="12" FontWeight="Bold"/>
+                        </Border>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding IncomingRequests}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RequestItemViewModel">
+                                <Border Background="#0f3460" CornerRadius="6" Margin="0,4" Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <TextBlock Grid.Column="0" Text="👤" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{Binding Username}" Foreground="White" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding SentAt}" Foreground="#8899aa" FontSize="11"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Command="{Binding AcceptCommand}"
+                                                Background="#1a3d1a" Foreground="#27ae60"
+                                                BorderThickness="0" CornerRadius="4"
+                                                Padding="12,6" FontSize="12" Cursor="Hand"
+                                                Margin="4,0">✓ Accept</Button>
+                                        <Button Grid.Column="3" Command="{Binding DeclineCommand}"
+                                                Background="#3d1a1a" Foreground="#e94560"
+                                                BorderThickness="0" CornerRadius="4"
+                                                Padding="12,6" FontSize="12" Cursor="Hand">✗ Decline</Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Friends List -->
+            <Border Background="#16213e" CornerRadius="10" Padding="20">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="👥 My Friends" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="{Binding Friends.Count}" Foreground="#8899aa" FontSize="14" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Empty State -->
+                    <Border Background="#0f3460" CornerRadius="6" Padding="20"
+                            IsVisible="{Binding Friends.Count, Converter={x:Static vm:IntToBoolConverter.Instance}, ConverterParameter=invert}">
+                        <TextBlock Text="No friends yet. Use the form above to add some!" 
+                                   Foreground="#8899aa" HorizontalAlignment="Center"/>
+                    </Border>
+
+                    <ItemsControl ItemsSource="{Binding Friends}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FriendItemViewModel">
+                                <Border Background="#0f3460" CornerRadius="6" Margin="0,4" Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <Border Grid.Column="0" Background="#533483" CornerRadius="20"
+                                                Width="36" Height="36" Margin="0,0,10,0">
+                                            <TextBlock Text="{Binding Username[0]}" Foreground="White"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                       FontWeight="Bold"/>
+                                        </Border>
+                                        <TextBlock Grid.Column="1" Text="{Binding Username}" Foreground="White"
+                                                   FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                        <Button Grid.Column="2" Command="{Binding ViewProfileCommand}"
+                                                Background="Transparent" Foreground="#8899aa"
+                                                BorderThickness="1" BorderBrush="#533483"
+                                                CornerRadius="4" Padding="10,6" FontSize="12"
+                                                Cursor="Hand" Margin="4,0">View Profile</Button>
+                                        <Button Grid.Column="3" Command="{Binding RemoveCommand}"
+                                                Background="#3d1a1a" Foreground="#e94560"
+                                                BorderThickness="0" CornerRadius="4"
+                                                Padding="10,6" FontSize="12" Cursor="Hand">Remove</Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Sent Requests -->
+            <Border Background="#16213e" CornerRadius="10" Padding="20"
+                    IsVisible="{Binding SentRequests.Count, Converter={x:Static vm:IntToBoolConverter.Instance}}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="📤 Sent Requests" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <ItemsControl ItemsSource="{Binding SentRequests}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:RequestItemViewModel">
+                                <Border Background="#0f3460" CornerRadius="6" Margin="0,4" Padding="14,10">
+                                    <Grid ColumnDefinitions="Auto,*,Auto">
+                                        <TextBlock Grid.Column="0" Text="👤" FontSize="18" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{Binding Username}" Foreground="White" FontWeight="SemiBold"/>
+                                            <TextBlock Text="Pending..." Foreground="#8899aa" FontSize="11"/>
+                                        </StackPanel>
+                                        <Button Grid.Column="2" Command="{Binding CancelCommand}"
+                                                Background="#3d1a1a" Foreground="#e94560"
+                                                BorderThickness="0" CornerRadius="4"
+                                                Padding="12,6" FontSize="12" Cursor="Hand">Cancel</Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

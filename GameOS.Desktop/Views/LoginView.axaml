@@ -1,0 +1,72 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.LoginView"
+             x:DataType="vm:LoginViewModel"
+             Background="#1a1a2e">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+          Width="420" Margin="20">
+        <Border Background="#16213e" CornerRadius="12" Padding="40">
+            <StackPanel Spacing="20">
+                <!-- Header -->
+                <StackPanel HorizontalAlignment="Center" Spacing="8">
+                    <TextBlock Text="🎮" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Sign In" FontSize="28" FontWeight="Bold"
+                               Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Welcome back to Game OS"
+                               Foreground="#8899aa" HorizontalAlignment="Center" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Error Message -->
+                <Border Background="#3d1a1a" CornerRadius="6" Padding="12,8"
+                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#e94560" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- Form -->
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Username or Email" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding EmailOrUsername}"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Enter username or email"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Password" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding Password}"
+                                 PasswordChar="•"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Enter password"/>
+                    </StackPanel>
+                </StackPanel>
+
+                <!-- Login Button -->
+                <Button Command="{Binding LoginCommand}"
+                        HorizontalAlignment="Stretch"
+                        Background="#e94560" Foreground="White"
+                        BorderThickness="0" CornerRadius="6"
+                        Padding="0,12" FontSize="15" FontWeight="SemiBold"
+                        HorizontalContentAlignment="Center"
+                        Cursor="Hand"
+                        IsEnabled="{Binding !IsLoading}">
+                    <TextBlock Text="{Binding IsLoading, Converter={x:Static vm:LoadingTextConverter.Instance}, ConverterParameter='Signing in...|Sign In'}"/>
+                </Button>
+
+                <!-- Signup Link -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="Don't have an account?" Foreground="#8899aa" FontSize="13"/>
+                    <Button Command="{Binding GoToSignupCommand}"
+                            Background="Transparent" Foreground="#e94560"
+                            BorderThickness="0" Padding="0" Cursor="Hand"
+                            FontSize="13" FontWeight="SemiBold">Sign Up</Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

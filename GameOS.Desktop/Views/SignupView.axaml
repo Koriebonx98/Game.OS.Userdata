@@ -1,0 +1,101 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.SignupView"
+             x:DataType="vm:SignupViewModel"
+             Background="#1a1a2e">
+
+    <Grid HorizontalAlignment="Center" VerticalAlignment="Center"
+          Width="440" Margin="20">
+        <Border Background="#16213e" CornerRadius="12" Padding="40">
+            <StackPanel Spacing="20">
+                <!-- Header -->
+                <StackPanel HorizontalAlignment="Center" Spacing="8">
+                    <TextBlock Text="🎮" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Create Account" FontSize="28" FontWeight="Bold"
+                               Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Join the Game OS community"
+                               Foreground="#8899aa" HorizontalAlignment="Center" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Error Message -->
+                <Border Background="#3d1a1a" CornerRadius="6" Padding="12,8"
+                        IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#e94560" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- Success Message -->
+                <Border Background="#1a3d1a" CornerRadius="6" Padding="12,8"
+                        IsVisible="{Binding SuccessMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Text="{Binding SuccessMessage}" Foreground="#27ae60" TextWrapping="Wrap"/>
+                </Border>
+
+                <!-- Form -->
+                <StackPanel Spacing="14">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Username" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding Username}"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Choose a username (min 3 characters)"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Email" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding Email}"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Enter your email"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Password" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding Password}"
+                                 PasswordChar="•"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Password (min 6 characters)"/>
+                    </StackPanel>
+
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Confirm Password" Foreground="#8899aa" FontSize="13"/>
+                        <TextBox Text="{Binding ConfirmPassword}"
+                                 PasswordChar="•"
+                                 Background="#0f3460" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="12,10"
+                                 Watermark="Confirm your password"/>
+                    </StackPanel>
+
+                    <CheckBox IsChecked="{Binding AcceptTerms}" Foreground="#8899aa">
+                        I accept the terms of service
+                    </CheckBox>
+                </StackPanel>
+
+                <!-- Signup Button -->
+                <Button Command="{Binding SignupCommand}"
+                        HorizontalAlignment="Stretch"
+                        Background="#e94560" Foreground="White"
+                        BorderThickness="0" CornerRadius="6"
+                        Padding="0,12" FontSize="15" FontWeight="SemiBold"
+                        HorizontalContentAlignment="Center"
+                        Cursor="Hand"
+                        IsEnabled="{Binding !IsLoading}">
+                    <TextBlock Text="{Binding IsLoading, Converter={x:Static vm:LoadingTextConverter.Instance}, ConverterParameter='Creating Account...|Create Account'}"/>
+                </Button>
+
+                <!-- Login Link -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="Already have an account?" Foreground="#8899aa" FontSize="13"/>
+                    <Button Command="{Binding GoToLoginCommand}"
+                            Background="Transparent" Foreground="#e94560"
+                            BorderThickness="0" Padding="0" Cursor="Hand"
+                            FontSize="13" FontWeight="SemiBold">Sign In</Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

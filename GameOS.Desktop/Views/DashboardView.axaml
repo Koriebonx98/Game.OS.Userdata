@@ -1,0 +1,370 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.DashboardView"
+             x:DataType="vm:DashboardViewModel"
+             Background="#1a1a2e">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <!-- ── Welcome Banner ──────────────────────────────────────────── -->
+        <Border Grid.Row="0" Background="#0f3460" Padding="32,24,32,28">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+
+                <!-- Avatar -->
+                <Border Grid.Column="0" Background="#533483" CornerRadius="40"
+                        Width="72" Height="72" Margin="0,0,20,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding AvatarInitial}"
+                               Foreground="White" FontSize="30" FontWeight="Bold"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+
+                <!-- Welcome text -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="🎮" FontSize="22" VerticalAlignment="Center"/>
+                        <TextBlock FontSize="26" FontWeight="Bold" Foreground="White"
+                                   VerticalAlignment="Center">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="Welcome back, {0}!">
+                                    <Binding Path="Username"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                    <TextBlock Foreground="#8899aa" FontSize="13">
+                        <TextBlock.Text>
+                            <MultiBinding StringFormat="Member since {0}  •  {1} games in library">
+                                <Binding Path="MemberSince"/>
+                                <Binding Path="TotalGames"/>
+                            </MultiBinding>
+                        </TextBlock.Text>
+                    </TextBlock>
+                </StackPanel>
+
+                <!-- Quick action buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
+                            VerticalAlignment="Center">
+                    <Button Command="{Binding GoToBrowseCommand}"
+                            Background="#e94560" Foreground="White"
+                            BorderThickness="0" CornerRadius="8"
+                            Padding="16,10" FontWeight="SemiBold" Cursor="Hand">
+                        + Add Games
+                    </Button>
+                    <Button Command="{Binding GoToFriendsCommand}"
+                            Background="#533483" Foreground="White"
+                            BorderThickness="0" CornerRadius="8"
+                            Padding="16,10" Cursor="Hand">
+                        👥 Friends
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ── Main Scroll Area ────────────────────────────────────────── -->
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel Margin="32,24" Spacing="28">
+
+                <!-- ── Stats Strip ─────────────────────────────────────── -->
+                <Grid ColumnDefinitions="*,*,*,*,*">
+                    <!-- Total Games -->
+                    <Border Grid.Column="0" Background="#16213e" CornerRadius="10"
+                            Padding="18,14" Margin="0,0,8,0">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TotalGames}" FontSize="32"
+                                       FontWeight="Bold" Foreground="#e94560"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Games Owned" Foreground="#8899aa"
+                                       FontSize="12" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Platforms -->
+                    <Border Grid.Column="1" Background="#16213e" CornerRadius="10"
+                            Padding="18,14" Margin="4,0">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TotalPlatforms}" FontSize="32"
+                                       FontWeight="Bold" Foreground="#533483"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Platforms" Foreground="#8899aa"
+                                       FontSize="12" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Wishlist -->
+                    <Border Grid.Column="2" Background="#16213e" CornerRadius="10"
+                            Padding="18,14" Margin="4,0">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding WishlistCount}" FontSize="32"
+                                       FontWeight="Bold" Foreground="#f39c12"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Wishlisted" Foreground="#8899aa"
+                                       FontSize="12" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Friends -->
+                    <Border Grid.Column="3" Background="#16213e" CornerRadius="10"
+                            Padding="18,14" Margin="4,0">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding FriendsCount}" FontSize="32"
+                                       FontWeight="Bold" Foreground="#27ae60"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Friends" Foreground="#8899aa"
+                                       FontSize="12" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                    <!-- Inbox badge -->
+                    <Border Grid.Column="4" Background="#16213e" CornerRadius="10"
+                            Padding="18,14" Margin="8,0,0,0">
+                        <StackPanel Spacing="4" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding InboxCount}" FontSize="32"
+                                       FontWeight="Bold" Foreground="#e94560"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Pending" Foreground="#8899aa"
+                                       FontSize="12" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- ── Quick-Nav Tiles ──────────────────────────────────── -->
+                <Grid ColumnDefinitions="*,*,*,*">
+                    <Border Grid.Column="0" Background="#16213e" CornerRadius="10"
+                            Margin="0,0,8,0" Cursor="Hand">
+                        <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#1e2e50"/>
+                            </Style>
+                        </Border.Styles>
+                        <Button Command="{Binding GoToBrowseCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Padding="20,16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="🔍" FontSize="28"/>
+                                <TextBlock Text="Browse Games" Foreground="White"
+                                           FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Discover new games across all platforms"
+                                           Foreground="#8899aa" FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                    <Border Grid.Column="1" Background="#16213e" CornerRadius="10"
+                            Margin="4,0" Cursor="Hand">
+                        <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#1e2e50"/>
+                            </Style>
+                        </Border.Styles>
+                        <Button Command="{Binding GoToWishlistCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Padding="20,16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="⭐" FontSize="28"/>
+                                <TextBlock Text="Wishlist" Foreground="White"
+                                           FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Games you want to own next"
+                                           Foreground="#8899aa" FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                    <Border Grid.Column="2" Background="#16213e" CornerRadius="10"
+                            Margin="4,0" Cursor="Hand">
+                        <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#1e2e50"/>
+                            </Style>
+                        </Border.Styles>
+                        <Button Command="{Binding GoToFriendsCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Padding="20,16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="👥" FontSize="28"/>
+                                <TextBlock Text="Friends" Foreground="White"
+                                           FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Connect and compare libraries"
+                                           Foreground="#8899aa" FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                    <Border Grid.Column="3" Background="#16213e" CornerRadius="10"
+                            Margin="8,0,0,0" Cursor="Hand">
+                        <Border.Styles>
+                            <Style Selector="Border:pointerover">
+                                <Setter Property="Background" Value="#1e2e50"/>
+                            </Style>
+                        </Border.Styles>
+                        <Button Command="{Binding GoToAccountCommand}"
+                                Background="Transparent" BorderThickness="0"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Padding="20,16">
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="⚙️" FontSize="28"/>
+                                <TextBlock Text="Account" Foreground="White"
+                                           FontWeight="SemiBold" FontSize="14"/>
+                                <TextBlock Text="Settings, API tokens and profile"
+                                           Foreground="#8899aa" FontSize="11"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Button>
+                    </Border>
+                </Grid>
+
+                <!-- ── Recently Added ───────────────────────────────────── -->
+                <StackPanel Spacing="14"
+                            IsVisible="{Binding RecentGames.Count,
+                                        Converter={x:Static vm:IntToBoolConverter.Instance}}">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🕐 Recently Added" FontSize="18" FontWeight="Bold"
+                                   Foreground="White" VerticalAlignment="Center"/>
+                        <Button Command="{Binding GoToLibraryCommand}"
+                                Background="Transparent" Foreground="#8899aa"
+                                BorderThickness="0" Padding="0" Cursor="Hand"
+                                FontSize="13">View All →</Button>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding RecentGames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DashboardGameItemViewModel">
+                                <Border Background="#16213e" CornerRadius="8"
+                                        Width="180" Margin="0,0,12,8" Padding="14,12">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="{Binding PlatformIcon}" FontSize="24"
+                                                   HorizontalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Title}" Foreground="White"
+                                                   FontSize="12" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" TextAlignment="Center"
+                                                   MaxLines="2"/>
+                                        <!-- Platform badge -->
+                                        <Border CornerRadius="4" Padding="8,3"
+                                                HorizontalAlignment="Center"
+                                                Background="{Binding PlatformColor,
+                                                    Converter={x:Static vm:HexColorToBrushConverter.Instance}}">
+                                            <TextBlock Text="{Binding Platform}"
+                                                       Foreground="White" FontSize="10"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding AddedAtShort}"
+                                                   Foreground="#8899aa" FontSize="10"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- ── My Games ─────────────────────────────────────────── -->
+                <StackPanel Spacing="14">
+                    <!-- Header row -->
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10"
+                                    VerticalAlignment="Center">
+                            <TextBlock Text="🎮 My Games" FontSize="18" FontWeight="Bold"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                            <!-- game count badge -->
+                            <Border Background="#533483" CornerRadius="12" Padding="10,3">
+                                <TextBlock Text="{Binding TotalGames}" Foreground="White"
+                                           FontSize="12" FontWeight="Bold"/>
+                            </Border>
+                        </StackPanel>
+                        <!-- Search -->
+                        <TextBox Grid.Column="1" Text="{Binding SearchText}"
+                                 Width="220"
+                                 Background="#16213e" Foreground="White"
+                                 BorderBrush="#533483" BorderThickness="1"
+                                 CornerRadius="6" Padding="10,7"
+                                 Watermark="🔍 Search your games…"/>
+                    </Grid>
+
+                    <!-- Status message -->
+                    <Border Background="#1a3d1a" CornerRadius="6" Padding="12,8"
+                            IsVisible="{Binding StatusMessage,
+                                        Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding StatusMessage}" Foreground="#27ae60"/>
+                    </Border>
+
+                    <!-- Loading state -->
+                    <TextBlock Text="Loading your library…"
+                               Foreground="#8899aa" FontSize="14"
+                               IsVisible="{Binding IsLoading}"
+                               HorizontalAlignment="Center" Margin="0,20"/>
+
+                    <!-- Empty state — no games yet -->
+                    <Border Background="#16213e" CornerRadius="10" Padding="40"
+                            IsVisible="{Binding MyGames.Count,
+                                        Converter={x:Static vm:IntToBoolConverter.Instance},
+                                        ConverterParameter=invert}">
+                        <StackPanel HorizontalAlignment="Center" Spacing="12">
+                            <TextBlock Text="🎮" FontSize="48" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Your library is empty" Foreground="White"
+                                       FontSize="16" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center"/>
+                            <TextBlock Text="Browse games and add them to your library to see them here."
+                                       Foreground="#8899aa" FontSize="13"
+                                       HorizontalAlignment="Center" TextAlignment="Center"
+                                       TextWrapping="Wrap" MaxWidth="340"/>
+                            <Button Command="{Binding GoToBrowseCommand}"
+                                    Background="#e94560" Foreground="White"
+                                    BorderThickness="0" CornerRadius="8"
+                                    Padding="24,10" FontWeight="SemiBold"
+                                    HorizontalAlignment="Center" Cursor="Hand">
+                                Browse Games
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Games grid — merged, all platforms -->
+                    <ItemsControl ItemsSource="{Binding MyGames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DashboardGameItemViewModel">
+                                <Border Background="#16213e" CornerRadius="10"
+                                        Width="200" Margin="0,0,12,12" Padding="16">
+                                    <StackPanel Spacing="10">
+                                        <!-- Platform icon -->
+                                        <TextBlock Text="{Binding PlatformIcon}" FontSize="32"
+                                                   HorizontalAlignment="Center"/>
+                                        <!-- Title -->
+                                        <TextBlock Text="{Binding Title}" Foreground="White"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   TextWrapping="Wrap" TextAlignment="Center"
+                                                   MaxLines="2" LineHeight="18"/>
+                                        <!-- Platform badge -->
+                                        <Border CornerRadius="4" Padding="10,4"
+                                                HorizontalAlignment="Center"
+                                                Background="{Binding PlatformColor,
+                                                    Converter={x:Static vm:HexColorToBrushConverter.Instance}}">
+                                            <TextBlock Text="{Binding Platform}"
+                                                       Foreground="White" FontSize="11"
+                                                       FontWeight="SemiBold"/>
+                                        </Border>
+                                        <!-- Added date -->
+                                        <TextBlock Text="{Binding AddedAtShort}"
+                                                   Foreground="#8899aa" FontSize="11"
+                                                   HorizontalAlignment="Center"
+                                                   IsVisible="{Binding AddedAtShort,
+                                                       Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <!-- bottom padding -->
+                <Border Height="20"/>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>
