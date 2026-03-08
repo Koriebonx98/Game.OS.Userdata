@@ -1,0 +1,85 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.InboxView"
+             x:DataType="vm:InboxViewModel"
+             Background="#1a1a2e">
+
+    <ScrollViewer>
+        <StackPanel Margin="32,24" Spacing="20">
+            <!-- Header with count -->
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="📬 Inbox" FontSize="28" FontWeight="Bold" Foreground="White"/>
+                <Border Background="#e94560" CornerRadius="12" Padding="10,4"
+                        VerticalAlignment="Center"
+                        IsVisible="{Binding Requests.Count, Converter={x:Static vm:IntToBoolConverter.Instance}}">
+                    <TextBlock Text="{Binding Requests.Count}" Foreground="White" FontWeight="Bold"/>
+                </Border>
+            </StackPanel>
+
+            <!-- Status Message -->
+            <Border Background="#1a3d1a" CornerRadius="6" Padding="12,8"
+                    IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                <TextBlock Text="{Binding StatusMessage}" Foreground="#27ae60"/>
+            </Border>
+
+            <!-- Empty State -->
+            <Border Background="#16213e" CornerRadius="10" Padding="40"
+                    IsVisible="{Binding !HasRequests}">
+                <StackPanel HorizontalAlignment="Center" Spacing="12">
+                    <TextBlock Text="📭" FontSize="48" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Your inbox is empty" FontSize="18" FontWeight="Bold"
+                               Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="No pending friend requests at this time."
+                               Foreground="#8899aa" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Friend Requests Section -->
+            <Border Background="#16213e" CornerRadius="10" Padding="20"
+                    IsVisible="{Binding HasRequests}">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="Friend Requests" FontSize="16" FontWeight="Bold"
+                               Foreground="White"/>
+                    <ItemsControl ItemsSource="{Binding Requests}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:InboxRequestItemViewModel">
+                                <Border Background="#0f3460" CornerRadius="8" Margin="0,4" Padding="16,12">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <!-- Avatar -->
+                                        <Border Grid.Column="0" Background="#533483" CornerRadius="24"
+                                                Width="44" Height="44" Margin="0,0,14,0">
+                                            <TextBlock Text="{Binding From[0]}" Foreground="White"
+                                                       FontSize="18" FontWeight="Bold"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"/>
+                                        </Border>
+                                        <!-- Info -->
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                            <TextBlock Text="{Binding From}" Foreground="White"
+                                                       FontWeight="Bold" FontSize="15"/>
+                                            <TextBlock Text="wants to be your friend" Foreground="#8899aa" FontSize="12"/>
+                                            <TextBlock Text="{Binding SentAt}" Foreground="#8899aa" FontSize="11"/>
+                                        </StackPanel>
+                                        <!-- Accept -->
+                                        <Button Grid.Column="2" Command="{Binding AcceptCommand}"
+                                                Background="#1a3d1a" Foreground="#27ae60"
+                                                BorderThickness="0" CornerRadius="6"
+                                                Padding="14,8" FontSize="13" FontWeight="SemiBold"
+                                                Cursor="Hand" Margin="6,0">✓ Accept</Button>
+                                        <!-- Decline -->
+                                        <Button Grid.Column="3" Command="{Binding DeclineCommand}"
+                                                Background="#3d1a1a" Foreground="#e94560"
+                                                BorderThickness="0" CornerRadius="6"
+                                                Padding="14,8" FontSize="13" FontWeight="SemiBold"
+                                                Cursor="Hand">✗ Decline</Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

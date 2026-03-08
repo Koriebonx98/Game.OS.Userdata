@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.HomeView"
+             x:DataType="vm:HomeViewModel"
+             Background="#1a1a2e">
+
+    <StackPanel Spacing="0">
+        <!-- Hero Section -->
+        <Border Background="#0f3460" Padding="60,50">
+            <StackPanel HorizontalAlignment="Center" Spacing="16">
+                <TextBlock Text="🎮" FontSize="64" HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding WelcomeMessage}"
+                           FontSize="36" FontWeight="Bold" Foreground="White"
+                           HorizontalAlignment="Center" TextAlignment="Center"/>
+                <TextBlock Text="Your ultimate gaming hub — track your library, wishlist, and connect with friends."
+                           Foreground="#8899aa" FontSize="16"
+                           HorizontalAlignment="Center" TextAlignment="Center"
+                           TextWrapping="Wrap" MaxWidth="600"/>
+
+                <!-- User Count Badge -->
+                <Border Background="#533483" CornerRadius="20" Padding="16,6"
+                        HorizontalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="👥" FontSize="14"/>
+                        <TextBlock Foreground="White" FontSize="13">
+                            <TextBlock.Text>
+                                <MultiBinding StringFormat="{}{0} gamers registered">
+                                    <Binding Path="UserCount"/>
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+
+                <!-- CTA Buttons -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12" Margin="0,8,0,0">
+                    <Button Command="{Binding BrowseGamesCommand}"
+                            Background="#e94560" Foreground="White"
+                            BorderThickness="0" CornerRadius="8"
+                            Padding="24,12" FontSize="15" FontWeight="SemiBold"
+                            Cursor="Hand">🎮 Browse Games</Button>
+                    <Button Command="{Binding GoToSignupCommand}"
+                            Background="Transparent" Foreground="White"
+                            BorderThickness="1" BorderBrush="#533483"
+                            CornerRadius="8" Padding="24,12" FontSize="15"
+                            Cursor="Hand"
+                            IsVisible="{Binding !IsLoggedIn}">Sign Up Free</Button>
+                    <Button Command="{Binding GoToLibraryCommand}"
+                            Background="#533483" Foreground="White"
+                            BorderThickness="0" CornerRadius="8"
+                            Padding="24,12" FontSize="15" FontWeight="SemiBold"
+                            Cursor="Hand"
+                            IsVisible="{Binding IsLoggedIn}">📚 My Library</Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
+        <!-- Feature Cards -->
+        <StackPanel Margin="40,40,40,20" Spacing="16">
+            <TextBlock Text="Everything you need for your gaming life"
+                       FontSize="22" FontWeight="Bold" Foreground="White"
+                       HorizontalAlignment="Center"/>
+            <Grid ColumnDefinitions="*,*,*" Margin="0,16,0,0">
+                <Grid.Styles>
+                    <Style Selector="Border.card">
+                        <Setter Property="Background" Value="#16213e"/>
+                        <Setter Property="CornerRadius" Value="10"/>
+                        <Setter Property="Padding" Value="28"/>
+                        <Setter Property="Margin" Value="8"/>
+                    </Style>
+                </Grid.Styles>
+
+                <Border Grid.Column="0" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="🔐" FontSize="36"/>
+                        <TextBlock Text="Secure Accounts" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="PBKDF2 password hashing and secure API tokens keep your data safe."
+                                   Foreground="#8899aa" TextWrapping="Wrap" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="⚡" FontSize="36"/>
+                        <TextBlock Text="Fast &amp; Local" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="All data stored locally — no server required. Instant loading and total privacy."
+                                   Foreground="#8899aa" TextWrapping="Wrap" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Classes="card">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="🌐" FontSize="36"/>
+                        <TextBlock Text="Multi-Platform" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Track games across PC, PlayStation, Xbox, Nintendo Switch and more."
+                                   Foreground="#8899aa" TextWrapping="Wrap" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </StackPanel>
+
+        <!-- Stats Row -->
+        <Grid ColumnDefinitions="*,*,*,*" Margin="48,8,48,40">
+            <Border Grid.Column="0" Background="#16213e" CornerRadius="8" Padding="20" Margin="8">
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="7" FontSize="28" FontWeight="Bold" Foreground="#e94560" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Platforms" Foreground="#8899aa" FontSize="13" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="1" Background="#16213e" CornerRadius="8" Padding="20" Margin="8">
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="27+" FontSize="28" FontWeight="Bold" Foreground="#e94560" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Sample Games" Foreground="#8899aa" FontSize="13" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="2" Background="#16213e" CornerRadius="8" Padding="20" Margin="8">
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="🔑" FontSize="28" HorizontalAlignment="Center"/>
+                    <TextBlock Text="API Tokens" Foreground="#8899aa" FontSize="13" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+            <Border Grid.Column="3" Background="#16213e" CornerRadius="8" Padding="20" Margin="8">
+                <StackPanel HorizontalAlignment="Center" Spacing="4">
+                    <TextBlock Text="👥" FontSize="28" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Friends System" Foreground="#8899aa" FontSize="13" HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </StackPanel>
+</UserControl>

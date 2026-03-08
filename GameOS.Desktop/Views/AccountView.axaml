@@ -1,0 +1,159 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameOS.Desktop.ViewModels"
+             x:Class="GameOS.Desktop.Views.AccountView"
+             x:DataType="vm:AccountViewModel"
+             Background="#1a1a2e">
+
+    <ScrollViewer>
+        <StackPanel Margin="32,24" Spacing="24" MaxWidth="700">
+            <!-- Header -->
+            <TextBlock Text="⚙️ Account Settings" FontSize="28" FontWeight="Bold" Foreground="White"/>
+
+            <!-- Account Info Card -->
+            <Border Background="#16213e" CornerRadius="10" Padding="24">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Account Information" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" >
+                        <!-- Avatar -->
+                        <Border Grid.RowSpan="3" Grid.Column="0" Background="#533483" CornerRadius="40"
+                                Width="72" Height="72" Margin="0,0,20,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Username[0]}" Foreground="White"
+                                       FontSize="28" FontWeight="Bold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" Grid.Row="0" Spacing="4">
+                            <TextBlock Text="{Binding Username}" Foreground="White"
+                                       FontSize="20" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding Email}" Foreground="#8899aa" FontSize="13"/>
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <TextBlock Text="Member since:" Foreground="#8899aa" FontSize="12"/>
+                                <TextBlock Text="{Binding CreatedAt}" Foreground="#8899aa" FontSize="12"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </StackPanel>
+            </Border>
+
+            <!-- Update Account Card -->
+            <Border Background="#16213e" CornerRadius="10" Padding="24">
+                <StackPanel Spacing="16">
+                    <TextBlock Text="Update Account" FontSize="16" FontWeight="Bold" Foreground="White"/>
+
+                    <!-- Error / Success -->
+                    <Border Background="#3d1a1a" CornerRadius="6" Padding="12,8"
+                            IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding ErrorMessage}" Foreground="#e94560" TextWrapping="Wrap"/>
+                    </Border>
+                    <Border Background="#1a3d1a" CornerRadius="6" Padding="12,8"
+                            IsVisible="{Binding SuccessMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Text="{Binding SuccessMessage}" Foreground="#27ae60"/>
+                    </Border>
+
+                    <StackPanel Spacing="12">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="New Email (leave blank to keep current)" Foreground="#8899aa" FontSize="13"/>
+                            <TextBox Text="{Binding NewEmail}"
+                                     Background="#0f3460" Foreground="White"
+                                     BorderBrush="#533483" BorderThickness="1"
+                                     CornerRadius="6" Padding="12,10"
+                                     Watermark="{Binding Email}"/>
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Current Password *" Foreground="#8899aa" FontSize="13"/>
+                            <TextBox Text="{Binding CurrentPassword}" PasswordChar="•"
+                                     Background="#0f3460" Foreground="White"
+                                     BorderBrush="#533483" BorderThickness="1"
+                                     CornerRadius="6" Padding="12,10"
+                                     Watermark="Required to save changes"/>
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="New Password (leave blank to keep current)" Foreground="#8899aa" FontSize="13"/>
+                            <TextBox Text="{Binding NewPassword}" PasswordChar="•"
+                                     Background="#0f3460" Foreground="White"
+                                     BorderBrush="#533483" BorderThickness="1"
+                                     CornerRadius="6" Padding="12,10"
+                                     Watermark="New password (min 6 chars)"/>
+                        </StackPanel>
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Confirm New Password" Foreground="#8899aa" FontSize="13"/>
+                            <TextBox Text="{Binding ConfirmNewPassword}" PasswordChar="•"
+                                     Background="#0f3460" Foreground="White"
+                                     BorderBrush="#533483" BorderThickness="1"
+                                     CornerRadius="6" Padding="12,10"
+                                     Watermark="Confirm new password"/>
+                        </StackPanel>
+                    </StackPanel>
+                    <Button Command="{Binding UpdateAccountCommand}"
+                            Background="#e94560" Foreground="White"
+                            BorderThickness="0" CornerRadius="6"
+                            Padding="20,10" FontWeight="SemiBold"
+                            Cursor="Hand" IsEnabled="{Binding !IsLoading}">
+                        <TextBlock Text="{Binding IsLoading, Converter={x:Static vm:LoadingTextConverter.Instance}, ConverterParameter='Saving...|Save Changes'}"/>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- API Token Card -->
+            <Border Background="#16213e" CornerRadius="10" Padding="24">
+                <StackPanel Spacing="16">
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="🔑 API Token" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="Use your token to access Game OS data programmatically."
+                                   Foreground="#8899aa" FontSize="13"/>
+                    </StackPanel>
+
+                    <!-- Token display -->
+                    <Border Background="#0f3460" CornerRadius="6" Padding="14,10">
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{Binding DisplayToken}"
+                                       Foreground="{Binding HasApiToken, Converter={x:Static vm:BoolToColorConverter.Instance}}"
+                                       FontFamily="Consolas,Courier New,monospace"
+                                       FontSize="13" VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <Button Grid.Column="1" Command="{Binding ToggleShowTokenCommand}"
+                                    Background="Transparent" Foreground="#8899aa"
+                                    BorderThickness="0" Padding="8,4" Cursor="Hand"
+                                    IsVisible="{Binding HasApiToken}">
+                                <TextBlock Text="{Binding ShowToken, Converter={x:Static vm:LoadingTextConverter.Instance}, ConverterParameter='Hide|Show'}"/>
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <!-- Issued at -->
+                    <StackPanel Orientation="Horizontal" Spacing="4"
+                                IsVisible="{Binding HasApiToken}">
+                        <TextBlock Text="Issued:" Foreground="#8899aa" FontSize="12"/>
+                        <TextBlock Text="{Binding ApiTokenIssuedAt}" Foreground="#8899aa" FontSize="12"/>
+                    </StackPanel>
+
+                    <!-- Token Actions -->
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Command="{Binding GenerateTokenCommand}"
+                                Background="#533483" Foreground="White"
+                                BorderThickness="0" CornerRadius="6"
+                                Padding="14,8" Cursor="Hand">
+                            <TextBlock Text="{Binding HasApiToken, Converter={x:Static vm:LoadingTextConverter.Instance}, ConverterParameter='Regenerate Token|Generate Token'}"/>
+                        </Button>
+                        <Button Command="{Binding RevokeTokenCommand}"
+                                Background="#3d1a1a" Foreground="#e94560"
+                                BorderThickness="0" CornerRadius="6"
+                                Padding="14,8" Cursor="Hand"
+                                IsVisible="{Binding HasApiToken}">Revoke Token</Button>
+                    </StackPanel>
+
+                    <!-- Code Example -->
+                    <Border Background="#0a0a1a" CornerRadius="6" Padding="14"
+                            IsVisible="{Binding HasApiToken}">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="C# Usage Example" Foreground="#8899aa" FontSize="12"/>
+                            <TextBlock Text="{Binding CodeExample}"
+                                       Foreground="#27ae60"
+                                       FontFamily="Consolas,Courier New,monospace"
+                                       FontSize="12" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
