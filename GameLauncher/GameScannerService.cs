@@ -26,6 +26,7 @@ public sealed class GameScannerService : IDisposable
     private readonly List<LocalRepack>        _repacks = new();
     private readonly List<FileSystemWatcher>  _watchers= new();
     private readonly SemaphoreSlim            _lock    = new(1, 1);
+    private CancellationTokenSource?          _debounceCts;
 
     // ── Cache paths ───────────────────────────────────────────────────────────
     private static readonly string CacheDir  = Path.Combine(
@@ -272,7 +273,8 @@ public sealed class GameScannerService : IDisposable
 
         try
         {
-            // Check Unix execute permission bits (.NET 7+)
+            // Check Unix execute permission bits (File.GetUnixFileMode available since .NET 7;
+            // this project targets .NET 8 so this is always supported)
             var mode = File.GetUnixFileMode(path);
             return (mode & (UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute)) != 0;
         }
@@ -306,8 +308,9 @@ public sealed class GameScannerService : IDisposable
     {
         try
         {
-            return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories)
-                            .Sum(f => { try { return new FileInfo(f).Length; } catch { return 0L; } });
+            return new DirectoryInfo(path)
+                .EnumerateFiles("*", SearchOption.AllDirectories)
+                .Sum(f => f.Length);
         }
         catch { return 0; }
     }
@@ -349,12 +352,17 @@ public sealed class GameScannerService : IDisposable
 
     private void OnFileSystemChanged(object sender, FileSystemEventArgs e)
     {
-        // Debounce: fire a re-scan on a thread-pool thread
-        Task.Delay(500).ContinueWith(async _ =>
+        // Cancel any pending debounced scan and start a fresh one
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _debounceCts = cts;
+        _ = Task.Delay(500, cts.Token).ContinueWith(async t =>
         {
+            if (t.IsCanceled) return;
             try { await ScanAllDrivesAsync(CancellationToken.None); }
             catch { }
-        });
+        }, TaskScheduler.Default);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -408,6 +416,8 @@ public sealed class GameScannerService : IDisposable
     public void Dispose()
     {
         DisposeWatchers();
+        _debounceCts?.Cancel();
+        _debounceCts?.Dispose();
         _lock.Dispose();
     }
 }

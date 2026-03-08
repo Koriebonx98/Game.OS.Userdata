@@ -116,11 +116,14 @@ namespace GameLauncher.Models
         public string FilePath { get; set; } = "";
         public string FileType { get; set; } = ""; // "zip", "rar", "folder"
         public long   SizeBytes{ get; set; }
+
+        private string? _sizeLabel;
         public string SizeLabel =>
-            SizeBytes >= 1_073_741_824 ? $"{SizeBytes / 1_073_741_824.0:F1} GB" :
-            SizeBytes >= 1_048_576     ? $"{SizeBytes / 1_048_576.0:F0} MB"     :
-            SizeBytes >= 1_024         ? $"{SizeBytes / 1_024.0:F0} KB"         :
-            $"{SizeBytes} B";
+            _sizeLabel ??=
+                SizeBytes >= 1_073_741_824 ? $"{SizeBytes / 1_073_741_824.0:F1} GB" :
+                SizeBytes >= 1_048_576     ? $"{SizeBytes / 1_048_576.0:F0} MB"     :
+                SizeBytes >= 1_024         ? $"{SizeBytes / 1_024.0:F0} KB"         :
+                $"{SizeBytes} B";
     }
 
     /// <summary>A store entry shown in the Games Store screen.</summary>
