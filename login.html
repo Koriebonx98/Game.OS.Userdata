@@ -3,86 +3,106 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game OS - Login</title>
+    <title>Game OS – Sign In</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎮 Game OS</h1>
-            <nav>
-                <a href="index.html" class="nav-link">Home</a>
-                <div id="guestNav">
-                    <a href="signup.html" class="nav-link">Sign Up</a>
-                </div>
-                <div id="userNav" class="hidden">
-                    <a href="account.html" class="nav-link">My Account</a>
-                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
-                </div>
-            </nav>
-        </header>
-        
-        <main>
-            <div class="form-container">
-                <h2>Welcome Back</h2>
-                <p class="form-subtitle">Sign in to your Game OS account</p>
-                
-                <!-- Connection Status -->
-                <div class="text-center">
-                    <div id="connectionStatus" class="status"></div>
-                </div>
-                
-                <form id="loginForm" class="auth-form">
-                    <div class="form-group">
-                        <label for="loginEmail">Email or Username *</label>
-                        <input 
-                            type="text" 
-                            id="loginEmail" 
-                            name="email" 
-                            placeholder="your.email@example.com"
-                            required
-                            autocomplete="email"
-                        >
-                        <small style="color: #666; font-size: 0.85em;">Enter your email or username</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="loginPassword">Password *</label>
-                        <input 
-                            type="password" 
-                            id="loginPassword" 
-                            name="password" 
-                            placeholder="Enter your password"
-                            required
-                            autocomplete="current-password"
-                        >
-                    </div>
-                    
-                    <div class="form-options">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="rememberMe" name="rememberMe">
-                            <span>Remember me</span>
-                        </label>
-                        <a href="#" class="link">Forgot password?</a>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-block">Login</button>
-                    
-                    <div class="form-footer">
-                        <p>Don't have an account? <a href="signup.html" class="link">Sign up here</a></p>
-                    </div>
-                </form>
-                
-                <!-- Message Display -->
-                <div id="loginMessage" class="message"></div>
+    <div class="console-auth-wrap">
+        <div class="console-auth-card">
+            <!-- Logo -->
+            <div class="console-auth-logo">
+                <div class="console-auth-logo-text">🎮 <span>Game OS</span></div>
             </div>
-        </main>
-        
-        <footer>
-            <p>&copy; 2026 Game OS. All rights reserved.</p>
-        </footer>
+
+            <h2 class="console-auth-title">Welcome Back</h2>
+            <p class="console-auth-subtitle">Sign in to your Game OS account</p>
+
+            <!-- Connection Status -->
+            <div style="text-align:center;margin-bottom:8px;">
+                <span id="connectionStatus" class="console-status-pill loading">Connecting…</span>
+            </div>
+
+            <!-- Login Form -->
+            <form id="loginForm" class="auth-form" style="background:none;">
+                <div class="console-form-group">
+                    <label for="loginEmail">Email or Username</label>
+                    <input
+                        type="text"
+                        id="loginEmail"
+                        name="email"
+                        placeholder="your.email@example.com"
+                        required
+                        autocomplete="email"
+                    >
+                    <small>Enter your email or username</small>
+                </div>
+
+                <div class="console-form-group">
+                    <label for="loginPassword">Password</label>
+                    <input
+                        type="password"
+                        id="loginPassword"
+                        name="password"
+                        placeholder="Enter your password"
+                        required
+                        autocomplete="current-password"
+                    >
+                </div>
+
+                <div class="console-form-options">
+                    <label class="console-checkbox-label">
+                        <input type="checkbox" id="rememberMe" name="rememberMe">
+                        <span>Remember me</span>
+                    </label>
+                    <a href="#" class="console-link" style="font-size:0.85em;">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="console-btn-submit">Sign In</button>
+            </form>
+
+            <!-- Divider -->
+            <div class="console-auth-divider">or</div>
+
+            <!-- Quick Login -->
+            <button class="console-quick-login-btn" onclick="handleQuickLogin()">⚡ Quick Login (Demo)</button>
+
+            <!-- Message Display -->
+            <div id="loginMessage" class="message" style="margin-top:12px;"></div>
+
+            <!-- Footer -->
+            <div class="console-auth-footer">
+                <a href="index.html" class="console-link" style="margin-right:16px;">← Home</a>
+                Don't have an account? <a href="signup.html" class="console-link">Sign up here</a>
+            </div>
+        </div>
     </div>
-    
+
     <script src="script.js"></script>
+    <script>
+    // Quick Login: fill demo credentials and submit
+    function handleQuickLogin() {
+        const emailInput = document.getElementById('loginEmail');
+        const passInput  = document.getElementById('loginPassword');
+        if (emailInput) emailInput.value = 'demo@gameos.local';
+        if (passInput)  passInput.value  = 'demo123';
+        const form = document.getElementById('loginForm');
+        if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+    }
+
+    // Style the status pill from script.js updateConnectionStatus hook
+    (function patchStatus() {
+        const origUpdate = typeof updateConnectionStatus === 'function' ? updateConnectionStatus : null;
+        // Poll the status element and style it
+        const poll = setInterval(() => {
+            const el = document.getElementById('connectionStatus');
+            if (!el) return;
+            const txt = el.textContent.toLowerCase();
+            el.className = 'console-status-pill ' +
+                (txt.includes('github') || txt.includes('connect') ? 'connected' :
+                 txt.includes('demo')   ? 'demo' : 'loading');
+        }, 500);
+        setTimeout(() => clearInterval(poll), 10000);
+    })();
+    </script>
 </body>
 </html>

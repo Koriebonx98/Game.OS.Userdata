@@ -3,114 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game OS - Sign Up</title>
+    <title>Game OS – Create Account</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>🎮 Game OS</h1>
-            <nav>
-                <a href="index.html" class="nav-link">Home</a>
-                <div id="guestNav">
-                    <a href="login.html" class="nav-link">Login</a>
-                </div>
-                <div id="userNav" class="hidden">
-                    <a href="account.html" class="nav-link">My Account</a>
-                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
-                </div>
-            </nav>
-        </header>
-        
-        <main>
-            <div class="form-container">
-                <h2>Create Account</h2>
-                <p class="form-subtitle">Join Game OS and start your gaming journey</p>
-                
-                <!-- Connection Status -->
-                <div class="text-center">
-                    <div id="connectionStatus" class="status"></div>
-                </div>
-                
-                <form id="signupForm" class="auth-form">
-                    <div class="form-group">
-                        <label for="signupUsername">Username *</label>
-                        <input 
-                            type="text" 
-                            id="signupUsername" 
-                            name="username" 
-                            placeholder="Choose a username"
-                            required
-                            minlength="3"
-                            autocomplete="username"
-                        >
-                        <small style="color: #666; font-size: 0.85em;">Minimum 3 characters</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="signupEmail">Email *</label>
-                        <input 
-                            type="email" 
-                            id="signupEmail" 
-                            name="email" 
-                            placeholder="your.email@example.com"
-                            required
-                            autocomplete="email"
-                        >
-                        <small style="color: #666; font-size: 0.85em;">We'll never share your email</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="signupPassword">Password *</label>
-                        <input 
-                            type="password" 
-                            id="signupPassword" 
-                            name="password" 
-                            placeholder="Create a strong password"
-                            required
-                            minlength="6"
-                            autocomplete="new-password"
-                        >
-                        <small style="color: #666; font-size: 0.85em;">Minimum 6 characters</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="signupConfirmPassword">Confirm Password *</label>
-                        <input 
-                            type="password" 
-                            id="signupConfirmPassword" 
-                            name="confirmPassword" 
-                            placeholder="Confirm your password"
-                            required
-                            minlength="6"
-                            autocomplete="new-password"
-                        >
-                    </div>
-                    
-                    <div class="form-options">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="agreeTerms" name="agreeTerms" required>
-                            <span>I agree to the <a href="#" class="link">Terms and Conditions</a></span>
-                        </label>
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary btn-block">Create Account</button>
-                    
-                    <div class="form-footer">
-                        <p>Already have an account? <a href="login.html" class="link">Login here</a></p>
-                    </div>
-                </form>
-                
-                <!-- Message Display -->
-                <div id="signupMessage" class="message"></div>
+    <div class="console-auth-wrap">
+        <div class="console-auth-card">
+            <!-- Logo -->
+            <div class="console-auth-logo">
+                <div class="console-auth-logo-text">🎮 <span>Game OS</span></div>
             </div>
-        </main>
-        
-        <footer>
-            <p>&copy; 2026 Game OS. All rights reserved.</p>
-        </footer>
+
+            <h2 class="console-auth-title">Create Account</h2>
+            <p class="console-auth-subtitle">Join Game OS and start your gaming journey</p>
+
+            <!-- Connection Status -->
+            <div style="text-align:center;margin-bottom:8px;">
+                <span id="connectionStatus" class="console-status-pill loading">Connecting…</span>
+            </div>
+
+            <!-- Signup Form -->
+            <form id="signupForm" class="auth-form" style="background:none;">
+                <div class="console-form-group">
+                    <label for="signupUsername">Username</label>
+                    <input
+                        type="text"
+                        id="signupUsername"
+                        name="username"
+                        placeholder="Choose a username"
+                        required
+                        minlength="3"
+                        autocomplete="username"
+                    >
+                    <small>Minimum 3 characters</small>
+                </div>
+
+                <div class="console-form-group">
+                    <label for="signupEmail">Email</label>
+                    <input
+                        type="email"
+                        id="signupEmail"
+                        name="email"
+                        placeholder="your.email@example.com"
+                        required
+                        autocomplete="email"
+                    >
+                    <small>We'll never share your email</small>
+                </div>
+
+                <div class="console-form-group">
+                    <label for="signupPassword">Password</label>
+                    <input
+                        type="password"
+                        id="signupPassword"
+                        name="password"
+                        placeholder="Create a strong password"
+                        required
+                        minlength="6"
+                        autocomplete="new-password"
+                    >
+                    <small>Minimum 6 characters</small>
+                </div>
+
+                <div class="console-form-group">
+                    <label for="signupConfirmPassword">Confirm Password</label>
+                    <input
+                        type="password"
+                        id="signupConfirmPassword"
+                        name="confirmPassword"
+                        placeholder="Confirm your password"
+                        required
+                        minlength="6"
+                        autocomplete="new-password"
+                    >
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <label class="console-checkbox-label">
+                        <input type="checkbox" id="agreeTerms" name="agreeTerms" required>
+                        <span>I agree to the <a href="#" class="console-link">Terms and Conditions</a></span>
+                    </label>
+                </div>
+
+                <button type="submit" class="console-btn-submit">Create Account</button>
+            </form>
+
+            <!-- Message Display -->
+            <div id="signupMessage" class="message" style="margin-top:0;"></div>
+
+            <!-- Footer -->
+            <div class="console-auth-footer">
+                <a href="index.html" class="console-link" style="margin-right:16px;">← Home</a>
+                Already have an account? <a href="login.html" class="console-link">Sign in here</a>
+            </div>
+        </div>
     </div>
-    
+
     <script src="script.js"></script>
+    <script>
+    // Style the status pill
+    (function patchStatus() {
+        const poll = setInterval(() => {
+            const el = document.getElementById('connectionStatus');
+            if (!el) return;
+            const txt = el.textContent.toLowerCase();
+            el.className = 'console-status-pill ' +
+                (txt.includes('github') || txt.includes('connect') ? 'connected' :
+                 txt.includes('demo')   ? 'demo' : 'loading');
+        }, 500);
+        setTimeout(() => clearInterval(poll), 10000);
+    })();
+    </script>
 </body>
 </html>
