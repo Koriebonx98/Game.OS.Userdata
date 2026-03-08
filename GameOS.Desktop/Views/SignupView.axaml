@@ -38,7 +38,7 @@
                                  Background="#0f3460" Foreground="White"
                                  BorderBrush="#533483" BorderThickness="1"
                                  CornerRadius="6" Padding="12,10"
-                                 Watermark="Choose a username (min 3 chars)"/>
+                                 Watermark="Choose a username (min 3 characters)"/>
                     </StackPanel>
 
                     <StackPanel Spacing="6">
@@ -57,7 +57,7 @@
                                  Background="#0f3460" Foreground="White"
                                  BorderBrush="#533483" BorderThickness="1"
                                  CornerRadius="6" Padding="12,10"
-                                 Watermark="Password (min 6 chars)"/>
+                                 Watermark="Password (min 6 characters)"/>
                     </StackPanel>
 
                     <StackPanel Spacing="6">

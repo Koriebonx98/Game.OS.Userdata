@@ -12,3 +12,7 @@ backend/.env
 # Editor directories
 .vscode/
 .idea/
+
+# C# / .NET build artifacts
+GameOS.Desktop/bin/
+GameOS.Desktop/obj/

@@ -16,7 +16,20 @@ public partial class MainWindowViewModel : ViewModelBase
     public MainWindowViewModel()
     {
         NavigationService.Initialize(vm => CurrentView = vm);
-        _currentView = new HomeViewModel(this);
+        var startView = System.Environment.GetEnvironmentVariable("GAMEOS_START_VIEW") ?? "home";
+        _currentView = startView switch
+        {
+            "login" => (ViewModelBase)new LoginViewModel(this),
+            "signup" => new SignupViewModel(this),
+            "games" => new GamesViewModel(),
+            "friends" => new FriendsViewModel(this),
+            "inbox" => new InboxViewModel(this),
+            "account" => new AccountViewModel(this),
+            _ => new HomeViewModel(this)
+        };
+        if (_currentView is GamesViewModel gvm) _ = gvm.LoadAsync();
+        if (_currentView is FriendsViewModel fvm) _ = fvm.LoadAsync();
+        if (_currentView is InboxViewModel ivm) _ = ivm.LoadAsync();
     }
 
     public void SetUser(User user)
