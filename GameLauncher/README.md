@@ -17,6 +17,10 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 |---|---|
 | ![Library](../Design/Screenshots/screenshot_library.png) | ![Store](../Design/Screenshots/screenshot_store.png) |
 
+| Local Game Detection | Profile |
+|---|---|
+| ![Detected on Drive](../Design/Screenshots/screenshot_library_detected.png) | ![Profile](../Design/Screenshots/screenshot_profile.png) |
+
 ---
 
 ## Features
