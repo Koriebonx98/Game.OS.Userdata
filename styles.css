@@ -2115,3 +2115,1184 @@ footer {
 }
 .ach-detail-close:hover { background: rgba(255,255,255,0.2); }
 
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   CONSOLE-STYLE UI  –  PlayStation / Xbox / Steam–inspired dark interface
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* Console layout resets the default card-container look */
+body.console-body {
+    background: #0a0e1a;
+    align-items: flex-start;
+    padding: 0;
+}
+
+body.console-body .container {
+    max-width: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    background: #0a0e1a;
+}
+
+/* ── Console Top-Bar ─────────────────────────────────────────────────────────── */
+.console-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 200;
+    background: rgba(10,14,26,0.92);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    display: flex;
+    align-items: center;
+    gap: 0;
+    height: 56px;
+    padding: 0 24px;
+}
+
+.console-topbar-logo {
+    font-size: 1.3em;
+    font-weight: 800;
+    color: #fff;
+    text-decoration: none;
+    letter-spacing: -0.5px;
+    white-space: nowrap;
+    margin-right: 32px;
+}
+
+.console-topbar-logo span {
+    background: linear-gradient(135deg, #6c63ff, #00b4d8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.console-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+}
+
+.console-nav-link {
+    color: rgba(255,255,255,0.68);
+    text-decoration: none;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.88em;
+    font-weight: 600;
+    transition: all 0.18s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.console-nav-link:hover,
+.console-nav-link.active {
+    color: #fff;
+    background: rgba(255,255,255,0.1);
+}
+
+.console-nav-link.active {
+    background: rgba(108,99,255,0.22);
+    color: #a5a0ff;
+}
+
+.console-nav-sep {
+    flex: 1;
+}
+
+.console-user-pill {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 24px;
+    padding: 5px 14px 5px 7px;
+    cursor: default;
+    transition: background 0.18s;
+}
+
+.console-user-pill:hover { background: rgba(255,255,255,0.12); }
+
+.console-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6c63ff, #00b4d8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9em;
+    flex-shrink: 0;
+}
+
+.console-avatar-name {
+    font-size: 0.85em;
+    font-weight: 600;
+    color: #fff;
+}
+
+/* ── Console Main Area ───────────────────────────────────────────────────────── */
+.console-main {
+    min-height: calc(100vh - 56px);
+    background: #0a0e1a;
+    color: #e2e8f0;
+    padding-bottom: 60px;
+}
+
+/* ── Hero / Featured Banner ─────────────────────────────────────────────────── */
+.console-hero {
+    position: relative;
+    overflow: hidden;
+    min-height: 340px;
+    display: flex;
+    align-items: flex-end;
+    background: linear-gradient(135deg, #1a0533 0%, #0d1b4b 40%, #0f172a 100%);
+}
+
+.console-hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 80% 60% at 70% 40%, rgba(108,99,255,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 50% at 20% 80%, rgba(0,180,216,0.15) 0%, transparent 55%),
+        linear-gradient(160deg, #0d1b4b 0%, #12052a 100%);
+}
+
+.console-hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 48px 40px 48px;
+    max-width: 640px;
+}
+
+.console-hero-tag {
+    display: inline-block;
+    background: rgba(108,99,255,0.3);
+    border: 1px solid rgba(108,99,255,0.5);
+    color: #a5a0ff;
+    font-size: 0.72em;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 20px;
+    margin-bottom: 16px;
+}
+
+.console-hero h1 {
+    font-size: 2.8em;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.1;
+    margin-bottom: 14px;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.5);
+}
+
+.console-hero p {
+    font-size: 1.05em;
+    color: rgba(255,255,255,0.72);
+    line-height: 1.65;
+    margin-bottom: 28px;
+    max-width: 480px;
+}
+
+.console-hero-actions {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.console-btn-primary {
+    background: linear-gradient(135deg, #6c63ff, #5a52d5);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    padding: 12px 28px;
+    font-size: 0.95em;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 20px rgba(108,99,255,0.35);
+}
+
+.console-btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(108,99,255,0.5);
+    background: linear-gradient(135deg, #7c74ff, #6c63ff);
+}
+
+.console-btn-secondary {
+    background: rgba(255,255,255,0.1);
+    color: #fff;
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 10px;
+    padding: 12px 28px;
+    font-size: 0.95em;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(4px);
+}
+
+.console-btn-secondary:hover {
+    background: rgba(255,255,255,0.18);
+    transform: translateY(-2px);
+}
+
+.console-hero-art {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 45%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10em;
+    opacity: 0.12;
+    pointer-events: none;
+    user-select: none;
+}
+
+/* ── Dashboard User Stats Bar ───────────────────────────────────────────────── */
+.console-statsbar {
+    background: rgba(255,255,255,0.04);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    padding: 16px 40px;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    flex-wrap: wrap;
+}
+
+.console-stat-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.console-stat-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1em;
+    flex-shrink: 0;
+}
+
+.console-stat-icon.purple { background: rgba(108,99,255,0.2); }
+.console-stat-icon.blue   { background: rgba(0,180,216,0.2); }
+.console-stat-icon.green  { background: rgba(34,197,94,0.2); }
+.console-stat-icon.orange { background: rgba(245,158,11,0.2); }
+
+.console-stat-label {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.45);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    font-weight: 600;
+}
+
+.console-stat-value {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.2;
+}
+
+/* ── Section Rows ────────────────────────────────────────────────────────────── */
+.console-section {
+    padding: 36px 40px 8px;
+}
+
+.console-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.console-section-title {
+    font-size: 1.1em;
+    font-weight: 700;
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.console-section-title .title-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 7px;
+    background: linear-gradient(135deg, #6c63ff, #00b4d8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8em;
+    flex-shrink: 0;
+}
+
+.console-section-see-all {
+    font-size: 0.82em;
+    color: rgba(108,99,255,0.9);
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.15s;
+}
+
+.console-section-see-all:hover { color: #a5a0ff; }
+
+/* ── Game Tiles Row (horizontal scroll on small) ────────────────────────────── */
+.console-tiles-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 16px;
+    padding-bottom: 8px;
+}
+
+.console-tiles-row.scroll-x {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 16px;
+    padding-bottom: 12px;
+}
+
+.console-tiles-row.scroll-x::-webkit-scrollbar { display: none; }
+
+/* ── Game Tile Card ──────────────────────────────────────────────────────────── */
+.console-game-tile {
+    flex-shrink: 0;
+    width: 180px;
+    background: #141b2d;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+    cursor: pointer;
+    text-decoration: none;
+    color: inherit;
+    scroll-snap-align: start;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-game-tile:hover {
+    transform: translateY(-4px) scale(1.02);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+    border-color: rgba(108,99,255,0.4);
+}
+
+.console-game-tile .tile-cover {
+    width: 100%;
+    aspect-ratio: 3/4;
+    background: linear-gradient(160deg, #1e293b, #0f172a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3.5em;
+    color: rgba(255,255,255,0.15);
+    position: relative;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.console-game-tile .tile-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+}
+
+.console-game-tile .tile-cover-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(108,99,255,0.85);
+    color: #fff;
+    font-size: 0.62em;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.console-game-tile .tile-cover-badge.sale {
+    background: rgba(239,68,68,0.9);
+}
+
+.console-game-tile .tile-cover-badge.new {
+    background: rgba(34,197,94,0.9);
+}
+
+.console-game-tile .tile-cover-badge.hot {
+    background: rgba(245,158,11,0.9);
+}
+
+.console-game-tile .tile-info {
+    padding: 12px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.console-game-tile .tile-title {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.3;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.console-game-tile .tile-platform {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.45);
+    font-weight: 500;
+}
+
+.console-game-tile .tile-price {
+    margin-top: auto;
+    padding-top: 8px;
+    font-size: 0.88em;
+    font-weight: 700;
+    color: #a5a0ff;
+}
+
+.console-game-tile .tile-price .tile-price-original {
+    text-decoration: line-through;
+    color: rgba(255,255,255,0.35);
+    font-weight: 400;
+    margin-right: 6px;
+    font-size: 0.88em;
+}
+
+.console-game-tile .tile-price.free {
+    color: #4ade80;
+}
+
+/* ── Quick Access Tiles ─────────────────────────────────────────────────────── */
+.console-quick-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 12px;
+}
+
+.console-quick-tile {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 12px;
+    padding: 20px 16px;
+    text-align: center;
+    cursor: pointer;
+    text-decoration: none;
+    color: #fff;
+    transition: all 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.console-quick-tile:hover {
+    background: rgba(108,99,255,0.15);
+    border-color: rgba(108,99,255,0.4);
+    transform: translateY(-2px);
+}
+
+.console-quick-tile-icon {
+    font-size: 1.8em;
+}
+
+.console-quick-tile-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: rgba(255,255,255,0.8);
+}
+
+/* ── Friends Online Widget ───────────────────────────────────────────────────── */
+.console-friends-row {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.console-friend-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 12px 16px;
+    transition: background 0.18s;
+    text-decoration: none;
+    color: inherit;
+}
+
+.console-friend-item:hover {
+    background: rgba(255,255,255,0.08);
+}
+
+.console-friend-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6c63ff, #00b4d8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    flex-shrink: 0;
+    position: relative;
+}
+
+.online-dot {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #0a0e1a;
+    background: #22c55e;
+}
+
+.online-dot.offline { background: #64748b; }
+
+.console-friend-info { flex: 1; min-width: 0; }
+
+.console-friend-name {
+    font-size: 0.9em;
+    font-weight: 600;
+    color: #fff;
+}
+
+.console-friend-status {
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.45);
+    margin-top: 2px;
+}
+
+/* ── News / Activity Feed ────────────────────────────────────────────────────── */
+.console-news-card {
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 12px;
+    overflow: hidden;
+    cursor: pointer;
+    transition: background 0.18s, border-color 0.18s;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+
+.console-news-card:hover {
+    background: rgba(255,255,255,0.08);
+    border-color: rgba(108,99,255,0.3);
+}
+
+.console-news-img {
+    width: 100%;
+    height: 100px;
+    background: linear-gradient(135deg, #1e293b, #312e81);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2.8em;
+}
+
+.console-news-body {
+    padding: 14px;
+}
+
+.console-news-cat {
+    font-size: 0.7em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #a5a0ff;
+    margin-bottom: 6px;
+}
+
+.console-news-title {
+    font-size: 0.88em;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1.4;
+    margin-bottom: 6px;
+}
+
+.console-news-date {
+    font-size: 0.72em;
+    color: rgba(255,255,255,0.38);
+}
+
+/* ── Two-Column Dashboard Layout ────────────────────────────────────────────── */
+.console-dash-grid {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 0;
+    padding: 0 40px;
+}
+
+@media (max-width: 900px) {
+    .console-dash-grid {
+        grid-template-columns: 1fr;
+        padding: 0 20px;
+    }
+
+    .console-section {
+        padding: 24px 20px 8px;
+    }
+
+    .console-hero-content {
+        padding: 32px 20px 32px;
+    }
+
+    .console-statsbar {
+        padding: 14px 20px;
+        gap: 20px;
+    }
+
+    .console-hero h1 { font-size: 2em; }
+
+    .console-hero-art { display: none; }
+
+    .console-topbar { padding: 0 16px; }
+}
+
+/* ── Dashboard Sidebar ────────────────────────────────────────────────────── */
+.console-sidebar {
+    padding: 36px 0 36px 32px;
+    border-left: 1px solid rgba(255,255,255,0.06);
+}
+
+.console-sidebar-section {
+    margin-bottom: 32px;
+}
+
+.console-sidebar-title {
+    font-size: 0.78em;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 14px;
+}
+
+/* ── Store Styles ────────────────────────────────────────────────────────────── */
+.store-hero {
+    position: relative;
+    min-height: 280px;
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0d1b4b 0%, #1a0533 60%, #0a0e1a 100%);
+}
+
+.store-hero-bg {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse 60% 70% at 75% 30%, rgba(0,180,216,0.2) 0%, transparent 55%),
+        radial-gradient(ellipse 50% 50% at 25% 70%, rgba(108,99,255,0.2) 0%, transparent 55%);
+}
+
+.store-hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 40px;
+    max-width: 580px;
+}
+
+.store-categories {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    padding: 20px 40px;
+    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+.store-cat-btn {
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.7);
+    border-radius: 20px;
+    padding: 6px 16px;
+    font-size: 0.82em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.18s;
+}
+
+.store-cat-btn:hover,
+.store-cat-btn.active {
+    background: rgba(108,99,255,0.25);
+    border-color: rgba(108,99,255,0.5);
+    color: #a5a0ff;
+}
+
+.store-cat-btn.active {
+    color: #fff;
+    background: rgba(108,99,255,0.4);
+}
+
+.store-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 20px;
+    padding: 32px 40px;
+}
+
+@media (max-width: 768px) {
+    .store-grid { padding: 20px; }
+    .store-categories { padding: 14px 20px; }
+    .store-hero-content { padding: 28px 20px; }
+}
+
+/* Store tile uses the console-game-tile, just wider */
+.store-tile {
+    background: #141b2d;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid rgba(255,255,255,0.07);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s;
+    cursor: pointer;
+}
+
+.store-tile:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.5);
+    border-color: rgba(108,99,255,0.4);
+}
+
+.store-tile-cover {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: linear-gradient(160deg, #1e293b, #0f172a);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3em;
+    position: relative;
+    overflow: hidden;
+}
+
+.store-tile-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    position: absolute;
+    inset: 0;
+}
+
+.store-tile-badge {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: rgba(239,68,68,0.9);
+    color: #fff;
+    font-size: 0.72em;
+    font-weight: 800;
+    padding: 3px 9px;
+    border-radius: 6px;
+}
+
+.store-tile-info {
+    padding: 14px;
+}
+
+.store-tile-title {
+    font-size: 0.9em;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 4px;
+    line-height: 1.3;
+}
+
+.store-tile-genre {
+    font-size: 0.75em;
+    color: rgba(255,255,255,0.4);
+    margin-bottom: 10px;
+}
+
+.store-tile-price-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    justify-content: space-between;
+}
+
+.store-tile-price {
+    font-size: 1em;
+    font-weight: 800;
+    color: #a5a0ff;
+}
+
+.store-tile-price.free { color: #4ade80; }
+
+.store-tile-orig-price {
+    font-size: 0.8em;
+    text-decoration: line-through;
+    color: rgba(255,255,255,0.3);
+}
+
+.store-add-btn {
+    background: linear-gradient(135deg, #6c63ff, #5a52d5);
+    color: #fff;
+    border: none;
+    border-radius: 7px;
+    padding: 6px 14px;
+    font-size: 0.78em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.18s, transform 0.18s;
+}
+
+.store-add-btn:hover {
+    opacity: 0.88;
+    transform: scale(1.05);
+}
+
+/* ── Login / Signup Console Style ────────────────────────────────────────────── */
+.console-auth-wrap {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #0a0e1a 0%, #1a0533 50%, #0a0e1a 100%);
+}
+
+.console-auth-card {
+    background: rgba(20,27,45,0.95);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 16px;
+    padding: 40px;
+    width: 100%;
+    max-width: 420px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+}
+
+.console-auth-logo {
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.console-auth-logo-text {
+    font-size: 2em;
+    font-weight: 800;
+    color: #fff;
+    letter-spacing: -0.5px;
+}
+
+.console-auth-logo-text span {
+    background: linear-gradient(135deg, #6c63ff, #00b4d8);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.console-auth-title {
+    font-size: 1.5em;
+    font-weight: 700;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.console-auth-subtitle {
+    font-size: 0.88em;
+    color: rgba(255,255,255,0.48);
+    text-align: center;
+    margin-bottom: 28px;
+}
+
+.console-form-group {
+    margin-bottom: 18px;
+}
+
+.console-form-group label {
+    display: block;
+    font-size: 0.82em;
+    font-weight: 600;
+    color: rgba(255,255,255,0.65);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 7px;
+}
+
+.console-form-group input[type="text"],
+.console-form-group input[type="email"],
+.console-form-group input[type="password"] {
+    width: 100%;
+    padding: 12px 16px;
+    background: rgba(255,255,255,0.07);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    color: #fff;
+    font-size: 0.95em;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    font-family: inherit;
+}
+
+.console-form-group input::placeholder {
+    color: rgba(255,255,255,0.28);
+}
+
+.console-form-group input:focus {
+    outline: none;
+    border-color: rgba(108,99,255,0.6);
+    box-shadow: 0 0 0 3px rgba(108,99,255,0.15);
+    background: rgba(255,255,255,0.09);
+}
+
+.console-form-group input:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.console-form-group small {
+    display: block;
+    font-size: 0.78em;
+    color: rgba(255,255,255,0.36);
+    margin-top: 5px;
+}
+
+.console-form-options {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 22px;
+    font-size: 0.85em;
+}
+
+.console-checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    color: rgba(255,255,255,0.6);
+    user-select: none;
+}
+
+.console-checkbox-label input[type="checkbox"] {
+    accent-color: #6c63ff;
+    width: 15px;
+    height: 15px;
+    cursor: pointer;
+}
+
+.console-link {
+    color: #a5a0ff;
+    text-decoration: none;
+    font-weight: 600;
+    transition: color 0.15s;
+}
+
+.console-link:hover { color: #fff; }
+
+.console-btn-submit {
+    width: 100%;
+    padding: 13px;
+    background: linear-gradient(135deg, #6c63ff, #5a52d5);
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 1em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 4px 18px rgba(108,99,255,0.35);
+    font-family: inherit;
+    letter-spacing: 0.02em;
+    margin-bottom: 18px;
+}
+
+.console-btn-submit:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 26px rgba(108,99,255,0.5);
+}
+
+.console-btn-submit:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.console-auth-divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0;
+    color: rgba(255,255,255,0.25);
+    font-size: 0.8em;
+}
+
+.console-auth-divider::before,
+.console-auth-divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(255,255,255,0.1);
+}
+
+.console-quick-login-btn {
+    width: 100%;
+    padding: 12px;
+    background: rgba(0,180,216,0.15);
+    color: #00b4d8;
+    border: 1.5px solid rgba(0,180,216,0.3);
+    border-radius: 10px;
+    font-size: 0.9em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s;
+    font-family: inherit;
+}
+
+.console-quick-login-btn:hover {
+    background: rgba(0,180,216,0.25);
+    border-color: rgba(0,180,216,0.5);
+}
+
+.console-auth-footer {
+    text-align: center;
+    margin-top: 20px;
+    font-size: 0.85em;
+    color: rgba(255,255,255,0.4);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    padding-top: 18px;
+}
+
+.console-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78em;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    margin-bottom: 10px;
+}
+
+.console-status-pill.connected {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+    border: 1px solid rgba(34,197,94,0.25);
+}
+
+.console-status-pill.demo {
+    background: rgba(245,158,11,0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.25);
+}
+
+.console-status-pill.loading {
+    background: rgba(100,116,139,0.15);
+    color: #94a3b8;
+    border: 1px solid rgba(100,116,139,0.25);
+}
+
+/* ── Console Message Styles ─────────────────────────────────────────────────── */
+.console-message {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin: 12px 0;
+    font-size: 0.88em;
+    display: none;
+    animation: slideIn 0.3s ease;
+}
+
+.console-message.success {
+    background: rgba(34,197,94,0.12);
+    color: #4ade80;
+    border: 1px solid rgba(34,197,94,0.2);
+}
+
+.console-message.error {
+    background: rgba(239,68,68,0.12);
+    color: #f87171;
+    border: 1px solid rgba(239,68,68,0.2);
+}
+
+.console-message.info {
+    background: rgba(0,180,216,0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(0,180,216,0.2);
+}
+
+.console-message.warning {
+    background: rgba(245,158,11,0.12);
+    color: #fbbf24;
+    border: 1px solid rgba(245,158,11,0.2);
+}
+
+/* ── Online / Offline Badge ─────────────────────────────────────────────────── */
+.online-badge {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #22c55e;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.online-badge.offline {
+    background: #64748b;
+}
+
+/* ── Console Footer ─────────────────────────────────────────────────────────── */
+.console-footer {
+    background: rgba(255,255,255,0.03);
+    border-top: 1px solid rgba(255,255,255,0.07);
+    padding: 20px 40px;
+    text-align: center;
+    color: rgba(255,255,255,0.3);
+    font-size: 0.8em;
+}
+
+/* ── Empty / loading states ─────────────────────────────────────────────────── */
+.console-empty {
+    text-align: center;
+    padding: 48px 20px;
+    color: rgba(255,255,255,0.3);
+}
+
+.console-empty-icon { font-size: 3em; margin-bottom: 12px; }
+.console-empty-text { font-size: 0.9em; }
+
+/* ── Responsive nav hide ─────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .console-topbar-logo { margin-right: 16px; }
+    .console-nav-link span.nav-label { display: none; }
+    .console-tiles-row { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .store-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+    .console-quick-row { grid-template-columns: repeat(3, 1fr); }
+    .console-game-tile { width: 150px; }
+}
+
