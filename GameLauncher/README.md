@@ -11,15 +11,15 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 | Login | Dashboard |
 |---|---|
-| ![Login](../Design/Screenshots/screenshot_login.png) | ![Dashboard](../Design/Screenshots/screenshot_dashboard.png) |
+| ![Login](../Design/Screenshots/screenshot_login.png) | ![Dashboard](../Design/Screenshots/dashboard.png) |
 
-| My Library | Games Store |
+| My Games (Library) | Games Store |
 |---|---|
-| ![Library](../Design/Screenshots/screenshot_library.png) | ![Store](../Design/Screenshots/screenshot_store.png) |
+| ![My Games](../Design/Screenshots/my-games.png) | ![Games Store](../Design/Screenshots/games-store.png) |
 
-| Local Game Detection | Profile |
+| Friends | Profile |
 |---|---|
-| ![Detected on Drive](../Design/Screenshots/screenshot_library_detected.png) | ![Profile](../Design/Screenshots/screenshot_profile.png) |
+| ![Friends](../Design/Screenshots/friends.png) | ![Profile](../Design/Screenshots/screenshot_profile.png) |
 
 ---
 
@@ -31,8 +31,9 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 | 🏠 **Dashboard / Home** | Stats tiles, featured game hero banner, game card grid, recent achievements |
 | 🎮 **My Library** | Game cover cards, platform filter chips, search, star ratings |
 | 🛒 **Games Store** | Featured titles carousel, browse all, genre filter, search, add to library |
+| 👥 **Friends** | Friends list with online/offline status, current game, search, and add-friend request |
 | 👤 **Profile** | Avatar, stats, all achievements list |
-| 🚀 **Demo Mode** | One click — no GitHub account needed, built-in library of 8 games |
+| 🚀 **Demo Mode** | One click — no GitHub account needed, built-in library of 8 games + 8 demo friends |
 
 ---
 
@@ -96,6 +97,7 @@ GameLauncher/
 │   ├── DashboardViewModel.cs   # Stats, recent games, featured hero
 │   ├── LibraryViewModel.cs     # Filter, search, game collection
 │   ├── StoreViewModel.cs       # Browse, search, genre filter, add to library
+│   ├── FriendsViewModel.cs     # Friends list, online status, add-friend
 │   └── ProfileViewModel.cs     # Avatar, stats, achievements
 └── Views/
     ├── MainWindow.axaml        # Window shell with left-sidebar navigation
@@ -103,6 +105,7 @@ GameLauncher/
     ├── DashboardView.axaml     # Xbox-style home with hero banner + game tiles
     ├── LibraryView.axaml       # Game cover card grid
     ├── StoreView.axaml         # Store with featured carousel + catalogue
+    ├── FriendsView.axaml       # Friends list with online/offline status cards
     └── ProfileView.axaml       # Profile card + achievements list
 ```
 

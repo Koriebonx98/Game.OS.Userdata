@@ -67,6 +67,18 @@ namespace GameLauncher.Models
         [JsonPropertyName("sentAt")] public string SentAt { get; set; } = "";
     }
 
+    public class Friend
+    {
+        public string  Username      { get; set; } = "";
+        public bool    IsOnline      { get; set; }
+        public string? CurrentGame   { get; set; }
+        public string  AvatarColor   { get; set; } = "#0ea5e9";
+        public string  AvatarInitial => Username.Length > 0 ? Username[0].ToString().ToUpper() : "?";
+        public string  StatusLabel   => IsOnline ? (CurrentGame != null ? $"Playing {CurrentGame}" : "Online") : "Offline";
+        public string  StatusColor   => IsOnline ? "#22c55e" : "#6e7681";
+        public string  BadgeColor    => IsOnline ? "#22c55e" : "#30363d";
+    }
+
     public class Message
     {
         [JsonPropertyName("from")]   public string From   { get; set; } = "";
