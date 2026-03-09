@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><title>Game.OS – Friends</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; width:1280px; height:800px; display:flex; overflow:hidden; }
+.sidebar { width:220px; background:#161b22; display:flex; flex-direction:column; flex-shrink:0; }
+.logo-area { background:linear-gradient(135deg,#0ea5e9,#1d4ed8); height:80px; display:flex; align-items:center; justify-content:center; gap:10px; }
+.logo-g { width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:900; color:#fff; }
+.logo-text { font-size:18px; font-weight:800; color:#fff; }
+.nav-items { padding:12px 8px; flex:1; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:6px; margin-bottom:4px; font-size:14px; font-weight:600; color:#8b949e; }
+.nav-item.active { background:#1f6feb; color:#fff; }
+.main { flex:1; overflow-y:auto; }
+.page { padding:32px; }
+.page-title { font-size:28px; font-weight:700; color:#fff; margin-bottom:4px; }
+.page-sub { font-size:13px; color:#8b949e; margin-bottom:24px; }
+.friends-stats { display:flex; gap:12px; margin-bottom:24px; }
+.friends-stat { background:#161b22; border-radius:10px; padding:16px 20px; }
+.stat-num { font-size:28px; font-weight:700; color:#fff; }
+.stat-num.green { color:#3fb950; }
+.stat-lbl { font-size:12px; color:#8b949e; }
+.section-header { font-size:14px; font-weight:700; color:#8b949e; margin-bottom:10px; text-transform:uppercase; letter-spacing:0.05em; }
+.friend-entry { display:flex; align-items:center; gap:12px; padding:12px 14px; border-radius:8px; background:#161b22; margin-bottom:6px; }
+.friend-avatar { width:40px; height:40px; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#fff; flex-shrink:0; }
+.friend-name { font-size:14px; font-weight:600; color:#fff; margin-bottom:2px; }
+.friend-status { font-size:12px; display:flex; align-items:center; gap:5px; }
+.dot { display:inline-block; width:8px; height:8px; border-radius:4px; }
+.dot-green { background:#3fb950; }
+.dot-yellow { background:#f1c40f; }
+.dot-gray { background:#484f58; }
+.pending-section { background:#1a1a00; border-radius:10px; padding:16px 20px; margin-bottom:24px; }
+.pending-header { color:#f1c40f; font-size:14px; font-weight:700; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
+.pending-item { background:#21262d; border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+.pending-avatar { width:36px; height:36px; border-radius:18px; background:#484f58; display:flex; align-items:center; justify-content:center; font-size:16px; font-weight:700; color:#fff; }
+.pending-name { font-size:14px; font-weight:600; color:#fff; }
+.pending-time { font-size:11px; color:#8b949e; }
+.btn-row { display:flex; gap:6px; margin-left:auto; }
+.btn-accept { background:#238636; color:#fff; border:none; border-radius:4px; padding:5px 10px; font-size:12px; cursor:pointer; }
+.btn-decline { background:transparent; color:#f85149; border:1px solid #f85149; border-radius:4px; padding:5px 10px; font-size:12px; cursor:pointer; }
+</style>
+</head>
+<body>
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-g">G</div>
+    <div class="logo-text">Game.OS</div>
+  </div>
+  <div class="nav-items">
+    <div class="nav-item"><span style="font-size:16px;">🏠</span> Home</div>
+    <div class="nav-item"><span style="font-size:16px;">🎮</span> Library</div>
+    <div class="nav-item"><span style="font-size:16px;">🛒</span> Store</div>
+    <div class="nav-item active"><span style="font-size:16px;">👥</span> Friends</div>
+    <div class="nav-item"><span style="font-size:16px;">👤</span> Profile</div>
+  </div>
+  <div style="padding:16px 8px; border-top:1px solid #21262d;">
+    <div class="nav-item" style="color:#f85149;"><span style="font-size:16px;">⏻</span> Sign Out</div>
+  </div>
+</div>
+<div class="main">
+  <div class="page">
+    <div class="page-title">Friends</div>
+    <div class="page-sub">Koriebonx98's friend list</div>
+
+    <div class="friends-stats">
+      <div class="friends-stat">
+        <div class="stat-num green">3</div>
+        <div class="stat-lbl">Online</div>
+      </div>
+      <div class="friends-stat">
+        <div class="stat-num">6</div>
+        <div class="stat-lbl">Total Friends</div>
+      </div>
+    </div>
+
+    <!-- Pending request -->
+    <div class="pending-section">
+      <div class="pending-header">📨 Friend Requests (1)</div>
+      <div class="pending-item">
+        <div class="pending-avatar">M</div>
+        <div>
+          <div class="pending-name">MKDeluxeChamp</div>
+          <div class="pending-time">Sent 2 hours ago</div>
+        </div>
+        <div class="btn-row">
+          <button class="btn-accept">✓ Accept</button>
+          <button class="btn-decline">✗ Decline</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-header">● Online</div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:linear-gradient(135deg,#1d4ed8,#0ea5e9);">N</div>
+      <div>
+        <div class="friend-name">NintendoFan42</div>
+        <div class="friend-status"><span class="dot dot-green"></span><span style="color:#3fb950;">Online</span> · Now</div>
+      </div>
+    </div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:linear-gradient(135deg,#7c3aed,#a855f7);">G</div>
+      <div>
+        <div class="friend-name">GamingWithLex</div>
+        <div class="friend-status"><span class="dot dot-green"></span><span style="color:#3fb950;">Online</span> · Now</div>
+      </div>
+    </div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:linear-gradient(135deg,#d97706,#f59e0b);">S</div>
+      <div>
+        <div class="friend-name">SwitchPlayer99</div>
+        <div class="friend-status"><span class="dot dot-yellow"></span><span style="color:#f1c40f;">Away</span> · 12 min ago</div>
+      </div>
+    </div>
+
+    <div style="height:16px;"></div>
+    <div class="section-header">○ Offline</div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:#21262d;">P</div>
+      <div>
+        <div class="friend-name">ProGamer2025</div>
+        <div class="friend-status"><span class="dot dot-gray"></span><span style="color:#484f58;">Offline</span> · 3h ago</div>
+      </div>
+    </div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:#21262d;">R</div>
+      <div>
+        <div class="friend-name">RetroKing</div>
+        <div class="friend-status"><span class="dot dot-gray"></span><span style="color:#484f58;">Offline</span> · 1 Mar</div>
+      </div>
+    </div>
+    <div class="friend-entry">
+      <div class="friend-avatar" style="background:#21262d;">S</div>
+      <div>
+        <div class="friend-name">SpeedRunner7</div>
+        <div class="friend-status"><span class="dot dot-gray"></span><span style="color:#484f58;">Offline</span> · 28 Feb</div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
