@@ -18,7 +18,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private UserProfile     _profile      = new();
     private List<Game>      _library      = new();
     private List<Achievement> _achievements = new();
-    private bool            _demoMode     = false;
 
     // ── Child view models ──────────────────────────────────────────────────
     public LoginViewModel     LoginVm     { get; }
@@ -52,9 +51,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
-        bool hasPat = !string.IsNullOrWhiteSpace(
-            System.Environment.GetEnvironmentVariable("GAMEOS_PAT"));
-        _client = new GameOsClient(demoMode: !hasPat);
+        _client = new GameOsClient();
 
         LoginVm     = new LoginViewModel(_client);
         DashboardVm = new DashboardViewModel();
@@ -83,18 +80,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
-                                List<Achievement> achievements, bool demoMode)
+                                List<Achievement> achievements)
     {
         _profile      = profile;
         _library      = library;
         _achievements = achievements;
-        _demoMode     = demoMode;
+
+        bool isAdmin = _client.IsAdmin;
 
         DashboardVm.Load(profile, library, achievements);
         LibraryVm.Load(library);
-        StoreVm.Load(DemoData.Store, library, profile, _client, demoMode);
-        ProfileVm.Load(profile, library, achievements, demoMode);
-        FriendsVm.Load();
+        StoreVm.Load(DemoData.Store, library, profile, _client, isAdmin);
+        ProfileVm.Load(profile, library, achievements, isAdmin);
+        FriendsVm.Load(_client, profile.Username);
 
         ShowLogin = false;
         ShowMain  = true;
@@ -109,9 +107,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (page == "library")
             LibraryVm.Load(_library);
         if (page == "friends")
-            FriendsVm.Load();
+            FriendsVm.Load(_client, _profile.Username);
         if (page == "profile")
-            ProfileVm.Load(_profile, _library, _achievements, _demoMode);
+            ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
     }
 
     private void OpenDetailFromGame(Game game)

@@ -48,17 +48,19 @@
                     </TextBlock>
                 </StackPanel>
 
-                <!-- Mode badge -->
-                <Border Grid.Column="2"
-                        CornerRadius="6" Padding="12,6"
-                        VerticalAlignment="Top">
-                    <Border.Background>
-                        <SolidColorBrush Color="#238636"/>
-                    </Border.Background>
-                    <TextBlock Text="{Binding ModeBadge}"
-                               FontSize="12" FontWeight="Bold"
-                               Foreground="White"/>
-                </Border>
+                <!-- Mode badge — admin (purple) or live (green) -->
+                <Panel Grid.Column="2" VerticalAlignment="Top">
+                    <Border CornerRadius="6" Padding="12,6" Background="#9333ea"
+                            IsVisible="{Binding IsAdmin}">
+                        <TextBlock Text="{Binding ModeBadge}"
+                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
+                    </Border>
+                    <Border CornerRadius="6" Padding="12,6" Background="#238636"
+                            IsVisible="{Binding !IsAdmin}">
+                        <TextBlock Text="{Binding ModeBadge}"
+                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
+                    </Border>
+                </Panel>
 
             </Grid>
         </Border>

@@ -3,9 +3,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
-using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
@@ -14,350 +11,304 @@ using GameLauncher.Models;
 namespace GameLauncher
 {
     /// <summary>
-    /// Game OS client that calls the GitHub REST API to read and write player data.
-    /// No external server is required — everything runs on GitHub's infrastructure.
-    ///
-    /// PAT is loaded from the GAMEOS_PAT environment variable at runtime.
-    /// Never hard-code a token in source code.
+    /// Game.OS API client that calls the backend HTTP server.
+    /// Configure the API base URL via the GAMEOS_API_BASEURL environment variable
+    /// (default: http://localhost:3000).  No GitHub PAT is required.
     /// </summary>
     public sealed class GameOsClient : IDisposable
     {
         // ── Configuration ─────────────────────────────────────────────────────
-        // Set GAMEOS_OWNER and GAMEOS_DATA_REPO environment variables, or
-        // change the fallback values below for your own deployment.
-        private static readonly string Owner    = Environment.GetEnvironmentVariable("GAMEOS_OWNER")    ?? "Koriebonx98";
-        private static readonly string DataRepo = Environment.GetEnvironmentVariable("GAMEOS_DATA_REPO") ?? "Game.OS.Private.Data";
+        /// <summary>Backend API base URL.  Override with GAMEOS_API_BASEURL env var.</summary>
+        public static readonly string ApiBaseUrl =
+            (Environment.GetEnvironmentVariable("GAMEOS_API_BASEURL") ?? "http://localhost:3000")
+            .TrimEnd('/');
 
-        // PAT is loaded at runtime from a secure source — never from source code.
-        private static string GetPat() =>
-            Environment.GetEnvironmentVariable("GAMEOS_PAT")
-            ?? throw new InvalidOperationException(
-                "GAMEOS_PAT environment variable is not set.\n" +
-                "Set it to your GitHub fine-grained personal access token before launching.");
-
-        private static readonly string BaseUrl =
-            $"https://api.github.com/repos/{Owner}/{DataRepo}/contents/";
+        private static readonly string AdminUsername = "Admin.GameOS";
 
         private readonly HttpClient _http;
+        private string? _token;
         private string? _username;
-        private bool _demoMode;
 
-        public string? LoggedInUser => _username;
+        public string? LoggedInUser    => _username;
+        public bool    IsAuthenticated => _token != null;
 
-        /// <summary>
-        /// When true the client runs against built-in demo data and makes no
-        /// real network calls.  Useful for first-run / offline demonstrations.
-        /// </summary>
-        public bool DemoMode
+        /// <summary>True when the logged-in account is the admin account.</summary>
+        public bool IsAdmin =>
+            string.Equals(_username, AdminUsername, StringComparison.OrdinalIgnoreCase);
+
+        public GameOsClient()
         {
-            get => _demoMode;
-            set => _demoMode = value;
+            // HttpClient is created per-instance here because the launcher is a
+            // desktop application where a single client instance lives for the
+            // entire session.  In a server scenario use IHttpClientFactory instead.
+            _http = new HttpClient { BaseAddress = new Uri(ApiBaseUrl + "/") };
+            _http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
         }
 
-        public GameOsClient(bool demoMode = false)
-        {
-            _demoMode = demoMode;
-            _http = new HttpClient();
-            if (!demoMode)
-            {
-                string pat = GetPat();
-                _http.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", pat);
-                _http.DefaultRequestHeaders.Add("Accept", "application/vnd.github+json");
-                _http.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
-                _http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/1.0");
-            }
-        }
-
-        // ── Password hashing (PBKDF2) ─────────────────────────────────────────
-        public static string HashPassword(string password, string username)
-        {
-            byte[] salt = Encoding.UTF8.GetBytes($"{username.ToLower()}:gameos");
-            byte[] pass = Encoding.UTF8.GetBytes(password);
-            using var pbkdf2 = new Rfc2898DeriveBytes(
-                pass, salt, 100_000, HashAlgorithmName.SHA256);
-            return Convert.ToHexString(pbkdf2.GetBytes(32)).ToLower();
-        }
-
-        // ── Low-level GitHub file helpers ─────────────────────────────────────
-        public async Task<(T? content, string? sha)> ReadFileAsync<T>(
-            string path, CancellationToken ct = default)
-        {
-            var resp = await _http.GetAsync(BaseUrl + path, ct);
-            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return (default, null);
-            resp.EnsureSuccessStatusCode();
-
-            var ghFile = await resp.Content.ReadFromJsonAsync<GitHubFile>(
-                cancellationToken: ct);
-            if (ghFile?.Content == null) return (default, null);
-
-            string json = Encoding.UTF8.GetString(
-                Convert.FromBase64String(ghFile.Content.Replace("\n", "")));
-            var obj = JsonSerializer.Deserialize<T>(json,
-                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
-            return (obj, ghFile.Sha);
-        }
-
-        public async Task<string> WriteFileAsync(
-            string path, object content, string message,
-            string? sha = null, CancellationToken ct = default)
-        {
-            string json = JsonSerializer.Serialize(content,
-                new JsonSerializerOptions { WriteIndented = true });
-            string b64  = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
-
-            var body = new Dictionary<string, object?>
-            {
-                ["message"]   = message,
-                ["content"]   = b64,
-                ["sha"]       = sha,
-                ["committer"] = new { name  = "Game.OS Launcher",
-                                      email = "gameos-launcher@users.noreply.github.com" }
-            };
-
-            var resp = await _http.PutAsJsonAsync(BaseUrl + path, body, ct);
-            if (!resp.IsSuccessStatusCode)
-            {
-                string err = await resp.Content.ReadAsStringAsync(ct);
-                throw new GameOsException((int)resp.StatusCode,
-                    $"Write failed ({(int)resp.StatusCode}): {err}");
-            }
-            var result = await resp.Content.ReadFromJsonAsync<GitHubWriteResult>(
-                cancellationToken: ct);
-            return result?.Content?.Sha ?? sha ?? "";
-        }
-
-        // ── Login / Logout ────────────────────────────────────────────────────
+        // ── Authentication ────────────────────────────────────────────────────
+        /// <summary>Log in with username (or email) and password.  Returns the full profile.</summary>
         public async Task<UserProfile> LoginAsync(
             string usernameOrEmail, string password, CancellationToken ct = default)
         {
-            if (_demoMode)
-                return DemoLogin(usernameOrEmail, password);
+            var resp = await _http.PostAsJsonAsync("api/auth/token",
+                new { username = usernameOrEmail, password }, ct);
+            var result = await ParseResponseAsync<TokenResult>(resp, ct);
 
-            string accountKey;
-            if (usernameOrEmail.Contains('@'))
-            {
-                var (idx, _) = await ReadFileAsync<Dictionary<string, string>>(
-                    "accounts/email-index.json", ct);
-                if (idx == null || !idx.TryGetValue(
-                        usernameOrEmail.ToLower(), out accountKey!))
-                    throw new GameOsException(401, "Account not found.");
-            }
-            else
-            {
-                accountKey = usernameOrEmail.ToLower();
-            }
+            _token    = result.Token
+                ?? throw new GameOsException(500, "Server did not return an API token.");
+            _username = result.Username;
+            SetAuthHeader();
 
-            var (profile, _) = await ReadFileAsync<UserProfile>(
-                $"accounts/{accountKey}/profile.json", ct);
-            if (profile == null)
-                throw new GameOsException(401, "Account not found.");
-
-            string computed = HashPassword(password, profile.Username);
-            if (computed != profile.PasswordHash)
-                throw new GameOsException(401, "Invalid password.");
-
-            _username = profile.Username;
-            return profile;
+            return await FetchProfileAsync(ct);
         }
 
+        /// <summary>Register a new account.  Returns the created profile.</summary>
         public async Task<UserProfile> RegisterAsync(
             string username, string email, string password,
             CancellationToken ct = default)
         {
-            if (_demoMode)
-                return DemoRegister(username, email);
+            var resp = await _http.PostAsJsonAsync("api/create-account",
+                new { username, email, password }, ct);
+            var result = await ParseResponseAsync<TokenResult>(resp, ct);
 
-            string accountKey = username.ToLower();
-            var (existing, _) = await ReadFileAsync<UserProfile>(
-                $"accounts/{accountKey}/profile.json", ct);
-            if (existing != null)
-                throw new GameOsException(409, "Username is already taken.");
+            _token    = result.Token
+                ?? throw new GameOsException(500, "Server did not return an API token.");
+            _username = result.Username;
+            SetAuthHeader();
 
-            string hash = HashPassword(password, username);
-            var profile = new UserProfile
-            {
-                Username     = username,
-                Email        = email,
-                PasswordHash = hash,
-                CreatedAt    = DateTimeOffset.UtcNow.ToString("o")
-            };
-            await WriteFileAsync(
-                $"accounts/{accountKey}/profile.json",
-                profile, $"Register: {username}", null, ct);
-
-            // Update email index
-            var (idx, idxSha) = await ReadFileAsync<Dictionary<string, string>>(
-                "accounts/email-index.json", ct);
-            idx ??= new Dictionary<string, string>();
-            idx[email.ToLower()] = accountKey;
-            await WriteFileAsync("accounts/email-index.json", idx,
-                $"Email index: {email}", idxSha, ct);
-
-            _username = username;
-            return profile;
+            return await FetchProfileAsync(ct);
         }
 
-        public void Logout() => _username = null;
+        public void Logout()
+        {
+            _token    = null;
+            _username = null;
+            _http.DefaultRequestHeaders.Authorization = null;
+        }
 
-        // ── Profile / games / achievements ───────────────────────────────────
-        public Task<(UserProfile? p, string? sha)> GetProfileAsync(
-            string username, CancellationToken ct = default)
-            => ReadFileAsync<UserProfile>(
-                $"accounts/{username.ToLower()}/profile.json", ct);
+        // ── Profile ───────────────────────────────────────────────────────────
+        public async Task<UserProfile> GetProfileAsync(CancellationToken ct = default)
+            => await FetchProfileAsync(ct);
 
-        public Task<(List<Game>? g, string? sha)> GetGamesAsync(
-            string username, CancellationToken ct = default)
-            => ReadFileAsync<List<Game>>(
-                $"accounts/{username.ToLower()}/games.json", ct);
+        private async Task<UserProfile> FetchProfileAsync(CancellationToken ct)
+        {
+            var resp   = await _http.GetAsync("api/me", ct);
+            var result = await ParseResponseAsync<ProfileResult>(resp, ct);
+            return result.Profile ?? new UserProfile { Username = _username ?? "" };
+        }
 
-        public Task<(List<Achievement>? a, string? sha)> GetAchievementsAsync(
-            string username, CancellationToken ct = default)
-            => ReadFileAsync<List<Achievement>>(
-                $"accounts/{username.ToLower()}/achievements.json", ct);
+        // ── Games ─────────────────────────────────────────────────────────────
+        public async Task<List<Game>> GetGamesAsync(CancellationToken ct = default)
+        {
+            var resp   = await _http.GetAsync("api/me/games", ct);
+            var result = await ParseResponseAsync<GamesResult>(resp, ct);
+            return result.Games ?? new List<Game>();
+        }
 
         public async Task AddGameAsync(
-            string username, string platform, string title,
-            string? titleId = null, string? coverUrl = null,
+            string platform, string title, string? titleId = null,
             CancellationToken ct = default)
         {
-            string path = $"accounts/{username.ToLower()}/games.json";
-            var (games, sha) = await ReadFileAsync<List<Game>>(path, ct);
-            games ??= new List<Game>();
-
-            if (games.Exists(g =>
-                g.Platform == platform &&
-                string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)))
-                throw new GameOsException(400, "Game already in library.");
-
-            games.Add(new Game
-            {
-                Platform = platform,
-                Title    = title,
-                TitleId  = titleId,
-                CoverUrl = coverUrl,
-                AddedAt  = DateTimeOffset.UtcNow.ToString("o")
-            });
-            await WriteFileAsync(path, games, $"Add game: {title} ({platform})", sha, ct);
+            var resp = await _http.PostAsJsonAsync("api/me/games",
+                new { platform, title, titleId }, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
         }
 
         public async Task RemoveGameAsync(
-            string username, string platform, string title,
-            CancellationToken ct = default)
+            string platform, string title, CancellationToken ct = default)
         {
-            string path = $"accounts/{username.ToLower()}/games.json";
-            var (games, sha) = await ReadFileAsync<List<Game>>(path, ct);
-            if (games == null) return;
-            games.RemoveAll(g =>
-                g.Platform == platform &&
-                string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
-            await WriteFileAsync(path, games, $"Remove game: {title} ({platform})", sha, ct);
+            var req = new HttpRequestMessage(HttpMethod.Delete, "api/me/games")
+            {
+                Content = JsonContent.Create(new { platform, title })
+            };
+            var resp = await _http.SendAsync(req, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
+        }
+
+        // ── Achievements ──────────────────────────────────────────────────────
+        public async Task<List<Achievement>> GetAchievementsAsync(CancellationToken ct = default)
+        {
+            var resp   = await _http.GetAsync("api/me/achievements", ct);
+            var result = await ParseResponseAsync<AchievementsResult>(resp, ct);
+            return result.Achievements ?? new List<Achievement>();
         }
 
         // ── Friends ───────────────────────────────────────────────────────────
-        public Task<(List<string>? f, string? sha)> GetFriendsAsync(
+        public async Task<List<string>> GetFriendsAsync(CancellationToken ct = default)
+        {
+            var resp   = await _http.GetAsync("api/me/friends", ct);
+            var result = await ParseResponseAsync<FriendsResult>(resp, ct);
+            return result.Friends ?? new List<string>();
+        }
+
+        public async Task<List<FriendRequest>> GetFriendRequestsAsync(
             string username, CancellationToken ct = default)
-            => ReadFileAsync<List<string>>(
-                $"accounts/{username.ToLower()}/friends.json", ct);
+        {
+            var resp   = await _http.GetAsync(
+                $"api/get-friend-requests?username={Uri.EscapeDataString(username)}", ct);
+            var result = await ParseResponseAsync<FriendRequestsResult>(resp, ct);
+            return result.Requests ?? new List<FriendRequest>();
+        }
+
+        public async Task SendFriendRequestAsync(
+            string friendUsername, CancellationToken ct = default)
+        {
+            var resp = await _http.PostAsJsonAsync("api/send-friend-request",
+                new { username = _username, friendUsername }, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
+        }
+
+        public async Task AcceptFriendRequestAsync(
+            string fromUsername, CancellationToken ct = default)
+        {
+            var resp = await _http.PostAsJsonAsync("api/accept-friend-request",
+                new { username = _username, fromUsername }, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
+        }
+
+        public async Task DeclineFriendRequestAsync(
+            string fromUsername, CancellationToken ct = default)
+        {
+            var resp = await _http.PostAsJsonAsync("api/decline-friend-request",
+                new { username = _username, fromUsername }, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
+        }
 
         // ── Presence ──────────────────────────────────────────────────────────
-        public async Task UpdatePresenceAsync(
+        public async Task UpdatePresenceAsync(CancellationToken ct = default)
+        {
+            if (_username == null) return;
+            await _http.PostAsJsonAsync("api/update-presence",
+                new { username = _username }, ct);
+        }
+
+        public async Task<string?> GetPresenceAsync(
             string username, CancellationToken ct = default)
         {
-            if (_demoMode) return;
-            string path = $"accounts/{username.ToLower()}/presence.json";
-            var (_, sha) = await ReadFileAsync<object>(path, ct);
-            var data = new { username, lastSeen = DateTimeOffset.UtcNow.ToString("o") };
-            await WriteFileAsync(path, data, $"Presence: {username}", sha, ct);
-        }
-
-        // ── Direct messages ───────────────────────────────────────────────────
-        public async Task SendMessageAsync(
-            string fromUsername, string toUsername, string text,
-            CancellationToken ct = default)
-        {
-            if (text.Length > 1000)
-                throw new GameOsException(400, "Message too long (max 1,000 characters).");
-
-            string convPath = ConversationPath(fromUsername, toUsername);
-            var (msgs, sha) = await ReadFileAsync<List<Message>>(convPath, ct);
-            msgs ??= new List<Message>();
-            msgs.Add(new Message
+            try
             {
-                From   = fromUsername,
-                Text   = text,
-                SentAt = DateTimeOffset.UtcNow.ToString("o")
-            });
-            await WriteFileAsync(convPath, msgs,
-                $"Message from {fromUsername} to {toUsername}", sha, ct);
-        }
-
-        public Task<(List<Message>? msgs, string? sha)> GetMessagesAsync(
-            string userA, string userB, CancellationToken ct = default)
-            => ReadFileAsync<List<Message>>(ConversationPath(userA, userB), ct);
-
-        private static string ConversationPath(string a, string b)
-        {
-            string la = a.ToLower(), lb = b.ToLower();
-            return string.Compare(la, lb, StringComparison.Ordinal) < 0
-                ? $"accounts/{la}/conversations/{la}_{lb}.json"
-                : $"accounts/{lb}/conversations/{lb}_{la}.json";
-        }
-
-        // ── Demo mode helpers ─────────────────────────────────────────────────
-        private static readonly Dictionary<string, UserProfile> _demoUsers = new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["demo"] = new UserProfile
-            {
-                Username     = "Demo",
-                Email        = "demo@gameos.local",
-                PasswordHash = HashPassword("demo123", "Demo"),
-                CreatedAt    = "2025-01-01T00:00:00Z"
+                var resp = await _http.GetAsync(
+                    $"api/get-presence?username={Uri.EscapeDataString(username)}", ct);
+                if (!resp.IsSuccessStatusCode) return null;
+                var result = await resp.Content
+                    .ReadFromJsonAsync<PresenceResult>(cancellationToken: ct);
+                return result?.LastSeen;
             }
-        };
-
-        private UserProfile DemoLogin(string usernameOrEmail, string password)
-        {
-            string key = usernameOrEmail.Contains('@')
-                ? usernameOrEmail.Split('@')[0]
-                : usernameOrEmail;
-
-            if (!_demoUsers.TryGetValue(key, out var profile))
-                throw new GameOsException(401, "Account not found.");
-
-            string computed = HashPassword(password, profile.Username);
-            if (computed != profile.PasswordHash)
-                throw new GameOsException(401, "Invalid password.");
-
-            _username = profile.Username;
-            return profile;
+            catch { return null; }
         }
 
-        private UserProfile DemoRegister(string username, string email)
+        // ── Messages ──────────────────────────────────────────────────────────
+        public async Task SendMessageAsync(
+            string toUsername, string text, CancellationToken ct = default)
         {
-            var profile = new UserProfile
+            var resp = await _http.PostAsJsonAsync("api/send-message",
+                new { username = _username, toUsername, text }, ct);
+            await ParseResponseAsync<ApiResult>(resp, ct);
+        }
+
+        public async Task<List<Message>> GetMessagesAsync(
+            string withUsername, CancellationToken ct = default)
+        {
+            var resp   = await _http.GetAsync(
+                $"api/get-messages?username={Uri.EscapeDataString(_username ?? "")}" +
+                $"&withUsername={Uri.EscapeDataString(withUsername)}", ct);
+            var result = await ParseResponseAsync<MessagesResult>(resp, ct);
+            return result.Messages ?? new List<Message>();
+        }
+
+        // ── Health check ──────────────────────────────────────────────────────
+        public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
+        {
+            try
             {
-                Username  = username,
-                Email     = email,
-                CreatedAt = DateTimeOffset.UtcNow.ToString("o")
-            };
-            _username = username;
-            return profile;
+                var resp = await _http.GetAsync("health", ct);
+                return resp.IsSuccessStatusCode;
+            }
+            catch { return false; }
         }
 
         public void Dispose() => _http.Dispose();
 
-        // ── GitHub API wrappers ───────────────────────────────────────────────
-        private class GitHubFile
+        // ── Helpers ───────────────────────────────────────────────────────────
+        private void SetAuthHeader()
         {
-            [JsonPropertyName("content")] public string? Content { get; set; }
-            [JsonPropertyName("sha")]     public string? Sha     { get; set; }
+            if (_token != null)
+                _http.DefaultRequestHeaders.Authorization =
+                    new AuthenticationHeaderValue("Bearer", _token);
         }
 
-        private class GitHubWriteResult
+        private static async Task<T> ParseResponseAsync<T>(
+            HttpResponseMessage resp, CancellationToken ct)
+            where T : ApiResult
         {
-            [JsonPropertyName("content")] public GitHubFile? Content { get; set; }
+            T? result;
+            try
+            {
+                result = await resp.Content
+                    .ReadFromJsonAsync<T>(cancellationToken: ct);
+            }
+            catch
+            {
+                throw new GameOsException((int)resp.StatusCode,
+                    $"Unexpected response from server (HTTP {(int)resp.StatusCode}).");
+            }
+
+            if (result == null || !result.Success)
+            {
+                string msg = result?.Message
+                    ?? $"Request failed (HTTP {(int)resp.StatusCode}).";
+                throw new GameOsException((int)resp.StatusCode, msg);
+            }
+            return result;
+        }
+
+        // ── Response models ───────────────────────────────────────────────────
+        private class ApiResult
+        {
+            [JsonPropertyName("success")] public bool    Success { get; set; }
+            [JsonPropertyName("message")] public string? Message { get; set; }
+        }
+
+        private class TokenResult : ApiResult
+        {
+            [JsonPropertyName("token")]    public string? Token    { get; set; }
+            [JsonPropertyName("username")] public string? Username { get; set; }
+        }
+
+        private class ProfileResult : ApiResult
+        {
+            [JsonPropertyName("profile")] public UserProfile? Profile { get; set; }
+        }
+
+        private class GamesResult : ApiResult
+        {
+            [JsonPropertyName("games")] public List<Game>? Games { get; set; }
+        }
+
+        private class AchievementsResult : ApiResult
+        {
+            [JsonPropertyName("achievements")] public List<Achievement>? Achievements { get; set; }
+        }
+
+        private class FriendsResult : ApiResult
+        {
+            [JsonPropertyName("friends")] public List<string>? Friends { get; set; }
+        }
+
+        private class FriendRequestsResult : ApiResult
+        {
+            [JsonPropertyName("requests")] public List<FriendRequest>? Requests { get; set; }
+        }
+
+        private class PresenceResult
+        {
+            [JsonPropertyName("success")]  public bool    Success  { get; set; }
+            [JsonPropertyName("lastSeen")] public string? LastSeen { get; set; }
+        }
+
+        private class MessagesResult : ApiResult
+        {
+            [JsonPropertyName("messages")] public List<Message>? Messages { get; set; }
         }
     }
 

@@ -91,6 +91,29 @@ namespace GameLauncher.Models
         [JsonPropertyName("lastSeen")] public string? LastSeen { get; set; }
     }
 
+    /// <summary>A friend displayed in the Friends screen, populated from presence API.</summary>
+    public class FriendEntry
+    {
+        public string Username      { get; set; } = "";
+        /// <summary>First character of Username, upper-cased, for the avatar circle.</summary>
+        public string AvatarInitial =>
+            Username.Length > 0 ? Username[0].ToString().ToUpper() : "?";
+        /// <summary>Online / Away / Offline, derived from lastSeen timestamp.</summary>
+        public string Status        { get; set; } = "Offline";
+        public string LastSeen      { get; set; } = "Unknown";
+        public bool   IsOnline      => Status == "Online";
+        public bool   IsAway        => Status == "Away";
+    }
+
+    /// <summary>An incoming friend request shown in the Friends screen.</summary>
+    public class FriendRequestDisplay
+    {
+        public string FromUsername  { get; set; } = "";
+        public string AvatarInitial =>
+            FromUsername.Length > 0 ? FromUsername[0].ToString().ToUpper() : "?";
+        public string SentAgo       { get; set; } = "";
+    }
+
     /// <summary>Session data saved locally so players can stay logged in.</summary>
     public class SavedSession
     {

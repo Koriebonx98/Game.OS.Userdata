@@ -31,7 +31,7 @@ public partial class LoginViewModel : ViewModelBase
         }
     };
 
-    public System.Action<UserProfile, List<Game>, List<Achievement>, bool>? OnLoginSuccess { get; set; }
+    public System.Action<UserProfile, List<Game>, List<Achievement>>? OnLoginSuccess { get; set; }
 
     public LoginViewModel(GameOsClient client)
     {
@@ -51,26 +51,27 @@ public partial class LoginViewModel : ViewModelBase
         ErrorMessage = "";
         try
         {
-            var profile = await _client.LoginAsync(Username, Password);
-            var (games, _) = await _client.GetGamesAsync(profile.Username);
-            var (achievements, _) = await _client.GetAchievementsAsync(profile.Username);
+            var profile      = await _client.LoginAsync(Username, Password);
+            var games        = await _client.GetGamesAsync();
+            var achievements = await _client.GetAchievementsAsync();
 
-            var lib = games ?? new List<Game>();
-            // Enrich with demo metadata if missing
+            var lib = games;
+            // Enrich with static metadata where the API response lacks UI fields
             foreach (var g in lib)
             {
-                var demo = DemoData.Library.FirstOrDefault(d =>
+                var meta = DemoData.Library.FirstOrDefault(d =>
                     d.Title.Equals(g.Title, System.StringComparison.OrdinalIgnoreCase));
-                if (demo != null)
+                if (meta != null)
                 {
-                    g.Genre       ??= demo.Genre;
-                    g.Description ??= demo.Description;
-                    g.Rating      ??= demo.Rating;
-                    g.CoverColor  ??= demo.CoverColor;
+                    g.Genre       ??= meta.Genre;
+                    g.Description ??= meta.Description;
+                    g.Rating      ??= meta.Rating;
+                    g.CoverColor  ??= meta.CoverColor;
+                    g.CoverUrl    ??= meta.CoverUrl;
                 }
             }
 
-            OnLoginSuccess?.Invoke(profile, lib, achievements ?? new List<Achievement>(), _client.DemoMode);
+            OnLoginSuccess?.Invoke(profile, lib, achievements);
         }
         catch (GameOsException ex)
         {
@@ -111,8 +112,7 @@ public partial class LoginViewModel : ViewModelBase
         try
         {
             var profile = await _client.RegisterAsync(Username, Email, Password);
-            OnLoginSuccess?.Invoke(profile, new List<Game>(),
-                new List<Achievement>(), _client.DemoMode);
+            OnLoginSuccess?.Invoke(profile, new List<Game>(), new List<Achievement>());
         }
         catch (GameOsException ex)
         {
@@ -129,50 +129,14 @@ public partial class LoginViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void DemoMode()
-    {
-        _client.DemoMode = true;
-        IsLoading = false;
-        ErrorMessage = "";
-
-        // Bypass network entirely — load demo data directly
-        var profile = new UserProfile
-        {
-            Username     = "Demo",
-            Email        = "demo@gameos.local",
-            CreatedAt    = "2025-01-01T00:00:00Z",
-            PasswordHash = ""
-        };
-        OnLoginSuccess?.Invoke(
-            profile,
-            new System.Collections.Generic.List<Models.Game>(DemoData.Library),
-            new System.Collections.Generic.List<Models.Achievement>(DemoData.Achievements),
-            true);
-    }
-
-    [RelayCommand]
     private void ToggleForm() => ShowRegister = !ShowRegister;
 
-    /// <summary>Quick-login using a saved local account (enters demo mode with that username).</summary>
+    /// <summary>Quick-login — pre-fills the username field from a saved session.</summary>
     [RelayCommand]
     private void QuickLogin(SavedSession? session)
     {
         if (session == null) return;
-        _client.DemoMode = true;
-        IsLoading    = false;
+        Username = session.Username;
         ErrorMessage = "";
-
-        var profile = new UserProfile
-        {
-            Username  = session.Username,
-            Email     = $"{session.Username}@gameos.local",
-            CreatedAt = "2024-01-01T00:00:00Z",
-            PasswordHash = ""
-        };
-        OnLoginSuccess?.Invoke(
-            profile,
-            new System.Collections.Generic.List<Models.Game>(DemoData.Library),
-            new System.Collections.Generic.List<Models.Achievement>(DemoData.Achievements),
-            true);
     }
 }
