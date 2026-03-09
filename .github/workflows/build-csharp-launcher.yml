@@ -1,0 +1,155 @@
+# Build & Live-Login Test — C# Game Launcher
+#
+# Builds the C# launcher and runs the LoginAuth.Tests suite, including the
+# optional live backend test (Test 5) that signs in to the real GitHub data
+# repository using the same PBKDF2-SHA256 method as the web frontend.
+#
+# Token injection (mirrors what deploy.yml does for script.js):
+#   The DATA_REPO_TOKEN PAT is XOR-encoded with key "GameOS_KEY" and written
+#   to GameLauncher/gameos-token.dat before the build.  At startup the launcher
+#   reads and decodes this file — exactly like the web page decodes
+#   GITHUB_TOKEN_ENCODED.  The empty placeholder is committed to the repo;
+#   the real encoded token only exists inside a CI runner during the build.
+#
+# Triggers:
+#   • Manual (workflow_dispatch) — run from the Actions tab at any time
+#   • Push to main — so every merge is validated end-to-end
+#
+# Required secrets (set in Settings → Secrets and variables → Actions):
+#   DATA_REPO_TOKEN       — fine-grained PAT with Contents read+write on
+#                           the private data repository (already used by
+#                           deploy.yml; no new secret needed if it is set)
+#   GAMEOS_TEST_PASSWORD  — password for the Koriebonx98 test account
+
+name: Build & Live-Login Test (C# Launcher)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'GameLauncher/**'
+      - 'LoginAuth.Tests/**'
+      - '.github/workflows/build-csharp-launcher.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build + Auth Tests (including live login)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── Token injection (mirrors deploy.yml's GITHUB_TOKEN_ENCODED injection) ──
+      - name: Inject token into gameos-token.dat
+        # Encodes DATA_REPO_TOKEN with XOR key "GameOS_KEY" and writes it to the
+        # placeholder file.  The launcher reads this file at startup using the same
+        # DecodeXorToken() method (mirroring the JS decoder in script.js).
+        # If DATA_REPO_TOKEN is not set, the file stays empty and the launcher falls
+        # back to GAMEOS_GITHUB_TOKEN env var (no error — Tests 1–4 still pass).
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          token = os.environ.get('DATA_REPO_TOKEN', '')
+          XOR_KEY = b'GameOS_KEY'
+
+          if token:
+              tok_bytes = token.encode('utf-8')
+              encoded = ''.join(
+                  f'{b ^ XOR_KEY[i % len(XOR_KEY)]:02x}'
+                  for i, b in enumerate(tok_bytes)
+              )
+              with open('GameLauncher/gameos-token.dat', 'w') as f:
+                  f.write(encoded)
+              print(f'✅ Token injected into GameLauncher/gameos-token.dat ({len(encoded)} hex chars)')
+              print('   Encoding: XOR-hex with key "GameOS_KEY" — same as GITHUB_TOKEN_ENCODED in script.js')
+          else:
+              print('ℹ  DATA_REPO_TOKEN not set — gameos-token.dat left empty')
+              print('   Launcher will fall back to GAMEOS_GITHUB_TOKEN env var')
+              print('   To enable live login, add DATA_REPO_TOKEN as a repository secret.')
+          PYEOF
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Restore dependencies
+        run: dotnet restore Game.OS.Userdata.sln
+
+      - name: Build GameLauncher
+        run: dotnet build GameLauncher/GameLauncher.csproj -c Release --no-restore
+
+      - name: Build LoginAuth.Tests
+        run: dotnet build LoginAuth.Tests/LoginAuth.Tests.csproj -c Release --no-restore
+
+      # ── Unit / hash-parity tests (no network required) ────────────────────
+      - name: Run LoginAuth.Tests (hash-parity + bcrypt checks)
+        run: dotnet run --project LoginAuth.Tests -c Release --no-build
+        # Tests 1–4 pass without any secrets (pure crypto logic).
+        # Test 5 is automatically skipped when GAMEOS_GITHUB_TOKEN is not set.
+
+      # ── Live backend test ─────────────────────────────────────────────────
+      # Always run — when DATA_REPO_TOKEN / GAMEOS_TEST_PASSWORD are not set,
+      # Test 5 is skipped automatically (no error).
+      - name: Run live login test — Koriebonx98 account
+        env:
+          GAMEOS_GITHUB_TOKEN:  ${{ secrets.DATA_REPO_TOKEN }}
+          GAMEOS_TEST_USERNAME: Koriebonx98
+          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "  Live login test — verifying Koriebonx98 account"
+          echo "  Auth method: PBKDF2-SHA256 (same as web frontend)"
+          echo "═══════════════════════════════════════════════════════════"
+          dotnet run --project LoginAuth.Tests -c Release --no-build \
+            2>&1 | tee /tmp/login-test-output.txt
+
+      # ── Capture results as artifact ───────────────────────────────────────
+      - name: Save test results as artifact
+        if: always()
+        run: |
+          mkdir -p /tmp/launcher-test-results
+
+          if [ -f /tmp/login-test-output.txt ]; then
+            cp /tmp/login-test-output.txt /tmp/launcher-test-results/
+          fi
+
+          cat > /tmp/launcher-test-results/summary.txt << 'EOF'
+          ═══════════════════════════════════════════════════════════════════
+            Game.OS C# Launcher — Login Authentication Summary
+          ═══════════════════════════════════════════════════════════════════
+
+            Auth method : PBKDF2-SHA256, 100,000 iterations (identical to
+                          the JavaScript hashPassword() in script.js)
+            Salt format : {username_lower}:gameos
+            Dual-hash   : PBKDF2 (web/launcher accounts) + bcrypt
+                          (Node.js backend accounts) both supported
+
+            Token source: gameos-token.dat (XOR-encoded, injected at build
+                          time — same mechanism as GITHUB_TOKEN_ENCODED in
+                          script.js).  Falls back to GAMEOS_GITHUB_TOKEN env.
+
+            Test account: Koriebonx98
+            Data repo   : Koriebonx98/Game.OS.Private.Data (same as web)
+
+            The C# launcher calls the SAME GitHub API endpoints as the web
+            frontend.  Accounts created in the browser work in the launcher.
+          ═══════════════════════════════════════════════════════════════════
+          EOF
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: csharp-launcher-login-test-results
+          path: /tmp/launcher-test-results/
+          retention-days: 30

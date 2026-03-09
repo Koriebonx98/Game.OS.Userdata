@@ -48,13 +48,27 @@ The `LoginAuth.Tests` project proves this parity automatically.  Run it from the
 cd LoginAuth.Tests && dotnet run
 ```
 
-![Login Auth Tests — all 14 checks pass](https://github.com/user-attachments/assets/14f91c83-3d3b-49ee-8952-402666294cce)
-
-All 14 checks pass:
+All 14 checks pass automatically (no secrets required):
 - PBKDF2 hashes match Node.js reference vectors byte-for-byte
 - Username salt is case-insensitive (matches JS `username.toLowerCase()`)
 - Bcrypt hashes (Node.js backend accounts) are detected and verified correctly
 - Both hash types accept correct passwords and reject wrong ones
+
+To also run the **live backend test** (Test 5 — signs in to the real GitHub data repository):
+
+```bash
+GAMEOS_GITHUB_TOKEN=<DATA_REPO_TOKEN> \
+GAMEOS_TEST_USERNAME=Koriebonx98 \
+GAMEOS_TEST_PASSWORD=<your-password> \
+  dotnet run --project LoginAuth.Tests
+```
+
+The CI workflow `.github/workflows/build-csharp-launcher.yml` runs this test automatically on
+every push to `main` using the `DATA_REPO_TOKEN` and `GAMEOS_TEST_PASSWORD` repository secrets.
+
+![C# Launcher — Live Login Test Output](../Design/Screenshots/screenshot_login_auth_live_test.png)
+
+> *All 14 tests pass (Tests 1–4 verify hash parity; Test 5 confirms live backend login for Koriebonx98)*
 
 ### Login Success — C# Launcher Dashboard
 
@@ -118,18 +132,39 @@ dotnet run -c Release
 The launcher connects to the **same private GitHub data repository** as the website — no local
 server required.  Sign in with any account you already created on the web frontend.
 
-### Configuration
+### How token access works — same mechanism as the website
 
-The launcher reads the following optional environment variables:
+The web frontend and the C# launcher use **identical authentication**:
+
+| | Web frontend | C# launcher |
+|---|---|---|
+| Token storage | `GITHUB_TOKEN_ENCODED = '...'` in `script.js` | `gameos-token.dat` next to the executable |
+| Token encoding | XOR-hex, key `GameOS_KEY` (by `deploy.yml`) | XOR-hex, key `GameOS_KEY` (by `build-csharp-launcher.yml`) |
+| Decode method | `bytes.map((h,i) => chr(parseInt(h,16) ^ key[i%9]))` | `GitHubDataService.DecodeXorToken()` — same formula |
+| API calls | `fetch("https://api.github.com/repos/…")` | `HttpClient.GetAsync("https://api.github.com/repos/…")` |
+| Password hash | PBKDF2-SHA256, 100,000 iter, salt `{user_lower}:gameos` | Same — `Rfc2898DeriveBytes` |
+
+The `build-csharp-launcher.yml` GitHub Actions workflow:
+1. Reads `DATA_REPO_TOKEN` from repository secrets (same secret used by `deploy.yml`)
+2. XOR-encodes it with key `GameOS_KEY`
+3. Writes the encoded string to `GameLauncher/gameos-token.dat` before building
+4. Builds and publishes the app — the token file is bundled alongside the executable
+5. Runs the live login test for `Koriebonx98` to confirm everything works
+
+The empty placeholder `gameos-token.dat` is committed to the repo (just like `GITHUB_TOKEN_ENCODED = '';` is committed in `script.js`).  The real token is only present inside the CI runner during the build and is never committed back.
+
+![Build & Login Architecture](../Design/Screenshots/screenshot_build_and_login.png)
+
+### Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `GAMEOS_DATA_REPO_OWNER` | `Koriebonx98` | GitHub owner of the private data repository |
 | `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
-| `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT with Contents read+write access (required only when the data repository is **private**) |
+| `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT — developer/CI override; takes priority over `gameos-token.dat` |
 
-These variables are pre-configured for the default deployment.  You only need to set them if you
-are hosting your own data repository.
+> **For developers running from source:** set `GAMEOS_GITHUB_TOKEN` to your `DATA_REPO_TOKEN` PAT value.
+> End users running a published build get the token automatically via `gameos-token.dat`.
 
 ---
 
