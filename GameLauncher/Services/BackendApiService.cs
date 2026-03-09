@@ -72,8 +72,25 @@ namespace GameLauncher.Services
                     $"[BackendApiService] Access denied reading gameos-backend.url: {ex.Message}");
             }
 
+            // 3. Local development fallback — when building from source (e.g. Visual Studio)
+            //    with no injected backend URL AND no injected GitHub token, automatically
+            //    target the local backend server so the app works without extra env-var setup.
+            //    Run `cd backend && npm start` in the repo root to start it.
+            //
+            //    When gameos-token.dat has been injected by CI (published exe), the token is
+            //    already set and GitHub-direct mode is the right choice, so we skip this
+            //    fallback in that case to preserve existing end-user behaviour.
+            if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
+                return LocalhostBackendUrl;
+
             return null;
         }
+
+        /// <summary>
+        /// Default local development backend URL.  Matches the port used by
+        /// <c>backend/index.js</c> (PORT env var defaults to 3000).
+        /// </summary>
+        public const string LocalhostBackendUrl = "http://localhost:3000";
 
         // ── HTTP client ───────────────────────────────────────────────────────
 

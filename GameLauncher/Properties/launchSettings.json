@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json.schemastore.org/launchsettings.json",
+  "profiles": {
+    "GameLauncher (local backend)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "GAMEOS_BACKEND_URL": "http://localhost:3000"
+      }
+    },
+    "GameLauncher": {
+      "commandName": "Project"
+    }
+  }
+}

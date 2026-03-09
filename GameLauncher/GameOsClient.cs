@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using GameLauncher.Models;
@@ -114,10 +115,26 @@ namespace GameLauncher
         {
             if (_backend != null)
             {
-                var (profile, token) = await _backend.LoginAsync(usernameOrEmail, password, ct);
-                _username    = profile.Username;
-                _bearerToken = token;
-                return profile;
+                try
+                {
+                    var (profile, token) = await _backend.LoginAsync(usernameOrEmail, password, ct);
+                    _username    = profile.Username;
+                    _bearerToken = token;
+                    return profile;
+                }
+                catch (HttpRequestException) when (
+                    BackendApiService.BackendUrl == BackendApiService.LocalhostBackendUrl)
+                {
+                    // Local build: the developer hasn't started the backend yet.
+                    throw new GameOsException(503,
+                        "Cannot connect to the Game.OS backend server.\n\n" +
+                        "When running a local build, start the backend first:\n" +
+                        "  cd backend\n" +
+                        "  npm start\n\n" +
+                        "Then try signing in again.\n\n" +
+                        "Alternatively, set GAMEOS_BACKEND_URL to your deployed backend,\n" +
+                        "or set GAMEOS_GITHUB_TOKEN to your GitHub Personal Access Token.");
+                }
             }
 
             // GitHub-direct mode — requires a PAT bundled in gameos-token.dat

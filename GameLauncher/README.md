@@ -121,7 +121,18 @@ After a successful login the C# launcher shows the same account data fetched liv
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) or later
 - A Game.OS account (create one at the [web frontend](../README.md) — same account works in the launcher)
 
-### Run the launcher
+### Quick Start (Visual Studio)
+
+1. Open **`Game.OS.Userdata.sln`** in Visual Studio 2022+
+2. Start the backend in a separate terminal:
+   ```bash
+   cd backend
+   npm install   # first time only
+   npm start     # http://localhost:3000
+   ```
+3. Press **F5** — the launcher connects to the local backend automatically. No env vars needed.
+
+### Run from command line
 
 ```bash
 cd GameLauncher
@@ -161,7 +172,8 @@ The launcher supports two authentication modes and auto-detects which one to use
 
 #### Mode 1 — Backend REST API (preferred, no GitHub PAT needed)
 
-Set the `GAMEOS_BACKEND_URL` environment variable to your deployed backend URL:
+When `GAMEOS_BACKEND_URL` is set, the launcher calls the Node.js backend REST API.
+Set it to your deployed backend URL:
 
 ```bash
 # Windows
@@ -176,6 +188,20 @@ The launcher calls `POST {url}/api/auth/token` with `{ username, password }` —
 same endpoint the web frontend calls**.  The backend server holds the GitHub PAT; the launcher
 never needs to store or bundle one.
 
+**Local development (no env vars needed):** when neither `GAMEOS_BACKEND_URL` nor a GitHub
+token is configured, the launcher automatically tries `http://localhost:3000` so that building
+and running from Visual Studio works out of the box alongside the local backend server.
+Start the backend in a separate terminal before launching:
+
+```bash
+cd backend
+npm install   # first time only
+npm start     # starts the backend on http://localhost:3000
+```
+
+Then open `Game.OS.Userdata.sln` in Visual Studio and press **F5** — the launcher will
+connect to the local backend automatically.
+
 #### Mode 2 — GitHub-direct (fallback, requires a GitHub PAT)
 
 When `GAMEOS_BACKEND_URL` is not set, the launcher falls back to calling the GitHub API
@@ -188,8 +214,11 @@ directly (mirroring the web frontend's GitHub-direct mode).  This requires a Git
 | `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
 | `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT — developer/CI override; takes priority over `gameos-token.dat` |
 
-> **For developers running from source with a backend:** set `GAMEOS_BACKEND_URL`.
-> **For developers running from source without a backend:** set `GAMEOS_GITHUB_TOKEN`.
+> **Building from Visual Studio:** no configuration needed — just start `cd backend && npm start`
+> in a terminal, then press F5.  The launcher connects to `http://localhost:3000` automatically.
+>
+> **For developers with a deployed backend:** set `GAMEOS_BACKEND_URL`.
+> **For developers without a backend:** set `GAMEOS_GITHUB_TOKEN`.
 > End users running a published build get the token via `gameos-token.dat` (injected at CI build time).
 
 ---
