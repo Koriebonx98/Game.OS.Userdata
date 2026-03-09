@@ -1,7 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
-             xmlns:demo="using:GameLauncher"
+             xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.FriendsView"
              x:DataType="vm:FriendsViewModel"
              Background="#0d1117">
@@ -27,12 +27,25 @@
             </Button>
         </Grid>
 
+        <!-- Loading indicator -->
+        <TextBlock Text="Loading friends…"
+                   Foreground="#8b949e" FontSize="13" Margin="0,0,0,16"
+                   IsVisible="{Binding IsLoading}"/>
+
+        <!-- Error message -->
+        <Border Background="#3d1a1a" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,16"
+                IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="#f85149" FontSize="13"/>
+        </Border>
+
         <!-- Pending Requests -->
         <StackPanel IsVisible="{Binding PendingRequests.Count}" Margin="0,0,0,24">
             <TextBlock Text="Friend Requests" Classes="section-header"/>
             <ItemsControl ItemsSource="{Binding PendingRequests}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:DemoFriendRequest">
+                    <DataTemplate x:DataType="models:FriendRequestDisplay">
                         <Border Background="#161b22" CornerRadius="10"
                                 Padding="16,12" Margin="0,0,0,8">
                             <Grid ColumnDefinitions="48,*,Auto,Auto">
@@ -81,7 +94,7 @@
             </TextBlock>
             <ItemsControl ItemsSource="{Binding OnlineFriends}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="demo:DemoFriend">
+                    <DataTemplate x:DataType="models:FriendEntry">
                         <Border Background="#161b22" CornerRadius="10"
                                 Padding="16,12" Margin="0,0,0,8">
                             <Grid ColumnDefinitions="48,*,Auto">
@@ -120,12 +133,6 @@
                                         <TextBlock Text="{Binding Status}"
                                                    FontSize="12" Foreground="#f1c40f"
                                                    IsVisible="{Binding IsAway}"/>
-                                        <TextBlock Text="·" FontSize="12"
-                                                   Foreground="#8b949e"
-                                                   IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                        <TextBlock Text="{Binding CurrentGame}"
-                                                   FontSize="12" Foreground="#8b949e"
-                                                   IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                     </StackPanel>
                                 </StackPanel>
                                 <!-- Message button -->
@@ -145,7 +152,7 @@
             <TextBlock Text="⚫  Offline" Classes="section-header"/>
             <ItemsControl ItemsSource="{Binding OfflineFriends}">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="demo:DemoFriend">
+                    <DataTemplate x:DataType="models:FriendEntry">
                         <Border Background="#161b22" CornerRadius="10"
                                 Padding="16,12" Margin="0,0,0,8"
                                 Opacity="0.7">
@@ -182,6 +189,12 @@
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
+
+        <!-- Empty state — shown when not loading and no friends found -->
+        <TextBlock Text="No friends yet. Add friends to see them here."
+                   Foreground="#8b949e" FontSize="13" HorizontalAlignment="Center"
+                   Margin="0,32,0,0"
+                   IsVisible="{Binding HasNoFriends}"/>
 
     </StackPanel>
 </UserControl>

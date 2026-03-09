@@ -13,12 +13,22 @@ public partial class StoreViewModel : ViewModelBase
     private List<StoreGame> _allStore = new();
     private List<Game>      _library  = new();
     private UserProfile     _profile  = new();
-    private GameOsClient    _client   = new(demoMode: true);
-    private bool            _demoMode = true;
+    private GameOsClient    _client   = new();
 
     [ObservableProperty] private string  _searchText = "";
     [ObservableProperty] private string  _filterGenre = "All";
     [ObservableProperty] private string? _statusMessage;
+
+    // ── Admin catalog management ──────────────────────────────────────────
+    [ObservableProperty] private bool   _isAdmin      = false;
+    [ObservableProperty] private bool   _showAdminForm = false;
+    [ObservableProperty] private string _adminTitle       = "";
+    [ObservableProperty] private string _adminPlatform    = "PC";
+    [ObservableProperty] private string _adminGenre       = "";
+    [ObservableProperty] private string _adminPrice       = "";
+    [ObservableProperty] private string _adminDescription = "";
+    [ObservableProperty] private string _adminRating      = "8.0";
+    [ObservableProperty] private string _adminCoverUrl    = "";
 
     public ObservableCollection<StoreGame> Featured      { get; } = new();
     public ObservableCollection<StoreGame> FilteredStore { get; } = new();
@@ -28,23 +38,29 @@ public partial class StoreViewModel : ViewModelBase
     public Action<StoreGame>? OnOpenDetail { get; set; }
 
     public void Load(List<StoreGame> store, List<Game> library,
-                     UserProfile profile, GameOsClient client, bool demoMode)
+                     UserProfile profile, GameOsClient client, bool isAdmin)
     {
-        _allStore = store;
+        _allStore = new List<StoreGame>(store); // work on a copy so admin changes are session-scoped
         _library  = library;
         _profile  = profile;
         _client   = client;
-        _demoMode = demoMode;
+        IsAdmin   = isAdmin;
 
+        RebuildCollections();
+    }
+
+    private void RebuildCollections()
+    {
         Featured.Clear();
-        foreach (var g in store.Where(s => s.IsFeatured))
+        foreach (var g in _allStore.Where(s => s.IsFeatured))
             Featured.Add(g);
 
         Genres.Clear();
         Genres.Add("All");
-        foreach (var genre in store.Select(s => s.Genre).Distinct().OrderBy(g => g))
+        foreach (var genre in _allStore.Select(s => s.Genre).Distinct().OrderBy(g => g))
             Genres.Add(genre);
 
+        FilterGenre = "All";
         ApplyFilter();
     }
 
@@ -88,9 +104,9 @@ public partial class StoreViewModel : ViewModelBase
         }
 
         StatusMessage = $"Adding '{game.Title}'…";
-
-        if (_demoMode)
+        try
         {
+            await _client.AddGameAsync(game.Platform, game.Title);
             _library.Add(new Game
             {
                 Platform    = game.Platform,
@@ -106,28 +122,66 @@ public partial class StoreViewModel : ViewModelBase
             });
             StatusMessage = $"✓  '{game.Title}' added to your library!";
         }
-        else
+        catch (System.Exception ex)
         {
-            try
-            {
-                await _client.AddGameAsync(_profile.Username, game.Platform, game.Title);
-                _library.Add(new Game
-                {
-                    Platform = game.Platform,
-                    Title    = game.Title,
-                    Genre    = game.Genre,
-                    Rating   = game.Rating,
-                    AddedAt  = System.DateTimeOffset.UtcNow.ToString("o")
-                });
-                StatusMessage = $"✓  '{game.Title}' added to your library!";
-            }
-            catch (System.Exception ex)
-            {
-                StatusMessage = $"Error: {ex.Message}";
-            }
+            StatusMessage = $"Error: {ex.Message}";
         }
 
-        // Refresh owned state
         ApplyFilter();
+    }
+
+    // ── Admin: toggle add-game form ───────────────────────────────────────
+    [RelayCommand]
+    private void AdminToggleForm()
+    {
+        ShowAdminForm = !ShowAdminForm;
+        if (ShowAdminForm)
+        {
+            AdminTitle = ""; AdminPlatform = "PC"; AdminGenre = "";
+            AdminPrice = ""; AdminDescription = ""; AdminRating = "8.0";
+            AdminCoverUrl = "";
+        }
+    }
+
+    // ── Admin: add a new game to the catalog (session-only) ───────────────
+    [RelayCommand]
+    private void AdminAddCatalogGame()
+    {
+        if (string.IsNullOrWhiteSpace(AdminTitle) || string.IsNullOrWhiteSpace(AdminPlatform))
+        {
+            StatusMessage = "Title and Platform are required.";
+            return;
+        }
+        if (!double.TryParse(AdminRating, System.Globalization.NumberStyles.Any,
+                System.Globalization.CultureInfo.InvariantCulture, out double rating))
+            rating = 8.0;
+
+        var newGame = new StoreGame
+        {
+            Title       = AdminTitle.Trim(),
+            Platform    = AdminPlatform.Trim(),
+            Genre       = string.IsNullOrWhiteSpace(AdminGenre) ? "Other" : AdminGenre.Trim(),
+            Price       = string.IsNullOrWhiteSpace(AdminPrice) ? "Free" : AdminPrice.Trim(),
+            Description = AdminDescription.Trim(),
+            Rating      = Math.Clamp(rating, 0, 10),
+            CoverUrl    = string.IsNullOrWhiteSpace(AdminCoverUrl) ? null : AdminCoverUrl.Trim(),
+            IsFeatured  = false,
+            ReleaseYear = System.DateTime.Now.Year.ToString()
+        };
+
+        _allStore.Add(newGame);
+        RebuildCollections();
+        ShowAdminForm = false;
+        StatusMessage = $"✓  '{newGame.Title}' added to the catalog (this session only).";
+    }
+
+    // ── Admin: remove a game from the catalog (session-only) ─────────────
+    [RelayCommand]
+    private void AdminDeleteCatalogGame(StoreGame? game)
+    {
+        if (game == null) return;
+        _allStore.RemoveAll(s => s.Title == game.Title && s.Platform == game.Platform);
+        RebuildCollections();
+        StatusMessage = $"✓  '{game.Title}' removed from the catalog (this session only).";
     }
 }

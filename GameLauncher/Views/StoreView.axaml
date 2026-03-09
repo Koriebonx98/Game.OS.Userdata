@@ -23,6 +23,74 @@
                      Width="240" VerticalAlignment="Center"/>
         </Grid>
 
+        <!-- ══ ADMIN PANEL ══ (only visible to Admin.GameOS account) -->
+        <Border IsVisible="{Binding IsAdmin}"
+                Background="#1a0c2e" CornerRadius="10" Padding="16,14"
+                Margin="0,0,0,20">
+            <StackPanel Spacing="12">
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="🛡️  Admin — Catalog Management"
+                               FontSize="15" FontWeight="Bold" Foreground="#c084fc"
+                               VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="btn-secondary"
+                            Padding="12,6"
+                            Command="{Binding AdminToggleFormCommand}">
+                        <Panel>
+                            <TextBlock Text="+ Add Game" IsVisible="{Binding !ShowAdminForm}"/>
+                            <TextBlock Text="✕ Cancel"   IsVisible="{Binding ShowAdminForm}"/>
+                        </Panel>
+                    </Button>
+                </Grid>
+
+                <!-- Add-game form (shown when ShowAdminForm = true) -->
+                <StackPanel IsVisible="{Binding ShowAdminForm}" Spacing="10">
+                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto,Auto,Auto">
+                        <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,8,0">
+                            <TextBlock Text="Title *" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminTitle}"
+                                     Watermark="Game title"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="0" Grid.Column="1" Margin="8,0,0,0">
+                            <TextBlock Text="Platform *" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminPlatform}"
+                                     Watermark="PC / Switch / PS5 …"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,8,8,0">
+                            <TextBlock Text="Genre" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminGenre}"
+                                     Watermark="RPG / FPS / Action …"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Margin="8,8,0,0">
+                            <TextBlock Text="Price" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminPrice}"
+                                     Watermark="£49.99 / Free"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="0" Margin="0,8,8,0">
+                            <TextBlock Text="Rating (0–10)" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminRating}"
+                                     Watermark="8.0"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="2" Grid.Column="1" Margin="8,8,0,0">
+                            <TextBlock Text="Cover URL" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminCoverUrl}"
+                                     Watermark="https://…"/>
+                        </StackPanel>
+                        <StackPanel Grid.Row="3" Grid.ColumnSpan="2" Margin="0,8,0,0">
+                            <TextBlock Text="Description" Classes="form-label"/>
+                            <TextBox Classes="form-input" Text="{Binding AdminDescription}"
+                                     Watermark="Short description…"
+                                     AcceptsReturn="False"/>
+                        </StackPanel>
+                    </Grid>
+                    <Button Classes="btn-primary" HorizontalAlignment="Left" Padding="20,8"
+                            Command="{Binding AdminAddCatalogGameCommand}">
+                        ✓  Add to Catalog
+                    </Button>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+
         <!-- Status message -->
         <Border Background="#0d3d1a" CornerRadius="6" Padding="14,10"
                 Margin="0,0,0,16"
@@ -170,13 +238,24 @@
                                                    FontSize="14" FontWeight="Bold"
                                                    Foreground="#3fb950"
                                                    VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1"
-                                                Classes="btn-success"
-                                                Padding="8,5"
-                                                Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
-                                                CommandParameter="{Binding}">
-                                            +
-                                        </Button>
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                                            <Button Classes="btn-success"
+                                                    Padding="8,5"
+                                                    Command="{Binding $parent[UserControl].DataContext.AddGameCommand}"
+                                                    CommandParameter="{Binding}">
+                                                +
+                                            </Button>
+                                            <!-- Admin delete button -->
+                                            <Button Classes="btn-secondary"
+                                                    Padding="8,5"
+                                                    Foreground="#f85149"
+                                                    ToolTip.Tip="Admin: Remove from catalog"
+                                                    IsVisible="{Binding $parent[UserControl].DataContext.IsAdmin}"
+                                                    Command="{Binding $parent[UserControl].DataContext.AdminDeleteCatalogGameCommand}"
+                                                    CommandParameter="{Binding}">
+                                                🗑
+                                            </Button>
+                                        </StackPanel>
                                     </Grid>
                                 </StackPanel>
                             </Border>

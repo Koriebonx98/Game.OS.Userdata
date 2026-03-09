@@ -151,21 +151,6 @@
                                 </Panel>
                             </Button>
 
-                            <!-- Divider -->
-                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
-                                <Rectangle Width="80" Height="1" Fill="#30363d" VerticalAlignment="Center"/>
-                                <TextBlock Text="or" Foreground="#8b949e" FontSize="12"/>
-                                <Rectangle Width="80" Height="1" Fill="#30363d" VerticalAlignment="Center"/>
-                            </StackPanel>
-
-                            <!-- Demo button -->
-                            <Button Classes="btn-secondary"
-                                    HorizontalAlignment="Stretch"
-                                    HorizontalContentAlignment="Center"
-                                    Command="{Binding DemoModeCommand}">
-                                🚀  Try Demo Mode  (no account needed)
-                            </Button>
-
                             <!-- Switch to register -->
                             <Button Background="Transparent" Foreground="#1f6feb"
                                     HorizontalAlignment="Center"

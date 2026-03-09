@@ -4,10 +4,18 @@ using GameLauncher.Models;
 namespace GameLauncher
 {
     /// <summary>
-    /// Built-in demo data so the launcher can run without a live GitHub connection.
+    /// Static store catalog and game metadata used for display enrichment.
+    /// The store catalog has no backend API endpoint, so it is defined here.
+    /// The <see cref="LibraryMetadata"/> list provides UI-only metadata (genre,
+    /// description, rating, cover) used to enrich games returned by the API.
     /// </summary>
     internal static class DemoData
     {
+        /// <summary>
+        /// Metadata lookup for known games.  Used to enrich API-returned library
+        /// entries with cover colours, genres, descriptions, and ratings that the
+        /// backend does not currently store.
+        /// </summary>
         public static List<Game> Library { get; } = new()
         {
             new Game { Platform = "Switch", Title = "Mario Kart 8 Deluxe",  Genre = "Racing",      Rating = 9.7, AddedAt = "2025-06-01T10:00:00Z", Description = "Hit the road with the definitive version of Mario Kart 8! Race as your favourite Nintendo characters on 96 total courses, including all DLC Booster Course Pass tracks.",
@@ -57,40 +65,6 @@ namespace GameLauncher
                 CoverUrl    = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg" },
         };
 
-        public static List<Achievement> Achievements { get; } = new()
-        {
-            // Mario Kart 8 Deluxe achievements
-            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Gold Kart", AchievementId = "mk8_gold_kart",
-                Description = "Win all 12 Grand Prix cups in 200cc.",          UnlockedAt = "2025-06-05T16:00:00Z" },
-            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Triple Red Shells", AchievementId = "mk8_triple_red",
-                Description = "Hit 3 opponents in one race with Red Shells.",   UnlockedAt = "2025-06-03T20:00:00Z" },
-            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Speed Demon", AchievementId = "mk8_speed_demon",
-                Description = "Finish a race in first place in 200cc.",         UnlockedAt = "2025-06-02T18:30:00Z" },
-            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "King of the Road", AchievementId = "mk8_king_road",
-                Description = "Complete all 96 Booster Course Pass tracks.",    UnlockedAt = "2025-06-10T14:00:00Z" },
-            // Other game achievements
-            new Achievement { Platform = "PC",    GameTitle = "Cyberpunk 2077",  Name = "Night City Legend",   AchievementId = "cp77_legend",
-                Description = "Complete all main missions.",                     UnlockedAt = "2025-01-15T14:00:00Z" },
-            new Achievement { Platform = "PC",    GameTitle = "Elden Ring",      Name = "Elden Lord",          AchievementId = "er_elden_lord",
-                Description = "Defeat the Elden Beast.",                         UnlockedAt = "2025-02-20T18:30:00Z" },
-            new Achievement { Platform = "Xbox",  GameTitle = "Halo Infinite",   Name = "Master Chief",        AchievementId = "hi_master_chief",
-                Description = "Complete the campaign on Legendary.",             UnlockedAt = "2025-01-25T20:00:00Z" },
-            new Achievement { Platform = "PC",    GameTitle = "Baldur's Gate 3", Name = "Dark Urge Overcome",  AchievementId = "bg3_dark_urge",
-                Description = "Resist the Dark Urge throughout.",                UnlockedAt = "2025-03-10T16:00:00Z" },
-            new Achievement { Platform = "PS5",   GameTitle = "God of War Ragnarök", Name = "Father and Son", AchievementId = "gow_father_son",
-                Description = "Complete the main story.",                        UnlockedAt = "2025-02-10T21:00:00Z" },
-        };
-
-        public static List<DemoFriend> Friends { get; } = new()
-        {
-            new DemoFriend { Username = "NintendoFan99",  AvatarInitial = "N", AvatarGradient = "#e4000f,#c00000", Status = "Online",  CurrentGame = "Mario Kart 8 Deluxe", LastSeen = "Now"           },
-            new DemoFriend { Username = "SwitchMaster",   AvatarInitial = "S", AvatarGradient = "#0ea5e9,#0056a8", Status = "Online",  CurrentGame = "Zelda: TOTK",          LastSeen = "Now"           },
-            new DemoFriend { Username = "PCGamer_Alex",   AvatarInitial = "A", AvatarGradient = "#3fb950,#1b4332", Status = "Offline", CurrentGame = "",                     LastSeen = "2 hours ago"   },
-            new DemoFriend { Username = "Xboxer_Jordan",  AvatarInitial = "X", AvatarGradient = "#107c10,#1b4332", Status = "Online",  CurrentGame = "Halo Infinite",        LastSeen = "Now"           },
-            new DemoFriend { Username = "PS5King",        AvatarInitial = "P", AvatarGradient = "#003791,#0058cc", Status = "Away",    CurrentGame = "",                     LastSeen = "30 min ago"    },
-            new DemoFriend { Username = "RetroGamer_Kim", AvatarInitial = "K", AvatarGradient = "#9c27b0,#4a0080", Status = "Offline", CurrentGame = "",                     LastSeen = "Yesterday"     },
-        };
-
         public static List<StoreGame> Store { get; } = new()
         {
             // Featured
@@ -133,18 +107,5 @@ namespace GameLauncher
                 CoverUrl = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg",
                 CoverColor = "#001a28", CoverGradient = "#001a28,#003a5a" },
         };
-    }
-
-    /// <summary>A friend entry in the demo friends list.</summary>
-    public class DemoFriend
-    {
-        public string Username       { get; set; } = "";
-        public string AvatarInitial  { get; set; } = "";
-        public string AvatarGradient { get; set; } = "#1e90ff,#0056a8";
-        public string Status         { get; set; } = "Offline"; // "Online", "Away", "Offline"
-        public string CurrentGame    { get; set; } = "";
-        public string LastSeen       { get; set; } = "";
-        public bool   IsOnline       => Status == "Online";
-        public bool   IsAway         => Status == "Away";
     }
 }

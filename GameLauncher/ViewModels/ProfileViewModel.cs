@@ -14,13 +14,13 @@ public partial class ProfileViewModel : ViewModelBase
     [ObservableProperty] private int    _gamesCount;
     [ObservableProperty] private int    _achievementsCount;
     [ObservableProperty] private string _avatarInitial   = "?";
-    [ObservableProperty] private string _modeBadge       = "Demo";
-    [ObservableProperty] private bool   _isLiveMode      = false;
+    [ObservableProperty] private string _modeBadge       = "LIVE";
+    [ObservableProperty] private bool   _isAdmin         = false;
 
     public ObservableCollection<Achievement> AllAchievements { get; } = new();
 
     public void Load(UserProfile profile, List<Game> library,
-                     List<Achievement> achievements, bool demoMode)
+                     List<Achievement> achievements, bool isAdmin)
     {
         Username          = profile.Username;
         Email             = profile.Email;
@@ -28,8 +28,8 @@ public partial class ProfileViewModel : ViewModelBase
         AchievementsCount = achievements.Count;
         AvatarInitial     = profile.Username.Length > 0
             ? profile.Username[0].ToString().ToUpper() : "?";
-        ModeBadge = demoMode ? "DEMO" : "LIVE";
-        IsLiveMode = !demoMode;
+        IsAdmin   = isAdmin;
+        ModeBadge = isAdmin ? "ADMIN" : "LIVE";
 
         if (System.DateTimeOffset.TryParse(profile.CreatedAt, out var dt))
             MemberSince = dt.ToString("dd MMMM yyyy");
