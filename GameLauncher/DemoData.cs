@@ -10,6 +10,13 @@ namespace GameLauncher
     {
         public static List<Game> Library { get; } = new()
         {
+            new Game { Platform = "Switch", Title = "Mario Kart 8 Deluxe",  Genre = "Racing",      Rating = 9.7, AddedAt = "2025-06-01T10:00:00Z", Description = "Hit the road with the definitive version of Mario Kart 8! Race as your favourite Nintendo characters on 96 total courses, including all DLC Booster Course Pass tracks.",
+                CoverColor = "#c00000", CoverGradient = "#c00000,#ff6b00",
+                CoverUrl    = "https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/ncom/software/switch/70010000000153/b9248571a2c8cfc3ea62a6f9cf0e4219f2b9e7e5b87a38af51286aa5f18f7b0",
+                Screenshots = new() {
+                    "https://assets.nintendo.com/image/upload/f_auto/q_auto/ncom/software/switch/70010000000153/image/screenshot01",
+                    "https://assets.nintendo.com/image/upload/f_auto/q_auto/ncom/software/switch/70010000000153/image/screenshot02",
+                } },
             new Game { Platform = "PC",    Title = "Cyberpunk 2077",     Genre = "RPG",         Rating = 9.1, AddedAt = "2025-01-10T12:00:00Z", Description = "An open-world action RPG set in the dark future of Night City — a megalopolis obsessed with power, glamour and body modification.",            CoverColor = "#1a1a2e", CoverGradient = "#1a1a2e,#16213e",
                 CoverUrl    = "https://media.rawg.io/media/games/26d/26d4437715bee60138dab4a7c8c59c92.jpg",
                 Screenshots = new() {
@@ -21,7 +28,6 @@ namespace GameLauncher
                 CoverUrl    = "https://media.rawg.io/media/games/b45/b45575f34285f2c4479c9a5f719d972e.jpg",
                 Screenshots = new() {
                     "https://media.rawg.io/media/screenshots/3b8/3b8c388a3cf0a3e28db9b3b9ddaad4b4.jpg",
-                    "https://media.rawg.io/media/screenshots/fd8/fd8c19f8a09e4de50a4bcdc8e7be58ef.jpg",
                     "https://media.rawg.io/media/screenshots/fd8/fd8c19f8a09e4de50a4bcdc8e7be58ef.jpg",
                 } },
             new Game { Platform = "PC",    Title = "Baldur's Gate 3",    Genre = "RPG",         Rating = 9.8, AddedAt = "2025-03-01T15:00:00Z", Description = "Gather your party and return to the Forgotten Realms in this award-winning DnD RPG by Larian Studios.",             CoverColor = "#0d1b2a", CoverGradient = "#0d1b2a,#1b4332",
@@ -44,50 +50,101 @@ namespace GameLauncher
                 } },
             new Game { Platform = "PC",    Title = "Hogwarts Legacy",    Genre = "RPG",         Rating = 8.7, AddedAt = "2025-04-01T10:00:00Z", Description = "Explore an open-world Hogwarts in this immersive action RPG. Uncover a hidden truth about the wizarding world.",             CoverColor = "#1e0a2a", CoverGradient = "#1e0a2a,#4a0080",
                 CoverUrl    = "https://media.rawg.io/media/games/5ec/5ecac5cb026ec26a56efcc546364e348.jpg" },
-            new Game { Platform = "Switch", Title = "Zelda: TOTK",       Genre = "Adventure",   Rating = 9.9, AddedAt = "2025-04-15T14:00:00Z", Description = "Link discovers a mysterious power that lets him explore the skies and depths of Hyrule, encountering a secret in the clouds.",                  CoverColor = "#0a1628", CoverGradient = "#0a1628,#1a4a6e" },
+            new Game { Platform = "Switch", Title = "Zelda: TOTK",       Genre = "Adventure",   Rating = 9.9, AddedAt = "2025-04-15T14:00:00Z", Description = "Link discovers a mysterious power that lets him explore the skies and depths of Hyrule, encountering a secret in the clouds.",
+                CoverColor = "#0a1628", CoverGradient = "#0a1628,#1a4a6e",
+                CoverUrl    = "https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/ncom/software/switch/70010000063714/791ffa4ce68e0a0f99e5e8c6c58c0c0d7c29a32cd9a7a83c51d5e8f97c6a29a" },
             new Game { Platform = "PC",    Title = "Starfield",          Genre = "RPG",         Rating = 7.9, AddedAt = "2025-05-10T09:00:00Z", Description = "Bethesda Game Studios' first new universe in 25 years. Create any character and explore the vast reaches of the galaxy.",           CoverColor = "#05060f", CoverGradient = "#05060f,#1a1a3e",
                 CoverUrl    = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg" },
         };
 
         public static List<Achievement> Achievements { get; } = new()
         {
-            new Achievement { Platform = "PC",    GameTitle = "Cyberpunk 2077",  Name = "Night City Legend",   Description = "Complete all main missions.",            UnlockedAt = "2025-01-15T14:00:00Z" },
-            new Achievement { Platform = "PC",    GameTitle = "Elden Ring",      Name = "Elden Lord",          Description = "Defeat the Elden Beast.",                UnlockedAt = "2025-02-20T18:30:00Z" },
-            new Achievement { Platform = "Xbox",  GameTitle = "Halo Infinite",   Name = "Master Chief",        Description = "Complete the campaign on Legendary.",    UnlockedAt = "2025-01-25T20:00:00Z" },
-            new Achievement { Platform = "PC",    GameTitle = "Baldur's Gate 3", Name = "Dark Urge Overcome",  Description = "Resist the Dark Urge throughout.",       UnlockedAt = "2025-03-10T16:00:00Z" },
-            new Achievement { Platform = "PS5",   GameTitle = "God of War Ragnarök", Name = "Father and Son", Description = "Complete the main story.",               UnlockedAt = "2025-02-10T21:00:00Z" },
+            // Mario Kart 8 Deluxe achievements
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Gold Kart", AchievementId = "mk8_gold_kart",
+                Description = "Win all 12 Grand Prix cups in 200cc.",          UnlockedAt = "2025-06-05T16:00:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Triple Red Shells", AchievementId = "mk8_triple_red",
+                Description = "Hit 3 opponents in one race with Red Shells.",   UnlockedAt = "2025-06-03T20:00:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "Speed Demon", AchievementId = "mk8_speed_demon",
+                Description = "Finish a race in first place in 200cc.",         UnlockedAt = "2025-06-02T18:30:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", Name = "King of the Road", AchievementId = "mk8_king_road",
+                Description = "Complete all 96 Booster Course Pass tracks.",    UnlockedAt = "2025-06-10T14:00:00Z" },
+            // Other game achievements
+            new Achievement { Platform = "PC",    GameTitle = "Cyberpunk 2077",  Name = "Night City Legend",   AchievementId = "cp77_legend",
+                Description = "Complete all main missions.",                     UnlockedAt = "2025-01-15T14:00:00Z" },
+            new Achievement { Platform = "PC",    GameTitle = "Elden Ring",      Name = "Elden Lord",          AchievementId = "er_elden_lord",
+                Description = "Defeat the Elden Beast.",                         UnlockedAt = "2025-02-20T18:30:00Z" },
+            new Achievement { Platform = "Xbox",  GameTitle = "Halo Infinite",   Name = "Master Chief",        AchievementId = "hi_master_chief",
+                Description = "Complete the campaign on Legendary.",             UnlockedAt = "2025-01-25T20:00:00Z" },
+            new Achievement { Platform = "PC",    GameTitle = "Baldur's Gate 3", Name = "Dark Urge Overcome",  AchievementId = "bg3_dark_urge",
+                Description = "Resist the Dark Urge throughout.",                UnlockedAt = "2025-03-10T16:00:00Z" },
+            new Achievement { Platform = "PS5",   GameTitle = "God of War Ragnarök", Name = "Father and Son", AchievementId = "gow_father_son",
+                Description = "Complete the main story.",                        UnlockedAt = "2025-02-10T21:00:00Z" },
+        };
+
+        public static List<DemoFriend> Friends { get; } = new()
+        {
+            new DemoFriend { Username = "NintendoFan99",  AvatarInitial = "N", AvatarGradient = "#e4000f,#c00000", Status = "Online",  CurrentGame = "Mario Kart 8 Deluxe", LastSeen = "Now"           },
+            new DemoFriend { Username = "SwitchMaster",   AvatarInitial = "S", AvatarGradient = "#0ea5e9,#0056a8", Status = "Online",  CurrentGame = "Zelda: TOTK",          LastSeen = "Now"           },
+            new DemoFriend { Username = "PCGamer_Alex",   AvatarInitial = "A", AvatarGradient = "#3fb950,#1b4332", Status = "Offline", CurrentGame = "",                     LastSeen = "2 hours ago"   },
+            new DemoFriend { Username = "Xboxer_Jordan",  AvatarInitial = "X", AvatarGradient = "#107c10,#1b4332", Status = "Online",  CurrentGame = "Halo Infinite",        LastSeen = "Now"           },
+            new DemoFriend { Username = "PS5King",        AvatarInitial = "P", AvatarGradient = "#003791,#0058cc", Status = "Away",    CurrentGame = "",                     LastSeen = "30 min ago"    },
+            new DemoFriend { Username = "RetroGamer_Kim", AvatarInitial = "K", AvatarGradient = "#9c27b0,#4a0080", Status = "Offline", CurrentGame = "",                     LastSeen = "Yesterday"     },
         };
 
         public static List<StoreGame> Store { get; } = new()
         {
             // Featured
-            new StoreGame { Title = "GTA VI",                     Platform = "PC",    Genre = "Open World",   Price = "£69.99", Rating = 9.5, IsFeatured = true,  ReleaseYear = "2026", Description = "Rockstar's long-awaited return to Vice City with Lucia leading an epic crime saga.",
+            new StoreGame { Title = "Mario Kart 8 Deluxe",           Platform = "Switch", Genre = "Racing",       Price = "£49.99", Rating = 9.7, IsFeatured = true,  ReleaseYear = "2017", Description = "Hit the road with the definitive version of Mario Kart 8! Race on 96 total courses with friends online or locally.",
+                CoverUrl = "https://assets.nintendo.com/image/upload/ar_16:9,b_auto:border,c_lpad/b_white/f_auto/q_auto/dpr_auto/c_scale,w_300/ncom/software/switch/70010000000153/b9248571a2c8cfc3ea62a6f9cf0e4219f2b9e7e5b87a38af51286aa5f18f7b0",
+                CoverColor = "#c00000", CoverGradient = "#c00000,#ff6b00" },
+            new StoreGame { Title = "GTA VI",                         Platform = "PC",     Genre = "Open World",   Price = "£69.99", Rating = 9.5, IsFeatured = true,  ReleaseYear = "2026", Description = "Rockstar's long-awaited return to Vice City with Lucia leading an epic crime saga.",
                 CoverUrl = "https://media.rawg.io/media/games/2ad/2ad87a4a69b1104f02435c14c5196095.jpg",
                 CoverColor = "#0a1628", CoverGradient = "#0a1628,#1a3a6e" },
-            new StoreGame { Title = "The Elder Scrolls VI",       Platform = "PC",    Genre = "RPG",          Price = "£59.99", Rating = 9.3, IsFeatured = true,  ReleaseYear = "2026", Description = "Bethesda's next open-world fantasy epic set across Tamriel's uncharted lands.",
+            new StoreGame { Title = "The Elder Scrolls VI",           Platform = "PC",     Genre = "RPG",          Price = "£59.99", Rating = 9.3, IsFeatured = true,  ReleaseYear = "2026", Description = "Bethesda's next open-world fantasy epic set across Tamriel's uncharted lands.",
                 CoverColor = "#1a0c00", CoverGradient = "#1a0c00,#5c3a00" },
-            new StoreGame { Title = "Call of Duty 2025",          Platform = "PC",    Genre = "FPS",          Price = "£69.99", Rating = 8.2, IsFeatured = true,  ReleaseYear = "2025", Description = "The latest entry in the blockbuster CoD franchise with next-gen multiplayer.",
+            new StoreGame { Title = "Call of Duty 2025",              Platform = "PC",     Genre = "FPS",          Price = "£69.99", Rating = 8.2, IsFeatured = true,  ReleaseYear = "2025", Description = "The latest entry in the blockbuster CoD franchise with next-gen multiplayer.",
                 CoverColor = "#0c0c0c", CoverGradient = "#0c0c0c,#2a2a2a" },
             // New releases
-            new StoreGame { Title = "Hollow Knight: Silksong",    Platform = "PC",    Genre = "Metroidvania", Price = "£14.99", Rating = 9.4, IsFeatured = false, ReleaseYear = "2025", Description = "Hornet's long-awaited adventure continues in a vast kingdom teeming with bugs.",
+            new StoreGame { Title = "Hollow Knight: Silksong",        Platform = "PC",     Genre = "Metroidvania", Price = "£14.99", Rating = 9.4, IsFeatured = false, ReleaseYear = "2025", Description = "Hornet's long-awaited adventure continues in a vast kingdom teeming with bugs.",
+                CoverUrl = "https://media.rawg.io/media/games/4a0/4a0a1316102366260e6f38fd2a9cfdce.jpg",
                 CoverColor = "#120021", CoverGradient = "#120021,#3a0057" },
-            new StoreGame { Title = "Star Wars Outlaws",          Platform = "PC",    Genre = "Action",       Price = "£54.99", Rating = 8.0, IsFeatured = false, ReleaseYear = "2025", Description = "The first open-world Star Wars game. Kay Vess fights to earn freedom across the galaxy.",
+            new StoreGame { Title = "Star Wars Outlaws",               Platform = "PC",     Genre = "Action",       Price = "£54.99", Rating = 8.0, IsFeatured = false, ReleaseYear = "2025", Description = "The first open-world Star Wars game. Kay Vess fights to earn freedom across the galaxy.",
+                CoverUrl = "https://media.rawg.io/media/games/d82/d82fcb52ab66cb18bc6dc7900a8f9c22.jpg",
                 CoverColor = "#05060f", CoverGradient = "#05060f,#0a1628" },
-            new StoreGame { Title = "Metaphor: ReFantazio",       Platform = "PC",    Genre = "RPG",          Price = "£54.99", Rating = 9.3, IsFeatured = false, ReleaseYear = "2025", Description = "Atlus' new epic fantasy RPG where humanity's survival rests on a magical election.",
+            new StoreGame { Title = "Metaphor: ReFantazio",            Platform = "PC",     Genre = "RPG",          Price = "£54.99", Rating = 9.3, IsFeatured = false, ReleaseYear = "2025", Description = "Atlus' new epic fantasy RPG where humanity's survival rests on a magical election.",
                 CoverColor = "#1a0028", CoverGradient = "#1a0028,#5a0090",
                 CoverUrl = "https://media.rawg.io/media/games/5c0/5c0ba33e9cfc3e7e5ce0c6b3c8b7bcc6.jpg" },
-            new StoreGame { Title = "Monster Hunter Wilds",       Platform = "PC",    Genre = "Action RPG",   Price = "£54.99", Rating = 9.2, IsFeatured = false, ReleaseYear = "2025", Description = "Hunt massive monsters in breathtaking living ecosystems that shift with the seasons.",
+            new StoreGame { Title = "Monster Hunter Wilds",            Platform = "PC",     Genre = "Action RPG",   Price = "£54.99", Rating = 9.2, IsFeatured = false, ReleaseYear = "2025", Description = "Hunt massive monsters in breathtaking living ecosystems that shift with the seasons.",
+                CoverUrl = "https://media.rawg.io/media/games/618/618c2031a07bbff6b4f611f10b6bcdbc.jpg",
                 CoverColor = "#1c0a00", CoverGradient = "#1c0a00,#6b2800" },
-            new StoreGame { Title = "Warhammer 40K: Space Marine 2", Platform = "PC", Genre = "Action",      Price = "£44.99", Rating = 8.9, IsFeatured = false, ReleaseYear = "2025", Description = "Fight for the Emperor as an Ultramarine Space Marine in brutal third-person combat.",
+            new StoreGame { Title = "Warhammer 40K: Space Marine 2",  Platform = "PC",     Genre = "Action",       Price = "£44.99", Rating = 8.9, IsFeatured = false, ReleaseYear = "2025", Description = "Fight for the Emperor as an Ultramarine Space Marine in brutal third-person combat.",
+                CoverUrl = "https://media.rawg.io/media/games/b4b/b4b43c4c5f17ea9de5c9d27e0c0c0a30.jpg",
                 CoverColor = "#0a0c0a", CoverGradient = "#0a0c0a,#1a2e1a" },
-            new StoreGame { Title = "Dragon Age: Veilguard",      Platform = "PC",    Genre = "RPG",          Price = "£49.99", Rating = 8.6, IsFeatured = false, ReleaseYear = "2025", Description = "BioWare returns to Thedas. Lead a party of heroes to stop the ancient elven gods.",
+            new StoreGame { Title = "Dragon Age: Veilguard",          Platform = "PC",     Genre = "RPG",          Price = "£49.99", Rating = 8.6, IsFeatured = false, ReleaseYear = "2025", Description = "BioWare returns to Thedas. Lead a party of heroes to stop the ancient elven gods.",
+                CoverUrl = "https://media.rawg.io/media/games/b45/b45575f34285f2c4479c9a5f719d972e.jpg",
                 CoverColor = "#1a0028", CoverGradient = "#1a0028,#4a0057" },
-            new StoreGame { Title = "Avowed",                     Platform = "PC",    Genre = "RPG",          Price = "£49.99", Rating = 8.4, IsFeatured = false, ReleaseYear = "2025", Description = "Obsidian Entertainment's first-person RPG set in the Living Lands of Eora.",
+            new StoreGame { Title = "Avowed",                         Platform = "PC",     Genre = "RPG",          Price = "£49.99", Rating = 8.4, IsFeatured = false, ReleaseYear = "2025", Description = "Obsidian Entertainment's first-person RPG set in the Living Lands of Eora.",
+                CoverUrl = "https://media.rawg.io/media/games/3ea/3ea3c9bbd940b6cb7f2139e42d3d443f.jpg",
                 CoverColor = "#0a1420", CoverGradient = "#0a1420,#1a3040" },
-            new StoreGame { Title = "Doom: The Dark Ages",        Platform = "PC",    Genre = "FPS",          Price = "£49.99", Rating = 9.0, IsFeatured = false, ReleaseYear = "2025", Description = "The Doom Slayer returns in a prequel set in the brutal medieval realm of the Dark Ages.",
+            new StoreGame { Title = "Doom: The Dark Ages",            Platform = "PC",     Genre = "FPS",          Price = "£49.99", Rating = 9.0, IsFeatured = false, ReleaseYear = "2025", Description = "The Doom Slayer returns in a prequel set in the brutal medieval realm of the Dark Ages.",
+                CoverUrl = "https://media.rawg.io/media/games/fc1/fc1307a2774506b5bd65d7e8424664a7.jpg",
                 CoverColor = "#1a0000", CoverGradient = "#1a0000,#5a0000" },
-            new StoreGame { Title = "Like a Dragon: Pirate Yakuza", Platform = "PC", Genre = "RPG",          Price = "£49.99", Rating = 8.7, IsFeatured = false, ReleaseYear = "2025", Description = "Majima has lost his memory and become a pirate captain in this wild action RPG.",
+            new StoreGame { Title = "Like a Dragon: Pirate Yakuza",  Platform = "PC",     Genre = "RPG",          Price = "£49.99", Rating = 8.7, IsFeatured = false, ReleaseYear = "2025", Description = "Majima has lost his memory and become a pirate captain in this wild action RPG.",
+                CoverUrl = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg",
                 CoverColor = "#001a28", CoverGradient = "#001a28,#003a5a" },
         };
+    }
+
+    /// <summary>A friend entry in the demo friends list.</summary>
+    public class DemoFriend
+    {
+        public string Username       { get; set; } = "";
+        public string AvatarInitial  { get; set; } = "";
+        public string AvatarGradient { get; set; } = "#1e90ff,#0056a8";
+        public string Status         { get; set; } = "Offline"; // "Online", "Away", "Offline"
+        public string CurrentGame    { get; set; } = "";
+        public string LastSeen       { get; set; } = "";
+        public bool   IsOnline       => Status == "Online";
+        public bool   IsAway         => Status == "Away";
     }
 }

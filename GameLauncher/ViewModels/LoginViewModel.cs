@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -17,6 +18,18 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool   _isLoading    = false;
     [ObservableProperty] private bool   _showRegister = false;
+
+    /// <summary>Local saved accounts shown in the quick-login panel.</summary>
+    public ObservableCollection<SavedSession> SavedAccounts { get; } = new()
+    {
+        new SavedSession
+        {
+            Username    = "koriebonx98",
+            DisplayName = "koriebonx98",
+            AvatarColor = "#e4000f",
+            SavedAt     = "2024-01-01T00:00:00Z"
+        }
+    };
 
     public System.Action<UserProfile, List<Game>, List<Achievement>, bool>? OnLoginSuccess { get; set; }
 
@@ -139,4 +152,27 @@ public partial class LoginViewModel : ViewModelBase
 
     [RelayCommand]
     private void ToggleForm() => ShowRegister = !ShowRegister;
+
+    /// <summary>Quick-login using a saved local account (enters demo mode with that username).</summary>
+    [RelayCommand]
+    private void QuickLogin(SavedSession? session)
+    {
+        if (session == null) return;
+        _client.DemoMode = true;
+        IsLoading    = false;
+        ErrorMessage = "";
+
+        var profile = new UserProfile
+        {
+            Username  = session.Username,
+            Email     = $"{session.Username}@gameos.local",
+            CreatedAt = "2024-01-01T00:00:00Z",
+            PasswordHash = ""
+        };
+        OnLoginSuccess?.Invoke(
+            profile,
+            new System.Collections.Generic.List<Models.Game>(DemoData.Library),
+            new System.Collections.Generic.List<Models.Achievement>(DemoData.Achievements),
+            true);
+    }
 }
