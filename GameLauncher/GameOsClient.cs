@@ -120,11 +120,15 @@ namespace GameLauncher
                 return profile;
             }
 
-            // GitHub-direct mode — requires a PAT
+            // GitHub-direct mode — requires a PAT bundled in gameos-token.dat
             if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
                 throw new GameOsException(503,
-                    "Cannot reach the Game.OS data store.\n" +
-                    "Please check your internet connection and try again.");
+                    "Game.OS is not configured for login.\n\n" +
+                    "Please download the official Game.OS Launcher from GitHub Actions\n" +
+                    "(Actions → Build & Live-Login Test → GameOS-Launcher-win-x64 artifact),\n" +
+                    "which includes the credentials needed to connect to the data store.\n\n" +
+                    "Alternatively, set GAMEOS_BACKEND_URL to point to your backend server,\n" +
+                    "or set GAMEOS_GITHUB_TOKEN to your GitHub Personal Access Token.");
 
             var ghProfile = await _github!.VerifyLoginAsync(usernameOrEmail, password, ct)
                 ?? throw new GameOsException(401,

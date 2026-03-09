@@ -61,6 +61,9 @@ class Program
         // ── 6. live backend REST API (optional — requires GAMEOS_BACKEND_URL) ──
         allPassed &= await TestLiveRestApiOptionalAsync();
 
+        // ── 7. backend API round-trip using Admin.GameOS (requires GAMEOS_BACKEND_URL) ──
+        allPassed &= await TestBackendAdminLoginAsync();
+
         // ── Summary ───────────────────────────────────────────────────────────
         Console.WriteLine();
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
@@ -372,6 +375,104 @@ class Program
             }
 
             return loginOk && hasToken;
+        }
+        catch (GameOsException ex)
+        {
+            Pass(false, $"GameOsException {ex.StatusCode}: {ex.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Pass(false, $"Unexpected: {ex.Message}");
+            return false;
+        }
+    }
+
+    // ── Test 7: Backend API login using Admin.GameOS account ─────────────────
+    // Proves the C# launcher can log in via POST /api/auth/token exactly like
+    // the web frontend does in backend mode.
+    //
+    // The backend automatically creates the Admin.GameOS account on first startup
+    // with password = ADMIN_GAMEOS_PASSWORD env var (default: "GameOS2026").
+    // The backend's verifyPassword() accepts both PBKDF2 (web/GitHub-direct accounts)
+    // and bcrypt (backend-created accounts), so this works regardless of how the
+    // account was originally created.
+    //
+    // Requires GAMEOS_BACKEND_URL to be set.  Skips gracefully if it is not.
+    static async Task<bool> TestBackendAdminLoginAsync()
+    {
+        Section("7. Backend API Login — Admin.GameOS  (requires GAMEOS_BACKEND_URL)");
+
+        string? backendUrl     = Environment.GetEnvironmentVariable("GAMEOS_BACKEND_URL");
+        // Allow overriding the admin password via env var for flexibility;
+        // default matches the backend's ADMIN_GAMEOS_PASSWORD default.
+        string  adminDefaultPassword = Environment.GetEnvironmentVariable("ADMIN_GAMEOS_PASSWORD") ?? "GameOS2026";
+        const string adminUser = "Admin.GameOS";
+
+        if (string.IsNullOrEmpty(backendUrl))
+        {
+            Colour(ConsoleColor.Yellow, "  ⚠  Skipped — GAMEOS_BACKEND_URL not set.");
+            Console.WriteLine("       Start the backend server and set GAMEOS_BACKEND_URL to run this test.");
+            Console.WriteLine("       Example: GAMEOS_BACKEND_URL=http://localhost:3000 dotnet run");
+            return true;  // not a failure
+        }
+
+        Console.WriteLine($"  Backend URL  : {backendUrl}");
+        Console.WriteLine($"  Test account : {adminUser}");
+        Console.WriteLine();
+
+        try
+        {
+            using var service = new BackendApiService();
+
+            // Health check first
+            bool healthy = await service.CheckHealthAsync(CancellationToken.None);
+            Pass(healthy, $"Backend server reachable at {backendUrl}");
+            if (!healthy)
+            {
+                Pass(false, $"Backend not reachable — check GAMEOS_BACKEND_URL={backendUrl}");
+                return false;
+            }
+
+            // Login as Admin.GameOS via POST /api/auth/token
+            // This is the same REST API call the web frontend makes in backend mode.
+            var (profile, token) = await service.LoginAsync(adminUser, adminDefaultPassword, CancellationToken.None);
+
+            bool loginOk  = profile != null && !string.IsNullOrEmpty(profile.Username);
+            bool hasToken = !string.IsNullOrEmpty(token);
+
+            Pass(loginOk,  $"Login succeeded — username={profile?.Username}");
+            Pass(hasToken, $"Bearer token received from backend: {(hasToken ? "yes (gos_...)" : "no")}");
+
+            if (loginOk && hasToken)
+            {
+                // Verify the session by calling GET /api/me
+                var meProfile = await service.GetProfileAsync(CancellationToken.None);
+                bool meOk = meProfile != null && !string.IsNullOrEmpty(meProfile.Username);
+                Pass(meOk, $"GET /api/me succeeded — profile.username={meProfile?.Username}");
+
+                // Load games via GET /api/me/games
+                var games = await service.GetGamesAsync(CancellationToken.None);
+                Pass(true, $"GET /api/me/games — {games.Count} game(s) in library");
+
+                Console.WriteLine();
+                Colour(ConsoleColor.Green,
+                    $"  ✅  Backend API login CONFIRMED — {profile!.Username} authenticated via C# launcher");
+                Colour(ConsoleColor.Green,
+                    $"  ✅  Same REST API path as web frontend — POST /api/auth/token → Bearer token");
+                Colour(ConsoleColor.Green,
+                    $"  ✅  Login works via backend/API exactly as required");
+            }
+
+            return loginOk && hasToken;
+        }
+        catch (GameOsException ex) when (ex.StatusCode == 401)
+        {
+            Pass(false, $"Login failed (401) — wrong password for {adminUser}");
+            Console.WriteLine($"       Password tried: [{adminDefaultPassword.Length} chars]");
+            Console.WriteLine("       If the admin password was changed, set ADMIN_GAMEOS_PASSWORD=<new_password>");
+            Console.WriteLine("       Or check the data repo for the current accounts/admin.gameos/profile.json");
+            return false;
         }
         catch (GameOsException ex)
         {
