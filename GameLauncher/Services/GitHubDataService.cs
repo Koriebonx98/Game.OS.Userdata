@@ -173,12 +173,33 @@ namespace GameLauncher.Services
                 $"accounts/{accountKey}/profile.json", ct);
             if (profile == null) return null;
 
-            var inputHash = HashPassword(password, profile.Username);
-            if (!string.Equals(profile.PasswordHash, inputHash, StringComparison.Ordinal))
+            if (!VerifyPassword(password, profile.PasswordHash, profile.Username))
                 return null;
 
             return profile;
         }
+
+        /// <summary>
+        /// Verify a password against a stored hash that may be either a bcrypt hash
+        /// (produced by the Node.js backend — starts with "$2") or a PBKDF2 hex hash
+        /// (produced by the JavaScript frontend in GitHub mode).
+        /// Mirrors <c>verifyPassword(password, storedHash, username)</c> in backend/index.js.
+        /// </summary>
+        private static bool VerifyPassword(string password, string storedHash, string username)
+        {
+            if (IsBcryptHash(storedHash))
+            {
+                try { return BCrypt.Net.BCrypt.Verify(password, storedHash); }
+                catch { return false; }
+            }
+
+            var pbkdf2Hash = HashPassword(password, username);
+            return string.Equals(pbkdf2Hash, storedHash, StringComparison.Ordinal);
+        }
+
+        /// <summary>Returns true when the stored hash was produced by bcrypt (starts with "$2").</summary>
+        private static bool IsBcryptHash(string hash) =>
+            !string.IsNullOrEmpty(hash) && hash.StartsWith("$2", StringComparison.Ordinal);
 
         /// <summary>
         /// Register a new account in the GitHub data repository.

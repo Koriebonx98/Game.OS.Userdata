@@ -10,6 +10,62 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 ---
 
+## Visual Studio
+
+Open **`Game.OS.Userdata.sln`** in the repository root to load all three projects in
+**Visual Studio 2022+** with a single double-click.
+
+| Project | Type | Purpose |
+|---|---|---|
+| `GameLauncher` | WinExe / Avalonia | The graphical launcher application |
+| `LoginAuth.Tests` | Console | Proves C# login ≡ web frontend login |
+| `GameScanner.Tests` | Console | Proves local game/repack detection |
+
+All three are configured for Debug / Release × Any CPU.
+
+---
+
+## Login Flow — Same as the Website
+
+The C# launcher authenticates with **exactly the same method** as the web frontend:
+
+| Step | Web frontend (`script.js`) | C# launcher (`GitHubDataService.cs`) |
+|---|---|---|
+| Hash algorithm | PBKDF2-SHA256, 100 000 iter | PBKDF2-SHA256, 100 000 iter |
+| Salt | `{username}:gameos` | `{username}:gameos` |
+| Storage | GitHub data repo | GitHub data repo |
+| Bcrypt support | ✅ backend-created accounts | ✅ `BCrypt.Net.BCrypt.Verify()` |
+
+![Same Login — Web vs C# Launcher](../Design/Screenshots/screenshot_launcher_compare.png)
+
+> *Left: web browser login · Right: C# launcher — both sign in as the same account using identical PBKDF2-SHA256 password hashing*
+
+### Login Auth Tests — C# ≡ Web
+
+The `LoginAuth.Tests` project proves this parity automatically.  Run it from the repo root:
+
+```bash
+cd LoginAuth.Tests && dotnet run
+```
+
+![Login Auth Tests — all 14 checks pass](https://github.com/user-attachments/assets/14f91c83-3d3b-49ee-8952-402666294cce)
+
+All 14 checks pass:
+- PBKDF2 hashes match Node.js reference vectors byte-for-byte
+- Username salt is case-insensitive (matches JS `username.toLowerCase()`)
+- Bcrypt hashes (Node.js backend accounts) are detected and verified correctly
+- Both hash types accept correct passwords and reject wrong ones
+
+### Login Success — C# Launcher Dashboard
+
+After a successful login the C# launcher shows the same account data fetched live from GitHub:
+
+![C# Launcher — Login Success](../Design/Screenshots/screenshot_launcher_login_success.png)
+
+> *Dashboard after login: account name, game library, achievements, and platform count all loaded from the real GitHub data repository*
+
+---
+
 ## Screenshots
 
 | 🔐 Login | 🏠 Dashboard |
@@ -148,12 +204,6 @@ dotnet publish -c Release -r linux-x64 --self-contained true -p:PublishSingleFil
 ```
 
 The published executable appears in `bin/Release/net8.0/<rid>/publish/`.
-
----
-
-## Visual Studio
-
-Open `Game.OS.Userdata.sln` in the repository root to load both the launcher and the scanner tests in Visual Studio 2022+.
 
 ---
 
