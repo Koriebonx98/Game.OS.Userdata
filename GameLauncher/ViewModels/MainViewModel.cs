@@ -122,14 +122,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Navigate to the page requested by GAMEOS_DEMO_PAGE (for screenshots)
         if (!string.IsNullOrEmpty(_demoTargetPage) && _demoTargetPage != "dashboard")
         {
-            ActivePage = _demoTargetPage;
-            // For game detail, open the first library game
-            if (_demoTargetPage == "gamedetail")
+            // Normalise "gamedetail*" to the "library" page (detail overlay sits on top)
+            var basePage = _demoTargetPage.StartsWith("gamedetail") ? "library" : _demoTargetPage;
+            ActivePage = basePage;
+
+            if (_demoTargetPage.StartsWith("gamedetail"))
             {
-                // Find Elden Ring by title for the detail screenshot, fall back to first game
-                var detailGame = library.FirstOrDefault(g =>
-                    g.Title.Contains("Elden", StringComparison.OrdinalIgnoreCase))
-                    ?? (library.Count > 0 ? library[0] : null);
+                // Choose which game to show based on the page key:
+                //   gamedetail       → Mario Kart 8 Deluxe (27 real achievements + trailer)
+                //   gamedetail_gow   → God of War PS4 (37 real trophies)
+                //   gamedetail_tlou  → The Last of Us Part II
+                Game? detailGame = _demoTargetPage switch {
+                    "gamedetail_gow"  => library.FirstOrDefault(g => g.Title.Contains("God of War",          StringComparison.OrdinalIgnoreCase)),
+                    "gamedetail_tlou" => library.FirstOrDefault(g => g.Title.Contains("Last of Us",          StringComparison.OrdinalIgnoreCase)),
+                    _                 => library.FirstOrDefault(g => g.Title.Contains("Mario Kart",          StringComparison.OrdinalIgnoreCase))
+                                         ?? (library.Count > 0 ? library[0] : null),
+                };
 
                 if (detailGame != null)
                 {
