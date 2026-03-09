@@ -24,14 +24,18 @@ namespace GameLauncher.Services
     ///   verifyAccountGitHub()  → <see cref="VerifyLoginAsync"/>
     ///   createAccountGitHub()  → <see cref="CreateAccountAsync"/>
     ///
-    /// Configuration (via environment variables):
+    /// Token resolution (same priority as the web frontend):
+    ///   1. GAMEOS_GITHUB_TOKEN environment variable (developer / CI override)
+    ///   2. gameos-token.dat alongside the executable, XOR-encoded with key
+    ///      "GameOS_KEY" — injected at build time by build-csharp-launcher.yml
+    ///      using the same encoding as deploy.yml uses for GITHUB_TOKEN_ENCODED
+    ///      in script.js.  The empty placeholder is committed to the repo.
+    ///
+    /// Other configuration (via environment variables):
     ///   GAMEOS_DATA_REPO_OWNER  – GitHub account that owns the private data repo
     ///                             (default: Koriebonx98)
     ///   GAMEOS_DATA_REPO_NAME   – repository name for user data
     ///                             (default: Game.OS.Private.Data)
-    ///   GAMEOS_GITHUB_TOKEN     – fine-grained PAT with Contents read+write access
-    ///                             to the data repository.  Leave empty only when
-    ///                             the data repository is public.
     /// </summary>
     public sealed class GitHubDataService : IDisposable
     {
@@ -42,8 +46,89 @@ namespace GameLauncher.Services
         public static readonly string DataRepoName =
             Environment.GetEnvironmentVariable("GAMEOS_DATA_REPO_NAME") ?? "Game.OS.Private.Data";
 
-        public static readonly string? GitHubToken =
-            Environment.GetEnvironmentVariable("GAMEOS_GITHUB_TOKEN");
+        /// <summary>
+        /// Resolved GitHub PAT.  Uses the same priority order as the web frontend:
+        /// env var override → bundled gameos-token.dat → null (no auth, public repos only).
+        /// </summary>
+        public static readonly string? GitHubToken = ResolveGitHubToken();
+
+        /// <summary>
+        /// Resolve the GitHub PAT.
+        /// Priority:
+        ///   1. GAMEOS_GITHUB_TOKEN environment variable (developer / CI override)
+        ///   2. gameos-token.dat in the application directory, XOR-decoded with key
+        ///      "GameOS_KEY" — the same encoding used by GITHUB_TOKEN_ENCODED in
+        ///      script.js and injected by the deploy / build workflows.
+        /// </summary>
+        private static string? ResolveGitHubToken()
+        {
+            // 1. Environment variable (developer or CI override)
+            var envToken = Environment.GetEnvironmentVariable("GAMEOS_GITHUB_TOKEN");
+            if (!string.IsNullOrEmpty(envToken)) return envToken;
+
+            // 2. Bundled token file injected at build/publish time
+            //    (mirrors GITHUB_TOKEN_ENCODED = '...' in script.js)
+            try
+            {
+                var tokenFile = System.IO.Path.Combine(
+                    AppContext.BaseDirectory, "gameos-token.dat");
+                if (System.IO.File.Exists(tokenFile))
+                {
+                    var encoded = System.IO.File.ReadAllText(tokenFile).Trim();
+                    if (!string.IsNullOrEmpty(encoded))
+                    {
+                        var decoded = DecodeXorToken(encoded);
+                        if (decoded != null)
+                            return decoded;
+                    }
+                }
+            }
+            catch (Exception ex) when (
+                ex is System.IO.IOException or
+                UnauthorizedAccessException or
+                System.IO.DirectoryNotFoundException)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GitHubDataService] Could not read gameos-token.dat: {ex.Message}");
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// XOR-decode a token encoded with key "GameOS_KEY".
+        /// Exactly reverses the encoding used by deploy.yml and build-csharp-launcher.yml,
+        /// and mirrors the JavaScript decoder in script.js:
+        ///   bytes.map((h, i) => String.fromCharCode(parseInt(h, 16) ^ key.charCodeAt(i % key.length)))
+        /// Returns null if the hex string is malformed (odd length or invalid characters).
+        /// </summary>
+        private static string? DecodeXorToken(string xorHex)
+        {
+            const string key = "GameOS_KEY";
+            if (xorHex.Length % 2 != 0)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    "[GitHubDataService] gameos-token.dat contains an odd-length hex string — " +
+                    "the file may be corrupted or only partially written.");
+                return null;
+            }
+            try
+            {
+                var sb = new StringBuilder(xorHex.Length / 2);
+                for (int i = 0; i < xorHex.Length; i += 2)
+                {
+                    var b = Convert.ToByte(xorHex.Substring(i, 2), 16);
+                    sb.Append((char)(b ^ key[(i / 2) % key.Length]));
+                }
+                return sb.ToString();
+            }
+            catch (FormatException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GitHubDataService] gameos-token.dat contains invalid hex data: {ex.Message}");
+                return null;
+            }
+        }
 
         private readonly HttpClient _http;
 

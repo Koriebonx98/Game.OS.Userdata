@@ -13,6 +13,16 @@
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
+  <!-- gameos-token.dat: empty placeholder committed to the repo.
+       The build-csharp-launcher.yml workflow injects the XOR-encoded DATA_REPO_TOKEN
+       before building, mirroring how deploy.yml injects GITHUB_TOKEN_ENCODED into
+       script.js.  The decoded token is read at startup by GitHubDataService. -->
+  <ItemGroup>
+    <Content Include="gameos-token.dat">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Avalonia" Version="11.3.12" />
     <PackageReference Include="Avalonia.Desktop" Version="11.3.12" />

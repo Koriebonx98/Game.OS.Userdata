@@ -132,23 +132,39 @@ dotnet run -c Release
 The launcher connects to the **same private GitHub data repository** as the website — no local
 server required.  Sign in with any account you already created on the web frontend.
 
-### Configuration
+### How token access works — same mechanism as the website
 
-The launcher reads the following optional environment variables:
+The web frontend and the C# launcher use **identical authentication**:
+
+| | Web frontend | C# launcher |
+|---|---|---|
+| Token storage | `GITHUB_TOKEN_ENCODED = '...'` in `script.js` | `gameos-token.dat` next to the executable |
+| Token encoding | XOR-hex, key `GameOS_KEY` (by `deploy.yml`) | XOR-hex, key `GameOS_KEY` (by `build-csharp-launcher.yml`) |
+| Decode method | `bytes.map((h,i) => chr(parseInt(h,16) ^ key[i%9]))` | `GitHubDataService.DecodeXorToken()` — same formula |
+| API calls | `fetch("https://api.github.com/repos/…")` | `HttpClient.GetAsync("https://api.github.com/repos/…")` |
+| Password hash | PBKDF2-SHA256, 100,000 iter, salt `{user_lower}:gameos` | Same — `Rfc2898DeriveBytes` |
+
+The `build-csharp-launcher.yml` GitHub Actions workflow:
+1. Reads `DATA_REPO_TOKEN` from repository secrets (same secret used by `deploy.yml`)
+2. XOR-encodes it with key `GameOS_KEY`
+3. Writes the encoded string to `GameLauncher/gameos-token.dat` before building
+4. Builds and publishes the app — the token file is bundled alongside the executable
+5. Runs the live login test for `Koriebonx98` to confirm everything works
+
+The empty placeholder `gameos-token.dat` is committed to the repo (just like `GITHUB_TOKEN_ENCODED = '';` is committed in `script.js`).  The real token is only present inside the CI runner during the build and is never committed back.
+
+![Build & Login Architecture](../Design/Screenshots/screenshot_build_and_login.png)
+
+### Configuration
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `GAMEOS_DATA_REPO_OWNER` | `Koriebonx98` | GitHub owner of the private data repository |
 | `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
-| `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT with Contents read+write access (required when the data repository is **private**) |
+| `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT — developer/CI override; takes priority over `gameos-token.dat` |
 
-> **Note:** the deployed Game.OS website injects `DATA_REPO_TOKEN` at build time (via the `deploy.yml`
-> GitHub Actions workflow) so users never need to handle tokens when using the browser.  When running
-> the C# launcher from source you must set `GAMEOS_GITHUB_TOKEN` to the same PAT, or the launcher
-> will be unable to reach the private data repository and all login attempts will fail.
->
-> The `build-csharp-launcher.yml` CI workflow sets this automatically from the `DATA_REPO_TOKEN`
-> repository secret so the automated live-login test always works without any local configuration.
+> **For developers running from source:** set `GAMEOS_GITHUB_TOKEN` to your `DATA_REPO_TOKEN` PAT value.
+> End users running a published build get the token automatically via `gameos-token.dat`.
 
 ---
 
