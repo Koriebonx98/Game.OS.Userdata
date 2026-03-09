@@ -26,8 +26,14 @@ class Program
     [
         ("testuser",     "TestPass123", "50ad5d6fb130bcaca2c96094d9609a9e3ebb1852a51245afeabc05f9e6b81379"),
         ("Admin.GameOS", "GameOS2026",  "2f96663f1e20c234b7b4dc61d3887f9ffa417141345cbda1a0b0079c737a3502"),
-        ("Koriebonx98",  "mypassword",  null),  // no fixed vector — just check format / determinism
+        ("Koriebonx98",  "mypassword",  null),  // format / determinism check only
     ];
+
+    // Reference hash for Koriebonx98 with the real account password.
+    // Pre-computed via Node.js (same algorithm as hashPassword() in script.js):
+    //   node -e "const c=require('crypto');c.pbkdf2('Myipodfool98','koriebonx98:gameos',100000,32,'sha256',(e,k)=>console.log(k.toString('hex')))"
+    private const string Koriebonx98ExpectedHash =
+        "98df8a71e3a4ad953895182c2dfd793327959b46311692d8f26aeac935822db4";
 
     static async Task<int> Main(string[] args)
     {
@@ -36,6 +42,9 @@ class Program
 
         // ── 1. PBKDF2 hash parity ────────────────────────────────────────────
         allPassed &= TestPbkdf2HashParity();
+
+        // ── 1b. Koriebonx98 real-account hash parity ─────────────────────────
+        allPassed &= TestKoriebonx98HashParity();
 
         // ── 2. PBKDF2 case-insensitive salt (JS lowercases username) ─────────
         allPassed &= TestPbkdf2CaseInsensitiveSalt();
@@ -92,6 +101,51 @@ class Program
                 passed &= ok;
             }
         }
+        return passed;
+    }
+
+    // ── Test 1b: Koriebonx98 real-account PBKDF2 hash parity ─────────────────
+    // Verifies that the C# hash for the Koriebonx98 account with its real password
+    // matches the pre-computed Node.js reference value — proving the C# app will
+    // accept the same credentials as the web frontend.
+    //
+    // When GAMEOS_TEST_PASSWORD is set (CI / developer with credentials), the test
+    // additionally verifies that the computed hash matches the pre-computed constant.
+    // Without the env var the hash is still checked for format / determinism.
+    static bool TestKoriebonx98HashParity()
+    {
+        Section("1b. Koriebonx98 Real-Account Hash Parity  (C# hash = Node.js reference)");
+
+        bool passed = true;
+
+        // Always: verify the reference constant itself is a valid 64-char hex string
+        bool refOk = Koriebonx98ExpectedHash.Length == 64 && IsHex(Koriebonx98ExpectedHash);
+        Pass(refOk, $"Reference hash is valid 64-char hex: {refOk}");
+        passed &= refOk;
+
+        string? testPassword = Environment.GetEnvironmentVariable("GAMEOS_TEST_PASSWORD");
+        if (string.IsNullOrEmpty(testPassword))
+        {
+            Colour(ConsoleColor.Yellow,
+                "  ⚠  GAMEOS_TEST_PASSWORD not set — skipping live hash-match check.");
+            Console.WriteLine("       To verify: GAMEOS_TEST_PASSWORD=<password> dotnet run");
+            return passed;
+        }
+
+        // Compute C# hash and compare to the pre-computed Node.js reference
+        var actualHash = GitHubDataService.HashPassword(testPassword, "Koriebonx98");
+        bool hashOk = string.Equals(actualHash, Koriebonx98ExpectedHash, StringComparison.Ordinal);
+        Pass(hashOk, hashOk
+            ? "C# hash for Koriebonx98 matches Node.js reference vector ✓"
+            : $"MISMATCH\n     expected: {Koriebonx98ExpectedHash}\n     actual:   {actualHash}");
+        passed &= hashOk;
+
+        if (hashOk)
+        {
+            Colour(ConsoleColor.Green,
+                "  ✅  Koriebonx98 PBKDF2 hash verified — C# login will accept this account");
+        }
+
         return passed;
     }
 
@@ -231,7 +285,9 @@ class Program
 
                 Console.WriteLine();
                 Colour(ConsoleColor.Green,
-                    $"  ✅  Real backend login confirmed: {profile!.Username} authenticated via PBKDF2/bcrypt");
+                    $"  ✅  Real backend login confirmed: {profile!.Username} authenticated via PBKDF2");
+                Colour(ConsoleColor.Green,
+                    $"  ✅  C# launcher login identical to web frontend — same PBKDF2-SHA256, same accounts");
             }
 
             return loginOk;

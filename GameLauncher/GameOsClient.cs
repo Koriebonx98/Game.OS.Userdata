@@ -78,10 +78,20 @@ namespace GameLauncher
         /// Verifies credentials against the GitHub data repository using PBKDF2-SHA256
         /// with 100,000 iterations — exactly matching the web login flow.
         /// Returns the full profile on success.
+        /// Throws <see cref="GameOsException"/> with status 401 if credentials are wrong,
+        /// or status 503 if the data repository cannot be reached (no GitHub token configured).
         /// </summary>
         public async Task<UserProfile> LoginAsync(
             string usernameOrEmail, string password, CancellationToken ct = default)
         {
+            // Warn early if no GitHub token is configured — the data repository is
+            // private so every API call will silently return 404 without auth.
+            if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
+                throw new GameOsException(503,
+                    "No GitHub token is configured. " +
+                    "Please use the official pre-built launcher (which has the token bundled) " +
+                    "or set the GAMEOS_GITHUB_TOKEN environment variable to a valid PAT.");
+
             var profile = await _github.VerifyLoginAsync(usernameOrEmail, password, ct)
                 ?? throw new GameOsException(401,
                     "Invalid username/email or password.");
