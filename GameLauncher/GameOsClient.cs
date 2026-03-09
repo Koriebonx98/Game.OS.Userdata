@@ -1,39 +1,48 @@
 using System;
 using System.Collections.Generic;
-using System.Net.Http;
-using System.Net.Http.Headers;
-using System.Net.Http.Json;
-using System.Text.Json.Serialization;
 using System.Threading;
 using System.Threading.Tasks;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher
 {
     /// <summary>
-    /// Game.OS API client that calls the backend HTTP server.
-    /// Configure the API base URL via the GAMEOS_API_BASEURL environment variable
-    /// (default: http://localhost:3000).  No GitHub PAT is required.
+    /// Game.OS API client.  Authenticates users and reads/writes their data
+    /// directly from the GitHub data repository — exactly the same way the
+    /// web frontend does.  No Node.js backend or PAT is required from the user:
+    /// just a regular username and password.
+    ///
+    /// Configure the data repository and optional GitHub token via environment
+    /// variables (see <see cref="GitHubDataService"/> for details):
+    ///   GAMEOS_DATA_REPO_OWNER  (default: Koriebonx98)
+    ///   GAMEOS_DATA_REPO_NAME   (default: Game.OS.Private.Data)
+    ///   GAMEOS_GITHUB_TOKEN     (fine-grained PAT; omit for public repos)
     /// </summary>
     public sealed class GameOsClient : IDisposable
     {
-        // ── Configuration ─────────────────────────────────────────────────────
-        /// <summary>Backend API base URL.  Override with GAMEOS_API_BASEURL env var.</summary>
-        public static readonly string ApiBaseUrl =
-            (Environment.GetEnvironmentVariable("GAMEOS_API_BASEURL") ?? "http://localhost:3000")
-            .TrimEnd('/');
-
         private static readonly string AdminUsername = "Admin.GameOS";
 
-        private readonly HttpClient _http;
-        private string? _token;
+        private readonly GitHubDataService _github;
+
         private string? _username;
 
-        public string? LoggedInUser    => _username;
-        public bool    IsAuthenticated => _token != null;
-        /// <summary>The raw bearer token for the current session.  Persist this to
-        /// enable silent re-login on next launch (same as localStorage on the website).</summary>
-        public string? Token => _token;
+        /// <summary>The currently logged-in username, or <c>null</c> if not authenticated.</summary>
+        public string? LoggedInUser => _username;
+
+        /// <summary>
+        /// True once the user has authenticated.  Used by the main view-model to
+        /// distinguish GitHub mode from demo mode.
+        /// </summary>
+        public bool IsAuthenticated => _username != null;
+
+        /// <summary>
+        /// A stable session marker stored in the local session cache so the next
+        /// launch can silently restore the session without re-entering credentials
+        /// (mirrors the web app's <c>gameOSUser</c> localStorage entry).
+        /// In GitHub mode this is the username — no bearer token is needed.
+        /// </summary>
+        public string? Token => _username;
 
         /// <summary>True when the logged-in account is the admin account.</summary>
         public bool IsAdmin =>
@@ -41,293 +50,173 @@ namespace GameLauncher
 
         public GameOsClient()
         {
-            // HttpClient is created per-instance here because the launcher is a
-            // desktop application where a single client instance lives for the
-            // entire session.  In a server scenario use IHttpClientFactory instead.
-            _http = new HttpClient { BaseAddress = new Uri(ApiBaseUrl + "/") };
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+            _github = new GitHubDataService();
         }
 
         // ── Authentication ────────────────────────────────────────────────────
+
         /// <summary>
         /// Restore a previously-saved session without re-entering credentials.
-        /// Sets the bearer token directly and validates it by calling <c>/api/me</c>.
-        /// Throws <see cref="GameOsException"/> if the token is expired or invalid —
-        /// the caller should then fall back to the full login form.
+        /// Verifies the account still exists in the GitHub data repository.
+        /// Throws <see cref="GameOsException"/> if the account cannot be found —
+        /// the caller should then show the login form.
         /// </summary>
         public async Task<UserProfile> RestoreSessionAsync(
             string token, string username, CancellationToken ct = default)
         {
-            _token    = token;
-            _username = username;
-            SetAuthHeader();
-            return await FetchProfileAsync(ct);
+            // In GitHub mode the token is the username (a stable session marker).
+            // Verify the account still exists in the data repository.
+            var profile = await _github.GetProfileAsync(username, ct)
+                ?? throw new GameOsException(404,
+                    "Account not found. Please log in again.");
+            _username = profile.Username;
+            return profile;
         }
 
-        /// <summary>Log in with username (or email) and password.  Returns the full profile.</summary>
+        /// <summary>
+        /// Log in with username (or email) and password.
+        /// Verifies credentials against the GitHub data repository using PBKDF2-SHA256
+        /// with 100,000 iterations — exactly matching the web login flow.
+        /// Returns the full profile on success.
+        /// </summary>
         public async Task<UserProfile> LoginAsync(
             string usernameOrEmail, string password, CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/auth/token",
-                new { username = usernameOrEmail, password }, ct);
-            var result = await ParseResponseAsync<TokenResult>(resp, ct);
-
-            _token    = result.Token
-                ?? throw new GameOsException(500, "Server did not return an API token.");
-            _username = result.Username;
-            SetAuthHeader();
-
-            return await FetchProfileAsync(ct);
+            var profile = await _github.VerifyLoginAsync(usernameOrEmail, password, ct)
+                ?? throw new GameOsException(401,
+                    "Invalid username/email or password.");
+            _username = profile.Username;
+            return profile;
         }
 
-        /// <summary>Register a new account.  Returns the created profile.</summary>
+        /// <summary>
+        /// Register a new account in the GitHub data repository.
+        /// Returns the created profile on success.
+        /// </summary>
         public async Task<UserProfile> RegisterAsync(
             string username, string email, string password,
             CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/create-account",
-                new { username, email, password }, ct);
-            var result = await ParseResponseAsync<TokenResult>(resp, ct);
-
-            _token    = result.Token
-                ?? throw new GameOsException(500, "Server did not return an API token.");
-            _username = result.Username;
-            SetAuthHeader();
-
-            return await FetchProfileAsync(ct);
+            var profile = await _github.CreateAccountAsync(username, email, password, ct);
+            _username = profile.Username;
+            return profile;
         }
 
         public void Logout()
         {
-            _token    = null;
             _username = null;
-            _http.DefaultRequestHeaders.Authorization = null;
         }
 
         // ── Profile ───────────────────────────────────────────────────────────
         public async Task<UserProfile> GetProfileAsync(CancellationToken ct = default)
-            => await FetchProfileAsync(ct);
-
-        private async Task<UserProfile> FetchProfileAsync(CancellationToken ct)
         {
-            var resp   = await _http.GetAsync("api/me", ct);
-            var result = await ParseResponseAsync<ProfileResult>(resp, ct);
-            return result.Profile ?? new UserProfile { Username = _username ?? "" };
+            if (_username == null)
+                throw new GameOsException(401, "Not authenticated.");
+            return await _github.GetProfileAsync(_username, ct)
+                ?? new UserProfile { Username = _username };
         }
 
         // ── Games ─────────────────────────────────────────────────────────────
         public async Task<List<Game>> GetGamesAsync(CancellationToken ct = default)
         {
-            var resp   = await _http.GetAsync("api/me/games", ct);
-            var result = await ParseResponseAsync<GamesResult>(resp, ct);
-            return result.Games ?? new List<Game>();
+            if (_username == null) return new List<Game>();
+            return await _github.GetGamesAsync(_username, ct);
         }
 
         public async Task AddGameAsync(
             string platform, string title, string? titleId = null,
             CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/me/games",
-                new { platform, title, titleId }, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.AddGameAsync(_username, platform, title, titleId, ct);
         }
 
         public async Task RemoveGameAsync(
             string platform, string title, CancellationToken ct = default)
         {
-            var req = new HttpRequestMessage(HttpMethod.Delete, "api/me/games")
-            {
-                Content = JsonContent.Create(new { platform, title })
-            };
-            var resp = await _http.SendAsync(req, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.RemoveGameAsync(_username, platform, title, ct);
         }
 
         // ── Achievements ──────────────────────────────────────────────────────
         public async Task<List<Achievement>> GetAchievementsAsync(CancellationToken ct = default)
         {
-            var resp   = await _http.GetAsync("api/me/achievements", ct);
-            var result = await ParseResponseAsync<AchievementsResult>(resp, ct);
-            return result.Achievements ?? new List<Achievement>();
+            if (_username == null) return new List<Achievement>();
+            return await _github.GetAchievementsAsync(_username, ct);
         }
 
         // ── Friends ───────────────────────────────────────────────────────────
         public async Task<List<string>> GetFriendsAsync(CancellationToken ct = default)
         {
-            var resp   = await _http.GetAsync("api/me/friends", ct);
-            var result = await ParseResponseAsync<FriendsResult>(resp, ct);
-            return result.Friends ?? new List<string>();
+            if (_username == null) return new List<string>();
+            return await _github.GetFriendsAsync(_username, ct);
         }
 
         public async Task<List<FriendRequest>> GetFriendRequestsAsync(
             string username, CancellationToken ct = default)
-        {
-            var resp   = await _http.GetAsync(
-                $"api/get-friend-requests?username={Uri.EscapeDataString(username)}", ct);
-            var result = await ParseResponseAsync<FriendRequestsResult>(resp, ct);
-            return result.Requests ?? new List<FriendRequest>();
-        }
+            => await _github.GetFriendRequestsAsync(username, ct);
 
         public async Task SendFriendRequestAsync(
             string friendUsername, CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/send-friend-request",
-                new { username = _username, friendUsername }, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.SendFriendRequestAsync(_username, friendUsername, ct);
         }
 
         public async Task AcceptFriendRequestAsync(
             string fromUsername, CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/accept-friend-request",
-                new { username = _username, fromUsername }, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.AcceptFriendRequestAsync(_username, fromUsername, ct);
         }
 
         public async Task DeclineFriendRequestAsync(
             string fromUsername, CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/decline-friend-request",
-                new { username = _username, fromUsername }, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.DeclineFriendRequestAsync(_username, fromUsername, ct);
         }
 
         // ── Presence ──────────────────────────────────────────────────────────
         public async Task UpdatePresenceAsync(CancellationToken ct = default)
         {
             if (_username == null) return;
-            await _http.PostAsJsonAsync("api/update-presence",
-                new { username = _username }, ct);
+            await _github.UpdatePresenceAsync(_username, ct);
         }
 
         public async Task<string?> GetPresenceAsync(
             string username, CancellationToken ct = default)
-        {
-            try
-            {
-                var resp = await _http.GetAsync(
-                    $"api/get-presence?username={Uri.EscapeDataString(username)}", ct);
-                if (!resp.IsSuccessStatusCode) return null;
-                var result = await resp.Content
-                    .ReadFromJsonAsync<PresenceResult>(cancellationToken: ct);
-                return result?.LastSeen;
-            }
-            catch { return null; }
-        }
+            => await _github.GetPresenceAsync(username, ct);
 
         // ── Messages ──────────────────────────────────────────────────────────
         public async Task SendMessageAsync(
             string toUsername, string text, CancellationToken ct = default)
         {
-            var resp = await _http.PostAsJsonAsync("api/send-message",
-                new { username = _username, toUsername, text }, ct);
-            await ParseResponseAsync<ApiResult>(resp, ct);
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            await _github.SendMessageAsync(_username, toUsername, text, ct);
         }
 
         public async Task<List<Message>> GetMessagesAsync(
             string withUsername, CancellationToken ct = default)
         {
-            var resp   = await _http.GetAsync(
-                $"api/get-messages?username={Uri.EscapeDataString(_username ?? "")}" +
-                $"&withUsername={Uri.EscapeDataString(withUsername)}", ct);
-            var result = await ParseResponseAsync<MessagesResult>(resp, ct);
-            return result.Messages ?? new List<Message>();
+            if (_username == null) return new List<Message>();
+            return await _github.GetMessagesAsync(_username, withUsername, ct);
         }
 
         // ── Health check ──────────────────────────────────────────────────────
+        /// <summary>Returns true when the GitHub data repository is reachable.</summary>
         public async Task<bool> CheckHealthAsync(CancellationToken ct = default)
         {
             try
             {
-                var resp = await _http.GetAsync("health", ct);
-                return resp.IsSuccessStatusCode;
+                // A quick read of the email index tells us the repo is accessible.
+                await _github.ReadFileAsync<object>("accounts/email-index.json", ct);
+                return true;
             }
             catch { return false; }
         }
 
-        public void Dispose() => _http.Dispose();
-
-        // ── Helpers ───────────────────────────────────────────────────────────
-        private void SetAuthHeader()
-        {
-            if (_token != null)
-                _http.DefaultRequestHeaders.Authorization =
-                    new AuthenticationHeaderValue("Bearer", _token);
-        }
-
-        private static async Task<T> ParseResponseAsync<T>(
-            HttpResponseMessage resp, CancellationToken ct)
-            where T : ApiResult
-        {
-            T? result;
-            try
-            {
-                result = await resp.Content
-                    .ReadFromJsonAsync<T>(cancellationToken: ct);
-            }
-            catch
-            {
-                throw new GameOsException((int)resp.StatusCode,
-                    $"Unexpected response from server (HTTP {(int)resp.StatusCode}).");
-            }
-
-            if (result == null || !result.Success)
-            {
-                string msg = result?.Message
-                    ?? $"Request failed (HTTP {(int)resp.StatusCode}).";
-                throw new GameOsException((int)resp.StatusCode, msg);
-            }
-            return result;
-        }
-
-        // ── Response models ───────────────────────────────────────────────────
-        private class ApiResult
-        {
-            [JsonPropertyName("success")] public bool    Success { get; set; }
-            [JsonPropertyName("message")] public string? Message { get; set; }
-        }
-
-        private class TokenResult : ApiResult
-        {
-            [JsonPropertyName("token")]    public string? Token    { get; set; }
-            [JsonPropertyName("username")] public string? Username { get; set; }
-        }
-
-        private class ProfileResult : ApiResult
-        {
-            [JsonPropertyName("profile")] public UserProfile? Profile { get; set; }
-        }
-
-        private class GamesResult : ApiResult
-        {
-            [JsonPropertyName("games")] public List<Game>? Games { get; set; }
-        }
-
-        private class AchievementsResult : ApiResult
-        {
-            [JsonPropertyName("achievements")] public List<Achievement>? Achievements { get; set; }
-        }
-
-        private class FriendsResult : ApiResult
-        {
-            [JsonPropertyName("friends")] public List<string>? Friends { get; set; }
-        }
-
-        private class FriendRequestsResult : ApiResult
-        {
-            [JsonPropertyName("requests")] public List<FriendRequest>? Requests { get; set; }
-        }
-
-        private class PresenceResult
-        {
-            [JsonPropertyName("success")]  public bool    Success  { get; set; }
-            [JsonPropertyName("lastSeen")] public string? LastSeen { get; set; }
-        }
-
-        private class MessagesResult : ApiResult
-        {
-            [JsonPropertyName("messages")] public List<Message>? Messages { get; set; }
-        }
+        public void Dispose() => _github.Dispose();
     }
 
     // ── Custom exception ──────────────────────────────────────────────────────
