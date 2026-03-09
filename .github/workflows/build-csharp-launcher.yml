@@ -4,15 +4,19 @@
 #   Test 5 — GitHub-direct login (requires DATA_REPO_TOKEN + GAMEOS_TEST_PASSWORD)
 #   Test 6 — Backend REST API login (requires GAMEOS_BACKEND_URL + GAMEOS_TEST_PASSWORD)
 #
-# Both tests verify that Koriebonx98 can log in with Myipodfool98.
+# Both tests verify that Koriebonx98 can log in successfully.
 # Tests 1–4 (PBKDF2 hash parity, bcrypt detection) always run without secrets.
 #
-# Token injection (mirrors what deploy.yml does for script.js):
-#   The DATA_REPO_TOKEN PAT is XOR-encoded with key "GameOS_KEY" and written
-#   to GameLauncher/gameos-token.dat before the build.  At startup the launcher
-#   reads and decodes this file — exactly like the web page decodes
-#   GITHUB_TOKEN_ENCODED.  The empty placeholder is committed to the repo;
-#   the real encoded token only exists inside a CI runner during the build.
+# Pre-built EXE (Windows x64):
+#   The workflow publishes a self-contained single-file Windows exe with the
+#   backend URL baked in (via gameos-backend.url) so it works immediately on
+#   launch — no environment variables or PAT setup required.
+#
+# Injection at build time:
+#   gameos-token.dat  — DATA_REPO_TOKEN XOR-encoded (GitHub-direct auth)
+#   gameos-backend.url — GAMEOS_BACKEND_URL written as plain text (backend mode)
+#   Both files are empty placeholders committed to the repo; the real values
+#   only exist inside the CI runner during the build.
 #
 # Triggers:
 #   • Manual (workflow_dispatch) — run from the Actions tab at any time
@@ -22,10 +26,10 @@
 #   DATA_REPO_TOKEN       — fine-grained PAT with Contents read+write on
 #                           the private data repository (already used by
 #                           deploy.yml; no new secret needed if it is set)
+#   GAMEOS_BACKEND_URL    — URL of the deployed Node.js backend server
+#                           (e.g. https://gameos.up.railway.app)
+#                           Baked into the exe so users never need to set env vars
 #   GAMEOS_TEST_PASSWORD  — password for the Koriebonx98 test account
-#   GAMEOS_BACKEND_URL    — (optional) URL of the deployed Node.js backend server
-#                           When set, Test 6 exercises the same REST API the
-#                           web frontend uses — no GitHub PAT needed by the client
 
 name: Build & Live-Login Test (C# Launcher)
 
@@ -87,6 +91,32 @@ jobs:
               print('   To enable live login, add DATA_REPO_TOKEN as a repository secret.')
           PYEOF
 
+      # ── Backend URL injection ──────────────────────────────────────────────
+      - name: Inject backend URL into gameos-backend.url
+        # Writes the deployed backend URL into the placeholder file so the launcher
+        # connects to the backend out of the box — no env var setup required by end users.
+        # If GAMEOS_BACKEND_URL is not set, the file stays empty and the launcher
+        # falls back to GitHub-direct mode (gameos-token.dat).
+        env:
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          url = os.environ.get('GAMEOS_BACKEND_URL', '').strip().rstrip('/')
+
+          if url:
+              with open('GameLauncher/gameos-backend.url', 'w') as f:
+                  f.write(url)
+              print(f'✅ Backend URL injected into GameLauncher/gameos-backend.url')
+              print(f'   URL: {url}')
+              print('   The launcher will use backend mode automatically — no env vars needed.')
+          else:
+              print('ℹ  GAMEOS_BACKEND_URL not set — gameos-backend.url left empty')
+              print('   Launcher will fall back to GitHub-direct mode (gameos-token.dat).')
+              print('   To enable backend mode, add GAMEOS_BACKEND_URL as a repository secret.')
+          PYEOF
+
       # ── Build ──────────────────────────────────────────────────────────────
       - name: Restore dependencies
         run: dotnet restore Game.OS.Userdata.sln
@@ -122,6 +152,30 @@ jobs:
           dotnet run --project LoginAuth.Tests -c Release --no-build \
             2>&1 | tee /tmp/login-test-output.txt
 
+      # ── Publish standalone Windows exe ────────────────────────────────────
+      # Produces a single self-contained GameLauncher.exe for Windows x64.
+      # The gameos-backend.url and gameos-token.dat files are automatically
+      # bundled in the publish output (CopyToOutputDirectory=Always) so users
+      # can run the exe immediately without any configuration.
+      - name: Publish Windows x64 standalone exe
+        run: |
+          dotnet publish GameLauncher/GameLauncher.csproj \
+            -c Release \
+            -r win-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o /tmp/GameOS-Launcher-win-x64
+          echo "✅ Windows exe published to /tmp/GameOS-Launcher-win-x64"
+          echo "   Included files:"
+          ls -lh /tmp/GameOS-Launcher-win-x64/
+          echo ""
+          if grep -q . /tmp/GameOS-Launcher-win-x64/gameos-backend.url 2>/dev/null; then
+            echo "✅ gameos-backend.url — backend URL baked in (login works out of the box)"
+          else
+            echo "ℹ  gameos-backend.url — empty (launcher will use GitHub-direct mode)"
+          fi
+
       # ── Capture results as artifact ───────────────────────────────────────
       - name: Save test results as artifact
         if: always()
@@ -144,7 +198,7 @@ jobs:
             Auth method B (Backend REST API, Test 6 — PREFERRED):
               POST {GAMEOS_BACKEND_URL}/api/auth/token  { username, password }
               No GitHub PAT required from the client.
-              Set GAMEOS_BACKEND_URL to your deployed backend server URL.
+              Backend URL baked into gameos-backend.url at build time.
               Same endpoint the web frontend calls in backend mode.
 
             Dual-hash    : PBKDF2 (web/launcher accounts) + bcrypt
@@ -162,3 +216,10 @@ jobs:
           name: csharp-launcher-login-test-results
           path: /tmp/launcher-test-results/
           retention-days: 30
+
+      - name: Upload Windows exe artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: GameOS-Launcher-win-x64
+          path: /tmp/GameOS-Launcher-win-x64/
+          retention-days: 90
