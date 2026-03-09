@@ -91,6 +91,17 @@
                         </Button>
 
                         <Button Classes="nav-item"
+                                Classes.active="{Binding IsFriends}"
+                                HorizontalAlignment="Stretch"
+                                Command="{Binding NavigateCommand}"
+                                CommandParameter="friends">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <TextBlock Text="👥" FontSize="16"/>
+                                <TextBlock Text="Friends"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="nav-item"
                                 Classes.active="{Binding IsProfile}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
@@ -121,6 +132,9 @@
                             </Border>
                             <Border IsVisible="{Binding IsStore}">
                                 <views:StoreView DataContext="{Binding StoreVm}"/>
+                            </Border>
+                            <Border IsVisible="{Binding IsFriends}">
+                                <views:FriendsView DataContext="{Binding FriendsVm}"/>
                             </Border>
                             <Border IsVisible="{Binding IsProfile}">
                                 <views:ProfileView DataContext="{Binding ProfileVm}"/>

@@ -1,0 +1,187 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:demo="using:GameLauncher"
+             x:Class="GameLauncher.Views.FriendsView"
+             x:DataType="vm:FriendsViewModel"
+             Background="#0d1117">
+
+    <StackPanel Margin="32,28,32,28" Spacing="0">
+
+        <!-- Header -->
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,24">
+            <StackPanel Grid.Column="0">
+                <TextBlock Text="Friends" Classes="page-title"/>
+                <TextBlock Classes="page-subtitle">
+                    <TextBlock.Text>
+                        <MultiBinding StringFormat="{}{0} online · {1} total">
+                            <Binding Path="OnlineCount"/>
+                            <Binding Path="TotalCount"/>
+                        </MultiBinding>
+                    </TextBlock.Text>
+                </TextBlock>
+            </StackPanel>
+            <Button Grid.Column="1" Classes="btn-primary"
+                    VerticalAlignment="Center" Padding="16,10">
+                + Add Friend
+            </Button>
+        </Grid>
+
+        <!-- Pending Requests -->
+        <StackPanel IsVisible="{Binding PendingRequests.Count}" Margin="0,0,0,24">
+            <TextBlock Text="Friend Requests" Classes="section-header"/>
+            <ItemsControl ItemsSource="{Binding PendingRequests}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:DemoFriendRequest">
+                        <Border Background="#161b22" CornerRadius="10"
+                                Padding="16,12" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="48,*,Auto,Auto">
+                                <!-- Avatar -->
+                                <Border Grid.Column="0" Width="40" Height="40"
+                                        CornerRadius="20" Background="#1f6feb">
+                                    <TextBlock Text="{Binding AvatarInitial}"
+                                               FontSize="18" FontWeight="Bold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <!-- Info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                            Margin="12,0,0,0" Spacing="2">
+                                    <TextBlock Text="{Binding FromUsername}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Foreground="White"/>
+                                    <TextBlock FontSize="11" Foreground="#8b949e">
+                                        <Run Text="Sent "/>
+                                        <Run Text="{Binding SentAgo}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <!-- Accept -->
+                                <Button Grid.Column="2" Classes="btn-success"
+                                        Padding="14,7" Margin="0,0,8,0">
+                                    ✓ Accept
+                                </Button>
+                                <!-- Decline -->
+                                <Button Grid.Column="3" Classes="btn-secondary"
+                                        Padding="14,7">
+                                    ✕ Decline
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Online Friends -->
+        <StackPanel IsVisible="{Binding OnlineFriends.Count}" Margin="0,0,0,24">
+            <TextBlock Classes="section-header">
+                <Run Text="🟢  Online — "/>
+                <Run Text="{Binding OnlineCount}"/>
+            </TextBlock>
+            <ItemsControl ItemsSource="{Binding OnlineFriends}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="demo:DemoFriend">
+                        <Border Background="#161b22" CornerRadius="10"
+                                Padding="16,12" Margin="0,0,0,8">
+                            <Grid ColumnDefinitions="48,*,Auto">
+                                <!-- Avatar with status dot -->
+                                <Panel Grid.Column="0" Width="40" Height="40">
+                                    <Border Width="40" Height="40" CornerRadius="20"
+                                            Background="#1f6feb">
+                                        <TextBlock Text="{Binding AvatarInitial}"
+                                                   FontSize="18" FontWeight="Bold"
+                                                   Foreground="White"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <!-- Status dot -->
+                                    <Border Width="13" Height="13" CornerRadius="7"
+                                            Background="#3fb950"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            IsVisible="{Binding IsOnline}"/>
+                                    <Border Width="13" Height="13" CornerRadius="7"
+                                            Background="#f1c40f"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Bottom"
+                                            IsVisible="{Binding IsAway}"/>
+                                </Panel>
+                                <!-- Friend info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                            Margin="12,0,0,0" Spacing="2">
+                                    <TextBlock Text="{Binding Username}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Foreground="White"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <TextBlock Text="{Binding Status}"
+                                                   FontSize="12" Foreground="#3fb950"
+                                                   IsVisible="{Binding IsOnline}"/>
+                                        <TextBlock Text="{Binding Status}"
+                                                   FontSize="12" Foreground="#f1c40f"
+                                                   IsVisible="{Binding IsAway}"/>
+                                        <TextBlock Text="·" FontSize="12"
+                                                   Foreground="#8b949e"
+                                                   IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        <TextBlock Text="{Binding CurrentGame}"
+                                                   FontSize="12" Foreground="#8b949e"
+                                                   IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Message button -->
+                                <Button Grid.Column="2" Classes="btn-secondary"
+                                        Padding="12,7" VerticalAlignment="Center">
+                                    💬 Message
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <!-- Offline Friends -->
+        <StackPanel IsVisible="{Binding OfflineFriends.Count}">
+            <TextBlock Text="⚫  Offline" Classes="section-header"/>
+            <ItemsControl ItemsSource="{Binding OfflineFriends}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="demo:DemoFriend">
+                        <Border Background="#161b22" CornerRadius="10"
+                                Padding="16,12" Margin="0,0,0,8"
+                                Opacity="0.7">
+                            <Grid ColumnDefinitions="48,*,Auto">
+                                <!-- Avatar -->
+                                <Border Grid.Column="0" Width="40" Height="40"
+                                        CornerRadius="20" Background="#21262d">
+                                    <TextBlock Text="{Binding AvatarInitial}"
+                                               FontSize="18" FontWeight="Bold"
+                                               Foreground="#8b949e"
+                                               HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"/>
+                                </Border>
+                                <!-- Friend info -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
+                                            Margin="12,0,0,0" Spacing="2">
+                                    <TextBlock Text="{Binding Username}"
+                                               FontSize="14" FontWeight="SemiBold"
+                                               Foreground="#c9d1d9"/>
+                                    <TextBlock FontSize="12" Foreground="#8b949e">
+                                        <Run Text="Last seen "/>
+                                        <Run Text="{Binding LastSeen}"/>
+                                    </TextBlock>
+                                </StackPanel>
+                                <!-- Message button -->
+                                <Button Grid.Column="2" Classes="btn-secondary"
+                                        Padding="12,7" VerticalAlignment="Center"
+                                        Opacity="0.6">
+                                    💬 Message
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+    </StackPanel>
+</UserControl>
