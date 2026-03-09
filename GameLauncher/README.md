@@ -157,14 +157,40 @@ The empty placeholder `gameos-token.dat` is committed to the repo (just like `GI
 
 ### Configuration
 
+The launcher supports two authentication modes and auto-detects which one to use:
+
+#### Mode 1 — Backend REST API (preferred, no GitHub PAT needed)
+
+Set the `GAMEOS_BACKEND_URL` environment variable to your deployed backend URL:
+
+```bash
+# Windows
+set GAMEOS_BACKEND_URL=https://gameos.up.railway.app
+dotnet run
+
+# Linux / macOS
+GAMEOS_BACKEND_URL=https://gameos.up.railway.app dotnet run
+```
+
+The launcher calls `POST {url}/api/auth/token` with `{ username, password }` — **exactly the
+same endpoint the web frontend calls**.  The backend server holds the GitHub PAT; the launcher
+never needs to store or bundle one.
+
+#### Mode 2 — GitHub-direct (fallback, requires a GitHub PAT)
+
+When `GAMEOS_BACKEND_URL` is not set, the launcher falls back to calling the GitHub API
+directly (mirroring the web frontend's GitHub-direct mode).  This requires a GitHub PAT:
+
 | Variable | Default | Purpose |
 |---|---|---|
+| `GAMEOS_BACKEND_URL` | *(none)* | **Preferred** — backend server URL; no PAT needed |
 | `GAMEOS_DATA_REPO_OWNER` | `Koriebonx98` | GitHub owner of the private data repository |
 | `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
 | `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT — developer/CI override; takes priority over `gameos-token.dat` |
 
-> **For developers running from source:** set `GAMEOS_GITHUB_TOKEN` to your `DATA_REPO_TOKEN` PAT value.
-> End users running a published build get the token automatically via `gameos-token.dat`.
+> **For developers running from source with a backend:** set `GAMEOS_BACKEND_URL`.
+> **For developers running from source without a backend:** set `GAMEOS_GITHUB_TOKEN`.
+> End users running a published build get the token via `gameos-token.dat` (injected at CI build time).
 
 ---
 
@@ -196,8 +222,23 @@ launch.  The default password is `GameOS2026` — change it immediately via Acco
 
 ## How It Connects to the Backend
 
-The launcher calls the **GitHub REST API directly** — the same API calls made by the web frontend
-(`script.js`).  No Node.js proxy server is involved:
+The launcher supports two connection modes:
+
+### Mode 1 — Backend REST API (preferred)
+
+When `GAMEOS_BACKEND_URL` is set, the launcher calls the **Node.js backend REST API** —
+the same server the web frontend calls in backend mode.  No GitHub PAT is required:
+
+```
+Launcher  →  POST {GAMEOS_BACKEND_URL}/api/auth/token   (login)
+             GET  {GAMEOS_BACKEND_URL}/api/me/games      (game library)
+             GET  {GAMEOS_BACKEND_URL}/api/me/achievements (achievements)
+```
+
+### Mode 2 — GitHub API Direct (fallback)
+
+When `GAMEOS_BACKEND_URL` is not set, the launcher calls the **GitHub REST API** directly —
+the same API calls made by the web frontend's GitHub-direct mode.  Requires a GitHub PAT:
 
 ```
 Launcher  →  https://api.github.com/repos/{owner}/{repo}/contents/{path}

@@ -55,8 +55,11 @@ class Program
         // ── 4. dual-hash login (mock profile) ────────────────────────────────
         allPassed &= TestDualHashLogin();
 
-        // ── 5. live backend (optional — requires GAMEOS_GITHUB_TOKEN) ─────────
+        // ── 5. live backend GitHub-direct (optional — requires GAMEOS_GITHUB_TOKEN) ──
         allPassed &= await TestLiveBackendOptionalAsync();
+
+        // ── 6. live backend REST API (optional — requires GAMEOS_BACKEND_URL) ──
+        allPassed &= await TestLiveRestApiOptionalAsync();
 
         // ── Summary ───────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -291,6 +294,84 @@ class Program
             }
 
             return loginOk;
+        }
+        catch (GameOsException ex)
+        {
+            Pass(false, $"GameOsException {ex.StatusCode}: {ex.Message}");
+            return false;
+        }
+        catch (Exception ex)
+        {
+            Pass(false, $"Unexpected: {ex.Message}");
+            return false;
+        }
+    }
+
+    // ── Test 6: live backend REST API (optional) ─────────────────────────────
+    // Mirrors exactly the web frontend backend-mode login path:
+    //   POST {GAMEOS_BACKEND_URL}/api/auth/token  { username, password }
+    // No GitHub PAT required — the backend server holds the PAT.
+    static async Task<bool> TestLiveRestApiOptionalAsync()
+    {
+        Section("6. Live Backend REST API Test  (requires GAMEOS_BACKEND_URL)");
+
+        string? backendUrl = Environment.GetEnvironmentVariable("GAMEOS_BACKEND_URL");
+        string? username   = Environment.GetEnvironmentVariable("GAMEOS_TEST_USERNAME");
+        string? password   = Environment.GetEnvironmentVariable("GAMEOS_TEST_PASSWORD");
+
+        if (string.IsNullOrEmpty(backendUrl))
+        {
+            Colour(ConsoleColor.Yellow, "  ⚠  Skipped — GAMEOS_BACKEND_URL not set.");
+            Console.WriteLine("       To run: GAMEOS_BACKEND_URL=<url> GAMEOS_TEST_USERNAME=<user> GAMEOS_TEST_PASSWORD=<pass> dotnet run");
+            Console.WriteLine("       This test exercises the same REST API path the web frontend uses.");
+            Console.WriteLine("       No GitHub PAT required — just point to the deployed backend server.");
+            return true;  // not a failure
+        }
+
+        if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
+        {
+            Colour(ConsoleColor.Yellow, "  ⚠  Skipped — GAMEOS_TEST_USERNAME or GAMEOS_TEST_PASSWORD not set.");
+            return true;
+        }
+
+        Console.WriteLine($"  Connecting to backend REST API at {backendUrl} ...");
+
+        try
+        {
+            using var service = new BackendApiService();
+
+            bool healthy = await service.CheckHealthAsync(CancellationToken.None);
+            Pass(healthy, $"Backend server reachable: {healthy}");
+
+            if (!healthy)
+            {
+                Pass(false, $"Backend health check failed — verify GAMEOS_BACKEND_URL={backendUrl}");
+                return false;
+            }
+
+            var (profile, token) = await service.LoginAsync(username, password, CancellationToken.None);
+            bool loginOk = profile != null && !string.IsNullOrEmpty(profile.Username);
+            Pass(loginOk, $"Login succeeded — username={profile?.Username}");
+
+            bool hasToken = !string.IsNullOrEmpty(token);
+            Pass(hasToken, $"Bearer token received from backend: {(hasToken ? "yes" : "no")}");
+
+            if (loginOk)
+            {
+                var games = await service.GetGamesAsync(CancellationToken.None);
+                Pass(true, $"Games loaded via REST API:     {games.Count}");
+
+                var achievements = await service.GetAchievementsAsync(CancellationToken.None);
+                Pass(true, $"Achievements loaded via REST:  {achievements.Count}");
+
+                Console.WriteLine();
+                Colour(ConsoleColor.Green,
+                    $"  ✅  Backend REST API login confirmed: {profile!.Username} authenticated");
+                Colour(ConsoleColor.Green,
+                    $"  ✅  Same path as web frontend — no GitHub PAT required from client");
+            }
+
+            return loginOk && hasToken;
         }
         catch (GameOsException ex)
         {
