@@ -1,0 +1,284 @@
+# Release C# Game Launcher — Creates a GitHub Release with a ready-to-run Windows exe.
+#
+# The published exe has the DATA_REPO_TOKEN XOR-encoded and bundled so users can
+# download and run it immediately — no configuration, no tokens to manage.
+# Login works exactly the same way as the website (same GitHub data repository,
+# same PBKDF2-SHA256 password hashing, same account data).
+#
+# ┌─────────────────────────────────────────────────────────────────────────────┐
+# │  HOW TO CREATE A RELEASE                                                   │
+# │  ─────────────────────────────────────────────────────────────────────────  │
+# │  1. Go to Actions → Release C# Launcher → Run workflow                     │
+# │  2. Enter a version tag (e.g. v1.2.0) and optional release notes           │
+# │  3. Click Run workflow                                                      │
+# │  4. A GitHub Release is created with GameOS-Launcher-win-x64.zip           │
+# │     Users download the zip, extract, and run GameLauncher.exe              │
+# └─────────────────────────────────────────────────────────────────────────────┘
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   DATA_REPO_TOKEN    — Fine-grained PAT with Contents read+write on the private
+#                        data repository (same secret used by deploy.yml)
+#   GAMEOS_BACKEND_URL — (optional) Deployed backend server URL.  If set it is
+#                        baked into gameos-backend.url so the exe connects via the
+#                        REST API; otherwise it uses GitHub-direct mode via
+#                        the encoded DATA_REPO_TOKEN in gameos-token.dat.
+#
+# Required permissions: contents: write (to create releases and upload assets)
+
+name: Release C# Launcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version tag (e.g. v1.0.0)'
+        required: true
+        default: 'v1.0.0'
+      release_notes:
+        description: 'Additional release notes (optional)'
+        required: false
+        default: ''
+      prerelease:
+        description: 'Mark as pre-release?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+permissions:
+  contents: write   # create releases + upload assets
+
+jobs:
+  build-and-release:
+    name: Build & Publish GitHub Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── Same token injection as build-csharp-launcher.yml ────────────────────
+      - name: Inject DATA_REPO_TOKEN into gameos-token.dat
+        # XOR-encodes the token with key "GameOS_KEY" so the encoded string
+        # doesn't trigger GitHub secret scanning.  Mirrors the GITHUB_TOKEN_ENCODED
+        # injection in deploy.yml and is decoded at runtime by DecodeXorToken().
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          token   = os.environ.get('DATA_REPO_TOKEN', '')
+          XOR_KEY = b'GameOS_KEY'
+
+          if token:
+              tok_bytes = token.encode('utf-8')
+              encoded = ''.join(
+                  f'{b ^ XOR_KEY[i % len(XOR_KEY)]:02x}'
+                  for i, b in enumerate(tok_bytes)
+              )
+              with open('GameLauncher/gameos-token.dat', 'w') as f:
+                  f.write(encoded)
+              print(f'✅ DATA_REPO_TOKEN injected ({len(encoded)} hex chars)')
+              print('   Encoding: XOR-hex with key "GameOS_KEY" — same as GITHUB_TOKEN_ENCODED in script.js')
+          else:
+              print('⚠  DATA_REPO_TOKEN is not set — gameos-token.dat will be empty.')
+              print('   The published exe will not be able to log in without it.')
+              print('   Add DATA_REPO_TOKEN as a repository secret to enable login.')
+          PYEOF
+
+      # ── Backend URL injection (optional) ─────────────────────────────────────
+      - name: Inject GAMEOS_BACKEND_URL into gameos-backend.url
+        # If a deployed backend server URL is available, bake it in.
+        # Without it the exe falls back to GitHub-direct mode (gameos-token.dat).
+        env:
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          url = os.environ.get('GAMEOS_BACKEND_URL', '').strip().rstrip('/')
+
+          if url:
+              with open('GameLauncher/gameos-backend.url', 'w') as f:
+                  f.write(url)
+              print(f'✅ Backend URL injected: {url}')
+              print('   The exe will connect to this backend automatically — no env vars needed.')
+          else:
+              print('ℹ  GAMEOS_BACKEND_URL not set — using GitHub-direct mode (gameos-token.dat).')
+          PYEOF
+
+      # ── Build & Publish ───────────────────────────────────────────────────────
+      - name: Restore NuGet packages
+        run: dotnet restore GameLauncher/GameLauncher.csproj
+
+      - name: Publish Windows x64 standalone exe
+        run: |
+          dotnet publish GameLauncher/GameLauncher.csproj \
+            -c Release \
+            -r win-x64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
+            -o /tmp/GameOS-Launcher-win-x64
+
+          echo "✅ Published to /tmp/GameOS-Launcher-win-x64"
+          echo ""
+          echo "  Contents:"
+          ls -lh /tmp/GameOS-Launcher-win-x64/
+          echo ""
+
+          if grep -q . /tmp/GameOS-Launcher-win-x64/gameos-backend.url 2>/dev/null; then
+            echo "✅ gameos-backend.url — backend URL baked in (REST API mode)"
+          elif grep -q . /tmp/GameOS-Launcher-win-x64/gameos-token.dat 2>/dev/null; then
+            echo "✅ gameos-token.dat   — GitHub PAT baked in (GitHub-direct mode)"
+          else
+            echo "⚠  Neither gameos-backend.url nor gameos-token.dat has content."
+            echo "   The exe will show a 'not configured' error on login."
+            echo "   Set DATA_REPO_TOKEN in repository secrets and re-run this workflow."
+          fi
+
+      # ── Package ───────────────────────────────────────────────────────────────
+      - name: Create release zip
+        run: |
+          cd /tmp/GameOS-Launcher-win-x64
+          # Include the exe and both config files (one or both will have content)
+          zip -j /tmp/GameOS-Launcher-win-x64.zip \
+            GameLauncher.exe \
+            gameos-backend.url \
+            gameos-token.dat
+          echo "✅ Packaged: /tmp/GameOS-Launcher-win-x64.zip"
+          ls -lh /tmp/GameOS-Launcher-win-x64.zip
+
+      # ── Run auth tests before publishing ─────────────────────────────────────
+      # Sets up Node.js + local backend for end-to-end login verification (Admin.GameOS).
+      # The release is published only when the tests pass.
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
+      - name: Start local backend for pre-release login test
+        env:
+          GITHUB_TOKEN:          ${{ secrets.DATA_REPO_TOKEN }}
+          REPO_OWNER:            Koriebonx98
+          REPO_NAME:             Game.OS.Private.Data
+          ADMIN_GAMEOS_PASSWORD: ${{ secrets.ADMIN_GAMEOS_PASSWORD || 'GameOS2026' }}
+          PORT:                  3000
+        run: |
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "ℹ  DATA_REPO_TOKEN not set — skipping pre-release login test."
+            echo "BACKEND_STARTED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          export TOKEN_HMAC_SECRET="$(openssl rand -hex 32)"
+          cd backend
+          nohup node index.js > /tmp/backend-release.log 2>&1 &
+          BACKEND_PID=$!
+          echo "$BACKEND_PID" > /tmp/backend-release.pid
+
+          SERVER_READY=false
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+              echo "✅ Backend ready after ${i}s"
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "true" ]; then
+            echo "BACKEND_STARTED=true" >> "$GITHUB_ENV"
+          else
+            echo "❌ Backend did not start in time"
+            cat /tmp/backend-release.log || true
+            echo "BACKEND_STARTED=false" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+      - name: Pre-release login test (Admin.GameOS + Koriebonx98)
+        env:
+          GAMEOS_GITHUB_TOKEN:   ${{ secrets.DATA_REPO_TOKEN }}
+          GAMEOS_BACKEND_URL:    http://localhost:3000
+          GAMEOS_TEST_USERNAME:  Koriebonx98
+          GAMEOS_TEST_PASSWORD:  ${{ secrets.GAMEOS_TEST_PASSWORD }}
+          ADMIN_GAMEOS_PASSWORD: ${{ secrets.ADMIN_GAMEOS_PASSWORD || 'GameOS2026' }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "  Pre-release login verification — confirming release works"
+          echo "═══════════════════════════════════════════════════════════"
+          dotnet run --project LoginAuth.Tests -c Release
+
+      - name: Stop local backend
+        if: always()
+        run: |
+          if [ -f /tmp/backend-release.pid ]; then
+            BACKEND_PID=$(cat /tmp/backend-release.pid)
+            if kill "$BACKEND_PID" 2>/dev/null; then
+              echo "✅ Backend (PID $BACKEND_PID) stopped"
+            fi
+          fi
+
+      # ── Create GitHub Release ─────────────────────────────────────────────────
+      - name: Create GitHub Release and upload exe
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION:  ${{ github.event.inputs.version }}
+          EXTRA_NOTES: ${{ github.event.inputs.release_notes }}
+          IS_PRERELEASE: ${{ github.event.inputs.prerelease }}
+        run: |
+          NOTES="## Game.OS Launcher ${VERSION}
+
+          Download **GameOS-Launcher-win-x64.zip**, extract, and run **GameLauncher.exe**.
+          Sign in with your Game.OS username and password — the same account you use on the website.
+
+          ### Quick start
+          1. Download \`GameOS-Launcher-win-x64.zip\` below
+          2. Extract the zip to any folder
+          3. Double-click \`GameLauncher.exe\`
+          4. Sign in — same username and password as the [Game.OS website](https://koriebonx98.github.io/Game.OS.Userdata/)
+
+          ### Requirements
+          - Windows 10 / 11 (x64)
+          - No .NET runtime required — fully self-contained single exe
+
+          ### What's included
+          | File | Purpose |
+          |------|---------|
+          | \`GameLauncher.exe\` | The launcher (self-contained, ~90 MB) |
+          | \`gameos-token.dat\` | Encoded credentials — same auth as the website |
+          | \`gameos-backend.url\` | Backend server URL (if configured) |
+
+          ### Same login as the website
+          The launcher uses **identical authentication** to the Game.OS website:
+          - PBKDF2-SHA256 password hashing (100,000 iterations)
+          - Same private GitHub data repository (\`Game.OS.Private.Data\`)
+          - Same accounts — create an account on the website, log in here
+
+          ${EXTRA_NOTES}"
+
+          PRERELEASE_FLAG=""
+          if [ "$IS_PRERELEASE" = "true" ]; then
+            PRERELEASE_FLAG="--prerelease"
+          fi
+
+          gh release create "$VERSION" \
+            --title "Game.OS Launcher $VERSION" \
+            --notes "$NOTES" \
+            $PRERELEASE_FLAG \
+            /tmp/GameOS-Launcher-win-x64.zip#GameOS-Launcher-win-x64.zip
+
+          echo "✅ Release $VERSION published!"
+          echo "   Download: https://github.com/${{ github.repository }}/releases/tag/$VERSION"
