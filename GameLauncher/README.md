@@ -5,11 +5,12 @@ A **graphical Windows/Linux/macOS PC game launcher** for Game.OS — designed li
 
 Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform WPF-style GUI).
 
+> **Same backend as the website** — the launcher authenticates and stores data directly in the
+> same private GitHub repository that the web frontend uses.  No separate Node.js server is needed.
+
 ---
 
 ## Screenshots
-
-> All screenshots taken from the live launcher in **Demo Mode** — no backend required.
 
 | 🔐 Login | 🏠 Dashboard |
 |---|---|
@@ -34,7 +35,6 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 | Screen | What it does |
 |---|---|
 | 🔐 **Login / Register** | Dark-themed sign-in form; **Remember me** caches your session token between launches (same as the website) |
-| 🚀 **Demo Mode** | Click *Try Demo Mode* on the login screen to explore every page instantly — no backend or account needed |
 | 🏠 **Dashboard / Home** | Stats tiles, featured game hero banner, recently-added game cards, recent achievements |
 | 🎮 **My Library** | Game cover cards loaded from the cloud, platform filter chips, search bar, star ratings |
 | 🎯 **Game Details** | Full-screen overlay with cover art, description, rating, screenshots carousel, play button |
@@ -49,45 +49,44 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) or later
-- The **Game.OS backend** running (see below), **or** use Demo Mode (no backend needed)
+- A Game.OS account (create one at the [web frontend](../README.md) — same account works in the launcher)
 
-### Demo Mode — no account required
-
-Click **🚀 Try Demo Mode** on the login screen to instantly explore every page with rich sample data — no backend server, no account needed.
+### Run the launcher
 
 ```bash
 cd GameLauncher
 dotnet run -c Release
-# → click "Try Demo Mode" on the login screen
+# → sign in with your Game.OS username and password
 ```
+
+The launcher connects to the **same private GitHub data repository** as the website — no local
+server required.  Sign in with any account you already created on the web frontend.
 
 ### Configuration
 
-The launcher reads one environment variable:
+The launcher reads the following optional environment variables:
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GAMEOS_API_BASEURL` | `http://localhost:3000` | Base URL of the Game.OS backend API |
+| `GAMEOS_DATA_REPO_OWNER` | `Koriebonx98` | GitHub owner of the private data repository |
+| `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
+| `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT with Contents read+write access (required only when the data repository is **private**) |
 
-### Run the launcher with a real account
+These variables are pre-configured for the default deployment.  You only need to set them if you
+are hosting your own data repository.
 
-```bash
-# Start the backend first (from the backend/ directory)
-cd backend
-npm install
-node index.js
+---
 
-# In another terminal, run the launcher
-cd GameLauncher
-dotnet run -c Release
-```
+## Account Setup
 
-With a custom backend URL:
-```bash
-export GAMEOS_API_BASEURL="https://your-backend.example.com"
-cd GameLauncher
-dotnet run -c Release
-```
+The launcher shares accounts with the web frontend.  To get started:
+
+1. **Create an account** on the [Game.OS website](../README.md) (or via the in-app register form)
+2. **Launch the app** and sign in with the same username and password
+3. Your game library, friends list, achievements, and profile are all synced via GitHub
+
+The **Remember me** checkbox saves your session locally so the next launch signs you in automatically
+— identical to how the website handles `localStorage` session persistence.
 
 ---
 
@@ -98,24 +97,40 @@ Log in with the admin account (`Admin.GameOS`) to unlock admin features:
 - The **Games Store** page shows an **Admin — Catalog Management** panel
 - Admin can **Add** new games to the in-store catalog
 - Admin can **Remove** games from the catalog
-- Note: admin catalog changes are **session-only** (no dedicated backend endpoint for catalog persistence yet)
 
-The admin account is defined server-side in the backend.  Contact your backend operator for the admin password.
+The admin account is created automatically in the GitHub data repository on first web-frontend
+launch.  The default password is `GameOS2026` — change it immediately via Account Settings.
 
 ---
 
-## Backend Setup
+## How It Connects to the Backend
 
-The launcher connects to the Game.OS Node.js/Express backend.  See `../backend/README.md` for full setup instructions.  Required environment variables for the backend:
+The launcher calls the **GitHub REST API directly** — the same API calls made by the web frontend
+(`script.js`).  No Node.js proxy server is involved:
 
 ```
-GITHUB_TOKEN       = GitHub personal access token (repo scope) for the data repository
-REPO_OWNER         = GitHub owner of the data repository
-REPO_NAME          = Name of the private data repository
-TOKEN_HMAC_SECRET  = Secret key for signing API tokens
+Launcher  →  https://api.github.com/repos/{owner}/{repo}/contents/{path}
+Website   →  https://api.github.com/repos/{owner}/{repo}/contents/{path}
 ```
 
-Once the backend is running on `http://localhost:3000` the launcher will connect automatically.
+Data is stored as JSON files in the private data repository:
+
+```
+accounts/
+  email-index.json          ← email → username mapping
+  {username}/
+    profile.json            ← credentials + metadata
+    games.json              ← game library
+    achievements.json       ← achievements list
+    friends.json            ← friend usernames
+    friend_requests.json    ← incoming requests
+    presence.json           ← last-seen timestamp
+  messages/
+    {user1}_{user2}.json    ← message threads
+```
+
+Password hashing uses **PBKDF2-SHA256 with 100,000 iterations** — identical to the website — so
+an account created in the browser works in the launcher without any migration.
 
 ---
 

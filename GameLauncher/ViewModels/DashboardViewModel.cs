@@ -53,8 +53,8 @@ public partial class DashboardViewModel : ViewModelBase
         foreach (var a in achievements.OrderByDescending(a => a.UnlockedAt).Take(4))
             RecentAchievements.Add(a);
 
-        // Featured — pick the highest-rated store game
-        FeaturedGame = DemoData.Store.OrderByDescending(s => s.Rating).FirstOrDefault();
+        // Featured — pick the highest-rated store game (same static catalog as script.js)
+        FeaturedGame = GameCatalog.Store.OrderByDescending(s => s.Rating).FirstOrDefault();
         if (FeaturedGame != null)
             FeaturedGradient = FeaturedGame.CoverGradient;
     }
