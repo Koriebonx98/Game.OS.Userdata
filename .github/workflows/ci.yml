@@ -5,6 +5,8 @@
 #   2. The deploy.yml GAMES_DB_TOKEN_ENCODED-injection step would succeed on this branch's script.js
 #   3. The frontend HTML files are present and syntactically well-formed
 #   4. The backend Node.js code is syntactically valid
+#   5. The C# GameLauncher and LoginAuth.Tests projects compile without errors
+#   6. The C# login-auth unit tests (hash parity + bcrypt) all pass
 
 name: CI
 
@@ -73,3 +75,34 @@ jobs:
 
       - name: Check script.js syntax
         run: node --check script.js && echo "✅ script.js syntax OK"
+
+  validate-csharp:
+    name: Build & test C# launcher
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet packages
+        run: dotnet restore Game.OS.Userdata.sln
+
+      - name: Build GameLauncher
+        run: dotnet build GameLauncher/GameLauncher.csproj -c Release --no-restore
+
+      - name: Build LoginAuth.Tests
+        run: dotnet build LoginAuth.Tests/LoginAuth.Tests.csproj -c Release --no-restore
+
+      - name: Run LoginAuth.Tests — hash parity + bcrypt checks (no network)
+        # Tests 1–4 verify that the C# PBKDF2 hash matches the JavaScript
+        # hashPassword() function byte-for-byte, and that the bcrypt path works.
+        # Test 5 (live backend) is skipped automatically when GAMEOS_GITHUB_TOKEN
+        # is not set — it runs in the separate build-csharp-launcher.yml workflow.
+        run: |
+          dotnet run --project LoginAuth.Tests -c Release --no-build
+          echo "✅ C# login auth tests passed — hash parity with web frontend confirmed"

@@ -1,0 +1,122 @@
+# Build & Live-Login Test — C# Game Launcher
+#
+# Builds the C# launcher and runs the LoginAuth.Tests suite, including the
+# optional live backend test (Test 5) that signs in to the real GitHub data
+# repository using the same PBKDF2-SHA256 method as the web frontend.
+#
+# Triggers:
+#   • Manual (workflow_dispatch) — run from the Actions tab at any time
+#   • Push to main — so every merge is validated end-to-end
+#
+# Required secrets (set in Settings → Secrets and variables → Actions):
+#   DATA_REPO_TOKEN       — fine-grained PAT with Contents read+write on
+#                           the private data repository (already used by
+#                           deploy.yml; no new secret needed if it is set)
+#   GAMEOS_TEST_PASSWORD  — the password for the test account.
+#                           Add as a repository secret named GAMEOS_TEST_PASSWORD.
+#
+# Test account:
+#   Username: Koriebonx98  (provided as GAMEOS_TEST_USERNAME env var below)
+#   Password: stored in the GAMEOS_TEST_PASSWORD repository secret
+
+name: Build & Live-Login Test (C# Launcher)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'GameLauncher/**'
+      - 'LoginAuth.Tests/**'
+      - '.github/workflows/build-csharp-launcher.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build + Auth Tests (including live login)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Restore dependencies
+        run: dotnet restore Game.OS.Userdata.sln
+
+      - name: Build GameLauncher
+        run: dotnet build GameLauncher/GameLauncher.csproj -c Release --no-restore
+
+      - name: Build LoginAuth.Tests
+        run: dotnet build LoginAuth.Tests/LoginAuth.Tests.csproj -c Release --no-restore
+
+      # ── Unit / hash-parity tests (no network required) ────────────────────
+      - name: Run LoginAuth.Tests (hash-parity + bcrypt checks)
+        run: dotnet run --project LoginAuth.Tests -c Release --no-build
+        # Tests 1–4 pass without any secrets (pure crypto logic).
+        # Test 5 is automatically skipped when GAMEOS_GITHUB_TOKEN is not set.
+
+      # ── Live backend test ─────────────────────────────────────────────────
+      # Always run this step — when DATA_REPO_TOKEN / GAMEOS_TEST_PASSWORD are
+      # not configured the test code automatically skips Test 5 and the step
+      # exits with success (no conditional needed).
+      - name: Run live login test — Koriebonx98 account
+        env:
+          GAMEOS_GITHUB_TOKEN:  ${{ secrets.DATA_REPO_TOKEN }}
+          GAMEOS_TEST_USERNAME: Koriebonx98
+          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+        run: |
+          echo "═══════════════════════════════════════════════════════════"
+          echo "  Live login test — verifying Koriebonx98 account"
+          echo "  Auth method: PBKDF2-SHA256 (same as web frontend)"
+          echo "═══════════════════════════════════════════════════════════"
+          dotnet run --project LoginAuth.Tests -c Release --no-build \
+            2>&1 | tee /tmp/login-test-output.txt
+          echo ""
+          echo "── Test output saved to login-test-output.txt ──"
+
+      # ── Capture output as artifact ("screenshot") ────────────────────────
+      - name: Save test results as artifact
+        if: always()
+        run: |
+          mkdir -p /tmp/launcher-test-results
+
+          # Always include the basic test run output
+          if [ -f /tmp/login-test-output.txt ]; then
+            cp /tmp/login-test-output.txt /tmp/launcher-test-results/
+          fi
+
+          # Write a summary report
+          cat > /tmp/launcher-test-results/summary.txt << 'EOF'
+          ═══════════════════════════════════════════════════════════════════
+            Game.OS C# Launcher — Login Authentication Summary
+          ═══════════════════════════════════════════════════════════════════
+
+            Auth method : PBKDF2-SHA256, 100 000 iterations (identical to
+                          the JavaScript hashPassword() in script.js)
+            Salt format : {username_lower}:gameos
+            Dual-hash   : PBKDF2 (web/launcher accounts) + bcrypt
+                          (Node.js backend accounts) both supported
+
+            Test account: Koriebonx98
+            Data repo   : Koriebonx98/Game.OS.Private.Data
+
+            The C# launcher uses the SAME login logic as the web frontend.
+            Accounts created in the browser work in the launcher and vice versa.
+          ═══════════════════════════════════════════════════════════════════
+          EOF
+
+      - name: Upload test results artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: csharp-launcher-login-test-results
+          path: /tmp/launcher-test-results/
+          retention-days: 30
