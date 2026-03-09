@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -310,23 +311,31 @@ namespace GameLauncher.Services
         }
 
         // ── User data writes ──────────────────────────────────────────────────
+        /// <summary>
+        /// Add a game to the user's library, persisting the full metadata
+        /// (cover URL, genre, description, rating, screenshots) so it round-trips
+        /// through GitHub exactly the way the website stores game data.
+        /// </summary>
         public async Task AddGameAsync(
-            string username, string platform, string title, string? titleId,
+            string username, Game game,
             CancellationToken ct = default)
         {
             var key = $"accounts/{username.ToLowerInvariant()}/games.json";
             var (games, sha) = await ReadFileAsync<List<Game>>(key, ct);
             var library = games ?? new List<Game>();
 
-            library.Add(new Game
-            {
-                Platform = platform,
-                Title    = title,
-                TitleId  = titleId,
-                AddedAt  = DateTimeOffset.UtcNow.ToString("o"),
-            });
+            // Don't add duplicates (same title + platform)
+            if (library.Any(g =>
+                    string.Equals(g.Title,    game.Title,    StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(g.Platform, game.Platform, StringComparison.OrdinalIgnoreCase)))
+                return;
 
-            await WriteFileAsync(key, library, $"Add game '{title}' for {username}", sha, ct);
+            // Stamp AddedAt if the caller left it blank
+            if (string.IsNullOrEmpty(game.AddedAt))
+                game.AddedAt = DateTimeOffset.UtcNow.ToString("o");
+
+            library.Add(game);
+            await WriteFileAsync(key, library, $"Add game '{game.Title}' for {username}", sha, ct);
         }
 
         public async Task RemoveGameAsync(

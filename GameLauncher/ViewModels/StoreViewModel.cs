@@ -125,20 +125,29 @@ public partial class StoreViewModel : ViewModelBase
         StatusMessage = $"Adding '{game.Title}'…";
         try
         {
-            await _client.AddGameAsync(game.Platform, game.Title);
-            _library.Add(new Game
+            // Build the full Game so all metadata (cover URL, genre, description,
+            // rating, screenshots) is persisted to GitHub — the same data that
+            // accounts/{user}/games.json stores on the website backend.
+            var newGame = new Game
             {
-                Platform    = game.Platform,
-                Title       = game.Title,
-                Genre       = game.Genre,
-                Rating      = game.Rating,
-                Description = game.Description,
-                CoverUrl    = game.CoverUrl,
-                Screenshots = game.Screenshots,
-                CoverColor  = game.CoverColor,
-                CoverGradient = game.CoverGradient,
-                AddedAt     = System.DateTimeOffset.UtcNow.ToString("o")
-            });
+                Platform        = game.Platform,
+                Title           = game.Title,
+                Genre           = game.Genre,
+                Rating          = game.Rating,
+                Description     = game.Description,
+                CoverUrl        = game.CoverUrl,
+                Screenshots     = game.Screenshots,
+                Price           = game.Price,
+                TrailerUrl      = game.TrailerUrl,
+                AchievementsUrl = game.AchievementsUrl,
+                AddedAt         = System.DateTimeOffset.UtcNow.ToString("o"),
+            };
+            // CoverColor / CoverGradient are [JsonIgnore] — UI-only, not persisted
+            newGame.CoverColor    = game.CoverColor;
+            newGame.CoverGradient = game.CoverGradient;
+
+            await _client.AddGameAsync(newGame);
+            _library.Add(newGame);
             StatusMessage = $"✓  '{game.Title}' added to your library!";
         }
         catch (System.Exception ex)

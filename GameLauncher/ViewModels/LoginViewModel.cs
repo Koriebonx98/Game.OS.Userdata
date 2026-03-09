@@ -249,7 +249,7 @@ public partial class LoginViewModel : ViewModelBase
     {
         foreach (var g in games)
         {
-            var meta = DemoData.Library.FirstOrDefault(d =>
+            var meta = GameCatalog.Metadata.FirstOrDefault(d =>
                 d.Title.Equals(g.Title, System.StringComparison.OrdinalIgnoreCase));
             if (meta != null)
             {

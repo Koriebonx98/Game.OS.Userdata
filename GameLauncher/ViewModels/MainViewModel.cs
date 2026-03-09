@@ -98,7 +98,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         DashboardVm.Load(profile, library, achievements);
         LibraryVm.Load(library);
-        StoreVm.Load(DemoData.Store, library, profile, _client, isAdmin);
+        StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
         FriendsVm.Load(_client, profile.Username);
 
