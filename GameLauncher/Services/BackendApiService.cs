@@ -44,8 +44,35 @@ namespace GameLauncher.Services
 
         private static string? ResolveBackendUrl()
         {
+            // 1. Environment variable (developer / CI override)
             var url = Environment.GetEnvironmentVariable("GAMEOS_BACKEND_URL")?.Trim().TrimEnd('/');
-            return string.IsNullOrEmpty(url) ? null : url;
+            if (!string.IsNullOrEmpty(url)) return url;
+
+            // 2. Bundled URL file injected at build/publish time
+            //    (mirrors gameos-token.dat for the GitHub PAT)
+            try
+            {
+                var urlFile = System.IO.Path.Combine(
+                    AppContext.BaseDirectory, "gameos-backend.url");
+                if (System.IO.File.Exists(urlFile))
+                {
+                    var fileUrl = System.IO.File.ReadAllText(urlFile).Trim().TrimEnd('/');
+                    if (!string.IsNullOrEmpty(fileUrl))
+                        return fileUrl;
+                }
+            }
+            catch (System.IO.IOException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] Failed to read gameos-backend.url: {ex.Message}");
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] Access denied reading gameos-backend.url: {ex.Message}");
+            }
+
+            return null;
         }
 
         // ── HTTP client ───────────────────────────────────────────────────────

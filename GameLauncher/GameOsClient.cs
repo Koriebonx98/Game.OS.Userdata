@@ -124,8 +124,7 @@ namespace GameLauncher
             if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
                 throw new GameOsException(503,
                     "Cannot reach the Game.OS data store.\n" +
-                    "Set GAMEOS_BACKEND_URL to your backend server URL, or " +
-                    "set GAMEOS_GITHUB_TOKEN to a valid fine-grained PAT.");
+                    "Please check your internet connection and try again.");
 
             var ghProfile = await _github!.VerifyLoginAsync(usernameOrEmail, password, ct)
                 ?? throw new GameOsException(401,
