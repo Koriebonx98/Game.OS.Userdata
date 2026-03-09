@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -83,7 +84,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
         _ = LoginVm.TryAutoLoginAsync();
+
+        // GAMEOS_DEMO_PAGE env var: auto-trigger demo mode and navigate to the given page.
+        // Used for headless screenshot capture without needing a backend server.
+        // Example: GAMEOS_DEMO_PAGE=dashboard, library, store, friends, profile, gamedetail
+        var demoPage = Environment.GetEnvironmentVariable("GAMEOS_DEMO_PAGE");
+        if (!string.IsNullOrEmpty(demoPage))
+        {
+            // Set target page BEFORE Execute so OnLoginSuccess can read it
+            _demoTargetPage = demoPage.ToLowerInvariant();
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => LoginVm.DemoLoginCommand.Execute(null),
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        }
     }
+
+    private string? _demoTargetPage;
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
                                 List<Achievement> achievements)
@@ -102,7 +118,31 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         ShowLogin = false;
         ShowMain  = true;
-        ActivePage = "dashboard";
+
+        // Navigate to the page requested by GAMEOS_DEMO_PAGE (for screenshots)
+        if (!string.IsNullOrEmpty(_demoTargetPage) && _demoTargetPage != "dashboard")
+        {
+            ActivePage = _demoTargetPage;
+            // For game detail, open the first library game
+            if (_demoTargetPage == "gamedetail")
+            {
+                // Find Elden Ring by title for the detail screenshot, fall back to first game
+                var detailGame = library.FirstOrDefault(g =>
+                    g.Title.Contains("Elden", StringComparison.OrdinalIgnoreCase))
+                    ?? (library.Count > 0 ? library[0] : null);
+
+                if (detailGame != null)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        OpenDetailFromGame(detailGame),
+                        Avalonia.Threading.DispatcherPriority.Background);
+                }
+            }
+        }
+        else
+        {
+            ActivePage = "dashboard";
+        }
     }
 
     [RelayCommand]

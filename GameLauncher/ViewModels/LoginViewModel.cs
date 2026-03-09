@@ -183,6 +183,56 @@ public partial class LoginViewModel : ViewModelBase
     private void ToggleForm() => ShowRegister = !ShowRegister;
 
     /// <summary>
+    /// Demo mode — loads the full launcher with rich sample data without
+    /// needing a backend server or an account.  Shows every page exactly
+    /// as it appears when logged in.
+    /// </summary>
+    [RelayCommand]
+    private void DemoLogin()
+    {
+        var profile = new UserProfile
+        {
+            Username  = "DemoPlayer",
+            Email     = "demo@gameos.example.com",
+            CreatedAt = "2024-06-15T10:00:00Z",
+        };
+
+        // Use all DemoData library entries as the player's library
+        var games = DemoData.Library
+            .Select(g => new Game
+            {
+                Platform    = g.Platform,
+                Title       = g.Title,
+                TitleId     = g.TitleId,
+                CoverUrl    = g.CoverUrl,
+                Screenshots = g.Screenshots,
+                AddedAt     = g.AddedAt,
+                Genre       = g.Genre,
+                Description = g.Description,
+                Rating      = g.Rating,
+                CoverColor  = g.CoverColor,
+                CoverGradient = g.CoverGradient,
+            })
+            .ToList();
+
+        var achievements = new List<Achievement>
+        {
+            new() { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe",  AchievementId = "mk8_1",  Name = "Speed Racer",        Description = "Win your first online race.",             UnlockedAt = "2025-06-02T18:00:00Z" },
+            new() { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe",  AchievementId = "mk8_2",  Name = "All Cups Gold",      Description = "Win every cup on 150cc.",                 UnlockedAt = "2025-06-10T20:30:00Z" },
+            new() { Platform = "Switch", GameTitle = "Zelda: TOTK",          AchievementId = "totk_1", Name = "Sky Explorer",       Description = "Reach the highest sky island.",           UnlockedAt = "2025-04-20T14:00:00Z" },
+            new() { Platform = "PC",     GameTitle = "Cyberpunk 2077",        AchievementId = "cp_1",   Name = "Night City Legend",  Description = "Complete the main story.",                UnlockedAt = "2025-01-15T22:00:00Z" },
+            new() { Platform = "PC",     GameTitle = "Elden Ring",            AchievementId = "er_1",   Name = "Elden Lord",         Description = "Achieve the Elden Lord ending.",          UnlockedAt = "2025-02-28T21:00:00Z" },
+            new() { Platform = "PC",     GameTitle = "Baldur's Gate 3",       AchievementId = "bg3_1",  Name = "Honour Among Thieves",Description = "Complete the game on Honour Mode.",     UnlockedAt = "2025-03-10T19:00:00Z" },
+            new() { Platform = "Xbox",   GameTitle = "Halo Infinite",         AchievementId = "hi_1",   Name = "Demon",              Description = "Complete the campaign on Legendary.",     UnlockedAt = "2025-01-25T16:00:00Z" },
+            new() { Platform = "PS5",    GameTitle = "God of War Ragnarök",   AchievementId = "gow_1",  Name = "Ragnarök Survivor",  Description = "Defeat Odin.",                            UnlockedAt = "2025-02-08T20:00:00Z" },
+            new() { Platform = "PC",     GameTitle = "Hogwarts Legacy",       AchievementId = "hl_1",   Name = "Legend of Hogwarts", Description = "Discover all ancient magic secrets.",    UnlockedAt = "2025-04-05T17:00:00Z" },
+            new() { Platform = "PC",     GameTitle = "Starfield",             AchievementId = "sf_1",   Name = "Into the Starfield", Description = "Join Constellation.",                     UnlockedAt = "2025-05-12T11:00:00Z" },
+        };
+
+        OnLoginSuccess?.Invoke(profile, games, achievements);
+    }
+
+    /// <summary>
     /// Quick-login — if the saved session has a token, restore it silently.
     /// Otherwise pre-fill the username field so the user just needs to type
     /// the password (same UX as the web's single-session model).

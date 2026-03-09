@@ -9,17 +9,23 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 ## Screenshots
 
-| Login | Dashboard |
+> All screenshots taken from the live launcher in **Demo Mode** — no backend required.
+
+| 🔐 Login | 🏠 Dashboard |
 |---|---|
 | ![Login](../Design/Screenshots/screenshot_login.png) | ![Dashboard](../Design/Screenshots/screenshot_dashboard.png) |
 
-| My Library | Games Store |
+| 🎮 My Library | 🛒 Games Store |
 |---|---|
 | ![Library](../Design/Screenshots/screenshot_library.png) | ![Store](../Design/Screenshots/screenshot_store.png) |
 
-| Local Game Detection | Profile |
+| 🎯 Game Details | 👤 Profile |
 |---|---|
-| ![Detected on Drive](../Design/Screenshots/screenshot_library_detected.png) | ![Profile](../Design/Screenshots/screenshot_profile.png) |
+| ![Game Detail](../Design/Screenshots/screenshot_gamedetail.png) | ![Profile](../Design/Screenshots/screenshot_profile.png) |
+
+| 👥 Friends | 🔍 Local Game Detection |
+|---|---|
+| ![Friends](../Design/Screenshots/screenshot_friends.png) | ![Detected on Drive](../Design/Screenshots/screenshot_library_detected.png) |
 
 ---
 
@@ -27,11 +33,14 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 | Screen | What it does |
 |---|---|
-| 🔐 **Login / Register** | Dark-themed sign-in form; create a new account via the same backend API |
-| 🏠 **Dashboard / Home** | Stats tiles, featured game hero banner, game card grid, recent achievements |
-| 🎮 **My Library** | Game cover cards, platform filter chips, search, star ratings |
-| 🛒 **Games Store** | Featured titles carousel, browse all, genre filter, search, add to library |
-| 👤 **Profile** | Avatar, stats, all achievements list, LIVE / ADMIN badge |
+| 🔐 **Login / Register** | Dark-themed sign-in form; **Remember me** caches your session token between launches (same as the website) |
+| 🚀 **Demo Mode** | Click *Try Demo Mode* on the login screen to explore every page instantly — no backend or account needed |
+| 🏠 **Dashboard / Home** | Stats tiles, featured game hero banner, recently-added game cards, recent achievements |
+| 🎮 **My Library** | Game cover cards loaded from the cloud, platform filter chips, search bar, star ratings |
+| 🎯 **Game Details** | Full-screen overlay with cover art, description, rating, screenshots carousel, play button |
+| 🛒 **Games Store** | Featured titles carousel, browse all, genre filter, search, one-click add to library |
+| 👥 **Friends** | Live friend list with online/away/offline presence, pending friend requests |
+| 👤 **Profile** | Avatar, stats, full achievements list, LIVE / ADMIN badge |
 | 🛡️ **Admin Mode** | When logged in as `Admin.GameOS`, a catalog management panel appears in the store |
 
 ---
@@ -40,7 +49,17 @@ Built with **.NET 8** + [Avalonia UI](https://avaloniaui.net/) (cross-platform W
 
 ### Prerequisites
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) or later
-- The **Game.OS backend** running (see below)
+- The **Game.OS backend** running (see below), **or** use Demo Mode (no backend needed)
+
+### Demo Mode — no account required
+
+Click **🚀 Try Demo Mode** on the login screen to instantly explore every page with rich sample data — no backend server, no account needed.
+
+```bash
+cd GameLauncher
+dotnet run -c Release
+# → click "Try Demo Mode" on the login screen
+```
 
 ### Configuration
 
@@ -50,7 +69,7 @@ The launcher reads one environment variable:
 |---|---|---|
 | `GAMEOS_API_BASEURL` | `http://localhost:3000` | Base URL of the Game.OS backend API |
 
-### Run the launcher
+### Run the launcher with a real account
 
 ```bash
 # Start the backend first (from the backend/ directory)
