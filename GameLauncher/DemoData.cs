@@ -11,6 +11,50 @@ namespace GameLauncher
     /// </summary>
     internal static class DemoData
     {
+        // ── Demo local games (simulates games found on a connected drive) ──────
+        // Used in demo/offline mode so the Library and GameDetail screens show
+        // the "Detected on Drive" section and Play + ··· buttons.
+        public static IReadOnlyList<LocalGame> DemoLocalGames { get; } = new List<LocalGame>
+        {
+            new LocalGame
+            {
+                Title          = "Mario Kart 8 Deluxe",
+                DriveRoot      = "E:\\",
+                FolderPath     = "E:\\Games\\Mario Kart 8 Deluxe",
+                ExecutablePath = "E:\\Games\\Mario Kart 8 Deluxe\\yuzu.exe",
+                ExecutableType = "exe",
+                DriveInstances = new List<LocalGameDriveEntry>
+                {
+                    new LocalGameDriveEntry
+                    {
+                        DriveRoot      = "E:\\",
+                        FolderPath     = "E:\\Games\\Mario Kart 8 Deluxe",
+                        ExecutablePath = "E:\\Games\\Mario Kart 8 Deluxe\\yuzu.exe",
+                        ExecutableType = "exe",
+                    }
+                }
+            },
+        };
+
+        // ── Demo repacks (simulates repack archives ready to install) ──────────
+        public static IReadOnlyList<LocalRepack> DemoRepacks { get; } = new List<LocalRepack>
+        {
+            new LocalRepack
+            {
+                Title     = "Elden Ring",
+                FilePath  = "D:\\Repacks\\Elden.Ring-CODEX.zip",
+                FileType  = "zip",
+                SizeBytes = 48_318_382_080L, // ~45 GB
+            },
+            new LocalRepack
+            {
+                Title     = "Cyberpunk 2077",
+                FilePath  = "D:\\Repacks\\Cyberpunk.2077-FitGirl.zip",
+                FileType  = "zip",
+                SizeBytes = 32_212_254_720L, // ~30 GB
+            },
+        };
+
         /// <summary>
         /// Metadata lookup for known games.  Used to enrich API-returned library
         /// entries with cover colours, genres, descriptions, and ratings that the

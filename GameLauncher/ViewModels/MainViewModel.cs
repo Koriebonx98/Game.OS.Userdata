@@ -100,6 +100,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     private string? _demoTargetPage;
+    /// <summary>True when the session was started via DemoLogin (no real backend token).</summary>
+    private bool    _isDemoMode;
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
                                 List<Achievement> achievements)
@@ -108,13 +110,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _library      = library;
         _achievements = achievements;
 
+        // DemoLogin does not set a token on the client — detect demo mode by checking
+        // whether the client is authenticated against a real backend.
+        _isDemoMode = !_client.IsAuthenticated;
+
         bool isAdmin = _client.IsAdmin;
 
         DashboardVm.Load(profile, library, achievements);
         LibraryVm.Load(library);
         StoreVm.Load(DemoData.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
-        FriendsVm.Load(_client, profile.Username);
+
+        // In demo mode the backend is not reachable, so load demo friends directly.
+        if (_isDemoMode)
+        {
+            FriendsVm.LoadDemo();
+            // Inject demo local games so the Library and GameDetail screens show
+            // "Detected on Drive" / Play buttons even without real filesystem games.
+            LibraryVm.UpdateLocalGames(DemoData.DemoLocalGames);
+            LibraryVm.UpdateRepacks(DemoData.DemoRepacks);
+        }
+        else
+            FriendsVm.Load(_client, profile.Username);
 
         ShowLogin = false;
         ShowMain  = true;
@@ -161,20 +178,41 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (page == "library")
             LibraryVm.Load(_library);
         if (page == "friends")
-            FriendsVm.Load(_client, _profile.Username);
+        {
+            if (_isDemoMode)
+                FriendsVm.LoadDemo();
+            else
+                FriendsVm.Load(_client, _profile.Username);
+        }
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
     }
 
     private void OpenDetailFromGame(Game game)
     {
-        DetailVm.LoadFromGame(game);
+        // Check if this game is installed locally or has a repack available
+        LocalGame? localGame = LibraryVm.LocalGames
+            .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+        LocalRepack? repack = null;
+        if (localGame == null)
+            repack = LibraryVm.ReadyToInstall
+                .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+
+        DetailVm.LoadFromGame(game, localGame, repack);
         ShowDetail = true;
     }
 
     private void OpenDetailFromStoreGame(StoreGame game)
     {
-        DetailVm.LoadFromStoreGame(game);
+        // Check if this store game is installed locally or has a repack available
+        LocalGame? localGame = LibraryVm.LocalGames
+            .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+        LocalRepack? repack = null;
+        if (localGame == null)
+            repack = LibraryVm.ReadyToInstall
+                .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+
+        DetailVm.LoadFromStoreGame(game, localGame, repack);
         ShowDetail = true;
     }
 

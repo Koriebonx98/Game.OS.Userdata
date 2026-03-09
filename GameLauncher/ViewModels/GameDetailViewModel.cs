@@ -46,6 +46,16 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _activeDrivePath  = "";
     [ObservableProperty] private string _activeExeType    = "";
 
+    // ── Install / launch state ────────────────────────────────────────────────
+    /// <summary>True when the game is found installed on a local drive.</summary>
+    [ObservableProperty] private bool _isInstalled;
+    /// <summary>True when a repack archive is available to install (but game is not yet installed).</summary>
+    [ObservableProperty] private bool _isRepack;
+    /// <summary>File path of the repack archive, used by the Install command.</summary>
+    [ObservableProperty] private string _repackPath = "";
+    /// <summary>Display label for the repack archive size.</summary>
+    [ObservableProperty] private string _repackSizeLabel = "";
+
     public ObservableCollection<string> DriveLabels { get; } = new();
 
     private List<LocalGameDriveEntry> _driveInstances = new();
@@ -72,11 +82,81 @@ public partial class GameDetailViewModel : ViewModelBase
         catch { /* best-effort */ }
     }
 
+    /// <summary>Launches the installed game executable.</summary>
+    [RelayCommand]
+    private void LaunchGame()
+    {
+        if (!IsInstalled || string.IsNullOrEmpty(ActiveDrivePath)) return;
+        try
+        {
+            // Find the executable within the active drive path
+            if (_driveInstances.Count > 0)
+            {
+                int idx   = System.Math.Clamp(SelectedDriveIndex, 0, _driveInstances.Count - 1);
+                var entry = _driveInstances[idx];
+                if (!string.IsNullOrEmpty(entry.ExecutablePath))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName        = entry.ExecutablePath,
+                        UseShellExecute = true
+                    });
+                    return;
+                }
+            }
+            // Fallback: open the folder
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = ActiveDrivePath,
+                UseShellExecute = true
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Opens the repack archive with the system extractor (or explorer).</summary>
+    [RelayCommand]
+    private void InstallRepack()
+    {
+        if (!IsRepack || string.IsNullOrEmpty(RepackPath)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = RepackPath,
+                UseShellExecute = true
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Opens the game folder in the system file manager.</summary>
+    [RelayCommand]
+    private void ShowMoreOptions()
+    {
+        if (string.IsNullOrEmpty(ActiveDrivePath)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = ActiveDrivePath,
+                UseShellExecute = true
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Populate from a cloud library Game
     // ─────────────────────────────────────────────────────────────────────────
 
-    public void LoadFromGame(Game game)
+    /// <summary>
+    /// Load a cloud library game into the detail view.
+    /// </summary>
+    /// <param name="game">The cloud library entry.</param>
+    /// <param name="localGame">If not null, the game is installed on this drive — shows Play + ··· buttons.</param>
+    /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
+    public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null)
     {
         Title         = game.Title;
         Platform      = game.Platform;
@@ -93,13 +173,21 @@ public partial class GameDetailViewModel : ViewModelBase
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
+
+        ApplyInstallState(localGame, repack);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Populate from a store StoreGame
     // ─────────────────────────────────────────────────────────────────────────
 
-    public void LoadFromStoreGame(StoreGame game)
+    /// <summary>
+    /// Load a store game into the detail view.
+    /// </summary>
+    /// <param name="game">The store entry.</param>
+    /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
+    /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
+    public void LoadFromStoreGame(StoreGame game, LocalGame? localGame = null, LocalRepack? repack = null)
     {
         Title         = game.Title;
         Platform      = game.Platform;
@@ -114,10 +202,16 @@ public partial class GameDetailViewModel : ViewModelBase
         PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
         PopulateAchievements(null);
-        IsLocalGame = false;
+        IsLocalGame       = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
+
+        ApplyInstallState(localGame, repack);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Populate from a locally detected LocalGame
+    // ─────────────────────────────────────────────────────────────────────────
 
     // ─────────────────────────────────────────────────────────────────────────
     // Populate from a locally detected LocalGame
@@ -138,6 +232,10 @@ public partial class GameDetailViewModel : ViewModelBase
         HasScreenshots = false;
         PopulateAchievements(null);
         IsLocalGame    = true;
+        IsInstalled    = true;
+        IsRepack       = false;
+        RepackPath     = "";
+        RepackSizeLabel = "";
 
         _driveInstances = game.DriveInstances.Count > 0
             ? game.DriveInstances
@@ -159,6 +257,71 @@ public partial class GameDetailViewModel : ViewModelBase
         HasMultipleDrives  = _driveInstances.Count > 1;
         SelectedDriveIndex = 0;
         RefreshActiveDrive();
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Private helpers
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Applies installation / repack state shared by <see cref="LoadFromGame"/>
+    /// and <see cref="LoadFromStoreGame"/>.
+    /// </summary>
+    private void ApplyInstallState(LocalGame? localGame, LocalRepack? repack)
+    {
+        if (localGame != null)
+        {
+            // Game is installed on a local drive — show Play + ··· buttons
+            IsInstalled     = true;
+            IsRepack        = false;
+            RepackPath      = "";
+            RepackSizeLabel = "";
+
+            _driveInstances = localGame.DriveInstances.Count > 0
+                ? localGame.DriveInstances
+                : new List<LocalGameDriveEntry>
+                {
+                    new LocalGameDriveEntry
+                    {
+                        DriveRoot      = localGame.DriveRoot,
+                        FolderPath     = localGame.FolderPath,
+                        ExecutablePath = localGame.ExecutablePath,
+                        ExecutableType = localGame.ExecutableType,
+                    }
+                };
+
+            DriveLabels.Clear();
+            foreach (var d in _driveInstances)
+                DriveLabels.Add(d.DriveRoot);
+
+            HasMultipleDrives  = _driveInstances.Count > 1;
+            SelectedDriveIndex = 0;
+            RefreshActiveDrive();
+        }
+        else if (repack != null)
+        {
+            // Repack archive available — show Install button
+            IsInstalled      = false;
+            IsRepack         = true;
+            RepackPath       = repack.FilePath;
+            RepackSizeLabel  = repack.SizeLabel;
+            _driveInstances  = new List<LocalGameDriveEntry>();
+            ActiveDriveLabel = "";
+            ActiveDrivePath  = "";
+            ActiveExeType    = "";
+        }
+        else
+        {
+            // Neither installed nor a repack — no action buttons
+            IsInstalled      = false;
+            IsRepack         = false;
+            RepackPath       = "";
+            RepackSizeLabel  = "";
+            _driveInstances  = new List<LocalGameDriveEntry>();
+            ActiveDriveLabel = "";
+            ActiveDrivePath  = "";
+            ActiveExeType    = "";
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────

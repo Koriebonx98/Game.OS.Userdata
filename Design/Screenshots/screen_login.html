@@ -1,60 +1,64 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title></title>
-<style type="text/css">
-.ansi2html-content { display: inline; white-space: pre-wrap; word-wrap: break-word; }
-.body_foreground { color: #AAAAAA; }
-.body_background { background-color: #000000; }
-.inv_foreground { color: #000000; }
-.inv_background { background-color: #AAAAAA; }
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><title>Game.OS – Login</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; display:flex; align-items:center; justify-content:center; min-height:800px; width:1280px; }
+.center { display:flex; flex-direction:column; align-items:center; gap:24px; max-width:440px; width:100%; margin:40px auto; }
+.logo-box { width:72px; height:72px; border-radius:16px; background:linear-gradient(135deg,#0ea5e9,#1d4ed8); display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:900; color:#fff; }
+.app-title { font-size:32px; font-weight:900; color:#fff; text-align:center; }
+.app-sub { font-size:14px; color:#8b949e; text-align:center; }
+.saved-accounts { background:#161b22; border-radius:12px; padding:20px 16px; width:100%; }
+.saved-lbl { font-size:13px; font-weight:600; color:#8b949e; margin-bottom:12px; }
+.saved-item { background:#0d1117; border-radius:10px; padding:10px 14px; display:flex; align-items:center; gap:12px; margin-bottom:8px; cursor:pointer; }
+.saved-avatar { width:40px; height:40px; border-radius:20px; background:#1e90ff; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#fff; flex-shrink:0; }
+.saved-name { font-size:15px; font-weight:600; color:#fff; }
+.saved-sub { font-size:11px; color:#8b949e; }
+.saved-arrow { margin-left:auto; color:#1f6feb; font-size:18px; }
+.login-card { background:#161b22; border-radius:14px; padding:40px; width:100%; }
+.card-title { font-size:22px; font-weight:700; color:#fff; text-align:center; margin-bottom:16px; }
+.form-lbl { font-size:13px; font-weight:600; color:#c9d1d9; margin-bottom:6px; display:block; }
+.form-input { background:#21262d; color:#fff; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-size:14px; width:100%; margin-bottom:16px; }
+.remember { display:flex; align-items:center; gap:8px; font-size:13px; color:#8b949e; margin-bottom:16px; }
+.btn-primary { background:#1f6feb; color:#fff; border:none; border-radius:6px; padding:12px; font-weight:600; font-size:14px; width:100%; cursor:pointer; margin-bottom:12px; }
+.divider { display:flex; align-items:center; gap:12px; margin:4px 0; }
+.divider-line { flex:1; height:1px; background:#30363d; }
+.divider-text { font-size:12px; color:#484f58; }
+.btn-demo { background:#161b22; color:#8b949e; border:1px solid #30363d; border-radius:6px; padding:10px; font-size:13px; width:100%; cursor:pointer; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:8px; }
+.btn-link { background:transparent; border:none; color:#1f6feb; font-size:13px; cursor:pointer; display:block; margin:0 auto; }
 </style>
 </head>
-<body class="body_foreground body_background" style="font-size: normal;" >
-<pre class="ansi2html-content">
-                                   ____                                   ___    ____
-                                  / ___|   __ _   _ __ ___     ___       / _ \  / ___|
-                                 | |  _   / _` | | '_ ` _ \   / _ \     | | | | \___ \
-                                 | |_| | | (_| | | | | | | | |  __/  _  | |_| |  ___) |
-                                  \____|  \__,_| |_| |_| |_|  \___| (_)  \___/  |____/
+<body>
+<div class="center">
+  <div style="text-align:center;">
+    <div class="logo-box" style="margin:0 auto 8px;">G</div>
+    <div class="app-title">Game.OS</div>
+    <div class="app-sub">Your games. Your world. Your OS.</div>
+  </div>
 
-  ─────────────────────────────────────────────
-         Your games. Your world. Your OS.
-  ─────────────────────────────────────────────
+  <div class="saved-accounts">
+    <div class="saved-lbl">Saved Accounts</div>
+    <div class="saved-item">
+      <div class="saved-avatar">K</div>
+      <div>
+        <div class="saved-name">Koriebonx98</div>
+        <div class="saved-sub">Saved account  ·  Click to sign in</div>
+      </div>
+      <div class="saved-arrow">→</div>
+    </div>
+  </div>
 
-Welcome to Game.OS Launcher
-
-&gt; 🎮  Sign In
-  📝  Create Account
-  🚀  Demo Mode  (no GitHub account needed)
-  ❌  Exit
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-</pre>
-</body>
-
-</html>
+  <div class="login-card">
+    <div class="card-title">Sign In</div>
+    <label class="form-lbl">Username or Email</label>
+    <input class="form-input" value="Koriebonx98" readonly/>
+    <label class="form-lbl">Password</label>
+    <input class="form-input" type="password" value="password" readonly/>
+    <div class="remember"><input type="checkbox" checked/> Remember me <span style="font-size:11px;color:#484f58;">(stay signed in)</span></div>
+    <button class="btn-primary">Sign In</button>
+    <div class="divider"><div class="divider-line"></div><div class="divider-text">or</div><div class="divider-line"></div></div>
+    <button class="btn-demo"><span>🚀</span> Try Demo Mode (no account needed)</button>
+    <button class="btn-link">Don't have an account? Create one →</button>
+  </div>
+</div>
+</body></html>

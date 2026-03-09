@@ -97,6 +97,45 @@
                                    IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                    Margin="0,8,0,0"/>
 
+                        <!-- ── Action buttons: Play + ··· when installed ── -->
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,16,0,0"
+                                    IsVisible="{Binding IsInstalled}">
+                            <!-- Play button -->
+                            <Button Classes="btn-primary"
+                                    Padding="24,12"
+                                    Command="{Binding LaunchGameCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="▶" FontSize="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Play" FontSize="15" FontWeight="Bold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <!-- More options (···) button -->
+                            <Button Classes="btn-secondary"
+                                    Padding="16,12" ToolTip.Tip="More options"
+                                    Command="{Binding ShowMoreOptionsCommand}">
+                                <TextBlock Text="···" FontSize="18" FontWeight="Bold"
+                                           VerticalAlignment="Center"/>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- ── Install button when repack available ── -->
+                        <StackPanel Margin="0,16,0,0" Spacing="6"
+                                    IsVisible="{Binding IsRepack}">
+                            <Button Classes="btn-success"
+                                    Padding="24,12"
+                                    Command="{Binding InstallRepackCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{Binding RepackSizeLabel}"
+                                       FontSize="11" Foreground="#8b949e"
+                                       IsVisible="{Binding RepackSizeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+
                         <!-- Local game install info -->
                         <Border IsVisible="{Binding IsLocalGame}"
                                 Background="#0d3d1a" CornerRadius="8"
@@ -169,27 +208,61 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ── Trailer section ── -->
+                <!-- ── Trailer section (embedded preview, opens YouTube on click) ── -->
                 <Border IsVisible="{Binding HasTrailer}"
                         Background="#161b22" CornerRadius="10"
                         Padding="20,16" Margin="0,0,0,24">
                     <StackPanel Spacing="12">
                         <TextBlock Text="🎬  Trailer"
                                    Classes="section-header" Margin="0"/>
-                        <Button Classes="btn-primary"
-                                HorizontalAlignment="Left"
-                                Padding="20,10"
-                                Tag="{Binding TrailerUrl}"
-                                Command="{Binding OpenTrailerCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="▶" FontSize="16" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding TrailerLabel}"
-                                           FontSize="14" VerticalAlignment="Center"/>
-                            </StackPanel>
+
+                        <!-- YouTube embed-style player preview -->
+                        <Button Background="Transparent" BorderThickness="0"
+                                Padding="0" HorizontalAlignment="Left"
+                                Command="{Binding OpenTrailerCommand}"
+                                Cursor="Hand">
+                            <Border CornerRadius="10" ClipToBounds="True"
+                                    Width="480" Height="270">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                        <GradientStop Color="#0d1117" Offset="0"/>
+                                        <GradientStop Color="#161b22" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <!-- Black letterbox with play icon — like an embedded player -->
+                                <Grid>
+                                    <!-- Centered play button (YouTube-style) -->
+                                    <StackPanel HorizontalAlignment="Center"
+                                                VerticalAlignment="Center" Spacing="12">
+                                        <Border Width="80" Height="80" CornerRadius="40"
+                                                HorizontalAlignment="Center"
+                                                Opacity="0.90">
+                                            <Border.Background>
+                                                <SolidColorBrush Color="#FF0000"/>
+                                            </Border.Background>
+                                            <TextBlock Text="▶" FontSize="34"
+                                                       FontWeight="Black"
+                                                       Foreground="White"
+                                                       HorizontalAlignment="Center"
+                                                       VerticalAlignment="Center"
+                                                       Margin="6,0,0,0"/>
+                                        </Border>
+                                        <TextBlock Text="▶  Watch Trailer on YouTube"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="#c9d1d9"
+                                                   HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <!-- YouTube URL bar at bottom -->
+                                    <Border VerticalAlignment="Bottom"
+                                            Background="#0000008a"
+                                            Padding="12,6">
+                                        <TextBlock Text="{Binding TrailerUrl}"
+                                                   FontSize="10" Foreground="#8b949e"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                    </Border>
+                                </Grid>
+                            </Border>
                         </Button>
-                        <TextBlock Text="{Binding TrailerUrl}"
-                                   FontSize="11" Foreground="#8b949e"
-                                   TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                 </Border>
 

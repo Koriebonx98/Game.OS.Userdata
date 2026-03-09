@@ -10,7 +10,8 @@ namespace GameLauncher.ViewModels;
 
 /// <summary>
 /// View-model for the Friends screen.  Loads the friend list and incoming
-/// requests from the Game.OS backend API.
+/// requests from the Game.OS backend API, or shows demo friend data when
+/// running in demo mode (no backend connected).
 /// </summary>
 public partial class FriendsViewModel : ViewModelBase
 {
@@ -36,6 +37,40 @@ public partial class FriendsViewModel : ViewModelBase
         _client   = client;
         _username = username;
         _ = LoadAsync();
+    }
+
+    /// <summary>
+    /// Populates the friends screen with demo data — used when running in
+    /// demo / offline mode so the Friends page shows realistic content.
+    /// </summary>
+    public void LoadDemo()
+    {
+        IsLoading     = false;
+        ErrorMessage  = "";
+
+        OnlineFriends.Clear();
+        OfflineFriends.Clear();
+        PendingRequests.Clear();
+
+        // Demo online friends
+        OnlineFriends.Add(new FriendEntry { Username = "NintendoFan42", Status = "Online", LastSeen = "Now" });
+        OnlineFriends.Add(new FriendEntry { Username = "SwitchPlayer99", Status = "Away",  LastSeen = "12 min ago" });
+        OnlineFriends.Add(new FriendEntry { Username = "GamingWithLex",  Status = "Online", LastSeen = "Now" });
+
+        // Demo offline friends
+        OfflineFriends.Add(new FriendEntry { Username = "ProGamer2025", Status = "Offline", LastSeen = "3h ago" });
+        OfflineFriends.Add(new FriendEntry { Username = "RetroKing",    Status = "Offline", LastSeen = "1 Mar" });
+        OfflineFriends.Add(new FriendEntry { Username = "SpeedRunner7", Status = "Offline", LastSeen = "28 Feb" });
+
+        // Demo pending request
+        PendingRequests.Add(new FriendRequestDisplay
+        {
+            FromUsername = "MKDeluxeChamp",
+            SentAgo      = "2 hours ago"
+        });
+
+        OnlineCount = OnlineFriends.Count;
+        TotalCount  = OnlineFriends.Count + OfflineFriends.Count;
     }
 
     private async Task LoadAsync()
@@ -94,7 +129,15 @@ public partial class FriendsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            ErrorMessage = $"Could not load friends: {ex.Message}";
+            // If the API is unreachable (demo mode, no backend), fall back to demo data
+            if (!_client.IsAuthenticated)
+            {
+                LoadDemo();
+            }
+            else
+            {
+                ErrorMessage = $"Could not load friends: {ex.Message}";
+            }
         }
         finally
         {

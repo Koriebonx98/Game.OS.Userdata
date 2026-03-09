@@ -6,131 +6,160 @@
              x:DataType="vm:ProfileViewModel"
              Background="#0d1117">
 
-    <StackPanel Margin="32,28,32,28" Spacing="0">
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="0">
 
-        <!-- ── Header ── -->
-        <TextBlock Text="Profile" Classes="page-title" Margin="0,0,0,24"/>
+            <!-- ══ HERO BANNER (console-style account card) ══ -->
+            <Border Margin="0,0,0,0" MinHeight="200">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                        <GradientStop Color="#0d1b2e" Offset="0"/>
+                        <GradientStop Color="#0f2c54" Offset="0.5"/>
+                        <GradientStop Color="#072244" Offset="1"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid Margin="40,36,40,36" ColumnDefinitions="Auto,*,Auto">
 
-        <!-- ── Profile card ── -->
-        <Border Background="#161b22" CornerRadius="12" Padding="28"
-                Margin="0,0,0,24">
-            <Grid ColumnDefinitions="Auto,*,Auto">
-
-                <!-- Avatar -->
-                <Border Grid.Column="0"
-                        Width="80" Height="80"
-                        CornerRadius="40" Margin="0,0,24,0">
-                    <Border.Background>
-                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                            <GradientStop Color="#0ea5e9" Offset="0"/>
-                            <GradientStop Color="#1d4ed8" Offset="1"/>
-                        </LinearGradientBrush>
-                    </Border.Background>
-                    <TextBlock Text="{Binding AvatarInitial}"
-                               FontSize="36" FontWeight="Bold"
-                               Foreground="White"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"/>
-                </Border>
-
-                <!-- Info -->
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
-                    <TextBlock Text="{Binding Username}"
-                               FontSize="24" FontWeight="Bold" Foreground="White"/>
-                    <TextBlock Text="{Binding Email}"
-                               FontSize="13" Foreground="#8b949e"/>
-                    <TextBlock Classes="page-subtitle">
-                        <TextBlock.Text>
-                            <MultiBinding StringFormat="Member since {0}">
-                                <Binding Path="MemberSince"/>
-                            </MultiBinding>
-                        </TextBlock.Text>
-                    </TextBlock>
-                </StackPanel>
-
-                <!-- Mode badge — admin (purple) or live (green) -->
-                <Panel Grid.Column="2" VerticalAlignment="Top">
-                    <Border CornerRadius="6" Padding="12,6" Background="#9333ea"
-                            IsVisible="{Binding IsAdmin}">
-                        <TextBlock Text="{Binding ModeBadge}"
-                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
+                    <!-- ── Large Avatar ── -->
+                    <Border Grid.Column="0"
+                            Width="96" Height="96"
+                            CornerRadius="48" Margin="0,0,28,0">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                <GradientStop Color="#0ea5e9" Offset="0"/>
+                                <GradientStop Color="#1d4ed8" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <TextBlock Text="{Binding AvatarInitial}"
+                                   FontSize="44" FontWeight="Black"
+                                   Foreground="White"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
                     </Border>
-                    <Border CornerRadius="6" Padding="12,6" Background="#238636"
-                            IsVisible="{Binding !IsAdmin}">
-                        <TextBlock Text="{Binding ModeBadge}"
-                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
-                    </Border>
-                </Panel>
 
-            </Grid>
-        </Border>
-
-        <!-- ── Stats row ── -->
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0">
-            <Border Classes="stat-tile">
-                <StackPanel Spacing="2">
-                    <TextBlock Text="{Binding GamesCount}"
-                               Classes="stat-number"/>
-                    <TextBlock Text="Games" Classes="stat-label"/>
-                </StackPanel>
-            </Border>
-            <Border Classes="stat-tile">
-                <StackPanel Spacing="2">
-                    <TextBlock Text="{Binding AchievementsCount}"
-                               Classes="stat-number" Foreground="#f1c40f"/>
-                    <TextBlock Text="Achievements" Classes="stat-label"/>
-                </StackPanel>
-            </Border>
-        </StackPanel>
-
-        <!-- ── Achievements ── -->
-        <TextBlock Text="🏆  All Achievements" Classes="section-header"
-                   IsVisible="{Binding AllAchievements.Count}"/>
-
-        <ItemsControl ItemsSource="{Binding AllAchievements}"
-                      IsVisible="{Binding AllAchievements.Count}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:Achievement">
-                    <Border Classes="achievement-card">
-                        <Grid ColumnDefinitions="44,*">
-                            <Border Grid.Column="0" Width="36" Height="36"
-                                    CornerRadius="8" Background="#2d2000">
-                                <TextBlock Text="🏆" FontSize="18"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+                    <!-- ── User Info ── -->
+                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="{Binding Username}"
+                                       FontSize="30" FontWeight="Black" Foreground="White"/>
+                            <!-- Admin / Live badge -->
+                            <Border CornerRadius="6" Padding="10,4" Background="#9333ea"
+                                    IsVisible="{Binding IsAdmin}" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ModeBadge}"
+                                           FontSize="11" FontWeight="Bold" Foreground="White"/>
                             </Border>
-                            <StackPanel Grid.Column="1"
-                                        Margin="12,0,0,0"
-                                        VerticalAlignment="Center"
-                                        Spacing="2">
-                                <TextBlock Text="{Binding Name}"
-                                           Classes="achievement-title"/>
-                                <TextBlock Text="{Binding Description}"
-                                           Classes="achievement-desc"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="{Binding GameTitle}"
-                                               FontSize="10" Foreground="#8b949e"/>
-                                    <TextBlock Text="|" FontSize="10" Foreground="#30363d"/>
-                                    <TextBlock Text="{Binding Platform}"
-                                               FontSize="10" Foreground="#8b949e"/>
-                                </StackPanel>
+                            <Border CornerRadius="6" Padding="10,4" Background="#238636"
+                                    IsVisible="{Binding !IsAdmin}" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ModeBadge}"
+                                           FontSize="11" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding Email}"
+                                   FontSize="13" Foreground="#93c5fd" Opacity="0.9"/>
+
+                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
+                            <TextBlock Text="📅" FontSize="12" VerticalAlignment="Center"/>
+                            <TextBlock FontSize="12" Foreground="#8b949e" VerticalAlignment="Center">
+                                <TextBlock.Text>
+                                    <MultiBinding StringFormat="Member since {0}">
+                                        <Binding Path="MemberSince"/>
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- ── Stats column ── -->
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center"
+                                HorizontalAlignment="Right" Spacing="12">
+                        <!-- Games stat -->
+                        <Border Background="#ffffff18" CornerRadius="10" Padding="20,12">
+                            <StackPanel HorizontalAlignment="Center" Spacing="2">
+                                <TextBlock Text="{Binding GamesCount}"
+                                           FontSize="28" FontWeight="Black"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Games"
+                                           FontSize="11" Foreground="#93c5fd"
+                                           HorizontalAlignment="Center"/>
                             </StackPanel>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                        </Border>
+                        <!-- Achievements stat -->
+                        <Border Background="#ffffff18" CornerRadius="10" Padding="20,12">
+                            <StackPanel HorizontalAlignment="Center" Spacing="2">
+                                <TextBlock Text="{Binding AchievementsCount}"
+                                           FontSize="28" FontWeight="Black"
+                                           Foreground="#f1c40f"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="Trophies"
+                                           FontSize="11" Foreground="#fcd34d"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
 
-        <!-- Empty achievements state -->
-        <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,24,0,0"
-                    IsVisible="{Binding !AllAchievements.Count}">
-            <TextBlock Text="🏆" FontSize="40" HorizontalAlignment="Center"/>
-            <TextBlock Text="No achievements yet" FontSize="15"
-                       Foreground="#8b949e" HorizontalAlignment="Center"/>
-            <TextBlock Text="Keep playing to earn achievements"
-                       FontSize="13" Foreground="#6e7681"
-                       HorizontalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- ── Divider ── -->
+            <Rectangle Height="1" Fill="#21262d"/>
+
+            <!-- ── Main content area ── -->
+            <StackPanel Margin="32,28,32,28" Spacing="0">
+
+                <!-- ── Achievements ── -->
+                <TextBlock Text="🏆  All Achievements" Classes="section-header"
+                           IsVisible="{Binding AllAchievements.Count}"/>
+
+                <ItemsControl ItemsSource="{Binding AllAchievements}"
+                              IsVisible="{Binding AllAchievements.Count}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:Achievement">
+                            <Border Classes="achievement-card">
+                                <Grid ColumnDefinitions="44,*">
+                                    <Border Grid.Column="0" Width="36" Height="36"
+                                            CornerRadius="8" Background="#2d2000">
+                                        <TextBlock Text="🏆" FontSize="18"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1"
+                                                Margin="12,0,0,0"
+                                                VerticalAlignment="Center"
+                                                Spacing="2">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Classes="achievement-title"/>
+                                        <TextBlock Text="{Binding Description}"
+                                                   Classes="achievement-desc"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding GameTitle}"
+                                                       FontSize="10" Foreground="#8b949e"/>
+                                            <TextBlock Text="|" FontSize="10" Foreground="#30363d"/>
+                                            <TextBlock Text="{Binding Platform}"
+                                                       FontSize="10" Foreground="#8b949e"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Empty achievements state -->
+                <StackPanel HorizontalAlignment="Center" Spacing="8" Margin="0,32,0,0"
+                            IsVisible="{Binding !AllAchievements.Count}">
+                    <TextBlock Text="🏆" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="No achievements yet" FontSize="15"
+                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Keep playing to earn achievements"
+                               FontSize="13" Foreground="#6e7681"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+            </StackPanel>
+
         </StackPanel>
-
-    </StackPanel>
+    </ScrollViewer>
 </UserControl>

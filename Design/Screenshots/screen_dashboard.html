@@ -1,60 +1,125 @@
-<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
-<html>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-<title></title>
-<style type="text/css">
-.ansi2html-content { display: inline; white-space: pre-wrap; word-wrap: break-word; }
-.body_foreground { color: #AAAAAA; }
-.body_background { background-color: #000000; }
-.inv_foreground { color: #000000; }
-.inv_background { background-color: #AAAAAA; }
+<!DOCTYPE html>
+<html><head>
+<meta charset="UTF-8"><title>Game.OS – Dashboard</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; width:1280px; height:800px; display:flex; overflow:hidden; }
+.sidebar { width:220px; background:#161b22; display:flex; flex-direction:column; flex-shrink:0; }
+.logo-area { background:linear-gradient(135deg,#0ea5e9,#1d4ed8); height:80px; display:flex; align-items:center; justify-content:center; gap:10px; }
+.logo-g { width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:900; color:#fff; }
+.logo-text { font-size:18px; font-weight:800; color:#fff; }
+.nav-items { padding:12px 8px; flex:1; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:6px; margin-bottom:4px; font-size:14px; font-weight:600; color:#8b949e; }
+.nav-item.active { background:#1f6feb; color:#fff; }
+.main { flex:1; overflow-y:auto; }
+.page { padding:32px; }
+.greeting { font-size:28px; font-weight:700; color:#fff; margin-bottom:4px; }
+.sub { font-size:13px; color:#8b949e; margin-bottom:24px; }
+.stat-tiles { display:flex; gap:12px; margin-bottom:28px; }
+.stat-tile { background:#161b22; border-radius:10px; padding:20px 24px; }
+.stat-num { font-size:32px; font-weight:700; color:#fff; }
+.stat-num.yellow { color:#f1c40f; }
+.stat-num.blue { color:#1f6feb; }
+.stat-lbl { font-size:12px; color:#8b949e; }
+.hero-banner { background:linear-gradient(135deg,#c00000,#ff6b00); border-radius:12px; padding:28px; margin-bottom:28px; display:flex; align-items:center; gap:24px; position:relative; overflow:hidden; }
+.hero-badge { background:rgba(255,255,255,0.2); border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; color:#fff; margin-bottom:8px; display:inline-block; }
+.hero-title { font-size:28px; font-weight:900; color:#fff; margin-bottom:6px; }
+.hero-desc { font-size:13px; color:rgba(255,255,255,0.8); max-width:360px; margin-bottom:12px; }
+.hero-price { font-size:18px; font-weight:700; color:#fff; margin-bottom:12px; }
+.hero-cover { width:100px; height:140px; border-radius:8px; object-fit:cover; margin-left:auto; }
+.hero-cover-fallback { width:100px; height:140px; border-radius:8px; background:rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:900; color:rgba(255,255,255,0.6); margin-left:auto; }
+.section-header { font-size:16px; font-weight:700; color:#fff; margin-bottom:12px; }
+.games-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px; }
+.game-card { background:#161b22; border-radius:10px; width:158px; overflow:hidden; cursor:pointer; }
+.game-cover { width:158px; height:118px; object-fit:cover; display:block; }
+.game-cover-fb { width:158px; height:118px; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:900; color:rgba(255,255,255,0.6); }
+.game-info { padding:8px 10px; }
+.game-title { font-size:13px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
+.game-meta { font-size:11px; color:#8b949e; }
+.ach-list { display:flex; flex-direction:column; gap:8px; }
+.ach-item { background:#161b22; border-radius:8px; padding:10px 14px; display:flex; gap:10px; align-items:center; }
+.ach-icon { width:36px; height:36px; border-radius:6px; background:#2d2000; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.ach-name { font-size:13px; font-weight:600; color:#f0c040; }
+.ach-game { font-size:11px; color:#8b949e; }
+.stars { color:#f1c40f; }
 </style>
 </head>
-<body class="body_foreground body_background" style="font-size: normal;" >
-<pre class="ansi2html-content">
-Game.OS Launcher                                                                                   👤 Demo  DEMO MODE
-───────────────────────────────────────────────────────────────────────────
- 5        3               3            60h
- Games    Achievements    Platforms    Playtime
-───────────────────────────────────────────────────────────────────────────
+<body>
+<div class="sidebar">
+  <div class="logo-area">
+    <div class="logo-g">G</div>
+    <div class="logo-text">Game.OS</div>
+  </div>
+  <div class="nav-items">
+    <div class="nav-item active"><span style="font-size:16px;">🏠</span> Home</div>
+    <div class="nav-item"><span style="font-size:16px;">🎮</span> Library</div>
+    <div class="nav-item"><span style="font-size:16px;">🛒</span> Store</div>
+    <div class="nav-item"><span style="font-size:16px;">👥</span> Friends</div>
+    <div class="nav-item"><span style="font-size:16px;">👤</span> Profile</div>
+  </div>
+  <div style="padding:16px 8px; border-top:1px solid #21262d;">
+    <div class="nav-item" style="color:#f85149;"><span style="font-size:16px;">⏻</span> Sign Out</div>
+  </div>
+</div>
 
-🎮  RECENTLY ADDED
-╭─────────────────────────────────────────┬─────────────────┬────────────────────┬───────────────┬─────────────────────╮
-│ Title                                   │    Platform     │ Genre              │    Rating     │ Added               │
-├─────────────────────────────────────────┼─────────────────┼────────────────────┼───────────────┼─────────────────────┤
-│ Baldur's Gate 3                         │     🖥  PC      │ RPG                │     ★ 9.8     │ 01 Mar 2025         │
-│ Elden Ring                              │     🖥  PC      │ Action RPG         │     ★ 9.6     │ 14 Feb 2025         │
-│ God of War Ragnarök                     │     🔵 PS5      │ Action             │     ★ 9.7     │ 05 Feb 2025         │
-│ Halo Infinite                           │     🟢 Xbox     │ FPS                │     ★ 8.5     │ 20 Jan 2025         │
-│ Cyberpunk 2077                          │     🖥  PC      │ RPG                │     ★ 9.1     │ 10 Jan 2025         │
-╰─────────────────────────────────────────┴─────────────────┴────────────────────┴───────────────┴─────────────────────╯
-🏆  RECENT ACHIEVEMENTS
-╭────────────────────────────────┬──────────────────────────────────────┬────────────────────┬─────────────────────────╮
-│ Achievement                    │ Game                                 │      Platform      │ Unlocked                │
-├────────────────────────────────┼──────────────────────────────────────┼────────────────────┼─────────────────────────┤
-│ 🏆 Elden Lord                  │ Elden Ring                           │       🖥  PC       │ 20 Feb 2025             │
-│ 🏆 Master Chief                │ Halo Infinite                        │      🟢 Xbox       │ 25 Jan 2025             │
-│ 🏆 Night City Legend           │ Cyberpunk 2077                       │       🖥  PC       │ 15 Jan 2025             │
-╰────────────────────────────────┴──────────────────────────────────────┴────────────────────┴─────────────────────────╯
+<div class="main">
+  <div class="page">
+    <div class="greeting">Good evening, Koriebonx98!</div>
+    <div class="sub">Welcome back to Game.OS</div>
 
-───────────────────────────────────────────────────────────────────────────
-Main Menu
+    <div class="stat-tiles">
+      <div class="stat-tile">
+        <div class="stat-num">3</div>
+        <div class="stat-lbl">Games</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-num yellow">35</div>
+        <div class="stat-lbl">Achievements</div>
+      </div>
+      <div class="stat-tile">
+        <div class="stat-num blue">3</div>
+        <div class="stat-lbl">Platforms</div>
+      </div>
+    </div>
 
-&gt; 🎮  My Library
-  🛒  Games Store
-  🏆  Achievements
-  👤  Profile
-  🚪  Sign Out
+    <div class="hero-banner">
+      <div>
+        <div class="hero-badge">⭐ FEATURED</div>
+        <div class="hero-title">Mario Kart 8 Deluxe</div>
+        <div class="hero-desc">Hit the road with the definitive version of Mario Kart 8! Race on 96 total courses with friends online or locally.</div>
+        <div class="hero-price">£49.99</div>
+        <button style="background:#fff; color:#c00000; border:none; border-radius:6px; padding:10px 20px; font-weight:700; font-size:14px; cursor:pointer;">View Details</button>
+      </div>
+      <img src="https://cdn2.steamgriddb.com/grid/9cd6d894098e748716960bfcf9dbe115.png" class="hero-cover" onerror="this.outerHTML='<div class=hero-cover-fallback>MK8</div>'">
+    </div>
 
+    <div class="section-header">🕹️  Recently Added</div>
+    <div class="games-row">
+      <div class="game-card">
+        <img src="https://cdn2.steamgriddb.com/grid/9cd6d894098e748716960bfcf9dbe115.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#c00000,#ff6b00)>MK8</div>'">
+        <div class="game-info"><div class="game-title">Mario Kart 8 Deluxe</div><div class="game-meta"><span style="background:#1f6feb; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">Switch</span> <span class="stars">★★★★★</span></div></div>
+      </div>
+      <div class="game-card">
+        <img src="https://cdn2.steamgriddb.com/grid/368b80128d9e529adf93f7ce84dfaca0.jpg" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#1a0500,#5c1500)>GoW</div>'">
+        <div class="game-info"><div class="game-title">God of War</div><div class="game-meta"><span style="background:#003791; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">PS4</span> <span class="stars">★★★★★</span></div></div>
+      </div>
+      <div class="game-card">
+        <img src="https://cdn2.steamgriddb.com/grid/3a96a1164364c063f40ce33aaf971783.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#0a1a08,#1a3a10)>TLOU</div>'">
+        <div class="game-info"><div class="game-title">The Last of Us Part II</div><div class="game-meta"><span style="background:#003791; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">PS4</span> <span class="stars">★★★★★</span></div></div>
+      </div>
+    </div>
 
-
-
-
-
-
-
-</pre>
-</body>
-
-</html>
+    <div class="section-header">🏆  Recent Achievements</div>
+    <div class="ach-list">
+      <div class="ach-item">
+        <div class="ach-icon">🏆</div>
+        <div><div class="ach-name">Magic Mushroom's</div><div class="ach-game">Mario Kart 8 Deluxe · Switch</div></div>
+      </div>
+      <div class="ach-item">
+        <div class="ach-icon">🏆</div>
+        <div><div class="ach-name">Father and Son</div><div class="ach-game">God of War · PS4</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>
