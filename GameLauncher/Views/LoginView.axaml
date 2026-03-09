@@ -86,7 +86,7 @@
                                                     <TextBlock Text="{Binding DisplayName}"
                                                                FontSize="15" FontWeight="SemiBold"
                                                                Foreground="White"/>
-                                                    <TextBlock Text="Local account  ·  Quick sign in"
+                                                    <TextBlock Text="Saved account  ·  Click to sign in"
                                                                FontSize="11" Foreground="#8b949e"/>
                                                 </StackPanel>
                                                 <!-- Arrow -->
@@ -129,6 +129,20 @@
                                          Text="{Binding Password}"
                                          PasswordChar="●"
                                          Watermark="Enter password"/>
+                            </StackPanel>
+
+                            <!-- Remember me (mirrors the website's "Remember me" checkbox) -->
+                            <StackPanel Orientation="Horizontal" Spacing="8"
+                                        VerticalAlignment="Center">
+                                <CheckBox IsChecked="{Binding RememberMe}"
+                                          Foreground="#8b949e"
+                                          VerticalAlignment="Center"/>
+                                <TextBlock Text="Remember me"
+                                           FontSize="13" Foreground="#8b949e"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="(stay signed in)"
+                                           FontSize="11" Foreground="#484f58"
+                                           VerticalAlignment="Center"/>
                             </StackPanel>
 
                             <!-- Error -->

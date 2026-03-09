@@ -1,15 +1,18 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
 public partial class LoginViewModel : ViewModelBase
 {
-    private readonly GameOsClient _client;
+    private readonly GameOsClient        _client;
+    private readonly SessionCacheService _cache;
 
     [ObservableProperty] private string _username  = "";
     [ObservableProperty] private string _password  = "";
@@ -18,25 +21,63 @@ public partial class LoginViewModel : ViewModelBase
     [ObservableProperty] private string _errorMessage = "";
     [ObservableProperty] private bool   _isLoading    = false;
     [ObservableProperty] private bool   _showRegister = false;
+    /// <summary>When true the session token is saved to disk so the next launch
+    /// auto-logs the user in — mirrors the "Remember me" checkbox on the website.</summary>
+    [ObservableProperty] private bool   _rememberMe   = true;
 
-    /// <summary>Local saved accounts shown in the quick-login panel.</summary>
-    public ObservableCollection<SavedSession> SavedAccounts { get; } = new()
-    {
-        new SavedSession
-        {
-            Username    = "koriebonx98",
-            DisplayName = "koriebonx98",
-            AvatarColor = "#e4000f",
-            SavedAt     = "2024-01-01T00:00:00Z"
-        }
-    };
+    /// <summary>Local saved accounts shown in the quick-login panel.
+    /// Populated from <see cref="SessionCacheService"/> so the list always
+    /// reflects real previously-logged-in accounts.</summary>
+    public ObservableCollection<SavedSession> SavedAccounts { get; } = new();
 
     public System.Action<UserProfile, List<Game>, List<Achievement>>? OnLoginSuccess { get; set; }
 
-    public LoginViewModel(GameOsClient client)
+    public LoginViewModel(GameOsClient client, SessionCacheService cache)
     {
         _client = client;
+        _cache  = cache;
+        RefreshSavedAccounts();
     }
+
+    // ── Auto-login on startup ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Called once at application startup.  If the user previously ticked
+    /// "Remember me" the session is restored silently — exactly like the
+    /// website returning you to the dashboard because <c>gameOSUser</c> is
+    /// still in <c>localStorage</c>.
+    /// </summary>
+    public async System.Threading.Tasks.Task TryAutoLoginAsync()
+    {
+        var saved = _cache.GetRememberedSession();
+        if (saved == null) return;
+
+        IsLoading    = true;
+        ErrorMessage = "";
+        try
+        {
+            var profile      = await _client.RestoreSessionAsync(saved.Token, saved.Username);
+            var games        = await _client.GetGamesAsync();
+            var achievements = await _client.GetAchievementsAsync();
+            EnrichGames(games);
+            OnLoginSuccess?.Invoke(profile, games, achievements);
+        }
+        catch (Exception ex) when (ex is GameOsException or System.Net.Http.HttpRequestException)
+        {
+            // Token expired or server unavailable — clear the stale token so
+            // the user sees the login form (same as the web invalidating an old session).
+            _cache.ClearToken(saved.Username);
+            _client.Logout();
+            System.Diagnostics.Debug.WriteLine($"[AutoLogin] Session restore failed: {ex.Message}");
+            ErrorMessage = "";
+        }
+        finally
+        {
+            IsLoading = false;
+        }
+    }
+
+    // ── Commands ──────────────────────────────────────────────────────────
 
     [RelayCommand]
     private async System.Threading.Tasks.Task SignInAsync()
@@ -54,24 +95,22 @@ public partial class LoginViewModel : ViewModelBase
             var profile      = await _client.LoginAsync(Username, Password);
             var games        = await _client.GetGamesAsync();
             var achievements = await _client.GetAchievementsAsync();
+            EnrichGames(games);
 
-            var lib = games;
-            // Enrich with static metadata where the API response lacks UI fields
-            foreach (var g in lib)
+            // Persist the session so the user stays logged in across launches
+            // (same as the website writing to localStorage when "Remember me" is checked).
+            _cache.SaveSession(new CachedSession
             {
-                var meta = DemoData.Library.FirstOrDefault(d =>
-                    d.Title.Equals(g.Title, System.StringComparison.OrdinalIgnoreCase));
-                if (meta != null)
-                {
-                    g.Genre       ??= meta.Genre;
-                    g.Description ??= meta.Description;
-                    g.Rating      ??= meta.Rating;
-                    g.CoverColor  ??= meta.CoverColor;
-                    g.CoverUrl    ??= meta.CoverUrl;
-                }
-            }
+                Username    = profile.Username,
+                Email       = profile.Email,
+                Token       = _client.Token ?? "",
+                AvatarColor = "#1e90ff",
+                SavedAt     = System.DateTime.UtcNow.ToString("o"),
+                RememberMe  = RememberMe,
+            });
+            RefreshSavedAccounts();
 
-            OnLoginSuccess?.Invoke(profile, lib, achievements);
+            OnLoginSuccess?.Invoke(profile, games, achievements);
         }
         catch (GameOsException ex)
         {
@@ -112,6 +151,18 @@ public partial class LoginViewModel : ViewModelBase
         try
         {
             var profile = await _client.RegisterAsync(Username, Email, Password);
+
+            _cache.SaveSession(new CachedSession
+            {
+                Username    = profile.Username,
+                Email       = profile.Email,
+                Token       = _client.Token ?? "",
+                AvatarColor = "#1e90ff",
+                SavedAt     = System.DateTime.UtcNow.ToString("o"),
+                RememberMe  = RememberMe,
+            });
+            RefreshSavedAccounts();
+
             OnLoginSuccess?.Invoke(profile, new List<Game>(), new List<Achievement>());
         }
         catch (GameOsException ex)
@@ -131,12 +182,79 @@ public partial class LoginViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleForm() => ShowRegister = !ShowRegister;
 
-    /// <summary>Quick-login — pre-fills the username field from a saved session.</summary>
+    /// <summary>
+    /// Quick-login — if the saved session has a token, restore it silently.
+    /// Otherwise pre-fill the username field so the user just needs to type
+    /// the password (same UX as the web's single-session model).
+    /// </summary>
     [RelayCommand]
-    private void QuickLogin(SavedSession? session)
+    private async System.Threading.Tasks.Task QuickLogin(SavedSession? session)
     {
         if (session == null) return;
-        Username = session.Username;
+
+        // Try token-based silent restore first
+        var cached = _cache.GetSession(session.Username);
+        if (cached != null && !string.IsNullOrEmpty(cached.Token))
+        {
+            IsLoading    = true;
+            ErrorMessage = "";
+            try
+            {
+                var profile      = await _client.RestoreSessionAsync(cached.Token, cached.Username);
+                var games        = await _client.GetGamesAsync();
+                var achievements = await _client.GetAchievementsAsync();
+                EnrichGames(games);
+                OnLoginSuccess?.Invoke(profile, games, achievements);
+                return;
+            }
+            catch (Exception ex) when (ex is GameOsException or System.Net.Http.HttpRequestException)
+            {
+                // Token expired — clear it and fall through to password form
+                _cache.ClearToken(session.Username);
+                _client.Logout();
+                System.Diagnostics.Debug.WriteLine($"[QuickLogin] Session restore failed: {ex.Message}");
+            }
+            finally
+            {
+                IsLoading = false;
+            }
+        }
+
+        // Token not available or expired — pre-fill username so the user
+        // only needs to enter the password (same as web behaviour).
+        Username     = session.Username;
+        Password     = "";
         ErrorMessage = "";
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────
+
+    private void RefreshSavedAccounts()
+    {
+        SavedAccounts.Clear();
+        foreach (var s in _cache.GetSavedAccounts())
+            SavedAccounts.Add(s);
+    }
+
+    /// <summary>
+    /// Enrich API-returned games with UI metadata (cover URL, genre, etc.)
+    /// that the backend does not store — same as the website falling back to
+    /// static game metadata when the API response lacks those fields.
+    /// </summary>
+    private static void EnrichGames(List<Game> games)
+    {
+        foreach (var g in games)
+        {
+            var meta = DemoData.Library.FirstOrDefault(d =>
+                d.Title.Equals(g.Title, System.StringComparison.OrdinalIgnoreCase));
+            if (meta != null)
+            {
+                g.Genre       ??= meta.Genre;
+                g.Description ??= meta.Description;
+                g.Rating      ??= meta.Rating;
+                g.CoverColor  ??= meta.CoverColor;
+                g.CoverUrl    ??= meta.CoverUrl;
+            }
+        }
     }
 }

@@ -31,6 +31,9 @@ namespace GameLauncher
 
         public string? LoggedInUser    => _username;
         public bool    IsAuthenticated => _token != null;
+        /// <summary>The raw bearer token for the current session.  Persist this to
+        /// enable silent re-login on next launch (same as localStorage on the website).</summary>
+        public string? Token => _token;
 
         /// <summary>True when the logged-in account is the admin account.</summary>
         public bool IsAdmin =>
@@ -46,6 +49,21 @@ namespace GameLauncher
         }
 
         // ── Authentication ────────────────────────────────────────────────────
+        /// <summary>
+        /// Restore a previously-saved session without re-entering credentials.
+        /// Sets the bearer token directly and validates it by calling <c>/api/me</c>.
+        /// Throws <see cref="GameOsException"/> if the token is expired or invalid —
+        /// the caller should then fall back to the full login form.
+        /// </summary>
+        public async Task<UserProfile> RestoreSessionAsync(
+            string token, string username, CancellationToken ct = default)
+        {
+            _token    = token;
+            _username = username;
+            SetAuthHeader();
+            return await FetchProfileAsync(ct);
+        }
+
         /// <summary>Log in with username (or email) and password.  Returns the full profile.</summary>
         public async Task<UserProfile> LoginAsync(
             string usernameOrEmail, string password, CancellationToken ct = default)

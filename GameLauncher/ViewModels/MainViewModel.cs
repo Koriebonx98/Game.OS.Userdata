@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
@@ -11,8 +12,9 @@ namespace GameLauncher.ViewModels;
 /// </summary>
 public partial class MainViewModel : ViewModelBase, IDisposable
 {
-    private readonly GameOsClient      _client;
-    private readonly GameScannerService _scanner;
+    private readonly GameOsClient        _client;
+    private readonly GameScannerService  _scanner;
+    private readonly SessionCacheService _sessionCache;
 
     // ── Session data ───────────────────────────────────────────────────────
     private UserProfile     _profile      = new();
@@ -51,9 +53,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
-        _client = new GameOsClient();
+        _client       = new GameOsClient();
+        _sessionCache = new SessionCacheService();
 
-        LoginVm     = new LoginViewModel(_client);
+        LoginVm     = new LoginViewModel(_client, _sessionCache);
         DashboardVm = new DashboardViewModel();
         LibraryVm   = new LibraryViewModel();
         StoreVm     = new StoreViewModel();
@@ -77,6 +80,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanner.GamesUpdated   += games   => LibraryVm.UpdateLocalGames(games);
         _scanner.RepacksUpdated += repacks => LibraryVm.UpdateRepacks(repacks);
         _ = _scanner.StartAsync();
+
+        // Attempt silent auto-login from cached session (mirrors web localStorage restore)
+        _ = LoginVm.TryAutoLoginAsync();
     }
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
@@ -133,6 +139,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SignOut()
     {
+        // Clear the saved token so the next launch shows the login form
+        // (equivalent to the web calling localStorage.removeItem('gameOSUser'))
+        if (_client.LoggedInUser != null)
+            _sessionCache.ClearToken(_client.LoggedInUser);
+
         _client.Logout();
         _library      = new();
         _achievements = new();
