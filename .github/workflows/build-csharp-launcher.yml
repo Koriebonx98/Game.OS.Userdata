@@ -117,6 +117,68 @@ jobs:
               print('   To enable backend mode, add GAMEOS_BACKEND_URL as a repository secret.')
           PYEOF
 
+      # ── Set up Node.js for local backend server ──────────────────────────
+      - name: Set up Node.js 20 (for local backend)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci --ignore-scripts
+
+      # ── Start the Game.OS backend server locally ───────────────────────────
+      # Uses DATA_REPO_TOKEN as the GitHub PAT so the backend can read/write
+      # account data from the private data repository — exactly the same way
+      # the deployed backend works in production.
+      #
+      # The backend automatically creates the Admin.GameOS account on first startup
+      # using ADMIN_GAMEOS_PASSWORD (default: "GameOS2026").  Test 7 then logs in
+      # as Admin.GameOS to prove the C# launcher can authenticate via the backend API.
+      - name: Start Game.OS backend server (local, port 3000)
+        env:
+          GITHUB_TOKEN:          ${{ secrets.DATA_REPO_TOKEN }}
+          REPO_OWNER:            Koriebonx98
+          REPO_NAME:             Game.OS.Private.Data
+          ADMIN_GAMEOS_PASSWORD: GameOS2026
+          PORT:                  3000
+        run: |
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "ℹ  DATA_REPO_TOKEN not set — skipping local backend startup."
+            echo "   Test 7 (backend API login) will be skipped."
+            echo "BACKEND_STARTED=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          # Generate a random HMAC secret for this CI run (never reused, never stored)
+          export TOKEN_HMAC_SECRET="$(openssl rand -hex 32)"
+
+          cd backend
+          nohup node index.js > /tmp/backend.log 2>&1 &
+          BACKEND_PID=$!
+          echo "$BACKEND_PID" > /tmp/backend.pid
+          echo "  Backend PID: $BACKEND_PID"
+
+          # Wait up to 30 seconds for the /health endpoint to respond
+          SERVER_READY=false
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+              echo "✅ Backend server is ready at http://localhost:3000 (after ${i}s)"
+              SERVER_READY=true
+              break
+            fi
+            sleep 1
+          done
+
+          if [ "$SERVER_READY" = "true" ]; then
+            echo "BACKEND_STARTED=true" >> "$GITHUB_ENV"
+          else
+            echo "❌ Backend did not start within 30 seconds — check /tmp/backend.log"
+            cat /tmp/backend.log || true
+            echo "BACKEND_STARTED=false" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
       # ── Build ──────────────────────────────────────────────────────────────
       - name: Restore dependencies
         run: dotnet restore Game.OS.Userdata.sln
@@ -131,26 +193,44 @@ jobs:
       - name: Run LoginAuth.Tests (hash-parity + bcrypt checks)
         run: dotnet run --project LoginAuth.Tests -c Release --no-build
         # Tests 1–4 pass without any secrets (pure crypto logic).
-        # Tests 5–6 are automatically skipped when the relevant tokens are not set.
+        # Tests 5–7 are automatically skipped when the relevant tokens are not set.
 
-      # ── Live login tests ──────────────────────────────────────────────────
-      # Always run — tests are skipped automatically when secrets are absent.
-      # Test 5: GitHub-direct login (requires DATA_REPO_TOKEN / gameos-token.dat)
-      # Test 6: Backend REST API login (requires GAMEOS_BACKEND_URL — no PAT needed)
-      - name: Run live login tests — Koriebonx98 account
+      # ── Live login tests against local backend ────────────────────────────
+      # Test 5: GitHub-direct login (requires DATA_REPO_TOKEN)
+      # Test 6: Backend REST API login with GAMEOS_TEST_USERNAME/PASSWORD
+      # Test 7: Backend API login using Admin.GameOS (backend auto-creates this account)
+      #         This test PROVES the C# app can log in via the backend API without
+      #         needing any extra secrets — the backend creates Admin.GameOS on startup.
+      - name: Run live login tests — backend API (Admin.GameOS)
         env:
-          GAMEOS_GITHUB_TOKEN:  ${{ secrets.DATA_REPO_TOKEN }}
-          GAMEOS_BACKEND_URL:   ${{ secrets.GAMEOS_BACKEND_URL }}
-          GAMEOS_TEST_USERNAME: Koriebonx98
-          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+          GAMEOS_GITHUB_TOKEN:   ${{ secrets.DATA_REPO_TOKEN }}
+          GAMEOS_BACKEND_URL:    http://localhost:3000
+          GAMEOS_TEST_USERNAME:  Koriebonx98
+          GAMEOS_TEST_PASSWORD:  ${{ secrets.GAMEOS_TEST_PASSWORD }}
+          ADMIN_GAMEOS_PASSWORD: GameOS2026
         run: |
           echo "═══════════════════════════════════════════════════════════"
-          echo "  Live login tests — verifying Koriebonx98 account"
-          echo "  Test 5: GitHub-direct (PBKDF2-SHA256, requires DATA_REPO_TOKEN)"
-          echo "  Test 6: Backend REST API (no PAT required, uses GAMEOS_BACKEND_URL)"
+          echo "  Live login tests — backend API + Admin.GameOS account"
+          echo "  Test 5: GitHub-direct   (DATA_REPO_TOKEN → gameos-token.dat)"
+          echo "  Test 6: Backend REST API (GAMEOS_TEST_USERNAME + GAMEOS_TEST_PASSWORD)"
+          echo "  Test 7: Admin.GameOS    (backend auto-creates account, no extra secrets)"
+          echo "  Backend: http://localhost:3000"
           echo "═══════════════════════════════════════════════════════════"
           dotnet run --project LoginAuth.Tests -c Release --no-build \
             2>&1 | tee /tmp/login-test-output.txt
+
+      # ── Stop local backend ─────────────────────────────────────────────────
+      - name: Stop local backend server
+        if: always()
+        run: |
+          if [ -f /tmp/backend.pid ]; then
+            BACKEND_PID=$(cat /tmp/backend.pid)
+            if kill "$BACKEND_PID" 2>/dev/null; then
+              echo "✅ Backend server (PID $BACKEND_PID) stopped"
+            else
+              echo "ℹ  Backend server already stopped"
+            fi
+          fi
 
       # ── Publish standalone Windows exe ────────────────────────────────────
       # Produces a single self-contained GameLauncher.exe for Windows x64.
@@ -195,17 +275,23 @@ jobs:
               PBKDF2-SHA256, 100,000 iterations — same as script.js hashPassword()
               Requires DATA_REPO_TOKEN (GitHub PAT) in gameos-token.dat
 
-            Auth method B (Backend REST API, Test 6 — PREFERRED):
+            Auth method B (Backend REST API, Tests 6 & 7 — PREFERRED):
               POST {GAMEOS_BACKEND_URL}/api/auth/token  { username, password }
               No GitHub PAT required from the client.
               Backend URL baked into gameos-backend.url at build time.
               Same endpoint the web frontend calls in backend mode.
 
+            Test 7 (new): Backend API login using Admin.GameOS account
+              The backend auto-creates Admin.GameOS on first startup.
+              C# launcher calls POST /api/auth/token  →  Bearer token
+              Proves the C# app logs in via the backend API exactly as required.
+
             Dual-hash    : PBKDF2 (web/launcher accounts) + bcrypt
                           (Node.js backend accounts) both supported
 
-            Test account: Koriebonx98
-            Data repo   : Koriebonx98/Game.OS.Private.Data (same as web)
+            Local backend: http://localhost:3000 (started in CI from backend/index.js)
+            Test account : Koriebonx98 (Tests 5-6), Admin.GameOS (Test 7)
+            Data repo    : Koriebonx98/Game.OS.Private.Data (same as web)
           ═══════════════════════════════════════════════════════════════════
           EOF
 

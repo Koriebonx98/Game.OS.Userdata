@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><title>Game.OS C# Launcher – Admin.GameOS Login</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; display:flex; align-items:center; justify-content:center; min-height:800px; width:1280px; }
+.center { display:flex; flex-direction:column; align-items:center; gap:24px; max-width:440px; width:100%; margin:40px auto; }
+.logo-box { width:72px; height:72px; border-radius:16px; background:linear-gradient(135deg,#0ea5e9,#1d4ed8); display:flex; align-items:center; justify-content:center; font-size:38px; font-weight:900; color:#fff; margin:0 auto 8px; }
+.app-title { font-size:32px; font-weight:900; color:#fff; text-align:center; }
+.app-sub { font-size:14px; color:#8b949e; text-align:center; }
+.saved-box { background:#161b22; border-radius:12px; padding:20px 16px; width:100%; }
+.saved-lbl { font-size:13px; font-weight:600; color:#8b949e; margin-bottom:12px; }
+.saved-item { background:#0d1117; border-radius:10px; padding:10px 14px; display:flex; align-items:center; gap:12px; margin-bottom:8px; cursor:pointer; }
+.saved-item.active { box-shadow: 0 0 0 2px #1f6feb; }
+.saved-avatar { width:40px; height:40px; border-radius:20px; display:flex; align-items:center; justify-content:center; font-size:18px; font-weight:700; color:#fff; flex-shrink:0; }
+.card { background:#161b22; border-radius:14px; padding:40px; width:100%; }
+.card-title { font-size:22px; font-weight:700; color:#fff; text-align:center; margin-bottom:16px; }
+.form-lbl { font-size:13px; font-weight:600; color:#c9d1d9; margin-bottom:6px; display:block; }
+.form-input { background:#21262d; color:#fff; border:1px solid #30363d; border-radius:6px; padding:10px 12px; font-size:14px; width:100%; margin-bottom:16px; }
+.form-input.focused { border-color:#1f6feb; outline:none; }
+.remember { display:flex; align-items:center; gap:8px; font-size:13px; color:#8b949e; margin-bottom:16px; }
+.btn-primary { background:linear-gradient(135deg,#1f6feb,#0ea5e9); color:#fff; border:none; border-radius:6px; padding:12px; font-weight:600; font-size:14px; width:100%; cursor:pointer; margin-bottom:12px; }
+.btn-link { background:transparent; border:none; color:#1f6feb; font-size:13px; cursor:pointer; display:block; margin:0 auto; }
+.loading-badge { background:#0d4429; border:1px solid #238636; color:#3fb950; border-radius:6px; padding:8px 14px; font-size:13px; font-weight:600; text-align:center; margin-bottom:12px; display:flex; align-items:center; justify-content:center; gap:8px; }
+.admin-badge { background:#0d2840; border:1px solid #1f6feb; color:#58a6ff; border-radius:6px; padding:6px 12px; font-size:11px; font-weight:700; display:inline-block; margin-bottom:4px; }
+</style></head>
+<body>
+<div class="center">
+  <div style="text-align:center;">
+    <div class="logo-box">G</div>
+    <div class="app-title">Game.OS</div>
+    <div class="app-sub">Your games. Your world. Your OS.</div>
+  </div>
+
+  <!-- Saved accounts panel -->
+  <div class="saved-box">
+    <div class="saved-lbl">Saved Accounts</div>
+    <div class="saved-item active">
+      <div class="saved-avatar" style="background:linear-gradient(135deg,#f1c40f,#e67e22);">A</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:600;color:#fff;">Admin.GameOS</div>
+        <div style="font-size:11px;color:#8b949e;">Saved account · Click to sign in</div>
+      </div>
+      <div style="color:#1f6feb;font-size:18px;">→</div>
+    </div>
+    <div class="saved-item">
+      <div class="saved-avatar" style="background:linear-gradient(135deg,#0ea5e9,#1d4ed8);">K</div>
+      <div style="flex:1;">
+        <div style="font-size:15px;font-weight:600;color:#fff;">Koriebonx98</div>
+        <div style="font-size:11px;color:#8b949e;">Saved account · Click to sign in</div>
+      </div>
+      <div style="color:#1f6feb;font-size:18px;">→</div>
+    </div>
+  </div>
+
+  <!-- Login form -->
+  <div class="card">
+    <div style="text-align:center;margin-bottom:12px;">
+      <span class="admin-badge">🛡 Admin Account</span>
+    </div>
+    <div class="card-title">Sign In</div>
+    <label class="form-lbl">Username or Email</label>
+    <input class="form-input focused" value="Admin.GameOS" readonly>
+    <label class="form-lbl">Password</label>
+    <input class="form-input" type="password" value="GameOS2026" readonly>
+    <div class="remember"><input type="checkbox" checked> Remember me <span style="font-size:11px;color:#484f58;">(stay signed in)</span></div>
+    <div class="loading-badge">⟳ &nbsp;Signing in…</div>
+    <button class="btn-primary" disabled style="opacity:0.7;">Signing in…</button>
+    <button class="btn-link">Don't have an account? Create one →</button>
+  </div>
+</div>
+</body></html>
