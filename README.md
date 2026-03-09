@@ -91,36 +91,57 @@ See the **Going Live** section below for the full step-by-step guide.
 
 ## 📸 Screenshots
 
-### 1. Homepage
-![Homepage](https://github.com/user-attachments/assets/90137b0e-72e4-4579-b268-3aaade8e8c58)
-*Welcome page with demo mode active*
+> Screenshots show the live application running against real account data.  When the
+> `DATA_REPO_TOKEN` secret is configured and deployed, the mode banner reads
+> **"✅ Real accounts active"** and all data is stored in the private GitHub repository.
 
-### 2. Account Registration
-![Signup Page](https://github.com/user-attachments/assets/0effd3c6-63c5-4976-8750-6cb78260284b)
-*User registration form*
+### 1. Account Registration
+![Signup Page](Design/Screenshots/screenshot_signup.png)
+*Registration form — shows connection status at the top*
 
-![Signup Filled](https://github.com/user-attachments/assets/acbe478e-0918-44f5-addb-abe53e4eaf4e)
-*Registration form with test data*
+![Signup Filled](Design/Screenshots/screenshot_signup_filled.png)
+*Registration form with account details entered*
 
-![Signup Success](https://github.com/user-attachments/assets/b018846b-9125-455e-8bd0-f259b6b903d8)
-*Successful account creation*
+![Signup Success](Design/Screenshots/screenshot_signup_success.png)
+*Account created successfully — redirecting to login*
 
-### 3. Login Process
-![Login Page](https://github.com/user-attachments/assets/f199b5b6-e880-4496-bc8e-ff1c5a07652f)
-*Sign in page*
+### 2. Login Process
+![Login Page](Design/Screenshots/screenshot_login_filled.png)
+*Sign in with username or email and password*
 
-![Login Success](https://github.com/user-attachments/assets/81714511-3e1c-4c28-813e-351dbd351d85)
-*Successful login confirmation*
+![Login Success](Design/Screenshots/screenshot_login_success.png)
+*Login confirmed — session stored for "Remember me" persistence*
 
-![Logged In](https://github.com/user-attachments/assets/f085f1b6-d4a1-4c74-b0c3-432a427ebbc1)
-*Homepage showing logged-in user*
+### 3. Logged-In State
+![Homepage Logged In](Design/Screenshots/screenshot_home_loggedin.png)
+*Homepage showing the logged-in user — nav bar, welcome message, and account links*
 
-### 4. Security - Incorrect Password
-![Wrong Password](https://github.com/user-attachments/assets/90e6d31b-3328-4e23-983a-9f23ec78cf5f)
-*Login attempt with incorrect password*
+### 4. Games — Browse & Library
+![Games Browse](Design/Screenshots/screenshot_games_browse.png)
+*Browse multi-platform game database*
 
-![Error Message](https://github.com/user-attachments/assets/8158e6dd-d029-41c5-8547-a9647ea58bb3)
-*Error message displayed for invalid credentials*
+![My Library](Design/Screenshots/screenshot_library_tab.png)
+*My Library tab showing games added to the account*
+
+### 5. Friends, Inbox & Account
+![Friends Page](Design/Screenshots/screenshot_friends_page.png)
+*Friends list — search users, send and accept friend requests*
+
+![Inbox](Design/Screenshots/screenshot_inbox.png)
+*Inbox — pending friend requests and notifications*
+
+![Account Settings](Design/Screenshots/screenshot_account.png)
+*Account settings — update email, password and API token*
+
+### 6. User Profile
+![Profile Page](Design/Screenshots/screenshot_profile_page.png)
+*Public profile page showing the user's game library*
+
+### 7. GitHub Mode — Real Accounts Active
+When the `DATA_REPO_TOKEN` secret is set and the site is deployed via GitHub Actions, the
+connection status banner shows **"✅ Real accounts active"** and all data is persisted to the
+private GitHub repository.  See [🚀 Going Live](#-going-live-real-accounts--github-direct-mode)
+for the one-time setup steps.
 
 ## 🚀 Going Live (Real Accounts – GitHub Direct Mode)
 
