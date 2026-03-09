@@ -13,8 +13,15 @@
         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
             <StackPanel Grid.Column="0">
                 <TextBlock Text="Games Store" Classes="page-title"/>
-                <TextBlock Text="Discover and add games to your library"
-                           Classes="page-subtitle"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <TextBlock Text="Discover and add games to your library"
+                               Classes="page-subtitle"/>
+                    <TextBlock Text="·" Classes="page-subtitle"/>
+                    <TextBlock Text="{Binding CatalogCountLabel}"
+                               Classes="page-subtitle"
+                               Foreground="#1f6feb"
+                               IsVisible="{Binding HasCatalogCount}"/>
+                </StackPanel>
             </StackPanel>
             <TextBox Grid.Column="1"
                      Classes="form-input"

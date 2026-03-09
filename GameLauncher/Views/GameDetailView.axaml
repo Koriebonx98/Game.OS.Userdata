@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
+             xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.GameDetailView"
              x:DataType="vm:GameDetailViewModel"
              Background="#0d1117">
@@ -168,6 +169,30 @@
                     </StackPanel>
                 </Border>
 
+                <!-- ── Trailer section ── -->
+                <Border IsVisible="{Binding HasTrailer}"
+                        Background="#161b22" CornerRadius="10"
+                        Padding="20,16" Margin="0,0,0,24">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="🎬  Trailer"
+                                   Classes="section-header" Margin="0"/>
+                        <Button Classes="btn-primary"
+                                HorizontalAlignment="Left"
+                                Padding="20,10"
+                                Tag="{Binding TrailerUrl}"
+                                Command="{Binding OpenTrailerCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="▶" FontSize="16" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding TrailerLabel}"
+                                           FontSize="14" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <TextBlock Text="{Binding TrailerUrl}"
+                                   FontSize="11" Foreground="#8b949e"
+                                   TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                </Border>
+
                 <!-- ── Screenshots section ── -->
                 <Border IsVisible="{Binding HasScreenshots}"
                         Margin="0,0,0,0">
@@ -188,7 +213,7 @@
                                                 Width="340" Height="192">
                                             <views:CoverImage
                                                 ImageUrl="{Binding}"
-                                                LetterFontSize="0"
+                                                LetterFontSize="1"
                                                 ImageCornerRadius="8"
                                                 Width="340" Height="192"/>
                                         </Border>
@@ -196,6 +221,53 @@
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Achievements section ── -->
+                <Border IsVisible="{Binding HasAchievements}"
+                        Margin="0,24,0,0">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{Binding AchievementsLabel}"
+                                   Classes="section-header" Margin="0"/>
+                        <ItemsControl ItemsSource="{Binding Achievements}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:Achievement">
+                                    <Border Background="#161b22" CornerRadius="8"
+                                            Padding="12,10" Margin="0,0,8,8"
+                                            Width="260">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <!-- Achievement icon -->
+                                            <Border Width="40" Height="40" CornerRadius="6"
+                                                    ClipToBounds="True" Background="#21262d">
+                                                <views:CoverImage
+                                                    ImageUrl="{Binding IconUrl}"
+                                                    FallbackText="🏆"
+                                                    LetterFontSize="18"
+                                                    ImageCornerRadius="6"
+                                                    Width="40" Height="40"/>
+                                            </Border>
+                                            <!-- Name + description -->
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="#f0c040"
+                                                           TextWrapping="Wrap" MaxWidth="180"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="11" Foreground="#8b949e"
+                                                           TextWrapping="Wrap" MaxWidth="180"
+                                                           MaxLines="2"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                 </Border>
 

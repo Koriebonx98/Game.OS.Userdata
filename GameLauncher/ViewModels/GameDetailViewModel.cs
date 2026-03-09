@@ -23,9 +23,20 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string? _coverUrl;
     [ObservableProperty] private string? _coverGradient;
 
+    // ── Trailer ───────────────────────────────────────────────────────────────
+    /// <summary>YouTube trailer URL from the real Games.Database (e.g. https://youtu.be/…).</summary>
+    [ObservableProperty] private string? _trailerUrl;
+    [ObservableProperty] private bool    _hasTrailer;
+    [ObservableProperty] private string  _trailerLabel = "▶  Watch Trailer";
+
     // ── Screenshots ───────────────────────────────────────────────────────────
     public ObservableCollection<string> Screenshots { get; } = new();
     [ObservableProperty] private bool _hasScreenshots;
+
+    // ── Achievements ──────────────────────────────────────────────────────────
+    public ObservableCollection<Achievement> Achievements { get; } = new();
+    [ObservableProperty] private bool   _hasAchievements;
+    [ObservableProperty] private string _achievementsLabel = "";
 
     // ── Local game / drive info ───────────────────────────────────────────────
     [ObservableProperty] private bool   _isLocalGame;
@@ -45,6 +56,22 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void Close() => OnClose?.Invoke();
 
+    /// <summary>Opens the trailer URL in the system's default browser.</summary>
+    [RelayCommand]
+    private void OpenTrailer()
+    {
+        if (string.IsNullOrEmpty(TrailerUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = TrailerUrl,
+                UseShellExecute = true
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Populate from a cloud library Game
     // ─────────────────────────────────────────────────────────────────────────
@@ -60,7 +87,9 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
 
+        PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
+        PopulateAchievements(game.GameAchievements);
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
@@ -82,7 +111,9 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
 
+        PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
+        PopulateAchievements(null);
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
@@ -102,8 +133,10 @@ public partial class GameDetailViewModel : ViewModelBase
         Price         = null;
         CoverUrl      = null;
 
+        PopulateTrailer(null);
         Screenshots.Clear();
         HasScreenshots = false;
+        PopulateAchievements(null);
         IsLocalGame    = true;
 
         _driveInstances = game.DriveInstances.Count > 0
@@ -150,11 +183,29 @@ public partial class GameDetailViewModel : ViewModelBase
         if (idx >= 0) SelectedDriveIndex = idx;
     }
 
+    private void PopulateTrailer(string? url)
+    {
+        TrailerUrl   = url;
+        HasTrailer   = !string.IsNullOrEmpty(url);
+        TrailerLabel = HasTrailer ? "▶  Watch Trailer on YouTube" : "▶  Watch Trailer";
+    }
+
     private void PopulateScreenshots(List<string>? shots)
     {
         Screenshots.Clear();
         if (shots != null)
             foreach (var s in shots) Screenshots.Add(s);
         HasScreenshots = Screenshots.Count > 0;
+    }
+
+    private void PopulateAchievements(List<Achievement>? achievements)
+    {
+        Achievements.Clear();
+        if (achievements != null)
+            foreach (var a in achievements) Achievements.Add(a);
+        HasAchievements   = Achievements.Count > 0;
+        AchievementsLabel = HasAchievements
+            ? $"🏆  Achievements  ({Achievements.Count})"
+            : "🏆  Achievements";
     }
 }

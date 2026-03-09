@@ -30,6 +30,21 @@ public partial class StoreViewModel : ViewModelBase
     [ObservableProperty] private string _adminRating      = "8.0";
     [ObservableProperty] private string _adminCoverUrl    = "";
 
+    /// <summary>
+    /// Total games across all platforms in the Koriebonx98/Games.Database repository.
+    /// PC: ~153,713  |  Xbox 360: 5,132  |  PS3: 4,000  |  Switch: 2,245  |  PS4: 5
+    /// Updated by counting each {Platform}.Games.json in the public repository.
+    /// </summary>
+    private const int RealDatabaseTotal = 165_095;
+
+    [ObservableProperty] private int    _totalCatalogCount = 0;
+    [ObservableProperty] private string _catalogCountLabel = "";
+
+    /// <summary>True once the real catalog count has been loaded; drives the subtitle visibility.</summary>
+    public bool HasCatalogCount => TotalCatalogCount > 0;
+
+    partial void OnTotalCatalogCountChanged(int value) => OnPropertyChanged(nameof(HasCatalogCount));
+
     public ObservableCollection<StoreGame> Featured      { get; } = new();
     public ObservableCollection<StoreGame> FilteredStore { get; } = new();
     public ObservableCollection<string>    Genres        { get; } = new();
@@ -38,13 +53,17 @@ public partial class StoreViewModel : ViewModelBase
     public Action<StoreGame>? OnOpenDetail { get; set; }
 
     public void Load(List<StoreGame> store, List<Game> library,
-                     UserProfile profile, GameOsClient client, bool isAdmin)
+                     UserProfile profile, GameOsClient client, bool isAdmin,
+                     int totalCatalogCount = RealDatabaseTotal)
     {
         _allStore = new List<StoreGame>(store); // work on a copy so admin changes are session-scoped
         _library  = library;
         _profile  = profile;
         _client   = client;
         IsAdmin   = isAdmin;
+
+        TotalCatalogCount = totalCatalogCount;
+        CatalogCountLabel = $"{totalCatalogCount:N0}+ games in the database";
 
         RebuildCollections();
     }

@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
@@ -11,8 +13,9 @@ namespace GameLauncher.ViewModels;
 /// </summary>
 public partial class MainViewModel : ViewModelBase, IDisposable
 {
-    private readonly GameOsClient      _client;
-    private readonly GameScannerService _scanner;
+    private readonly GameOsClient        _client;
+    private readonly GameScannerService  _scanner;
+    private readonly SessionCacheService _sessionCache;
 
     // ── Session data ───────────────────────────────────────────────────────
     private UserProfile     _profile      = new();
@@ -51,9 +54,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public MainViewModel()
     {
-        _client = new GameOsClient();
+        _client       = new GameOsClient();
+        _sessionCache = new SessionCacheService();
 
-        LoginVm     = new LoginViewModel(_client);
+        LoginVm     = new LoginViewModel(_client, _sessionCache);
         DashboardVm = new DashboardViewModel();
         LibraryVm   = new LibraryViewModel();
         StoreVm     = new StoreViewModel();
@@ -77,7 +81,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanner.GamesUpdated   += games   => LibraryVm.UpdateLocalGames(games);
         _scanner.RepacksUpdated += repacks => LibraryVm.UpdateRepacks(repacks);
         _ = _scanner.StartAsync();
+
+        // Attempt silent auto-login from cached session (mirrors web localStorage restore)
+        _ = LoginVm.TryAutoLoginAsync();
+
+        // GAMEOS_DEMO_PAGE env var: auto-trigger demo mode and navigate to the given page.
+        // Used for headless screenshot capture without needing a backend server.
+        // Example: GAMEOS_DEMO_PAGE=dashboard, library, store, friends, profile, gamedetail
+        var demoPage = Environment.GetEnvironmentVariable("GAMEOS_DEMO_PAGE");
+        if (!string.IsNullOrEmpty(demoPage))
+        {
+            // Set target page BEFORE Execute so OnLoginSuccess can read it
+            _demoTargetPage = demoPage.ToLowerInvariant();
+            Avalonia.Threading.Dispatcher.UIThread.Post(
+                () => LoginVm.DemoLoginCommand.Execute(null),
+                Avalonia.Threading.DispatcherPriority.Loaded);
+        }
     }
+
+    private string? _demoTargetPage;
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
                                 List<Achievement> achievements)
@@ -96,7 +118,39 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         ShowLogin = false;
         ShowMain  = true;
-        ActivePage = "dashboard";
+
+        // Navigate to the page requested by GAMEOS_DEMO_PAGE (for screenshots)
+        if (!string.IsNullOrEmpty(_demoTargetPage) && _demoTargetPage != "dashboard")
+        {
+            // Normalise "gamedetail*" to the "library" page (detail overlay sits on top)
+            var basePage = _demoTargetPage.StartsWith("gamedetail") ? "library" : _demoTargetPage;
+            ActivePage = basePage;
+
+            if (_demoTargetPage.StartsWith("gamedetail"))
+            {
+                // Choose which game to show based on the page key:
+                //   gamedetail       → Mario Kart 8 Deluxe (27 real achievements + trailer)
+                //   gamedetail_gow   → God of War PS4 (37 real trophies)
+                //   gamedetail_tlou  → The Last of Us Part II
+                Game? detailGame = _demoTargetPage switch {
+                    "gamedetail_gow"  => library.FirstOrDefault(g => g.Title.Contains("God of War",          StringComparison.OrdinalIgnoreCase)),
+                    "gamedetail_tlou" => library.FirstOrDefault(g => g.Title.Contains("Last of Us",          StringComparison.OrdinalIgnoreCase)),
+                    _                 => library.FirstOrDefault(g => g.Title.Contains("Mario Kart",          StringComparison.OrdinalIgnoreCase))
+                                         ?? (library.Count > 0 ? library[0] : null),
+                };
+
+                if (detailGame != null)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        OpenDetailFromGame(detailGame),
+                        Avalonia.Threading.DispatcherPriority.Background);
+                }
+            }
+        }
+        else
+        {
+            ActivePage = "dashboard";
+        }
     }
 
     [RelayCommand]
@@ -133,6 +187,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SignOut()
     {
+        // Clear the saved token so the next launch shows the login form
+        // (equivalent to the web calling localStorage.removeItem('gameOSUser'))
+        if (_client.LoggedInUser != null)
+            _sessionCache.ClearToken(_client.LoggedInUser);
+
         _client.Logout();
         _library      = new();
         _achievements = new();
