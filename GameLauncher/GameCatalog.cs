@@ -4,63 +4,24 @@ using GameLauncher.Models;
 namespace GameLauncher
 {
     /// <summary>
-    /// Static store catalog and game metadata used for display enrichment.
-    /// The store catalog has no backend API endpoint, so it is defined here.
-    /// The <see cref="LibraryMetadata"/> list provides UI-only metadata (genre,
-    /// description, rating, cover) used to enrich games returned by the API.
+    /// Static store catalog and game metadata, mirroring the catalog embedded in
+    /// <c>script.js</c> on the website.  The store catalog has no separate backend
+    /// API endpoint — it lives here exactly as it does in the JavaScript frontend.
+    /// <para>
+    /// <see cref="Metadata"/> provides UI-only display data (cover URL, genre,
+    /// description, rating) used to enrich library entries returned by the GitHub
+    /// backend that were saved before those fields were persisted server-side.
+    /// </para>
     /// </summary>
-    internal static class DemoData
+    internal static class GameCatalog
     {
-        // ── Demo local games (simulates games found on a connected drive) ──────
-        // Used in demo/offline mode so the Library and GameDetail screens show
-        // the "Detected on Drive" section and Play + ··· buttons.
-        public static IReadOnlyList<LocalGame> DemoLocalGames { get; } = new List<LocalGame>
-        {
-            new LocalGame
-            {
-                Title          = "Mario Kart 8 Deluxe",
-                DriveRoot      = "E:\\",
-                FolderPath     = "E:\\Games\\Mario Kart 8 Deluxe",
-                ExecutablePath = "E:\\Games\\Mario Kart 8 Deluxe\\yuzu.exe",
-                ExecutableType = "exe",
-                DriveInstances = new List<LocalGameDriveEntry>
-                {
-                    new LocalGameDriveEntry
-                    {
-                        DriveRoot      = "E:\\",
-                        FolderPath     = "E:\\Games\\Mario Kart 8 Deluxe",
-                        ExecutablePath = "E:\\Games\\Mario Kart 8 Deluxe\\yuzu.exe",
-                        ExecutableType = "exe",
-                    }
-                }
-            },
-        };
-
-        // ── Demo repacks (simulates repack archives ready to install) ──────────
-        public static IReadOnlyList<LocalRepack> DemoRepacks { get; } = new List<LocalRepack>
-        {
-            new LocalRepack
-            {
-                Title     = "Elden Ring",
-                FilePath  = "D:\\Repacks\\Elden.Ring-CODEX.zip",
-                FileType  = "zip",
-                SizeBytes = 48_318_382_080L, // ~45 GB
-            },
-            new LocalRepack
-            {
-                Title     = "Cyberpunk 2077",
-                FilePath  = "D:\\Repacks\\Cyberpunk.2077-FitGirl.zip",
-                FileType  = "zip",
-                SizeBytes = 32_212_254_720L, // ~30 GB
-            },
-        };
-
         /// <summary>
-        /// Metadata lookup for known games.  Used to enrich API-returned library
-        /// entries with cover colours, genres, descriptions, and ratings that the
-        /// backend does not currently store.
+        /// Display-metadata lookup for known titles.  Fills in visual fields
+        /// (cover URL, gradient, genre, description, rating) for library entries
+        /// that do not already carry them — the same fallback the website uses when
+        /// a games.json entry has no <c>coverUrl</c>.
         /// </summary>
-        public static List<Game> Library { get; } = new()
+        public static List<Game> Metadata { get; } = new()
         {
             new Game { Platform = "Switch", Title = "Mario Kart 8 Deluxe",  Genre = "Racing",      Rating = 9.7, AddedAt = "2025-06-01T10:00:00Z", Description = "Hit the road with the definitive version of Mario Kart 8! Race as your favourite Nintendo characters on 96 total courses, including all DLC Booster Course Pass tracks.",
                 CoverColor = "#c00000", CoverGradient = "#c00000,#ff6b00",
@@ -109,6 +70,10 @@ namespace GameLauncher
                 CoverUrl    = "https://media.rawg.io/media/games/fd9/fd91fdea4f93fe71c2ff8c965c4eca74.jpg" },
         };
 
+        /// <summary>
+        /// Store catalog — mirrors the static game list embedded in <c>script.js</c>.
+        /// Sourced from the public <c>Koriebonx98/Games.Database</c> repository.
+        /// </summary>
         public static List<StoreGame> Store { get; } = new()
         {
             // ── Real PS4 games from Koriebonx98/Games.Database (PS4.Games.json) ──────

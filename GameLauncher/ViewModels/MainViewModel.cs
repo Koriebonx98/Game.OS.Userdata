@@ -85,23 +85,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
         _ = LoginVm.TryAutoLoginAsync();
 
-        // GAMEOS_DEMO_PAGE env var: auto-trigger demo mode and navigate to the given page.
-        // Used for headless screenshot capture without needing a backend server.
-        // Example: GAMEOS_DEMO_PAGE=dashboard, library, store, friends, profile, gamedetail
-        var demoPage = Environment.GetEnvironmentVariable("GAMEOS_DEMO_PAGE");
-        if (!string.IsNullOrEmpty(demoPage))
-        {
-            // Set target page BEFORE Execute so OnLoginSuccess can read it
-            _demoTargetPage = demoPage.ToLowerInvariant();
-            Avalonia.Threading.Dispatcher.UIThread.Post(
-                () => LoginVm.DemoLoginCommand.Execute(null),
-                Avalonia.Threading.DispatcherPriority.Loaded);
-        }
     }
-
-    private string? _demoTargetPage;
-    /// <summary>True when the session was started via DemoLogin (no real backend token).</summary>
-    private bool    _isDemoMode;
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
                                 List<Achievement> achievements)
@@ -110,64 +94,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _library      = library;
         _achievements = achievements;
 
-        // DemoLogin does not set a token on the client — detect demo mode by checking
-        // whether the client is authenticated against a real backend.
-        _isDemoMode = !_client.IsAuthenticated;
-
         bool isAdmin = _client.IsAdmin;
 
         DashboardVm.Load(profile, library, achievements);
         LibraryVm.Load(library);
-        StoreVm.Load(DemoData.Store, library, profile, _client, isAdmin);
+        StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
-
-        // In demo mode the backend is not reachable, so load demo friends directly.
-        if (_isDemoMode)
-        {
-            FriendsVm.LoadDemo();
-            // Inject demo local games so the Library and GameDetail screens show
-            // "Detected on Drive" / Play buttons even without real filesystem games.
-            LibraryVm.UpdateLocalGames(DemoData.DemoLocalGames);
-            LibraryVm.UpdateRepacks(DemoData.DemoRepacks);
-        }
-        else
-            FriendsVm.Load(_client, profile.Username);
+        FriendsVm.Load(_client, profile.Username);
 
         ShowLogin = false;
         ShowMain  = true;
-
-        // Navigate to the page requested by GAMEOS_DEMO_PAGE (for screenshots)
-        if (!string.IsNullOrEmpty(_demoTargetPage) && _demoTargetPage != "dashboard")
-        {
-            // Normalise "gamedetail*" to the "library" page (detail overlay sits on top)
-            var basePage = _demoTargetPage.StartsWith("gamedetail") ? "library" : _demoTargetPage;
-            ActivePage = basePage;
-
-            if (_demoTargetPage.StartsWith("gamedetail"))
-            {
-                // Choose which game to show based on the page key:
-                //   gamedetail       → Mario Kart 8 Deluxe (27 real achievements + trailer)
-                //   gamedetail_gow   → God of War PS4 (37 real trophies)
-                //   gamedetail_tlou  → The Last of Us Part II
-                Game? detailGame = _demoTargetPage switch {
-                    "gamedetail_gow"  => library.FirstOrDefault(g => g.Title.Contains("God of War",          StringComparison.OrdinalIgnoreCase)),
-                    "gamedetail_tlou" => library.FirstOrDefault(g => g.Title.Contains("Last of Us",          StringComparison.OrdinalIgnoreCase)),
-                    _                 => library.FirstOrDefault(g => g.Title.Contains("Mario Kart",          StringComparison.OrdinalIgnoreCase))
-                                         ?? (library.Count > 0 ? library[0] : null),
-                };
-
-                if (detailGame != null)
-                {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        OpenDetailFromGame(detailGame),
-                        Avalonia.Threading.DispatcherPriority.Background);
-                }
-            }
-        }
-        else
-        {
-            ActivePage = "dashboard";
-        }
+        ActivePage = "dashboard";
     }
 
     [RelayCommand]
@@ -178,12 +115,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (page == "library")
             LibraryVm.Load(_library);
         if (page == "friends")
-        {
-            if (_isDemoMode)
-                FriendsVm.LoadDemo();
-            else
-                FriendsVm.Load(_client, _profile.Username);
-        }
+            FriendsVm.Load(_client, _profile.Username);
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
     }

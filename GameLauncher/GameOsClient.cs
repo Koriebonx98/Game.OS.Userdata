@@ -124,11 +124,10 @@ namespace GameLauncher
         }
 
         public async Task AddGameAsync(
-            string platform, string title, string? titleId = null,
-            CancellationToken ct = default)
+            Game game, CancellationToken ct = default)
         {
             if (_username == null) throw new GameOsException(401, "Not authenticated.");
-            await _github.AddGameAsync(_username, platform, title, titleId, ct);
+            await _github.AddGameAsync(_username, game, ct);
         }
 
         public async Task RemoveGameAsync(

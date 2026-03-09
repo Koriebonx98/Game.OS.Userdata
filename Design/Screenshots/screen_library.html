@@ -1,129 +1,59 @@
-<!DOCTYPE html>
-<html><head>
-<meta charset="UTF-8"><title>Game.OS – Library</title>
-<style>
-* { margin:0; padding:0; box-sizing:border-box; }
+<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Game.OS – Library</title>
+<style>* { margin:0; padding:0; box-sizing:border-box; }
 body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; color:#c9d1d9; width:1280px; height:800px; display:flex; overflow:hidden; }
 .sidebar { width:220px; background:#161b22; display:flex; flex-direction:column; flex-shrink:0; }
 .logo-area { background:linear-gradient(135deg,#0ea5e9,#1d4ed8); height:80px; display:flex; align-items:center; justify-content:center; gap:10px; }
 .logo-g { width:40px; height:40px; background:rgba(255,255,255,0.2); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:20px; font-weight:900; color:#fff; }
 .logo-text { font-size:18px; font-weight:800; color:#fff; }
 .nav-items { padding:12px 8px; flex:1; }
-.nav-item { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:6px; margin-bottom:4px; font-size:14px; font-weight:600; color:#8b949e; }
+.nav-item { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:6px; margin-bottom:4px; font-size:14px; font-weight:600; color:#8b949e; cursor:pointer; }
 .nav-item.active { background:#1f6feb; color:#fff; }
+.nav-icon { font-size:16px; }
 .main { flex:1; overflow-y:auto; }
 .page { padding:32px; }
-.page-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
-.page-title { font-size:28px; font-weight:700; color:#fff; }
-.page-count { font-size:13px; color:#8b949e; }
-.search-row { display:flex; gap:12px; margin-bottom:20px; }
-.search-input { background:#21262d; color:#c9d1d9; border:1px solid #30363d; border-radius:6px; padding:10px 14px; font-size:14px; flex:1; }
-.platform-chips { display:flex; gap:8px; margin-bottom:24px; flex-wrap:wrap; }
-.chip { background:#21262d; border-radius:20px; padding:6px 14px; font-size:12px; font-weight:600; color:#8b949e; cursor:pointer; }
-.chip.active { background:#1f6feb; color:#fff; }
-.section-header { font-size:16px; font-weight:700; color:#fff; margin-bottom:12px; }
-.games-grid { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:28px; }
-.game-card { background:#161b22; border-radius:10px; width:158px; overflow:hidden; cursor:pointer; }
-.game-cover { width:158px; height:118px; object-fit:cover; display:block; }
-.game-cover-fb { width:158px; height:118px; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:900; color:rgba(255,255,255,0.6); }
-.game-info { padding:8px 10px; }
-.game-title { font-size:13px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; }
-.game-meta { font-size:11px; color:#8b949e; display:flex; gap:6px; align-items:center; }
-.plat-badge { border-radius:3px; padding:1px 5px; font-size:10px; font-weight:700; color:#fff; }
-.detected-section { background:#0d1f0d; border-radius:10px; padding:16px 20px; margin-bottom:24px; }
-.detected-header { color:#3fb950; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-.detected-game { background:#161b22; border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:14px; margin-bottom:8px; }
-.detected-icon { font-size:20px; }
-.detected-name { font-size:14px; font-weight:600; color:#fff; }
-.detected-path { font-size:11px; color:#8b949e; }
-.detected-badge { background:#0d3d1a; color:#3fb950; border-radius:4px; padding:3px 8px; font-size:11px; font-weight:600; margin-left:auto; }
-.repack-section { background:#1a1200; border-radius:10px; padding:16px 20px; }
-.repack-header { color:#f1c40f; font-size:14px; font-weight:700; display:flex; align-items:center; gap:8px; margin-bottom:12px; }
-.repack-game { background:#161b22; border-radius:8px; padding:10px 14px; display:flex; align-items:center; gap:14px; margin-bottom:8px; }
-.repack-name { font-size:14px; font-weight:600; color:#fff; }
-.repack-size { font-size:11px; color:#8b949e; }
-.btn-install { background:#238636; color:#fff; border:none; border-radius:6px; padding:6px 14px; font-size:12px; font-weight:600; cursor:pointer; margin-left:auto; }
+.plat-badge { border-radius:3px; padding:1px 6px; font-size:10px; font-weight:700; color:#fff; }
 .stars { color:#f1c40f; font-size:11px; }
-</style>
-</head>
-<body>
-<div class="sidebar">
-  <div class="logo-area">
-    <div class="logo-g">G</div>
-    <div class="logo-text">Game.OS</div>
+.chip {background:#21262d;border-radius:20px;padding:6px 14px;font-size:12px;font-weight:600;color:#8b949e;cursor:pointer;}
+.chip.a {background:#1f6feb;color:#fff;}
+.detected {background:#0d1f0d;border-radius:10px;padding:16px 20px;margin-bottom:20px;}
+.repack-sec {background:#1a1200;border-radius:10px;padding:16px 20px;}
+.btn-inst {background:#238636;color:#fff;border:none;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:600;cursor:pointer;margin-left:auto;}
+</style></head><body>
+<div class="sidebar"><div class="logo-area"><div class="logo-g">G</div><div class="logo-text">Game.OS</div></div><div class="nav-items"><div class="nav-item"><span class="nav-icon">🏠</span> Home</div><div class="nav-item active"><span class="nav-icon">🎮</span> Library</div><div class="nav-item"><span class="nav-icon">🛒</span> Store</div><div class="nav-item"><span class="nav-icon">👥</span> Friends</div><div class="nav-item"><span class="nav-icon">👤</span> Profile</div></div><div style="padding:16px 8px;border-top:1px solid #21262d;"><div class="nav-item" style="color:#f85149;"><span class="nav-icon">⏻</span> Sign Out</div></div></div>
+<div class="main"><div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+    <div><div style="font-size:28px;font-weight:700;color:#fff;">My Library</div><div style="font-size:13px;color:#8b949e;">3 games · 2 platforms · data from GitHub ✓</div></div>
+    <div style="font-size:12px;color:#3fb950;background:#0d1f0d;padding:6px 14px;border-radius:20px;">💿 1 game detected on drive</div>
   </div>
-  <div class="nav-items">
-    <div class="nav-item"><span style="font-size:16px;">🏠</span> Home</div>
-    <div class="nav-item active"><span style="font-size:16px;">🎮</span> Library</div>
-    <div class="nav-item"><span style="font-size:16px;">🛒</span> Store</div>
-    <div class="nav-item"><span style="font-size:16px;">👥</span> Friends</div>
-    <div class="nav-item"><span style="font-size:16px;">👤</span> Profile</div>
+  <input style="background:#21262d;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:10px 14px;font-size:14px;width:100%;margin-bottom:16px;" placeholder="🔍  Search your library…" readonly>
+  <div style="display:flex;gap:8px;margin-bottom:24px;">
+    <div class="chip a">All (3)</div><div class="chip">Switch (1)</div><div class="chip">PS4 (2)</div>
   </div>
-  <div style="padding:16px 8px; border-top:1px solid #21262d;">
-    <div class="nav-item" style="color:#f85149;"><span style="font-size:16px;">⏻</span> Sign Out</div>
+  <div style="font-size:16px;font-weight:700;color:#fff;margin-bottom:12px;">☁️  Cloud Library</div>
+  <div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:28px;">
+    <div style="background:#161b22;border-radius:10px;width:158px;overflow:hidden;cursor:pointer;flex-shrink:0;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNjMDAwMDAiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNmZjZiMDAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0idXJsKCNnKSIvPjxyZWN0IHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMTgpIi8+PHRleHQgeD0iNzkiIHk9IjUxIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7wn4+O77iPPC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSI5NiIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPk1hcmlvIEthcnQgOCBEZWzigKY8L3RleHQ+PHRleHQgeD0iNzkiIHk9IjEwOSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSI5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNikiPlN3aXRjaDwvdGV4dD48L3N2Zz4=" width="158" height="118" style="display:block;"><div style="padding:8px 10px;"><div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;">Mario Kart 8 Deluxe</div><div style="font-size:11px;display:flex;gap:6px;align-items:center;"><span class="plat-badge" style="background:#1f6feb;">Switch</span><span class="stars">★★★★★</span></div></div></div>
+    <div style="background:#161b22;border-radius:10px;width:158px;overflow:hidden;cursor:pointer;flex-shrink:0;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMxYTA1MDAiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiM4YjAwMDAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0idXJsKCNnKSIvPjxyZWN0IHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMTgpIi8+PHRleHQgeD0iNzkiIHk9IjUxIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7impTvuI88L3RleHQ+PHRleHQgeD0iNzkiIHk9Ijk2IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSI+R29kIG9mIFdhcjwvdGV4dD48dGV4dCB4PSI3OSIgeT0iMTA5IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC42KSI+UFM0PC90ZXh0Pjwvc3ZnPg==" width="158" height="118" style="display:block;"><div style="padding:8px 10px;"><div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;">God of War</div><div style="font-size:11px;display:flex;gap:6px;align-items:center;"><span class="plat-badge" style="background:#003791;">PS4</span><span class="stars">★★★★★</span></div></div></div>
+    <div style="background:#161b22;border-radius:10px;width:158px;overflow:hidden;cursor:pointer;flex-shrink:0;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4Ij48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiMwYTFhMDgiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiMxYTNhMTAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0idXJsKCNnKSIvPjxyZWN0IHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiBmaWxsPSJyZ2JhKDAsMCwwLDAuMTgpIi8+PHRleHQgeD0iNzkiIHk9IjUxIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjI4IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7wn4y/PC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSI5NiIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPlRoZSBMYXN0IG9mIFVzIElJPC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSIxMDkiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiIGZvbnQtc2l6ZT0iOSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjYpIj5QUzQ8L3RleHQ+PC9zdmc+" width="158" height="118" style="display:block;"><div style="padding:8px 10px;"><div style="font-size:13px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px;">The Last of Us Part II</div><div style="font-size:11px;display:flex;gap:6px;align-items:center;"><span class="plat-badge" style="background:#003791;">PS4</span><span class="stars">★★★★★</span></div></div></div>
   </div>
-</div>
-<div class="main">
-  <div class="page">
-    <div class="page-header">
-      <div><div class="page-title">My Library</div><div class="page-count">3 games</div></div>
-    </div>
-    <div class="search-row">
-      <input class="search-input" placeholder="Search games..." value="">
-    </div>
-    <div class="platform-chips">
-      <div class="chip active">All</div>
-      <div class="chip">Switch</div>
-      <div class="chip">PS4</div>
-    </div>
-
-    <div class="section-header">☁️  Cloud Library</div>
-    <div class="games-grid">
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/9cd6d894098e748716960bfcf9dbe115.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#c00000,#ff6b00)>MK8</div>'">
-        <div class="game-info"><div class="game-title">Mario Kart 8 Deluxe</div><div class="game-meta"><span class="plat-badge" style="background:#1f6feb;">Switch</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/368b80128d9e529adf93f7ce84dfaca0.jpg" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#1a0500,#5c1500)>GoW</div>'">
-        <div class="game-info"><div class="game-title">God of War</div><div class="game-meta"><span class="plat-badge" style="background:#003791;">PS4</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/3a96a1164364c063f40ce33aaf971783.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#0a1a08,#1a3a10)>TLOU</div>'">
-        <div class="game-info"><div class="game-title">The Last of Us Part II</div><div class="game-meta"><span class="plat-badge" style="background:#003791;">PS4</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-    </div>
-
-    <div class="detected-section">
-      <div class="detected-header">💿 Detected on Drive (1 game found)</div>
-      <div class="detected-game">
-        <span class="detected-icon">💿</span>
-        <div>
-          <div class="detected-name">Mario Kart 8 Deluxe</div>
-          <div class="detected-path">E:\Games\Mario Kart 8 Deluxe  ·  EXE</div>
-        </div>
-        <span class="detected-badge">● Installed</span>
-      </div>
-    </div>
-
-    <div class="repack-section">
-      <div class="repack-header">📦 Ready to Install (2 repacks)</div>
-      <div class="repack-game">
-        <span style="font-size:20px;">📦</span>
-        <div>
-          <div class="repack-name">Elden Ring</div>
-          <div class="repack-size">D:\Repacks\Elden.Ring-CODEX.zip  ·  45.0 GB</div>
-        </div>
-        <button class="btn-install">⬇ Install</button>
-      </div>
-      <div class="repack-game">
-        <span style="font-size:20px;">📦</span>
-        <div>
-          <div class="repack-name">Cyberpunk 2077</div>
-          <div class="repack-size">D:\Repacks\Cyberpunk.2077-FitGirl.zip  ·  30.0 GB</div>
-        </div>
-        <button class="btn-install">⬇ Install</button>
-      </div>
+  <div class="detected">
+    <div style="color:#3fb950;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:12px;">💿 Detected on Drive — 1 game found</div>
+    <div style="background:#161b22;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:14px;">
+      <span style="font-size:20px;">💿</span>
+      <div><div style="font-size:14px;font-weight:600;color:#fff;">Mario Kart 8 Deluxe</div><div style="font-size:11px;color:#8b949e;">E:\Games\Mario Kart 8 Deluxe  ·  EXE  ·  7.8 GB</div></div>
+      <span style="background:#0d3d1a;color:#3fb950;border-radius:4px;padding:3px 8px;font-size:11px;font-weight:600;margin-left:auto;">● Installed</span>
     </div>
   </div>
-</div>
-</body></html>
+  <div class="repack-sec">
+    <div style="color:#f1c40f;font-size:14px;font-weight:700;display:flex;align-items:center;gap:8px;margin-bottom:12px;">📦 Ready to Install — 2 repacks found</div>
+    <div style="background:#161b22;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:14px;margin-bottom:8px;">
+      <span style="font-size:20px;">📦</span>
+      <div><div style="font-size:14px;font-weight:600;color:#fff;">Elden Ring</div><div style="font-size:11px;color:#8b949e;">D:\Repacks\Elden.Ring-CODEX.zip  ·  45.0 GB</div></div>
+      <button class="btn-inst">⬇ Install</button>
+    </div>
+    <div style="background:#161b22;border-radius:8px;padding:10px 14px;display:flex;align-items:center;gap:14px;">
+      <span style="font-size:20px;">📦</span>
+      <div><div style="font-size:14px;font-weight:600;color:#fff;">Cyberpunk 2077</div><div style="font-size:11px;color:#8b949e;">D:\Repacks\Cyberpunk.2077-FitGirl.zip  ·  30.0 GB</div></div>
+      <button class="btn-inst">⬇ Install</button>
+    </div>
+  </div>
+</div></div></body></html>
