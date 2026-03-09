@@ -18,3 +18,5 @@ GameLauncher/bin/
 GameLauncher/obj/
 GameScanner.Tests/bin/
 GameScanner.Tests/obj/
+LoginAuth.Tests/bin/
+LoginAuth.Tests/obj/
