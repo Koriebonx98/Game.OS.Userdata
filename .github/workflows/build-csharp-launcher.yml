@@ -12,6 +12,12 @@
 #   backend URL baked in (via gameos-backend.url) so it works immediately on
 #   launch — no environment variables or PAT setup required.
 #
+# Visual Studio (developer builds from source):
+#   GameLauncher/Properties/launchSettings.json sets GAMEOS_BACKEND_URL=http://localhost:3000
+#   automatically when running with VS or `dotnet run` — no manual env-var setup needed.
+#   Start the local backend first:  cd backend && npm install && node index.js
+#   Then press ▶ in Visual Studio (or run `dotnet run`) and sign in normally.
+#
 # Injection at build time:
 #   gameos-token.dat  — DATA_REPO_TOKEN XOR-encoded (GitHub-direct auth)
 #   gameos-backend.url — GAMEOS_BACKEND_URL written as plain text (backend mode)

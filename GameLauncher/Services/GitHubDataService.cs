@@ -68,28 +68,38 @@ namespace GameLauncher.Services
 
             // 2. Bundled token file injected at build/publish time
             //    (mirrors GITHUB_TOKEN_ENCODED = '...' in script.js)
-            try
+            //    Also checks the current working directory so that running from Visual Studio
+            //    (where the working directory is the project folder) picks up the file.
+            var candidateDirs = new[]
             {
-                var tokenFile = System.IO.Path.Combine(
-                    AppContext.BaseDirectory, "gameos-token.dat");
-                if (System.IO.File.Exists(tokenFile))
+                AppContext.BaseDirectory,
+                System.Environment.CurrentDirectory,
+            };
+
+            foreach (var dir in candidateDirs)
+            {
+                try
                 {
-                    var encoded = System.IO.File.ReadAllText(tokenFile).Trim();
-                    if (!string.IsNullOrEmpty(encoded))
+                    var tokenFile = System.IO.Path.Combine(dir, "gameos-token.dat");
+                    if (System.IO.File.Exists(tokenFile))
                     {
-                        var decoded = DecodeXorToken(encoded);
-                        if (decoded != null)
-                            return decoded;
+                        var encoded = System.IO.File.ReadAllText(tokenFile).Trim();
+                        if (!string.IsNullOrEmpty(encoded))
+                        {
+                            var decoded = DecodeXorToken(encoded);
+                            if (decoded != null)
+                                return decoded;
+                        }
                     }
                 }
-            }
-            catch (Exception ex) when (
-                ex is System.IO.IOException or
-                UnauthorizedAccessException or
-                System.IO.DirectoryNotFoundException)
-            {
-                System.Diagnostics.Debug.WriteLine(
-                    $"[GitHubDataService] Could not read gameos-token.dat: {ex.Message}");
+                catch (Exception ex) when (
+                    ex is System.IO.IOException or
+                    UnauthorizedAccessException or
+                    System.IO.DirectoryNotFoundException)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[GitHubDataService] Could not read gameos-token.dat in {dir}: {ex.Message}");
+                }
             }
 
             return null;
