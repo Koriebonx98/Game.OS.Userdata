@@ -1,8 +1,11 @@
 # Build & Live-Login Test — C# Game Launcher
 #
-# Builds the C# launcher and runs the LoginAuth.Tests suite, including the
-# optional live backend test (Test 5) that signs in to the real GitHub data
-# repository using the same PBKDF2-SHA256 method as the web frontend.
+# Builds the C# launcher and runs the LoginAuth.Tests suite, including:
+#   Test 5 — GitHub-direct login (requires DATA_REPO_TOKEN + GAMEOS_TEST_PASSWORD)
+#   Test 6 — Backend REST API login (requires GAMEOS_BACKEND_URL + GAMEOS_TEST_PASSWORD)
+#
+# Both tests verify that Koriebonx98 can log in with Myipodfool98.
+# Tests 1–4 (PBKDF2 hash parity, bcrypt detection) always run without secrets.
 #
 # Token injection (mirrors what deploy.yml does for script.js):
 #   The DATA_REPO_TOKEN PAT is XOR-encoded with key "GameOS_KEY" and written
@@ -20,6 +23,9 @@
 #                           the private data repository (already used by
 #                           deploy.yml; no new secret needed if it is set)
 #   GAMEOS_TEST_PASSWORD  — password for the Koriebonx98 test account
+#   GAMEOS_BACKEND_URL    — (optional) URL of the deployed Node.js backend server
+#                           When set, Test 6 exercises the same REST API the
+#                           web frontend uses — no GitHub PAT needed by the client
 
 name: Build & Live-Login Test (C# Launcher)
 
@@ -95,20 +101,23 @@ jobs:
       - name: Run LoginAuth.Tests (hash-parity + bcrypt checks)
         run: dotnet run --project LoginAuth.Tests -c Release --no-build
         # Tests 1–4 pass without any secrets (pure crypto logic).
-        # Test 5 is automatically skipped when GAMEOS_GITHUB_TOKEN is not set.
+        # Tests 5–6 are automatically skipped when the relevant tokens are not set.
 
-      # ── Live backend test ─────────────────────────────────────────────────
-      # Always run — when DATA_REPO_TOKEN / GAMEOS_TEST_PASSWORD are not set,
-      # Test 5 is skipped automatically (no error).
-      - name: Run live login test — Koriebonx98 account
+      # ── Live login tests ──────────────────────────────────────────────────
+      # Always run — tests are skipped automatically when secrets are absent.
+      # Test 5: GitHub-direct login (requires DATA_REPO_TOKEN / gameos-token.dat)
+      # Test 6: Backend REST API login (requires GAMEOS_BACKEND_URL — no PAT needed)
+      - name: Run live login tests — Koriebonx98 account
         env:
           GAMEOS_GITHUB_TOKEN:  ${{ secrets.DATA_REPO_TOKEN }}
+          GAMEOS_BACKEND_URL:   ${{ secrets.GAMEOS_BACKEND_URL }}
           GAMEOS_TEST_USERNAME: Koriebonx98
           GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           echo "═══════════════════════════════════════════════════════════"
-          echo "  Live login test — verifying Koriebonx98 account"
-          echo "  Auth method: PBKDF2-SHA256 (same as web frontend)"
+          echo "  Live login tests — verifying Koriebonx98 account"
+          echo "  Test 5: GitHub-direct (PBKDF2-SHA256, requires DATA_REPO_TOKEN)"
+          echo "  Test 6: Backend REST API (no PAT required, uses GAMEOS_BACKEND_URL)"
           echo "═══════════════════════════════════════════════════════════"
           dotnet run --project LoginAuth.Tests -c Release --no-build \
             2>&1 | tee /tmp/login-test-output.txt
@@ -128,21 +137,21 @@ jobs:
             Game.OS C# Launcher — Login Authentication Summary
           ═══════════════════════════════════════════════════════════════════
 
-            Auth method : PBKDF2-SHA256, 100,000 iterations (identical to
-                          the JavaScript hashPassword() in script.js)
-            Salt format : {username_lower}:gameos
-            Dual-hash   : PBKDF2 (web/launcher accounts) + bcrypt
-                          (Node.js backend accounts) both supported
+            Auth method A (GitHub-direct, Test 5):
+              PBKDF2-SHA256, 100,000 iterations — same as script.js hashPassword()
+              Requires DATA_REPO_TOKEN (GitHub PAT) in gameos-token.dat
 
-            Token source: gameos-token.dat (XOR-encoded, injected at build
-                          time — same mechanism as GITHUB_TOKEN_ENCODED in
-                          script.js).  Falls back to GAMEOS_GITHUB_TOKEN env.
+            Auth method B (Backend REST API, Test 6 — PREFERRED):
+              POST {GAMEOS_BACKEND_URL}/api/auth/token  { username, password }
+              No GitHub PAT required from the client.
+              Set GAMEOS_BACKEND_URL to your deployed backend server URL.
+              Same endpoint the web frontend calls in backend mode.
+
+            Dual-hash    : PBKDF2 (web/launcher accounts) + bcrypt
+                          (Node.js backend accounts) both supported
 
             Test account: Koriebonx98
             Data repo   : Koriebonx98/Game.OS.Private.Data (same as web)
-
-            The C# launcher calls the SAME GitHub API endpoints as the web
-            frontend.  Accounts created in the browser work in the launcher.
           ═══════════════════════════════════════════════════════════════════
           EOF
 
