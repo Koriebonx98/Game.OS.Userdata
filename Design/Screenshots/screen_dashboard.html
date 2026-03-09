@@ -11,115 +11,99 @@ body { font-family:'Inter','Segoe UI',system-ui,sans-serif; background:#0d1117; 
 .nav-items { padding:12px 8px; flex:1; }
 .nav-item { display:flex; align-items:center; gap:12px; padding:14px 18px; border-radius:6px; margin-bottom:4px; font-size:14px; font-weight:600; color:#8b949e; }
 .nav-item.active { background:#1f6feb; color:#fff; }
+.nav-icon { font-size:16px; }
 .main { flex:1; overflow-y:auto; }
 .page { padding:32px; }
-.greeting { font-size:28px; font-weight:700; color:#fff; margin-bottom:4px; }
-.sub { font-size:13px; color:#8b949e; margin-bottom:24px; }
+
 .stat-tiles { display:flex; gap:12px; margin-bottom:28px; }
-.stat-tile { background:#161b22; border-radius:10px; padding:20px 24px; }
+.stat-tile { background:#161b22; border-radius:10px; padding:20px 24px; min-width:110px; }
 .stat-num { font-size:32px; font-weight:700; color:#fff; }
 .stat-num.yellow { color:#f1c40f; }
 .stat-num.blue { color:#1f6feb; }
 .stat-lbl { font-size:12px; color:#8b949e; }
-.hero-banner { background:linear-gradient(135deg,#c00000,#ff6b00); border-radius:12px; padding:28px; margin-bottom:28px; display:flex; align-items:center; gap:24px; position:relative; overflow:hidden; }
+.greeting { font-size:28px; font-weight:700; color:#fff; margin-bottom:4px; }
+.sub { font-size:13px; color:#8b949e; margin-bottom:24px; }
+.hero-banner { background:linear-gradient(135deg,#c00000,#ff6b00); border-radius:12px; padding:28px; margin-bottom:28px; display:flex; align-items:center; gap:24px; }
 .hero-badge { background:rgba(255,255,255,0.2); border-radius:4px; padding:4px 10px; font-size:11px; font-weight:700; color:#fff; margin-bottom:8px; display:inline-block; }
 .hero-title { font-size:28px; font-weight:900; color:#fff; margin-bottom:6px; }
-.hero-desc { font-size:13px; color:rgba(255,255,255,0.8); max-width:360px; margin-bottom:12px; }
+.hero-desc { font-size:13px; color:rgba(255,255,255,0.85); max-width:360px; margin-bottom:12px; }
 .hero-price { font-size:18px; font-weight:700; color:#fff; margin-bottom:12px; }
-.hero-cover { width:100px; height:140px; border-radius:8px; object-fit:cover; margin-left:auto; }
-.hero-cover-fallback { width:100px; height:140px; border-radius:8px; background:rgba(0,0,0,0.3); display:flex; align-items:center; justify-content:center; font-size:32px; font-weight:900; color:rgba(255,255,255,0.6); margin-left:auto; }
 .section-header { font-size:16px; font-weight:700; color:#fff; margin-bottom:12px; }
 .games-row { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:28px; }
 .game-card { background:#161b22; border-radius:10px; width:158px; overflow:hidden; cursor:pointer; }
 .game-cover { width:158px; height:118px; object-fit:cover; display:block; }
-.game-cover-fb { width:158px; height:118px; display:flex; align-items:center; justify-content:center; font-size:36px; font-weight:900; color:rgba(255,255,255,0.6); }
 .game-info { padding:8px 10px; }
-.game-title { font-size:13px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:2px; }
-.game-meta { font-size:11px; color:#8b949e; }
+.game-title { font-size:13px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-bottom:4px; }
+.game-meta { font-size:11px; color:#8b949e; display:flex; gap:6px; align-items:center; }
+.plat-badge { border-radius:3px; padding:1px 5px; font-size:10px; font-weight:700; color:#fff; }
+.stars { color:#f1c40f; }
 .ach-list { display:flex; flex-direction:column; gap:8px; }
 .ach-item { background:#161b22; border-radius:8px; padding:10px 14px; display:flex; gap:10px; align-items:center; }
-.ach-icon { width:36px; height:36px; border-radius:6px; background:#2d2000; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; }
+.ach-icon { width:36px; height:36px; border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:16px; flex-shrink:0; overflow:hidden; }
 .ach-name { font-size:13px; font-weight:600; color:#f0c040; }
 .ach-game { font-size:11px; color:#8b949e; }
-.stars { color:#f1c40f; }
 </style>
 </head>
 <body>
 <div class="sidebar">
-  <div class="logo-area">
-    <div class="logo-g">G</div>
-    <div class="logo-text">Game.OS</div>
-  </div>
-  <div class="nav-items">
-    <div class="nav-item active"><span style="font-size:16px;">🏠</span> Home</div>
-    <div class="nav-item"><span style="font-size:16px;">🎮</span> Library</div>
-    <div class="nav-item"><span style="font-size:16px;">🛒</span> Store</div>
-    <div class="nav-item"><span style="font-size:16px;">👥</span> Friends</div>
-    <div class="nav-item"><span style="font-size:16px;">👤</span> Profile</div>
-  </div>
+  <div class="logo-area"><div class="logo-g">G</div><div class="logo-text">Game.OS</div></div>
+  <div class="nav-items"><div class="nav-item active"><span class="nav-icon">🏠</span> Home</div>
+    <div class="nav-item"><span class="nav-icon">🎮</span> Library</div>
+    <div class="nav-item"><span class="nav-icon">🛒</span> Store</div>
+    <div class="nav-item"><span class="nav-icon">👥</span> Friends</div>
+    <div class="nav-item"><span class="nav-icon">👤</span> Profile</div>
+    </div>
   <div style="padding:16px 8px; border-top:1px solid #21262d;">
-    <div class="nav-item" style="color:#f85149;"><span style="font-size:16px;">⏻</span> Sign Out</div>
+    <div class="nav-item" style="color:#f85149;"><span class="nav-icon">⏻</span> Sign Out</div>
   </div>
 </div>
-
-<div class="main">
-  <div class="page">
-    <div class="greeting">Good evening, Koriebonx98!</div>
-    <div class="sub">Welcome back to Game.OS</div>
-
-    <div class="stat-tiles">
-      <div class="stat-tile">
-        <div class="stat-num">3</div>
-        <div class="stat-lbl">Games</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-num yellow">35</div>
-        <div class="stat-lbl">Achievements</div>
-      </div>
-      <div class="stat-tile">
-        <div class="stat-num blue">3</div>
-        <div class="stat-lbl">Platforms</div>
-      </div>
-    </div>
-
-    <div class="hero-banner">
-      <div>
-        <div class="hero-badge">⭐ FEATURED</div>
-        <div class="hero-title">Mario Kart 8 Deluxe</div>
-        <div class="hero-desc">Hit the road with the definitive version of Mario Kart 8! Race on 96 total courses with friends online or locally.</div>
-        <div class="hero-price">£49.99</div>
-        <button style="background:#fff; color:#c00000; border:none; border-radius:6px; padding:10px 20px; font-weight:700; font-size:14px; cursor:pointer;">View Details</button>
-      </div>
-      <img src="https://cdn2.steamgriddb.com/grid/9cd6d894098e748716960bfcf9dbe115.png" class="hero-cover" onerror="this.outerHTML='<div class=hero-cover-fallback>MK8</div>'">
-    </div>
-
-    <div class="section-header">🕹️  Recently Added</div>
-    <div class="games-row">
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/9cd6d894098e748716960bfcf9dbe115.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#c00000,#ff6b00)>MK8</div>'">
-        <div class="game-info"><div class="game-title">Mario Kart 8 Deluxe</div><div class="game-meta"><span style="background:#1f6feb; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">Switch</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/368b80128d9e529adf93f7ce84dfaca0.jpg" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#1a0500,#5c1500)>GoW</div>'">
-        <div class="game-info"><div class="game-title">God of War</div><div class="game-meta"><span style="background:#003791; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">PS4</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-      <div class="game-card">
-        <img src="https://cdn2.steamgriddb.com/grid/3a96a1164364c063f40ce33aaf971783.png" class="game-cover" onerror="this.outerHTML='<div class=game-cover-fb style=background:linear-gradient(135deg,#0a1a08,#1a3a10)>TLOU</div>'">
-        <div class="game-info"><div class="game-title">The Last of Us Part II</div><div class="game-meta"><span style="background:#003791; color:#fff; border-radius:3px; padding:1px 5px; font-size:10px;">PS4</span> <span class="stars">★★★★★</span></div></div>
-      </div>
-    </div>
-
-    <div class="section-header">🏆  Recent Achievements</div>
-    <div class="ach-list">
-      <div class="ach-item">
-        <div class="ach-icon">🏆</div>
-        <div><div class="ach-name">Magic Mushroom's</div><div class="ach-game">Mario Kart 8 Deluxe · Switch</div></div>
-      </div>
-      <div class="ach-item">
-        <div class="ach-icon">🏆</div>
-        <div><div class="ach-name">Father and Son</div><div class="ach-game">God of War · PS4</div></div>
-      </div>
-    </div>
+<div class="main"><div class="page">
+  <div class="greeting">Good evening, Koriebonx98!</div>
+  <div class="sub">Welcome back to Game.OS</div>
+  <div class="stat-tiles">
+    <div class="stat-tile"><div class="stat-num">3</div><div class="stat-lbl">Games</div></div>
+    <div class="stat-tile"><div class="stat-num yellow">35</div><div class="stat-lbl">Achievements</div></div>
+    <div class="stat-tile"><div class="stat-num blue">3</div><div class="stat-lbl">Platforms</div></div>
   </div>
-</div>
+  <div class="hero-banner">
+    <div>
+      <div class="hero-badge">⭐ RECENTLY PLAYED</div>
+      <div class="hero-title">Mario Kart 8 Deluxe</div>
+      <div class="hero-desc">Hit the road with the definitive version of Mario Kart 8! Race on 96 total courses with friends online or locally.</div>
+      <div class="hero-price">★★★★★ <span style="font-size:13px;opacity:0.8;">Rating 9.7</span></div>
+      <button style="background:#fff;color:#c00000;border:none;border-radius:6px;padding:10px 20px;font-weight:700;font-size:14px;cursor:pointer;">View Details</button>
+    </div>
+    <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMTAwIDE0MCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjgwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNjMDAwMDAiLz48c3RvcCBvZmZzZXQ9IjEwMCUiIHN0b3AtY29sb3I9IiNmZjZiMDAiLz48L2xpbmVhckdyYWRpZW50PjwvZGVmcz48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjE0MCIgZmlsbD0idXJsKCNnKSIgcng9IjYiLz48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjE0MCIgZmlsbD0icmdiYSgwLDAsMCwwLjEpIiByeD0iNiIvPjx0ZXh0IHg9IjUwIiB5PSI2MCIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIyOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZG9taW5hbnQtYmFzZWxpbmU9Im1pZGRsZSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjk1KSI+8J+Pju+4jzwvdGV4dD48dGV4dCB4PSI1MCIgeT0iMTIxIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjEwIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSI+TWFyaW8gS2FydCA4PC90ZXh0Pjx0ZXh0IHg9IjUwIiB5PSIxMzMiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiIGZvbnQtc2l6ZT0iOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjYpIj5Td2l0Y2g8L3RleHQ+PC9zdmc+" width="100" height="140" style="border-radius:8px;margin-left:auto;flex-shrink:0;">
+  </div>
+  <div class="section-header">🕹️  Recently Added</div>
+  <div class="games-row">
+    <div class="game-card">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiB2aWV3Qm94PSIwIDAgMTU4IDExOCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjYzAwMDAwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjZmY2YjAwIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjE1OCIgaGVpZ2h0PSIxMTgiIGZpbGw9InVybCgjZykiLz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0icmdiYSgwLDAsMCwwLjIpIi8+PHRleHQgeD0iNzkiIHk9IjQ5IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7wn4+O77iPPC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSI5NiIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPk1hcmlvIEthcnQgOCBEZWzigKY8L3RleHQ+PHRleHQgeD0iNzkiIHk9IjEwOSIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSI5IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuNikiPlN3aXRjaDwvdGV4dD48L3N2Zz4=" class="game-cover" width="158" height="118" style="display:block;border-radius:0;">
+        <div class="game-info">
+          <div class="game-title">Mario Kart 8 Deluxe</div>
+          <div class="game-meta"><span class="plat-badge" style="background:#1f6feb;">Switch</span> <span class="stars">★★★★★</span></div>
+        </div>
+      </div>
+    <div class="game-card">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiB2aWV3Qm94PSIwIDAgMTU4IDExOCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMWEwNTAwIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOGIwMDAwIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjE1OCIgaGVpZ2h0PSIxMTgiIGZpbGw9InVybCgjZykiLz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0icmdiYSgwLDAsMCwwLjIpIi8+PHRleHQgeD0iNzkiIHk9IjQ5IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7impTvuI88L3RleHQ+PHRleHQgeD0iNzkiIHk9Ijk2IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjExIiBmb250LXdlaWdodD0iNzAwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSJ3aGl0ZSI+R29kIG9mIFdhcjwvdGV4dD48dGV4dCB4PSI3OSIgeT0iMTA5IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjkiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9InJnYmEoMjU1LDI1NSwyNTUsMC42KSI+UFM0PC90ZXh0Pjwvc3ZnPg==" class="game-cover" width="158" height="118" style="display:block;border-radius:0;">
+        <div class="game-info">
+          <div class="game-title">God of War</div>
+          <div class="game-meta"><span class="plat-badge" style="background:#003791;">PS4</span> <span class="stars">★★★★★</span></div>
+        </div>
+      </div>
+    <div class="game-card">
+        <img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNTgiIGhlaWdodD0iMTE4IiB2aWV3Qm94PSIwIDAgMTU4IDExOCI+PGRlZnM+PGxpbmVhckdyYWRpZW50IGlkPSJnIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIxMDAlIj48c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjMGExYTA4Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjMWEzYTEwIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjE1OCIgaGVpZ2h0PSIxMTgiIGZpbGw9InVybCgjZykiLz48cmVjdCB3aWR0aD0iMTU4IiBoZWlnaHQ9IjExOCIgZmlsbD0icmdiYSgwLDAsMCwwLjIpIi8+PHRleHQgeD0iNzkiIHk9IjQ5IiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjMwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuOTUpIj7wn4y/PC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSI5NiIgZm9udC1mYW1pbHk9InN5c3RlbS11aSIgZm9udC1zaXplPSIxMSIgZm9udC13ZWlnaHQ9IjcwMCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0id2hpdGUiPlRoZSBMYXN0IG9mIFVzIElJPC90ZXh0Pjx0ZXh0IHg9Ijc5IiB5PSIxMDkiIGZvbnQtZmFtaWx5PSJzeXN0ZW0tdWkiIGZvbnQtc2l6ZT0iOSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjYpIj5QUzQ8L3RleHQ+PC9zdmc+" class="game-cover" width="158" height="118" style="display:block;border-radius:0;">
+        <div class="game-info">
+          <div class="game-title">The Last of Us Part II</div>
+          <div class="game-meta"><span class="plat-badge" style="background:#003791;">PS4</span> <span class="stars">★★★★★</span></div>
+        </div>
+      </div>
+  </div>
+  <div class="section-header">🏆  Recent Achievements</div>
+  <div class="ach-list">
+    <div class="ach-item"><div class="ach-icon" style="background:#1a3300;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2Ij48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIGZpbGw9IiMxYTMzMDAiIHJ4PSI2Ii8+PHRleHQgeD0iMTgiIHk9IjIyIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjE3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIj7wn42EPC90ZXh0Pjwvc3ZnPg==" width="36" height="36"></div><div><div class="ach-name">Magic Mushroom's</div><div class="ach-game">Mario Kart 8 Deluxe · Switch · Unlocked 08 Jun 2025</div></div></div>
+    <div class="ach-item"><div class="ach-icon" style="background:#1a0500;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2Ij48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIGZpbGw9IiMxYTA1MDAiIHJ4PSI2Ii8+PHRleHQgeD0iMTgiIHk9IjIyIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjE3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIj7impTvuI88L3RleHQ+PC9zdmc+" width="36" height="36"></div><div><div class="ach-name">Father and Son</div><div class="ach-game">God of War · PS4 · Unlocked 15 Mar 2025</div></div></div>
+    <div class="ach-item"><div class="ach-icon" style="background:#1a0020;"><img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIzNiIgaGVpZ2h0PSIzNiIgdmlld0JveD0iMCAwIDM2IDM2Ij48cmVjdCB3aWR0aD0iMzYiIGhlaWdodD0iMzYiIGZpbGw9IiMxYTAwMjAiIHJ4PSI2Ii8+PHRleHQgeD0iMTgiIHk9IjIyIiBmb250LWZhbWlseT0ic3lzdGVtLXVpIiBmb250LXNpemU9IjE3IiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBkb21pbmFudC1iYXNlbGluZT0ibWlkZGxlIj7wn6qoPC90ZXh0Pjwvc3ZnPg==" width="36" height="36"></div><div><div class="ach-name">Paper, Scissors, Rock</div><div class="ach-game">Mario Kart 8 Deluxe · Switch · Unlocked 21 Jun 2025</div></div></div>
+  </div>
+</div></div>
 </body></html>
