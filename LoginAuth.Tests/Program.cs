@@ -434,9 +434,23 @@ class Program
                 return false;
             }
 
-            // Login as Admin.GameOS via POST /api/auth/token
+            // Login as Admin.GameOS via POST /api/auth/token.
             // This is the same REST API call the web frontend makes in backend mode.
-            var (profile, token) = await service.LoginAsync(adminUser, adminDefaultPassword, CancellationToken.None);
+            // A 401 here means wrong password; other errors propagate to the outer catch.
+            GameLauncher.Models.UserProfile? profile;
+            string? token;
+            try
+            {
+                (profile, token) = await service.LoginAsync(adminUser, adminDefaultPassword, CancellationToken.None);
+            }
+            catch (GameOsException ex) when (ex.StatusCode == 401)
+            {
+                Pass(false, $"Login failed (401) — wrong password for {adminUser}");
+                Console.WriteLine($"       Password tried: [{adminDefaultPassword.Length} chars]");
+                Console.WriteLine("       If the admin password was changed, set ADMIN_GAMEOS_PASSWORD=<new_password>");
+                Console.WriteLine("       Or check the data repo for the current accounts/admin.gameos/profile.json");
+                return false;
+            }
 
             bool loginOk  = profile != null && !string.IsNullOrEmpty(profile.Username);
             bool hasToken = !string.IsNullOrEmpty(token);
@@ -465,14 +479,6 @@ class Program
             }
 
             return loginOk && hasToken;
-        }
-        catch (GameOsException ex) when (ex.StatusCode == 401)
-        {
-            Pass(false, $"Login failed (401) — wrong password for {adminUser}");
-            Console.WriteLine($"       Password tried: [{adminDefaultPassword.Length} chars]");
-            Console.WriteLine("       If the admin password was changed, set ADMIN_GAMEOS_PASSWORD=<new_password>");
-            Console.WriteLine("       Or check the data repo for the current accounts/admin.gameos/profile.json");
-            return false;
         }
         catch (GameOsException ex)
         {
