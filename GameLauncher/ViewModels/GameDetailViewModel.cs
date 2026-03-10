@@ -242,11 +242,29 @@ public partial class GameDetailViewModel : ViewModelBase
     private void ConfirmDeleteGame()
     {
         if (string.IsNullOrEmpty(ActiveDrivePath)) return;
+
+        // Safety guard: only allow deletion of directories whose name contains "Games"
+        // or whose parent directory contains "Games" — prevents accidental deletion of
+        // root drives, user home folders, or other system directories.
+        var normalized = System.IO.Path.GetFullPath(ActiveDrivePath);
+        bool looksLikeGameDir =
+            normalized.Contains(System.IO.Path.DirectorySeparatorChar + "Games" + System.IO.Path.DirectorySeparatorChar,
+                                 StringComparison.OrdinalIgnoreCase) ||
+            normalized.Contains(System.IO.Path.DirectorySeparatorChar + "Roms" + System.IO.Path.DirectorySeparatorChar,
+                                 StringComparison.OrdinalIgnoreCase);
+
+        if (!looksLikeGameDir)
+        {
+            SettingsStatus = "⛔  Safety check failed: path does not appear to be inside a Games folder.";
+            ConfirmDelete  = false;
+            return;
+        }
+
         try
         {
-            if (Directory.Exists(ActiveDrivePath))
+            if (Directory.Exists(normalized))
             {
-                Directory.Delete(ActiveDrivePath, recursive: true);
+                Directory.Delete(normalized, recursive: true);
                 SettingsStatus  = "✓  Game folder deleted.";
                 IsInstalled     = false;
                 ActiveDrivePath = "";
@@ -317,6 +335,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         if (!string.IsNullOrEmpty(exePath))
         {
+            System.Diagnostics.Process? gameProc = null;
             try
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
@@ -326,13 +345,13 @@ public partial class GameDetailViewModel : ViewModelBase
                 };
                 if (!string.IsNullOrEmpty(exeArgs))
                     psi.Arguments = exeArgs;
-                System.Diagnostics.Process.Start(psi);
+                gameProc = System.Diagnostics.Process.Start(psi);
             }
             catch { /* best-effort */ }
 
             // Register post-launch watcher (fire-and-forget)
             if (saved.PostLaunch.Count > 0)
-                _ = WatchAndRunPostLaunchAsync(exePath, saved.PostLaunch);
+                _ = WatchAndRunPostLaunchAsync(gameProc, saved.PostLaunch);
         }
         else if (!string.IsNullOrEmpty(ActiveDrivePath))
         {
@@ -359,21 +378,23 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     private static async System.Threading.Tasks.Task WatchAndRunPostLaunchAsync(
-        string exePath, List<LaunchEntry> postEntries)
+        System.Diagnostics.Process? gameProc, List<LaunchEntry> postEntries)
     {
-        try
+        if (gameProc != null)
         {
-            // Poll for the game process to exit (check every 10 seconds for up to 24 h)
-            var exeName = System.IO.Path.GetFileNameWithoutExtension(exePath);
-            for (int i = 0; i < 8640; i++)
+            try
             {
-                await System.Threading.Tasks.Task.Delay(10_000);
-                bool running = System.Diagnostics.Process
-                    .GetProcessesByName(exeName).Length > 0;
-                if (!running) break;
+                // Wait up to 24 hours for the game process to exit
+                using var cts = new System.Threading.CancellationTokenSource(
+                    System.TimeSpan.FromHours(24));
+                await gameProc.WaitForExitAsync(cts.Token);
+            }
+            catch { /* process may have already exited or be inaccessible */ }
+            finally
+            {
+                gameProc.Dispose();
             }
         }
-        catch { }
 
         foreach (var post in postEntries)
             TryStartProcess(post.Path, post.Arguments);

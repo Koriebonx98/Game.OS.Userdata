@@ -275,16 +275,29 @@ namespace GameLauncher.Models
         /// <summary>
         /// Converts the GitHub HTML image URL (blob/main/…) to a raw.githubusercontent.com URL
         /// so Avalonia's Image control can download it directly.
+        /// Already-raw URLs and non-GitHub URLs are returned unchanged.
         /// </summary>
         public string? RawImageUrl
         {
             get
             {
                 if (string.IsNullOrEmpty(Image)) return null;
+
+                // Already a raw URL — return as-is
+                if (Image.StartsWith("https://raw.githubusercontent.com/", StringComparison.Ordinal))
+                    return Image;
+
+                // Convert html blob URL:
                 // https://github.com/Owner/Repo/blob/main/path → https://raw.githubusercontent.com/Owner/Repo/main/path
-                return Image
-                    .Replace("https://github.com/", "https://raw.githubusercontent.com/", StringComparison.Ordinal)
-                    .Replace("/blob/", "/", StringComparison.Ordinal);
+                if (Image.StartsWith("https://github.com/", StringComparison.Ordinal) &&
+                    Image.Contains("/blob/", StringComparison.Ordinal))
+                {
+                    return Image
+                        .Replace("https://github.com/", "https://raw.githubusercontent.com/", StringComparison.Ordinal)
+                        .Replace("/blob/", "/", StringComparison.Ordinal);
+                }
+
+                return Image;
             }
         }
     }

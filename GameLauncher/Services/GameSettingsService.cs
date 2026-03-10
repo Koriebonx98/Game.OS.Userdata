@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Text;
 using System.Text.Json;
 using GameLauncher.Models;
 
@@ -54,10 +56,20 @@ namespace GameLauncher.Services
 
         private static string GetPath(string title)
         {
-            // Strip characters that are invalid in file names on any OS
-            var safe = string.Concat(title.Split(Path.GetInvalidFileNameChars()));
+            // Build a safe filename: keep alphanumeric and common chars, replace
+            // invalid characters with '_', then append a short hash of the original
+            // title to prevent collisions between sanitised names (e.g. "Game:One"
+            // and "GameOne" would otherwise produce the same filename).
+            var safe = string.Concat(title.Select(c =>
+                Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
             if (string.IsNullOrWhiteSpace(safe)) safe = "unknown";
-            return Path.Combine(SettingsDir, $"{safe}.settings.json");
+
+            // Append first 8 chars of a stable SHA-256 hash of the original title
+            using var sha = System.Security.Cryptography.SHA256.Create();
+            var hashBytes = sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(title));
+            var hashShort = BitConverter.ToString(hashBytes, 0, 4).Replace("-", "");
+
+            return Path.Combine(SettingsDir, $"{safe}_{hashShort}.settings.json");
         }
     }
 }
