@@ -170,6 +170,66 @@ if (!process.env.TOKEN_HMAC_SECRET) {
 }
 const TOKEN_HMAC_SECRET = process.env.TOKEN_HMAC_SECRET || 'change-me-please';
 
+// ── In-memory token cache ─────────────────────────────────────────────────────
+// Caches recently issued tokens to bridge the GitHub API propagation delay.
+// After POST /api/auth/token writes the token hash to GitHub, a subsequent
+// authenticated request (e.g. GET /api/me) might still see the old profile
+// from GitHub's API cache, causing a spurious 401.  This in-memory cache
+// ensures the token is valid immediately after login.
+//
+// TTL: 5 minutes — long enough to cover any GitHub propagation lag.
+// Revocation: evicted synchronously when POST /api/auth/revoke-token is called.
+
+const _tokenCache    = new Map(); // rawToken → { usernameLower, username, email, expiresAt }
+const TOKEN_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+/** Add a newly issued token to the in-memory cache. */
+function _cacheToken(rawToken, usernameLower, username, email) {
+    _tokenCache.set(rawToken, {
+        usernameLower,
+        username:  username  || usernameLower,
+        email:     email     || '',
+        expiresAt: Date.now() + TOKEN_CACHE_TTL_MS,
+    });
+}
+
+/**
+ * Return the cached token entry if it exists and hasn't expired.
+ * Expired entries are pruned lazily on lookup.
+ */
+function _lookupTokenCache(rawToken) {
+    const entry = _tokenCache.get(rawToken);
+    if (!entry) return null;
+    if (entry.expiresAt < Date.now()) {
+        _tokenCache.delete(rawToken);
+        return null;
+    }
+    return entry;
+}
+
+/** Remove all cached tokens issued to a given account (used on revoke). */
+function _evictTokensForUser(usernameLower) {
+    const toDelete = [];
+    for (const [token, entry] of _tokenCache.entries()) {
+        if (entry.usernameLower === usernameLower) {
+            toDelete.push(token);
+        }
+    }
+    for (const token of toDelete) {
+        _tokenCache.delete(token);
+    }
+}
+
+// Periodically remove expired entries to prevent unbounded cache growth.
+setInterval(() => {
+    const now = Date.now();
+    const toDelete = [];
+    for (const [token, entry] of _tokenCache.entries()) {
+        if (entry.expiresAt < now) toDelete.push(token);
+    }
+    for (const token of toDelete) _tokenCache.delete(token);
+}, TOKEN_CACHE_TTL_MS).unref(); // .unref() so this timer doesn't keep the process alive
+
 // ── Public API key ────────────────────────────────────────────────────────────
 // A single shared key for C# apps / game launchers that need read access
 // without authenticating as a specific user.  Set PUBLIC_API_KEY in .env.
@@ -316,6 +376,18 @@ async function authenticateToken(req, res, next) {
         return res.status(401).json({ success: false, message: 'Invalid API token format.' });
     }
 
+    // Check the in-memory cache first — covers the window between a token being
+    // issued (POST /api/auth/token) and GitHub's API returning the updated profile.
+    const cached = _lookupTokenCache(rawToken);
+    if (cached) {
+        req.tokenUser = {
+            username:      cached.username,
+            email:         cached.email,
+            usernameLower: cached.usernameLower,
+        };
+        return next();
+    }
+
     try {
         const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
         const storedHash  = accountFile && accountFile.content.api_token_hash;
@@ -369,6 +441,17 @@ async function authenticatePublicOrUserToken(req, res, next) {
     const usernameLower = parseTokenUsername(rawToken);
     if (!usernameLower || !sanitiseUsername(usernameLower)) {
         return res.status(401).json({ success: false, message: 'Invalid API token format.' });
+    }
+
+    // Check the in-memory cache first
+    const cached = _lookupTokenCache(rawToken);
+    if (cached) {
+        req.tokenUser = {
+            username:      cached.username,
+            email:         cached.email,
+            usernameLower: cached.usernameLower,
+        };
+        return next();
     }
 
     try {
@@ -1617,6 +1700,10 @@ app.post('/api/auth/token', async (req, res) => {
             accountFile.sha
         );
 
+        // Cache the token immediately so authenticated requests succeed even if
+        // GitHub's API hasn't yet returned the updated profile (propagation delay).
+        _cacheToken(rawToken, accountKey, accountFile.content.username, accountFile.content.email);
+
         res.json({
             success:  true,
             token:    rawToken,
@@ -1669,6 +1756,9 @@ app.post('/api/auth/revoke-token', async (req, res) => {
             `Revoke API token for: ${accountKey}`,
             accountFile.sha
         );
+
+        // Evict any cached tokens for this account so they're immediately invalid
+        _evictTokensForUser(accountKey);
 
         res.json({ success: true, message: 'API token revoked successfully.' });
     } catch (err) {
