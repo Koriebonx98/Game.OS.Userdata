@@ -124,10 +124,14 @@ namespace GameLauncher
             if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
                 throw new GameOsException(503,
                     "Game.OS is not configured for login.\n\n" +
-                    "Please download the official Game.OS Launcher from GitHub Actions\n" +
-                    "(Actions → Build & Live-Login Test → GameOS-Launcher-win-x64 artifact),\n" +
-                    "which includes the credentials needed to connect to the data store.\n\n" +
-                    "Alternatively, set GAMEOS_BACKEND_URL to point to your backend server,\n" +
+                    "Download the pre-built launcher from GitHub Actions:\n" +
+                    "  Actions → Build & Live-Login Test → GameOS-Launcher-win-x64\n" +
+                    "(it has the backend URL baked in and works immediately).\n\n" +
+                    "Building from Visual Studio? Start the local backend first:\n" +
+                    "  cd backend && npm install && node index.js\n" +
+                    "The launcher will auto-connect to http://localhost:3000.\n\n" +
+                    "Or set the GAMEOS_BACKEND_URL environment variable to your\n" +
+                    "deployed backend server URL (e.g. https://gameos.up.railway.app),\n" +
                     "or set GAMEOS_GITHUB_TOKEN to your GitHub Personal Access Token.");
 
             var ghProfile = await _github!.VerifyLoginAsync(usernameOrEmail, password, ct)

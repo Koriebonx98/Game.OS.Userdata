@@ -121,16 +121,41 @@ After a successful login the C# launcher shows the same account data fetched liv
 - [.NET 8 SDK](https://dotnet.microsoft.com/download) or later
 - A Game.OS account (create one at the [web frontend](../README.md) — same account works in the launcher)
 
-### Run the launcher
+### Option A — Download the pre-built launcher (easiest)
+
+Go to **GitHub Actions → Build & Live-Login Test → GameOS-Launcher-win-x64 artifact** and
+download the pre-built Windows exe. It has the backend URL baked in and works immediately.
+
+### Option B — Run from Visual Studio (developers)
+
+1. **Start the local backend server:**
+   ```bash
+   cd backend
+   npm install
+   node index.js
+   # → Server running at http://localhost:3000
+   ```
+   The backend needs `GITHUB_TOKEN`, `REPO_OWNER`, and `REPO_NAME` — see `backend/.env.example`.
+
+2. **Open Visual Studio** and load `Game.OS.Userdata.sln` from the repository root.
+
+3. **Press ▶ (Run)** with the **GameLauncher** project selected.
+
+   Visual Studio automatically reads `GameLauncher/Properties/launchSettings.json` and sets
+   `GAMEOS_BACKEND_URL=http://localhost:3000` before launching — **no manual env-var setup needed**.
+
+4. Sign in with your Game.OS account and the launcher will connect to the local backend.
+
+### Option C — Run from the command line
 
 ```bash
 cd GameLauncher
-dotnet run -c Release
-# → sign in with your Game.OS username and password
+dotnet run
+# launchSettings.json auto-sets GAMEOS_BACKEND_URL=http://localhost:3000
 ```
 
-The launcher connects to the **same private GitHub data repository** as the website — no local
-server required.  Sign in with any account you already created on the web frontend.
+The `Properties/launchSettings.json` is read by both Visual Studio and `dotnet run`, so the
+`GAMEOS_BACKEND_URL` environment variable is set automatically — no manual configuration needed.
 
 ### How token access works — same mechanism as the website
 
@@ -148,10 +173,12 @@ The `build-csharp-launcher.yml` GitHub Actions workflow:
 1. Reads `DATA_REPO_TOKEN` from repository secrets (same secret used by `deploy.yml`)
 2. XOR-encodes it with key `GameOS_KEY`
 3. Writes the encoded string to `GameLauncher/gameos-token.dat` before building
-4. Builds and publishes the app — the token file is bundled alongside the executable
-5. Runs the live login test for `Koriebonx98` to confirm everything works
+4. Reads `GAMEOS_BACKEND_URL` from secrets and writes it to `GameLauncher/gameos-backend.url`
+5. Builds and publishes the app — both files are bundled alongside the executable
+6. Runs the live login test for `Koriebonx98` to confirm everything works
 
-The empty placeholder `gameos-token.dat` is committed to the repo (just like `GITHUB_TOKEN_ENCODED = '';` is committed in `script.js`).  The real token is only present inside the CI runner during the build and is never committed back.
+The empty placeholder files are committed to the repo. The real values are only present inside
+the CI runner during the build and are never committed back.
 
 ![Build & Login Architecture](../Design/Screenshots/screenshot_build_and_login.png)
 
@@ -161,7 +188,10 @@ The launcher supports two authentication modes and auto-detects which one to use
 
 #### Mode 1 — Backend REST API (preferred, no GitHub PAT needed)
 
-Set the `GAMEOS_BACKEND_URL` environment variable to your deployed backend URL:
+The `Properties/launchSettings.json` automatically sets `GAMEOS_BACKEND_URL=http://localhost:3000`
+when running with Visual Studio or `dotnet run` — **no manual configuration needed**.
+
+To use a different backend URL, set the environment variable:
 
 ```bash
 # Windows
@@ -171,6 +201,8 @@ dotnet run
 # Linux / macOS
 GAMEOS_BACKEND_URL=https://gameos.up.railway.app dotnet run
 ```
+
+Or write the URL to `gameos-backend.url` in the project/executable folder.
 
 The launcher calls `POST {url}/api/auth/token` with `{ username, password }` — **exactly the
 same endpoint the web frontend calls**.  The backend server holds the GitHub PAT; the launcher
@@ -183,14 +215,14 @@ directly (mirroring the web frontend's GitHub-direct mode).  This requires a Git
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GAMEOS_BACKEND_URL` | *(none)* | **Preferred** — backend server URL; no PAT needed |
+| `GAMEOS_BACKEND_URL` | `http://localhost:3000` (via launchSettings.json) | **Preferred** — backend server URL; no PAT needed |
 | `GAMEOS_DATA_REPO_OWNER` | `Koriebonx98` | GitHub owner of the private data repository |
 | `GAMEOS_DATA_REPO_NAME` | `Game.OS.Private.Data` | Repository name for user data |
 | `GAMEOS_GITHUB_TOKEN` | *(none)* | Fine-grained PAT — developer/CI override; takes priority over `gameos-token.dat` |
 
-> **For developers running from source with a backend:** set `GAMEOS_BACKEND_URL`.
-> **For developers running from source without a backend:** set `GAMEOS_GITHUB_TOKEN`.
-> End users running a published build get the token via `gameos-token.dat` (injected at CI build time).
+> **For developers running from source:** just start the backend server and press ▶ in VS.
+> The `launchSettings.json` wires up the backend URL automatically.
+> End users running a published build get the URL via `gameos-backend.url` (injected at CI build time).
 
 ---
 

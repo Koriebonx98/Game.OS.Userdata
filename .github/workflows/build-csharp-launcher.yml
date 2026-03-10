@@ -12,6 +12,12 @@
 #   backend URL baked in (via gameos-backend.url) so it works immediately on
 #   launch — no environment variables or PAT setup required.
 #
+# Visual Studio (developer builds from source):
+#   GameLauncher/Properties/launchSettings.json sets GAMEOS_BACKEND_URL=http://localhost:3000
+#   automatically when running with VS or `dotnet run` — no manual env-var setup needed.
+#   Start the local backend first:  cd backend && npm install && node index.js
+#   Then press ▶ in Visual Studio (or run `dotnet run`) and sign in normally.
+#
 # Injection at build time:
 #   gameos-token.dat  — DATA_REPO_TOKEN XOR-encoded (GitHub-direct auth)
 #   gameos-backend.url — GAMEOS_BACKEND_URL written as plain text (backend mode)
@@ -231,6 +237,149 @@ jobs:
               echo "ℹ  Backend server already stopped"
             fi
           fi
+
+      # ── GUI screenshot capture ────────────────────────────────────────────
+      # Captures screenshots of the C# launcher running on Linux/Xvfb.
+      # Starts the local backend (if DATA_REPO_TOKEN is set) to allow Admin.GameOS
+      # auto-login (via pre-seeded session file) so every screen can be shown.
+      # Screenshots are uploaded as an artifact for review.
+      - name: Capture GUI screenshots (Xvfb + local backend)
+        if: env.BACKEND_STARTED == 'true'
+        env:
+          GITHUB_TOKEN:          ${{ secrets.DATA_REPO_TOKEN }}
+          REPO_OWNER:            Koriebonx98
+          REPO_NAME:             Game.OS.Private.Data
+          ADMIN_GAMEOS_PASSWORD: ${{ secrets.ADMIN_GAMEOS_PASSWORD || 'GameOS2026' }}
+          PORT:                  3000
+        run: |
+          set -e
+
+          # Install display + screenshot tools
+          sudo apt-get install -y --no-install-recommends \
+            xvfb scrot libx11-6 libxext6 libxfixes3 libxi6 libxcursor1 \
+            libxrender1 libxinerama1 libatk1.0-0 libgtk-3-0 \
+            libxcomposite1 libxdamage1 2>&1 | tail -3
+
+          # Build the Linux launcher binary
+          dotnet publish GameLauncher/GameLauncher.csproj \
+            -c Release -r linux-x64 --self-contained true \
+            -p:PublishSingleFile=true \
+            -o /tmp/gameos-linux 2>&1 | tail -3
+
+          # Write backend URL so the launcher auto-connects
+          echo "http://localhost:3000" > /tmp/gameos-linux/gameos-backend.url
+
+          # Pre-seed a saved Admin.GameOS session so the app auto-logs in
+          mkdir -p ~/.config/GameOS
+          cat > ~/.config/GameOS/sessions.json << 'SESSIONS'
+          [
+            {
+              "username": "Admin.GameOS",
+              "email": "admin@gameos.com",
+              "token": "WILL_BE_REPLACED_BY_BACKEND",
+              "avatarColor": "#1f6feb",
+              "savedAt": "2026-01-01T00:00:00.000Z",
+              "rememberMe": true
+            }
+          ]
+          SESSIONS
+
+          # Obtain a real Admin.GameOS token from the backend and update the session
+          export TOKEN_HMAC_SECRET="$(openssl rand -hex 32)"
+          cd backend
+          nohup node index.js > /tmp/backend-screenshot.log 2>&1 &
+          BACKEND_PID=$!
+          echo "$BACKEND_PID" > /tmp/backend-screenshot.pid
+
+          # Wait for backend
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+              echo "✅ Backend ready for screenshots"
+              break
+            fi
+            sleep 1
+          done
+          cd ..
+
+          # Obtain real session token for Admin.GameOS
+          ADMIN_TOKEN=$(curl -sf -X POST http://localhost:3000/api/auth/token \
+            -H "Content-Type: application/json" \
+            -d "{\"username\":\"Admin.GameOS\",\"password\":\"$ADMIN_GAMEOS_PASSWORD\"}" \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('token',''))" 2>/dev/null || echo "")
+
+          if [ -n "$ADMIN_TOKEN" ]; then
+            python3 -c "
+          import json
+          s = [{
+            'username': 'Admin.GameOS',
+            'email': 'admin@gameos.com',
+            'token': '$ADMIN_TOKEN',
+            'avatarColor': '#1f6feb',
+            'savedAt': '2026-01-01T00:00:00.000Z',
+            'rememberMe': True
+          }]
+          import os; os.makedirs(os.path.expanduser('~/.config/GameOS'), exist_ok=True)
+          with open(os.path.expanduser('~/.config/GameOS/sessions.json'), 'w') as f:
+            json.dump(s, f, indent=2)
+          print('✅ Session file written with real Admin.GameOS token')
+          "
+          else
+            echo "⚠  Could not obtain Admin.GameOS token — app will show login screen"
+          fi
+
+          mkdir -p /tmp/launcher-screenshots
+
+          # Start Xvfb virtual display
+          Xvfb :98 -screen 0 1400x900x24 -ac &
+          XVFB_PID=$!
+          sleep 2
+          echo "Xvfb started on :98 (PID $XVFB_PID)"
+
+          # Launch the C# app
+          export DISPLAY=:98
+          export GAMEOS_BACKEND_URL=http://localhost:3000
+          /tmp/gameos-linux/GameLauncher &
+          LAUNCHER_PID=$!
+          echo "Launcher PID: $LAUNCHER_PID"
+          sleep 10
+
+          # Take screenshots
+          DISPLAY=:98 scrot /tmp/launcher-screenshots/01_launcher_startup.png 2>/dev/null || true
+          echo "Screenshot 01: $(stat -c%s /tmp/launcher-screenshots/01_launcher_startup.png 2>/dev/null || echo 0) bytes"
+
+          sleep 5
+          DISPLAY=:98 scrot /tmp/launcher-screenshots/02_launcher_loaded.png 2>/dev/null || true
+          echo "Screenshot 02: $(stat -c%s /tmp/launcher-screenshots/02_launcher_loaded.png 2>/dev/null || echo 0) bytes"
+
+          # Save backend log as proof of requests processed during screenshot
+          if [ -f /tmp/backend-screenshot.log ]; then
+            cp /tmp/backend-screenshot.log /tmp/launcher-screenshots/backend-requests.log
+            echo ""
+            echo "=== Backend requests during screenshot session ==="
+            cat /tmp/backend-screenshot.log | head -30
+          fi
+
+          # Stop launcher and Xvfb
+          if kill "$LAUNCHER_PID" 2>/dev/null; then echo "Launcher stopped"; fi
+          if kill "$XVFB_PID" 2>/dev/null; then echo "Xvfb stopped"; fi
+
+          # Stop screenshot backend
+          if [ -f /tmp/backend-screenshot.pid ]; then
+            BACKEND_PID=$(cat /tmp/backend-screenshot.pid)
+            kill "$BACKEND_PID" 2>/dev/null && echo "Screenshot backend stopped" || true
+          fi
+
+          echo "✅ Screenshots saved to /tmp/launcher-screenshots/"
+          ls -lh /tmp/launcher-screenshots/
+
+      - name: Upload GUI screenshots artifact
+        if: env.BACKEND_STARTED == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: csharp-launcher-screenshots
+          path: /tmp/launcher-screenshots/
+          retention-days: 90
+          if-no-files-found: warn
 
       # ── Publish standalone Windows exe ────────────────────────────────────
       # Produces a single self-contained GameLauncher.exe for Windows x64.

@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "GameLauncher (local backend)": {
+      "commandName": "Project",
+      "environmentVariables": {
+        "GAMEOS_BACKEND_URL": "http://localhost:3000"
+      }
+    },
+    "GameLauncher (backend URL from file)": {
+      "commandName": "Project",
+      "environmentVariables": {}
+    }
+  }
+}
