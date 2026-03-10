@@ -1,0 +1,3 @@
+# Exclude local development screenshots (too large for repo tracking)
+linux-xvfb/after-login-kb.png
+linux-xvfb/after-nav-enter.png

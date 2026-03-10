@@ -1,0 +1,232 @@
+name: Game.OS Launcher — Linux Screenshots (Xvfb)
+
+# Captures screenshots of the running launcher on Linux using a virtual
+# framebuffer (Xvfb) and uploads them as workflow artifacts.
+# Trigger manually from the Actions tab, or on pushes to the launcher code.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'GameLauncher/**'
+      - '.github/workflows/launcher-screenshots.yml'
+
+jobs:
+  linux-screenshots:
+    name: Build & Screenshot (Linux + Xvfb)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      # ── 1. Checkout ───────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. .NET SDK ───────────────────────────────────────────────────────────
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      # ── 3. System packages ────────────────────────────────────────────────────
+      - name: Install Xvfb, openbox, scrot, xdotool, fonts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y \
+            xvfb openbox scrot xdotool x11-utils \
+            libgl1 mesa-utils libgles2 libopengl0 \
+            libglib2.0-0 libfontconfig1 libfreetype6 \
+            fonts-dejavu-core fonts-noto
+
+      # ── 4. Fake game directories ─────────────────────────────────────────────
+      - name: Create fake Linux game library at /Games/
+        run: |
+          sudo mkdir -p "/Games/Cyberpunk 2077"
+          sudo mkdir -p "/Games/The Witcher 3"
+          sudo mkdir -p "/Games/Grand Theft Auto V"
+          sudo mkdir -p "/Games/Dark Souls III"
+          sudo touch "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
+          sudo chmod +x "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
+          sudo touch "/Games/The Witcher 3/witcher3.elf"
+          sudo chmod +x "/Games/The Witcher 3/witcher3.elf"
+          sudo mkdir -p "/Games/Roms/Xbox 360/Games"
+          sudo touch "/Games/Roms/Xbox 360/Games/Halo 3.iso"
+          sudo touch "/Games/Roms/Xbox 360/Games/Gears of War.iso"
+          sudo mkdir -p "/Games/Roms/PS3/Games"
+          sudo touch "/Games/Roms/PS3/Games/God of War III.iso"
+          echo "Fake game library created at /Games/"
+          ls /Games/
+
+      # ── 5. Build ──────────────────────────────────────────────────────────────
+      - name: Restore & Build (Release)
+        run: |
+          dotnet restore GameLauncher/GameLauncher.csproj
+          dotnet build   GameLauncher/GameLauncher.csproj -c Release
+
+      # ── 6. Inject backend URL (if secret available) ───────────────────────────
+      - name: Inject backend URL
+        run: |
+          URL="${{ secrets.GAMEOS_BACKEND_URL }}"
+          if [ -n "$URL" ]; then
+            echo "$URL" > GameLauncher/bin/Release/net8.0/gameos-backend.url
+            echo "Backend URL injected"
+          else
+            echo "No GAMEOS_BACKEND_URL secret — launcher will use GitHub-direct mode"
+          fi
+
+      # ── 7. Publish self-contained binary ──────────────────────────────────────
+      - name: Publish linux-x64 self-contained
+        run: |
+          dotnet publish GameLauncher/GameLauncher.csproj \
+            -c Release -r linux-x64 --self-contained true \
+            -p:PublishSingleFile=true -o /tmp/gameos-linux
+          # Re-inject URL into published output
+          URL="${{ secrets.GAMEOS_BACKEND_URL }}"
+          [ -n "$URL" ] && echo "$URL" > /tmp/gameos-linux/gameos-backend.url
+          ls -lh /tmp/gameos-linux/GameLauncher
+
+      # ── 8. Run scanner unit-tests ─────────────────────────────────────────────
+      - name: Run GameScanner detection tests
+        run: |
+          cd GameScanner.Tests && dotnet run 2>&1 | tee /tmp/scanner-test-output.txt
+          cat /tmp/scanner-test-output.txt
+
+      # ── 9. Start Xvfb + openbox ───────────────────────────────────────────────
+      - name: Start virtual display (Xvfb + openbox)
+        run: |
+          Xvfb :99 -screen 0 1280x800x24 -ac -noreset &
+          sleep 3
+          openbox --config-file /dev/null &
+          sleep 2
+          DISPLAY=:99 xdpyinfo | grep "name of display"
+          echo "Virtual display ready"
+
+      # ── 10. Pre-seed session cache (so auto-login works if backend is up) ──────
+      - name: Pre-seed session cache for auto-login
+        env:
+          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+        run: |
+          CACHE_DIR="$HOME/.config/GameOS"
+          mkdir -p "$CACHE_DIR"
+          # The launcher will try to authenticate with these credentials on startup
+          # if a session exists with rememberMe=true and a valid token.
+          # We pre-populate the username so it appears in the quick-login panel.
+          cat > "$CACHE_DIR/sessions.json" << 'ENDJSON'
+          [{"username":"Koriebonx98","email":"","token":"","avatarColor":"#1e90ff","savedAt":"2026-01-01T00:00:00Z","rememberMe":false}]
+          ENDJSON
+          cat "$CACHE_DIR/sessions.json"
+
+      # ── 11. Launch app and take screenshots ───────────────────────────────────
+      - name: Launch Game.OS launcher and capture screenshots
+        env:
+          DISPLAY: ':99'
+          GAMEOS_DISABLE_GPU: '1'
+          LIBGL_ALWAYS_SOFTWARE: '1'
+          GALLIUM_DRIVER: softpipe
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+        run: |
+          mkdir -p /tmp/screenshots
+
+          cd /tmp/gameos-linux
+          ./GameLauncher > /tmp/launcher-stdout.log 2>/tmp/launcher-stderr.log &
+          APPPID=$!
+          echo "Launcher PID: $APPPID"
+
+          # Wait for the login screen to render
+          sleep 14
+
+          if ! kill -0 $APPPID 2>/dev/null; then
+            echo "::error::Launcher failed to start"
+            cat /tmp/launcher-stderr.log
+            exit 1
+          fi
+
+          # ── Screenshot 1: Login screen ─────────────────────────────────────
+          scrot /tmp/screenshots/01-login-screen.png
+          echo "✅ Login screen captured"
+
+          # ── Log in using keyboard-only navigation ─────────────────────────
+          # Avalonia auto-focuses the first TextBox (username field)
+          xdotool type --clearmodifiers --delay 80 "Koriebonx98"
+          sleep 0.5
+          xdotool key Tab  # → password field
+          sleep 0.3
+          xdotool type --clearmodifiers --delay 80 "${{ secrets.GAMEOS_TEST_PASSWORD }}"
+          sleep 0.3
+
+          # ── Screenshot 2: Credentials entered ─────────────────────────────
+          scrot /tmp/screenshots/02-credentials-entered.png
+          echo "✅ Credentials screenshot captured"
+
+          # Submit (Tab × 2 → Sign In button → Enter)
+          xdotool key Tab Tab Return
+          sleep 15  # Wait for network auth + data load
+
+          if ! kill -0 $APPPID 2>/dev/null; then
+            echo "::warning::Launcher exited after login attempt (may need backend URL)"
+          fi
+
+          # ── Screenshot 3: Dashboard / Home ────────────────────────────────
+          scrot /tmp/screenshots/03-dashboard.png
+          echo "✅ Dashboard screenshot captured"
+          sleep 2
+
+          # Navigate to My Library (Tab through sidebar; Library is 2nd nav button)
+          xdotool key Tab Tab Tab Return
+          sleep 4
+          scrot /tmp/screenshots/04-library.png
+          echo "✅ Library screenshot captured"
+
+          # Navigate to Games Store
+          xdotool key Tab Return
+          sleep 5
+          scrot /tmp/screenshots/05-game-store.png
+          echo "✅ Game Store screenshot captured"
+
+          # Navigate to App Store tab within the store
+          xdotool key Tab Return
+          sleep 4
+          scrot /tmp/screenshots/06-app-store.png
+          echo "✅ App Store screenshot captured"
+
+          # Navigate to Friends
+          xdotool key Tab Return
+          sleep 4
+          scrot /tmp/screenshots/07-friends.png
+          echo "✅ Friends screenshot captured"
+
+          echo ""
+          echo "All screenshots captured:"
+          ls -lh /tmp/screenshots/
+
+      # ── 12. Copy screenshots to repo ──────────────────────────────────────────
+      - name: Copy screenshots to repo
+        run: |
+          mkdir -p screenshots/linux-xvfb
+          cp /tmp/screenshots/*.png screenshots/linux-xvfb/ 2>/dev/null || true
+          ls screenshots/linux-xvfb/
+
+      # ── 13. Upload as artifacts ───────────────────────────────────────────────
+      - name: Upload screenshots as artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-xvfb-screenshots
+          path: |
+            /tmp/screenshots/
+            /tmp/scanner-test-output.txt
+            /tmp/launcher-stdout.log
+            /tmp/launcher-stderr.log
+          retention-days: 30
+
+      - name: Upload launcher logs on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: launcher-crash-logs
+          path: |
+            /tmp/launcher-stderr.log
+            /tmp/launcher-stdout.log
+          retention-days: 7
