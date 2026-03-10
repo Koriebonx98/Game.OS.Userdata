@@ -77,6 +77,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnOpenStoreDetail = OpenDetailFromStoreGame;
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
+        LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
 
         // Start background scanner regardless of login state
@@ -275,6 +276,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Asynchronously enrich with cover/description/trailer from Games.Database
         _ = EnrichLocalGameDetailAsync(game.Title);
+    }
+
+    private void OpenDetailFromLocalRepack(LocalRepack repack)
+    {
+        // Show repack info immediately so the UI is responsive
+        DetailVm.LoadFromLocalRepack(repack);
+        ShowDetail = true;
+
+        // Asynchronously enrich with real cover art / description / screenshots
+        // from the Games.Database — same enrichment as installed local games.
+        // StripRepackMarkers is applied inside EnrichLocalGameDetailAsync via
+        // FindDatabaseGame, so "[FitGirl Repack]" suffixes are stripped automatically.
+        _ = EnrichLocalGameDetailAsync(repack.Title);
     }
 
     /// <summary>

@@ -29,9 +29,11 @@ public partial class LibraryViewModel : ViewModelBase
     public ObservableCollection<LocalRom>    LocalRoms      { get; } = new();
 
     /// <summary>Invoked when the user clicks a cloud game card.</summary>
-    public Action<Game>?      OnOpenDetail      { get; set; }
+    public Action<Game>?       OnOpenDetail       { get; set; }
     /// <summary>Invoked when the user clicks a local/detected game card.</summary>
-    public Action<LocalGame>? OnOpenLocalDetail { get; set; }
+    public Action<LocalGame>?  OnOpenLocalDetail  { get; set; }
+    /// <summary>Invoked when the user clicks a ready-to-install repack card.</summary>
+    public Action<LocalRepack>? OnOpenRepackDetail { get; set; }
 
     public void Load(List<Game> games)
     {
@@ -95,6 +97,12 @@ public partial class LibraryViewModel : ViewModelBase
     private void OpenLocalGameDetail(LocalGame? game)
     {
         if (game != null) OnOpenLocalDetail?.Invoke(game);
+    }
+
+    [RelayCommand]
+    private void OpenRepackDetail(LocalRepack? repack)
+    {
+        if (repack != null) OnOpenRepackDetail?.Invoke(repack);
     }
 
     private void ApplyFilter()

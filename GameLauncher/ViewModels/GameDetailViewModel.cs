@@ -641,8 +641,49 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Private helpers
+    // Populate from a locally detected LocalRepack (ready-to-install archive)
     // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets up the detail overlay for a repack archive found on disk.
+    /// Shows basic title/size info immediately; the caller should follow up with
+    /// <see cref="MainViewModel.EnrichLocalGameDetailAsync"/> to pull real cover
+    /// art, description, screenshots and achievements from the Games.Database.
+    /// </summary>
+    public void LoadFromLocalRepack(LocalRepack repack)
+    {
+        Title             = repack.Title;
+        Platform          = "PC";
+        Genre             = "";
+        CoverGradient     = "#2d1b00,#5c3800";
+        RatingStars       = "—";
+        Price             = null;
+        CoverUrl          = null;
+        _databaseDescription = null;
+
+        Description = $"Repack archive ready to install  ·  {repack.SizeLabel}";
+
+        PopulateTrailer(null);
+        Screenshots.Clear();
+        HasScreenshots = false;
+        PopulateAchievements(null);
+
+        IsLocalGame      = true;
+        IsInstalled      = false;
+        IsRepack         = true;
+        IsSetupRepack    = repack.FileType == "setup";
+        ShowDrivePicker  = false;
+        RepackPath       = repack.FilePath;
+        RepackSizeLabel  = repack.SizeLabel;
+        _driveInstances  = new List<LocalGameDriveEntry>();
+        DriveLabels.Clear();
+        HasMultipleDrives  = false;
+        SelectedDriveIndex = 0;
+        ActiveDriveLabel   = "";
+        ActiveDrivePath    = "";
+        ActiveExeType      = "";
+    }
+
 
     /// <summary>
     /// Applies installation / repack state shared by <see cref="LoadFromGame"/>

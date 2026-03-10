@@ -73,8 +73,9 @@ jobs:
               print(f'backend url: {url}')
           PYEOF
 
-      - name: Create fake ROM placeholder files for scanner detection
+      - name: Create placeholder ROM and Repack files for scanner detection
         run: |
+          # ROMs — placed at {driveRoot}/Roms/{Platform}/Games/  (scanner path)
           sudo mkdir -p "/Roms/Xbox 360/Games"
           printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Halo 3.iso"               >/dev/null
           printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Gears of War.iso"        >/dev/null
@@ -90,7 +91,16 @@ jobs:
           printf 'placeholder' | sudo tee "/Roms/Switch/Games/Mario Kart 8 Deluxe.nsp"  >/dev/null
           sudo mkdir -p "/Roms/PS4/Games"
           printf 'placeholder' | sudo tee "/Roms/PS4/Games/God of War.pkg"               >/dev/null
-          echo "ROM placeholders:" && find /Roms -type f
+          # Repacks — placed at {driveRoot}/Repacks/  (scanner path)
+          # These are placeholder archive files so the scanner shows a "Ready to Install" section.
+          # File titles match real games in the Games.Database so the detail view enriches correctly.
+          sudo mkdir -p "/Repacks"
+          printf 'placeholder' | sudo tee "/Repacks/Elden Ring.iso"                      >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/Baldurs Gate 3.zip"                  >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/Cyberpunk 2077.iso"                  >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/God of War.iso"                      >/dev/null
+          echo "=== ROMs ===" && find /Roms -type f
+          echo "=== Repacks ===" && find /Repacks -type f
 
       - name: Restore & Publish linux-x64
         run: |
@@ -112,10 +122,10 @@ jobs:
 
       - name: Launch and screenshot all pages
         env:
-          DISPLAY:              ':99'
-          GAMEOS_DISABLE_GPU:   '1'
+          DISPLAY: ':99'
+          GAMEOS_DISABLE_GPU: '1'
           LIBGL_ALWAYS_SOFTWARE: '1'
-          GALLIUM_DRIVER:       softpipe
+          GALLIUM_DRIVER: softpipe
           GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           mkdir -p /tmp/ss
@@ -128,13 +138,21 @@ jobs:
 
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          ss()  { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
-          tab() { DISPLAY=:99 xdotool key Tab; sleep 0.15; }
-          ret() { DISPLAY=:99 xdotool key Return; }
+          ss() { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
+
+          # Focus the launcher window before sending any input
+          WID=$(DISPLAY=:99 xdotool search --onlyvisible --name '' 2>/dev/null | head -1)
+          if [ -n "$WID" ]; then
+            DISPLAY=:99 xdotool windowfocus --sync "$WID"
+            sleep 0.5
+          fi
 
           # 01 Login screen
           ss /tmp/ss/01-login-screen.png
 
+          # Click the username field (centre-left of window ≈ x=540, y=340 in a 1280×800 window)
+          DISPLAY=:99 xdotool mousemove 540 340 click 1
+          sleep 0.3
           DISPLAY=:99 xdotool type --clearmodifiers --delay 60 "Koriebonx98"
           sleep 0.4
           DISPLAY=:99 xdotool key Tab
@@ -160,49 +178,61 @@ jobs:
           sleep 8
           ss /tmp/ss/04-my-games.png
 
-          # 05 ROM Detection (scroll to bottom of library)
-          DISPLAY=:99 xdotool key End
+          # 05 Ready to Install (Repacks section) — scroll down to show it
+          DISPLAY=:99 xdotool key Next   # Page Down
           sleep 1
-          ss /tmp/ss/05-roms-detected.png
+          ss /tmp/ss/05-repacks-ready-to-install.png
 
-          # 06 Game Detail — click a ROM card (approx position after scroll)
-          DISPLAY=:99 xdotool mousemove 300 580 click 1
-          sleep 4
-          ss /tmp/ss/06-game-detail.png
+          # 06 Repack Detail — click the first repack card
+          # Repacks appear below the local games section; click a card ≈x=300, y=540
+          DISPLAY=:99 xdotool mousemove 300 540 click 1
+          sleep 5
+          ss /tmp/ss/06-repack-detail.png
 
-          # 07 Game Detail ··· (More Options) button — right of Play button ≈x=780,y=280
-          DISPLAY=:99 xdotool mousemove 780 280 click 1
-          sleep 2
-          ss /tmp/ss/07-game-detail-more-options.png
-
-          # Back to main nav
+          # Close detail
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 08 Games Store — nav at x≈110, y≈214
+          # 07 ROM Detection — scroll to bottom of library
+          DISPLAY=:99 xdotool mousemove 110 168 click 1
+          sleep 2
+          DISPLAY=:99 xdotool key End
+          sleep 1
+          ss /tmp/ss/07-roms-detected.png
+
+          # 08 ROM Detail — click a ROM card
+          DISPLAY=:99 xdotool mousemove 300 600 click 1
+          sleep 4
+          ss /tmp/ss/08-rom-detail.png
+
+          # Close detail
+          DISPLAY=:99 xdotool key Escape
+          sleep 1
+
+          # 09 Games Store — nav at x≈110, y≈214
           DISPLAY=:99 xdotool mousemove 110 214 click 1
           sleep 8
-          ss /tmp/ss/08-games-store.png
+          ss /tmp/ss/09-games-store.png
 
-          # 09 App Store tab inside the store page ≈x=420, y=155
+          # 10 App Store tab inside the store page ≈x=420, y=155
           DISPLAY=:99 xdotool mousemove 420 155 click 1
           sleep 5
-          ss /tmp/ss/09-app-store.png
+          ss /tmp/ss/10-app-store.png
 
-          # 10 Friends — nav at x≈110, y≈260
+          # 11 Friends — nav at x≈110, y≈260
           DISPLAY=:99 xdotool mousemove 110 260 click 1
           sleep 6
-          ss /tmp/ss/10-friends.png
+          ss /tmp/ss/11-friends.png
 
-          # 11 Friends conversation (click first friend card Message button ≈x=640, y=280)
+          # 12 Friends conversation (click Message button on first friend ≈x=640, y=280)
           DISPLAY=:99 xdotool mousemove 640 280 click 1
           sleep 4
-          ss /tmp/ss/11-friends-conversation.png
+          ss /tmp/ss/12-friends-conversation.png
 
-          # 12 Profile — nav at x≈110, y≈306
+          # 13 Profile — nav at x≈110, y≈306
           DISPLAY=:99 xdotool mousemove 110 306 click 1
           sleep 4
-          ss /tmp/ss/12-profile.png
+          ss /tmp/ss/13-profile.png
 
           echo "=== Linux screenshots ==="
           ls -lh /tmp/ss/
@@ -264,8 +294,9 @@ jobs:
               print(f'backend url: {url}')
           PYEOF
 
-      - name: Create fake ROM placeholder files
+      - name: Create placeholder ROM and Repack files for scanner detection
         run: |
+          # ROMs — {driveRoot}/Roms/{Platform}/Games/  (scanner scans / on macOS)
           sudo mkdir -p "/Roms/Xbox 360/Games"
           printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Halo 3.iso"               >/dev/null
           printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Gears of War.iso"        >/dev/null
@@ -281,7 +312,14 @@ jobs:
           printf 'placeholder' | sudo tee "/Roms/Switch/Games/Mario Kart 8 Deluxe.nsp"  >/dev/null
           sudo mkdir -p "/Roms/PS4/Games"
           printf 'placeholder' | sudo tee "/Roms/PS4/Games/God of War.pkg"               >/dev/null
-          echo "ROM placeholders:" && find /Roms -type f
+          # Repacks — {driveRoot}/Repacks/  (scanner scans / on macOS)
+          sudo mkdir -p "/Repacks"
+          printf 'placeholder' | sudo tee "/Repacks/Elden Ring.iso"                      >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/Baldurs Gate 3.zip"                  >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/Cyberpunk 2077.iso"                  >/dev/null
+          printf 'placeholder' | sudo tee "/Repacks/God of War.iso"                      >/dev/null
+          echo "=== ROMs ===" && find /Roms -type f
+          echo "=== Repacks ===" && find /Repacks -type f
 
       - name: Restore & Publish osx-arm64
         run: |
@@ -295,9 +333,9 @@ jobs:
 
       - name: Launch and screenshot all pages
         env:
-          GAMEOS_DISABLE_GPU:          '1'
+          GAMEOS_DISABLE_GPU:           '1'
           AVALONIA_USE_RASTER_RENDERER: '1'
-          GAMEOS_TEST_PASSWORD:        ${{ secrets.GAMEOS_TEST_PASSWORD }}
+          GAMEOS_TEST_PASSWORD:         ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           mkdir -p /tmp/ss
           chmod +x /tmp/gameos-mac/GameLauncher
@@ -307,14 +345,14 @@ jobs:
           sleep 18
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          tap()  { osascript -e "tell application \"System Events\" to key code $1"      2>/dev/null || true; }
-          type() { osascript -e "tell application \"System Events\" to keystroke \"$1\"" 2>/dev/null || true; }
-          ss()   { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
+          tap()       { osascript -e "tell application \"System Events\" to key code $1"      2>/dev/null || true; }
+          send_text() { osascript -e "tell application \"System Events\" to keystroke \"$1\"" 2>/dev/null || true; }
+          ss()        { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
           PASS="${GAMEOS_TEST_PASSWORD}"
-          # Key codes: 48=Tab 36=Return 53=Escape
+          # Key codes: 48=Tab 36=Return 53=Escape 121=PageDown 119=End
 
           ss /tmp/ss/01-login-screen.png
-          type "Koriebonx98"; sleep 0.4
+          send_text "Koriebonx98"; sleep 0.4
           tap 48; sleep 0.3
           osascript -e "tell application \"System Events\" to keystroke \"${PASS}\"" 2>/dev/null || true
           sleep 0.3
@@ -330,30 +368,41 @@ jobs:
           # My Games — Tab to Library nav
           for i in $(seq 1 6); do tap 48; sleep 0.15; done; tap 36; sleep 8
           ss /tmp/ss/04-my-games.png
-          osascript -e 'tell application "System Events" to key code 125 using command down' 2>/dev/null || true
-          sleep 1
-          ss /tmp/ss/05-roms-detected.png
+
+          # Repacks (Ready to Install) — Page Down to reveal section
+          tap 121; sleep 1
+          ss /tmp/ss/05-repacks-ready-to-install.png
+          # Click first repack card (Tab to it, Return to open)
+          tap 48; sleep 0.3; tap 36; sleep 5
+          ss /tmp/ss/06-repack-detail.png
+          tap 53; sleep 0.3  # close detail
+
+          # ROMs — navigate back to library and scroll to end
+          tap 53; sleep 0.3
+          for i in $(seq 1 6); do tap 48; sleep 0.15; done; tap 36; sleep 3
+          tap 119; sleep 1  # End key
+          ss /tmp/ss/07-roms-detected.png
 
           # Games Store
           tap 53; sleep 0.3
           for i in $(seq 1 7); do tap 48; sleep 0.15; done; tap 36; sleep 8
-          ss /tmp/ss/06-games-store.png
+          ss /tmp/ss/08-games-store.png
 
           # App Store tab
           tap 48; sleep 0.3; tap 36; sleep 5
-          ss /tmp/ss/07-app-store.png
+          ss /tmp/ss/09-app-store.png
 
           # Friends
           tap 53; sleep 0.3
           for i in $(seq 1 3); do tap 48; sleep 0.15; done; tap 36; sleep 6
-          ss /tmp/ss/08-friends.png
+          ss /tmp/ss/10-friends.png
           tap 48; sleep 0.3; tap 36; sleep 4
-          ss /tmp/ss/09-friends-conversation.png
+          ss /tmp/ss/11-friends-conversation.png
 
           # Profile
           tap 53; sleep 0.3
           for i in $(seq 1 4); do tap 48; sleep 0.15; done; tap 36; sleep 4
-          ss /tmp/ss/10-profile.png
+          ss /tmp/ss/12-profile.png
 
           echo "=== macOS screenshots ===" && ls -lh /tmp/ss/
 
@@ -409,9 +458,10 @@ jobs:
           $url = ($env:GAMEOS_BACKEND_URL ?? '').Trim().TrimEnd('/')
           if ($url) { Set-Content 'GameLauncher\gameos-backend.url' $url; Write-Host "backend url: $url" }
 
-      - name: Create fake ROM placeholder files
+      - name: Create placeholder ROM and Repack files for scanner detection
         shell: pwsh
         run: |
+          # ROMs — C:\Roms\{Platform}\Games\ (scanner scans C:\ on Windows)
           New-Item -ItemType Directory -Force 'C:\Roms\Xbox 360\Games' | Out-Null
           'placeholder' | Set-Content 'C:\Roms\Xbox 360\Games\Halo 3.iso'
           'placeholder' | Set-Content 'C:\Roms\Xbox 360\Games\Gears of War.iso'
@@ -427,7 +477,14 @@ jobs:
           'placeholder' | Set-Content 'C:\Roms\Switch\Games\Mario Kart 8 Deluxe.nsp'
           New-Item -ItemType Directory -Force 'C:\Roms\PS4\Games' | Out-Null
           'placeholder' | Set-Content 'C:\Roms\PS4\Games\God of War.pkg'
-          Write-Host "ROM placeholders:" && Get-ChildItem -Recurse 'C:\Roms' | Select-Object FullName
+          # Repacks — C:\Repacks\ (scanner scans C:\ on Windows)
+          New-Item -ItemType Directory -Force 'C:\Repacks' | Out-Null
+          'placeholder' | Set-Content 'C:\Repacks\Elden Ring.iso'
+          'placeholder' | Set-Content 'C:\Repacks\Baldurs Gate 3.zip'
+          'placeholder' | Set-Content 'C:\Repacks\Cyberpunk 2077.iso'
+          'placeholder' | Set-Content 'C:\Repacks\God of War.iso'
+          Write-Host "=== ROMs ===" && Get-ChildItem -Recurse 'C:\Roms' | Select-Object FullName
+          Write-Host "=== Repacks ===" && Get-ChildItem 'C:\Repacks' | Select-Object FullName
 
       - name: Restore & Publish win-x64
         shell: pwsh
@@ -476,6 +533,11 @@ jobs:
           Start-Sleep -Milliseconds 500
 
           ss "$ssDir\01-login-screen.png"
+          # Click near centre of screen to ensure focus, then type credentials
+          $f = New-Object System.Windows.Forms.Form -Property @{ Width=1; Height=1; WindowState='Minimized'; ShowInTaskbar=$false }
+          $f.Show(); $f.Activate(); $f.Close()
+          try { $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
+          Start-Sleep -Milliseconds 400
           keys "Koriebonx98"
           Start-Sleep -Milliseconds 400
           keys "{TAB}"
@@ -500,31 +562,43 @@ jobs:
           1..6 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
           keys "{RETURN}"; Start-Sleep -Seconds 8
           ss "$ssDir\04-my-games.png"
+
+          # Repacks (Ready to Install) — Page Down to show section
+          keys "{NEXT}"; Start-Sleep -Seconds 1
+          ss "$ssDir\05-repacks-ready-to-install.png"
+          # Tab to first repack card and open its detail
+          keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 5
+          ss "$ssDir\06-repack-detail.png"
+          keys "{ESC}"; Start-Sleep -Milliseconds 300
+
+          # ROMs — go back to library, scroll to end
+          1..6 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
+          keys "{RETURN}"; Start-Sleep -Seconds 3
           keys "{END}"; Start-Sleep -Seconds 1
-          ss "$ssDir\05-roms-detected.png"
+          ss "$ssDir\07-roms-detected.png"
 
           # Games Store
           keys "{ESC}"; Start-Sleep -Milliseconds 300
           1..7 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
           keys "{RETURN}"; Start-Sleep -Seconds 8
-          ss "$ssDir\06-games-store.png"
+          ss "$ssDir\08-games-store.png"
           # App Store tab
           keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 5
-          ss "$ssDir\07-app-store.png"
+          ss "$ssDir\09-app-store.png"
 
           # Friends
           keys "{ESC}"; Start-Sleep -Milliseconds 300
           1..3 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
           keys "{RETURN}"; Start-Sleep -Seconds 6
-          ss "$ssDir\08-friends.png"
+          ss "$ssDir\10-friends.png"
           keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 4
-          ss "$ssDir\09-friends-conversation.png"
+          ss "$ssDir\11-friends-conversation.png"
 
           # Profile
           keys "{ESC}"; Start-Sleep -Milliseconds 300
           1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
           keys "{RETURN}"; Start-Sleep -Seconds 4
-          ss "$ssDir\10-profile.png"
+          ss "$ssDir\12-profile.png"
 
           Write-Host "=== Windows screenshots ===" && Get-ChildItem $ssDir | Select-Object Name, Length
 
