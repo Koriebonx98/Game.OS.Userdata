@@ -46,6 +46,13 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _activeDrivePath  = "";
     [ObservableProperty] private string _activeExeType    = "";
 
+    /// <summary>
+    /// Database description stored when <see cref="EnrichFromDatabaseGame"/> is called.
+    /// Prevents <see cref="RefreshActiveDrive"/> from overwriting a real description
+    /// with the "Installed at: …" placeholder.
+    /// </summary>
+    private string? _databaseDescription;
+
     // ── Install / launch state ────────────────────────────────────────────────
     /// <summary>True when the game is found installed on a local drive.</summary>
     [ObservableProperty] private bool _isInstalled;
@@ -219,13 +226,14 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromLocalGame(LocalGame game)
     {
-        Title         = game.Title;
-        Platform      = "PC";
-        Genre         = "";
-        CoverGradient = "#0d2137,#163d5e";
-        RatingStars   = "—";
-        Price         = null;
-        CoverUrl      = null;
+        Title             = game.Title;
+        Platform          = "PC";
+        Genre             = "";
+        CoverGradient     = "#0d2137,#163d5e";
+        RatingStars       = "—";
+        Price             = null;
+        CoverUrl          = null;
+        _databaseDescription = null;
 
         PopulateTrailer(null);
         Screenshots.Clear();
@@ -328,6 +336,38 @@ public partial class GameDetailViewModel : ViewModelBase
 
     partial void OnSelectedDriveIndexChanged(int value) => RefreshActiveDrive();
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // Enrich a local game detail with data looked up from Games.Database
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called asynchronously after <see cref="LoadFromLocalGame"/> to fill in
+    /// cover image, description, trailer, screenshots and achievements URL from
+    /// the public Games.Database — the same data the website shows.
+    /// Must be called on the UI thread.
+    /// </summary>
+    public void EnrichFromDatabaseGame(DatabaseGame dbGame)
+    {
+        // Use the canonical database title (e.g. "Call of Duty: Black Ops II"
+        // instead of the Windows-safe folder name "Call of Duty - Black Ops II")
+        if (!string.IsNullOrEmpty(dbGame.Title))
+            Title = dbGame.Title;
+
+        if (!string.IsNullOrEmpty(dbGame.CoverUrl))
+            CoverUrl = dbGame.CoverUrl;
+
+        if (!string.IsNullOrEmpty(dbGame.Description))
+        {
+            _databaseDescription = dbGame.Description;
+            Description          = dbGame.Description;
+        }
+
+        PopulateTrailer(dbGame.TrailerUrl);
+        PopulateScreenshots(dbGame.Screenshots);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     private void RefreshActiveDrive()
     {
         if (_driveInstances.Count == 0) return;
@@ -336,7 +376,11 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveDriveLabel = entry.DriveRoot;
         ActiveDrivePath  = entry.FolderPath;
         ActiveExeType    = entry.ExecutableType.ToUpperInvariant();
-        Description      = $"Installed at: {entry.FolderPath}";
+        // Use the real database description if available; fall back to install path
+        if (!string.IsNullOrEmpty(_databaseDescription))
+            Description = _databaseDescription;
+        else
+            Description = $"Installed at: {entry.FolderPath}";
     }
 
     [RelayCommand]

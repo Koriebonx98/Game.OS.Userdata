@@ -154,12 +154,16 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             _allStore = dbGames
                 .Select(g => new StoreGame
                 {
-                    Title    = g.Title ?? "",
-                    Platform = platform,
-                    Genre    = "Unknown",
-                    Price    = "N/A",
-                    Rating   = 0,
-                    CoverUrl = g.CoverUrl,
+                    Title           = g.Title ?? "",
+                    Platform        = platform,
+                    Genre           = "Unknown",
+                    Price           = "N/A",
+                    Rating          = 0,
+                    CoverUrl        = g.CoverUrl,
+                    Description     = g.Description ?? "",
+                    TrailerUrl      = g.TrailerUrl,
+                    AchievementsUrl = g.AchievementsUrl,
+                    Screenshots     = g.Screenshots,
                 })
                 .ToList();
 

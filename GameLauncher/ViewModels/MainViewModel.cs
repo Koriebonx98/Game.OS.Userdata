@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -150,9 +152,77 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private void OpenDetailFromLocalGame(LocalGame game)
     {
+        // Show basic info immediately so the UI is responsive
         DetailVm.LoadFromLocalGame(game);
         ShowDetail = true;
+
+        // Asynchronously enrich with cover/description/trailer from Games.Database
+        _ = EnrichLocalGameDetailAsync(game.Title);
     }
+
+    /// <summary>
+    /// Looks up <paramref name="localTitle"/> in the PC Games.Database and, if found,
+    /// enriches the currently-open detail panel with cover, description, trailer and
+    /// screenshots — the same data shown on the website.
+    /// Title matching handles Windows-safe folder names such as
+    /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II".
+    /// </summary>
+    private async Task EnrichLocalGameDetailAsync(string localTitle)
+    {
+        try
+        {
+            var dbGames = await GameOsClient.FetchGamesDatabaseAsync("PC");
+            var dbGame  = FindDatabaseGame(dbGames, localTitle);
+            if (dbGame != null)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => DetailVm.EnrichFromDatabaseGame(dbGame));
+            }
+        }
+        catch { /* best-effort — basic info already displayed */ }
+    }
+
+    /// <summary>
+    /// Tries to match a local game folder title against the Games.Database.
+    /// First attempts an exact (case-insensitive) match, then a normalised match
+    /// that replaces the Windows-safe " - " separator with ": " (e.g.
+    /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II").
+    /// </summary>
+    private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle)
+    {
+        var exact = dbGames.FirstOrDefault(g =>
+            string.Equals(g.Title, localTitle, StringComparison.OrdinalIgnoreCase));
+        if (exact != null) return exact;
+
+        string normalized = NormalizeGameTitle(localTitle);
+        if (!string.Equals(normalized, localTitle, StringComparison.Ordinal))
+        {
+            return dbGames.FirstOrDefault(g =>
+                string.Equals(g.Title, normalized, StringComparison.OrdinalIgnoreCase));
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Converts a Windows folder-safe game name to its canonical form.
+    /// Windows folder names cannot contain ":" so installers often replace
+    /// "Franchise: Subtitle" with "Franchise - Subtitle".
+    /// This method reverses that substitution so the database lookup succeeds
+    /// and the correct title is displayed in the UI.
+    /// Only the first " - " separator is replaced (non-greedy) to preserve any
+    /// additional dashes in the subtitle (e.g. "Game - Part 1 - Episode 2"
+    /// becomes "Game: Part 1 - Episode 2").
+    /// </summary>
+    internal static string NormalizeGameTitle(string title)
+    {
+        if (string.IsNullOrEmpty(title)) return title;
+        // Replace only the first " - " with ": " to reconstruct subtitle separators
+        return _titleNormalizeRegex.Replace(title, "$1: $2");
+    }
+
+    // Compiled once for the process lifetime (called on every local game detail open)
+    private static readonly Regex _titleNormalizeRegex =
+        new(@"^(.+?) - (.+)$", RegexOptions.Compiled);
 
     [RelayCommand]
     private void SignOut()

@@ -195,9 +195,17 @@ namespace GameLauncher.Models
     /// <summary>A game entry from the public Koriebonx98/Games.Database repository.</summary>
     public class DatabaseGame
     {
-        [JsonPropertyName("Title")]    public string? Title   { get; set; }
-        [JsonPropertyName("TitleID")]  public string? TitleId { get; set; }
-        [JsonPropertyName("CoverUrl")] public string? CoverUrl { get; set; }
-        [JsonPropertyName("appid")]    public long?   AppId   { get; set; }
+        [JsonPropertyName("Title")]    public string? Title          { get; set; }
+        [JsonPropertyName("TitleID")]  public string? TitleId        { get; set; }
+        [JsonPropertyName("CoverUrl")] public string? CoverUrl       { get; set; }
+        [JsonPropertyName("appid")]    public long?   AppId          { get; set; }
+        /// <summary>Game description (extracted from Description or description field).</summary>
+        public string?       Description     { get; set; }
+        /// <summary>First trailer URL (from trailers array).</summary>
+        public string?       TrailerUrl      { get; set; }
+        /// <summary>Link to the achievements JSON file in Games.Database.</summary>
+        public string?       AchievementsUrl { get; set; }
+        /// <summary>Background/screenshot image URLs (from background_images array).</summary>
+        public List<string>? Screenshots     { get; set; }
     }
 }
