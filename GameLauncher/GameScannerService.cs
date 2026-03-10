@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using GameLauncher.Models;
@@ -20,10 +21,12 @@ public sealed class GameScannerService : IDisposable
     // ── Events ────────────────────────────────────────────────────────────────
     public event Action<List<LocalGame>>?   GamesUpdated;
     public event Action<List<LocalRepack>>? RepacksUpdated;
+    public event Action<List<LocalRom>>?    RomsUpdated;
 
     // ── Internal state ────────────────────────────────────────────────────────
     private readonly List<LocalGame>          _games   = new();
     private readonly List<LocalRepack>        _repacks = new();
+    private readonly List<LocalRom>           _roms    = new();
     private readonly List<FileSystemWatcher>  _watchers= new();
     private readonly SemaphoreSlim            _lock    = new(1, 1);
     private CancellationTokenSource?          _debounceCts;
@@ -34,10 +37,12 @@ public sealed class GameScannerService : IDisposable
         "GameOS");
     private static readonly string GameCache  = Path.Combine(CacheDir, "detected_games.json");
     private static readonly string RepackCache= Path.Combine(CacheDir, "detected_repacks.json");
+    private static readonly string RomCache   = Path.Combine(CacheDir, "detected_roms.json");
 
     // ── Public snapshots ──────────────────────────────────────────────────────
     public IReadOnlyList<LocalGame>   Games   => _games;
     public IReadOnlyList<LocalRepack> Repacks => _repacks;
+    public IReadOnlyList<LocalRom>    Roms    => _roms;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Public API
@@ -53,6 +58,7 @@ public sealed class GameScannerService : IDisposable
         {
             GamesUpdated?.Invoke(new List<LocalGame>(_games));
             RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
+            RomsUpdated?.Invoke(new List<LocalRom>(_roms));
         }
 
         // Always do a fresh scan to stay current
@@ -111,6 +117,7 @@ public sealed class GameScannerService : IDisposable
     {
         var foundGamesRaw = new List<LocalGame>();
         var foundRepacks  = new List<LocalRepack>();
+        var foundRoms     = new List<LocalRom>();
 
         await Task.Run(() =>
         {
@@ -119,6 +126,7 @@ public sealed class GameScannerService : IDisposable
                 ct.ThrowIfCancellationRequested();
                 ScanGamesDir(driveRoot, foundGamesRaw);
                 ScanRepacksDir(driveRoot, foundRepacks);
+                ScanRomsDir(driveRoot, foundRoms);
             }
         }, ct);
 
@@ -145,6 +153,8 @@ public sealed class GameScannerService : IDisposable
             _games.AddRange(foundGames);
             _repacks.Clear();
             _repacks.AddRange(foundRepacks);
+            _roms.Clear();
+            _roms.AddRange(foundRoms);
         }
         finally
         {
@@ -154,6 +164,7 @@ public sealed class GameScannerService : IDisposable
         SaveCache();
         GamesUpdated?.Invoke(new List<LocalGame>(_games));
         RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
+        RomsUpdated?.Invoke(new List<LocalRom>(_roms));
     }
 
     /// <summary>Scan <paramref name="driveRoot"/>/Games for game folders.</summary>
@@ -181,6 +192,96 @@ public sealed class GameScannerService : IDisposable
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
+    }
+
+    /// <summary>
+    /// Scans <paramref name="driveRoot"/>/Roms for non-PC ROM files.
+    /// Expected layout: Roms/{PlatformName}/Games/{RomFile}
+    ///                   or Roms/{PlatformName}/Games/{GameName}/{RomFile}
+    /// </summary>
+    private static void ScanRomsDir(string driveRoot, List<LocalRom> results)
+    {
+        string romsPath = Path.Combine(driveRoot, "Roms");
+        if (!Directory.Exists(romsPath)) return;
+
+        try
+        {
+            foreach (var platformDir in Directory.EnumerateDirectories(romsPath))
+            {
+                string platform = Path.GetFileName(platformDir);
+                string gamesDir = Path.Combine(platformDir, "Games");
+                if (!Directory.Exists(gamesDir)) continue;
+
+                try
+                {
+                    foreach (var entry in Directory.EnumerateFileSystemEntries(
+                                 gamesDir, "*", SearchOption.AllDirectories))
+                    {
+                        if (Directory.Exists(entry)) continue; // skip sub-folders
+                        string ext = Path.GetExtension(entry).ToLowerInvariant();
+                        if (!IsRomFile(ext)) continue;
+
+                        long size = 0;
+                        try { size = new FileInfo(entry).Length; } catch { }
+
+                        // Prefer the parent folder name as the title when the file
+                        // is inside a named sub-directory; fall back to the filename.
+                        string parent = Path.GetDirectoryName(entry) ?? gamesDir;
+                        string title  = string.Equals(
+                                            Path.GetFullPath(parent),
+                                            Path.GetFullPath(gamesDir),
+                                            StringComparison.OrdinalIgnoreCase)
+                            ? Path.GetFileNameWithoutExtension(entry)
+                            : Path.GetFileName(parent);
+
+                        results.Add(new LocalRom
+                        {
+                            Title    = title,
+                            Platform = platform,
+                            FilePath = entry,
+                            FileType = ext.TrimStart('.'),
+                            SizeBytes= size,
+                        });
+                    }
+                }
+                catch (UnauthorizedAccessException) { }
+                catch (IOException) { }
+            }
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
+    }
+
+    // ── ROM extension list ─────────────────────────────────────────────────
+
+    private static readonly HashSet<string> _romExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Generic archive / disc formats
+        ".zip", ".7z", ".rar",
+        // Sony / Microsoft
+        ".iso", ".bin", ".cue", ".xex", ".xiso",
+        // Nintendo
+        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".3ds",
+        // Other
+        ".elf", ".img", ".chd", ".pbp",
+    };
+
+    private static bool IsRomFile(string ext) => _romExtensions.Contains(ext);
+
+    // ── Repack marker stripping ────────────────────────────────────────────
+
+    // Matches "[Repack]", "[FitGirl Repack]", "[DODI Repack]", etc.
+    private static readonly Regex _repackMarkerRegex =
+        new(@"\[[\w\s]*[Rr]epack[\w\s]*\]", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Removes common repack annotation patterns from a folder/file name so
+    /// the clean game title can be matched against the Games.Database.
+    /// </summary>
+    internal static string StripRepackMarkers(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return name;
+        return _repackMarkerRegex.Replace(name, "").Trim();
     }
 
     /// <summary>Scan <paramref name="driveRoot"/>/Repacks recursively.</summary>
@@ -214,13 +315,17 @@ public sealed class GameScannerService : IDisposable
                     }
                     // If the folder itself is a repack folder with no archive, add the folder
                     if (!foundAny)
+                    {
+                        // Check for an installer (Setup.exe) within the folder
+                        string? setupExe = FindSetupExe(sub);
                         results.Add(new LocalRepack
                         {
-                            Title    = Path.GetFileName(sub),
-                            FilePath = sub,
-                            FileType = "folder",
-                            SizeBytes= GetDirectorySize(sub),
+                            Title     = StripRepackMarkers(Path.GetFileName(sub)),
+                            FilePath  = setupExe ?? sub,
+                            FileType  = setupExe != null ? "setup" : "folder",
+                            SizeBytes = GetDirectorySize(sub),
                         });
+                    }
                 }
                 catch (UnauthorizedAccessException) { }
                 catch (IOException) { }
@@ -235,6 +340,24 @@ public sealed class GameScannerService : IDisposable
     // ─────────────────────────────────────────────────────────────────────────
 
     private sealed record ExeInfo(string FullPath, string Type);
+
+    /// <summary>
+    /// Looks for a setup/install executable inside a repack folder.
+    /// Returns the full path of the first Setup*.exe found (case-insensitive),
+    /// or null if none is found.
+    /// </summary>
+    private static string? FindSetupExe(string folder)
+    {
+        if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows)) return null;
+        try
+        {
+            return Directory.EnumerateFiles(folder, "setup*.exe", SearchOption.AllDirectories)
+                            .FirstOrDefault()
+                ?? Directory.EnumerateFiles(folder, "install*.exe", SearchOption.AllDirectories)
+                            .FirstOrDefault();
+        }
+        catch { return null; }
+    }
 
     private static ExeInfo? FindExecutable(string folder)
     {
@@ -309,11 +432,14 @@ public sealed class GameScannerService : IDisposable
     {
         long size = 0;
         try { size = new FileInfo(filePath).Length; } catch { }
+
+        string rawTitle = fromSubfolder
+            ? $"{Path.GetFileName(Path.GetDirectoryName(filePath))} / {Path.GetFileName(filePath)}"
+            : Path.GetFileNameWithoutExtension(filePath);
+
         return new LocalRepack
         {
-            Title    = fromSubfolder
-                         ? $"{Path.GetFileName(Path.GetDirectoryName(filePath))} / {Path.GetFileName(filePath)}"
-                         : Path.GetFileNameWithoutExtension(filePath),
+            Title    = StripRepackMarkers(rawTitle),
             FilePath = filePath,
             FileType = Path.GetExtension(filePath).TrimStart('.').ToLowerInvariant(),
             SizeBytes= size,
@@ -343,6 +469,7 @@ public sealed class GameScannerService : IDisposable
         {
             TryWatch(Path.Combine(driveRoot, "Games"));
             TryWatch(Path.Combine(driveRoot, "Repacks"));
+            TryWatch(Path.Combine(driveRoot, "Roms"));
         }
     }
 
@@ -402,7 +529,12 @@ public sealed class GameScannerService : IDisposable
                 var r = JsonSerializer.Deserialize<List<LocalRepack>>(File.ReadAllText(RepackCache));
                 if (r != null) { _repacks.Clear(); _repacks.AddRange(r); }
             }
-            return _games.Count > 0 || _repacks.Count > 0;
+            if (File.Exists(RomCache))
+            {
+                var rom = JsonSerializer.Deserialize<List<LocalRom>>(File.ReadAllText(RomCache));
+                if (rom != null) { _roms.Clear(); _roms.AddRange(rom); }
+            }
+            return _games.Count > 0 || _repacks.Count > 0 || _roms.Count > 0;
         }
         catch { return false; }
     }
@@ -415,6 +547,7 @@ public sealed class GameScannerService : IDisposable
             var opts = new JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(GameCache,   JsonSerializer.Serialize(_games,   opts));
             File.WriteAllText(RepackCache, JsonSerializer.Serialize(_repacks, opts));
+            File.WriteAllText(RomCache,    JsonSerializer.Serialize(_roms,    opts));
         }
         catch { }
     }

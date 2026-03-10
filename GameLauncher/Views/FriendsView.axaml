@@ -6,6 +6,12 @@
              x:DataType="vm:FriendsViewModel"
              Background="#0d1117">
 
+    <Grid RowDefinitions="*,Auto">
+
+    <!-- ── Friends list (scrollable) ── -->
+    <ScrollViewer Grid.Row="0"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
     <StackPanel Margin="32,28,32,28" Spacing="0">
 
         <!-- Header -->
@@ -137,7 +143,9 @@
                                 </StackPanel>
                                 <!-- Message button -->
                                 <Button Grid.Column="2" Classes="btn-secondary"
-                                        Padding="12,7" VerticalAlignment="Center">
+                                        Padding="12,7" VerticalAlignment="Center"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
+                                        CommandParameter="{Binding Username}">
                                     💬 Message
                                 </Button>
                             </Grid>
@@ -180,7 +188,9 @@
                                 <!-- Message button -->
                                 <Button Grid.Column="2" Classes="btn-secondary"
                                         Padding="12,7" VerticalAlignment="Center"
-                                        Opacity="0.6">
+                                        Opacity="0.6"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
+                                        CommandParameter="{Binding Username}">
                                     💬 Message
                                 </Button>
                             </Grid>
@@ -197,4 +207,93 @@
                    IsVisible="{Binding HasNoFriends}"/>
 
     </StackPanel>
+    </ScrollViewer>
+
+    <!-- ── Inline conversation panel ── -->
+    <Border Grid.Row="1"
+            Background="#161b22"
+            BorderBrush="#30363d"
+            BorderThickness="0,1,0,0"
+            IsVisible="{Binding ShowConversation}">
+        <Grid RowDefinitions="Auto,*,Auto" MaxHeight="340">
+
+            <!-- Conversation header -->
+            <Border Grid.Row="0" Padding="16,10" Background="#1c2128">
+                <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
+                            VerticalAlignment="Center">
+                    <TextBlock Text="💬" FontSize="16"/>
+                    <TextBlock Text="{Binding ConversationFriend}"
+                               FontSize="14" FontWeight="Bold" Foreground="White"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <Button Grid.Column="1" Classes="btn-secondary" Padding="10,6"
+                        Command="{Binding CloseConversationCommand}">
+                    ✕
+                </Button>
+                </Grid>
+            </Border>
+
+            <!-- Message list -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="16,8">
+                <StackPanel Spacing="8">
+                    <!-- Message error -->
+                    <TextBlock Text="{Binding MessageError}"
+                               Foreground="#f85149" FontSize="12"
+                               IsVisible="{Binding MessageError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <!-- No messages yet -->
+                    <TextBlock Text="No messages yet. Say hello!"
+                               Foreground="#8b949e" FontSize="12"
+                               HorizontalAlignment="Center" Margin="0,16,0,0"
+                               IsVisible="{Binding !ConversationMessages.Count}"/>
+                    <!-- Message bubbles -->
+                    <ItemsControl ItemsSource="{Binding ConversationMessages}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:Message">
+                                <Border CornerRadius="10" Padding="10,7"
+                                        Margin="0,2">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding From}"
+                                                   FontSize="11" FontWeight="Bold"
+                                                   Foreground="#1f6feb"/>
+                                        <TextBlock Text="{Binding Text}"
+                                                   FontSize="13" Foreground="#c9d1d9"
+                                                   TextWrapping="Wrap"/>
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Send message input -->
+            <Border Grid.Row="2" Padding="12,10" Background="#1c2128">
+                <Grid ColumnDefinitions="*,Auto">
+                <TextBox Grid.Column="0"
+                         Text="{Binding NewMessageText}"
+                         Watermark="Type a message…"
+                         Background="#21262d"
+                         Foreground="White"
+                         BorderBrush="#30363d"
+                         CornerRadius="8"
+                         Padding="10,8"
+                         Margin="0,0,8,0"/>
+                <Button Grid.Column="1"
+                        Classes="btn-primary"
+                        Padding="16,8"
+                        IsEnabled="{Binding !IsSendingMessage}"
+                        Command="{Binding SendMessageCommand}">
+                    Send ➤
+                </Button>
+                </Grid>
+            </Border>
+
+        </Grid>
+    </Border>
+
+    </Grid>
 </UserControl>

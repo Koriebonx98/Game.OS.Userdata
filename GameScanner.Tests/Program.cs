@@ -7,7 +7,7 @@ using GameLauncher;
 using GameLauncher.Models;
 
 /// <summary>
-/// Demonstrates the GameScannerService detecting fake games and repacks
+/// Demonstrates the GameScannerService detecting fake games, repacks and ROMs
 /// from the TestData directory.
 /// </summary>
 class Program
@@ -36,9 +36,11 @@ class Program
 
         List<LocalGame>   detectedGames   = new();
         List<LocalRepack> detectedRepacks = new();
+        List<LocalRom>    detectedRoms    = new();
 
         scanner.GamesUpdated   += g => detectedGames   = g;
         scanner.RepacksUpdated += r => detectedRepacks = r;
+        scanner.RomsUpdated    += r => detectedRoms    = r;
 
         // Set up symlinks so the scanner's standard GetDriveRoots() path ($HOME) picks up TestData
         await ScanDirectory(scanner, testDataDir);
@@ -81,6 +83,30 @@ class Program
             passed = false;
         }
 
+        // ── ROMS ──────────────────────────────────────────────────────────────
+        Console.WriteLine($"🕹️  Detected ROMs ({detectedRoms.Count}):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        foreach (var r in detectedRoms.OrderBy(r => r.Platform).ThenBy(r => r.Title))
+        {
+            Console.WriteLine($"  ✅  [{r.Platform,-10}]  {r.Title,-25}  [{r.FileType,-5}]  {r.SizeLabel}");
+        }
+        Console.WriteLine();
+
+        // Expected: FakeGBAGame (GBA), FakeSNESGame (SNES), FakePS3Game (PS3)
+        var expectedRoms = new[] {
+            ("FakeGBAGame", "GBA"),
+            ("FakeSNESGame", "SNES"),
+            ("FakePS3Game", "PS3"),
+        };
+        foreach (var (title, platform) in expectedRoms)
+        {
+            if (!detectedRoms.Any(r => r.Title == title && r.Platform == platform))
+            {
+                // ROM scanning requires TestData/Roms to exist — soft warning
+                Console.WriteLine($"  ⚠  ROM not found: {title} ({platform}) — ensure TestData/Roms exists");
+            }
+        }
+
         // ── SUMMARY ───────────────────────────────────────────────────────────
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
         if (passed)
@@ -101,18 +127,20 @@ class Program
     }
 
     // Runs the scanner by creating temporary symlinks in $HOME so that the standard
-    // GetDriveRoots() scan path picks up the TestData Games/ and Repacks/ directories,
+    // GetDriveRoots() scan path picks up the TestData Games/, Repacks/ and Roms/ directories,
     // then calls StartAsync() which is the normal public entry point.
     private static async Task ScanDirectory(GameScannerService scanner, string driveRoot)
     {
-        // On Linux, $HOME is always included in GetDriveRoots(), so placing Games/ and
-        // Repacks/ symlinks there ensures the scanner finds our TestData sub-directories.
+        // On Linux, $HOME is always included in GetDriveRoots(), so placing Games/, Repacks/
+        // and Roms/ symlinks there ensures the scanner finds our TestData sub-directories.
         string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
         string gamesLink  = Path.Combine(home, "Games");
         string repacksLink= Path.Combine(home, "Repacks");
+        string romsLink   = Path.Combine(home, "Roms");
 
         bool cleanGames   = false;
         bool cleanRepacks = false;
+        bool cleanRoms    = false;
 
         try
         {
@@ -127,6 +155,12 @@ class Program
                 Directory.CreateSymbolicLink(repacksLink, Path.Combine(driveRoot, "Repacks"));
                 cleanRepacks = true;
             }
+            string romsTestPath = Path.Combine(driveRoot, "Roms");
+            if (!Directory.Exists(romsLink) && Directory.Exists(romsTestPath))
+            {
+                Directory.CreateSymbolicLink(romsLink, romsTestPath);
+                cleanRoms = true;
+            }
 
             await scanner.StartAsync();
         }
@@ -134,6 +168,7 @@ class Program
         {
             if (cleanGames)   try { Directory.Delete(gamesLink); }   catch { }
             if (cleanRepacks) try { Directory.Delete(repacksLink); } catch { }
+            if (cleanRoms)    try { Directory.Delete(romsLink); }    catch { }
         }
     }
 

@@ -23,8 +23,10 @@ public partial class LibraryViewModel : ViewModelBase
     // ── Local drive detection ──────────────────────────────────────────────
     [ObservableProperty] private bool _hasLocalGames;
     [ObservableProperty] private bool _hasRepacks;
+    [ObservableProperty] private bool _hasRoms;
     public ObservableCollection<LocalGame>   LocalGames     { get; } = new();
     public ObservableCollection<LocalRepack> ReadyToInstall { get; } = new();
+    public ObservableCollection<LocalRom>    LocalRoms      { get; } = new();
 
     /// <summary>Invoked when the user clicks a cloud game card.</summary>
     public Action<Game>?      OnOpenDetail      { get; set; }
@@ -63,6 +65,17 @@ public partial class LibraryViewModel : ViewModelBase
             ReadyToInstall.Clear();
             foreach (var r in repacks) ReadyToInstall.Add(r);
             HasRepacks = ReadyToInstall.Count > 0;
+        });
+    }
+
+    /// <summary>Called by MainViewModel when the scanner emits new ROMs.</summary>
+    public void UpdateRoms(IReadOnlyList<LocalRom> roms)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            LocalRoms.Clear();
+            foreach (var r in roms) LocalRoms.Add(r);
+            HasRoms = LocalRoms.Count > 0;
         });
     }
 
