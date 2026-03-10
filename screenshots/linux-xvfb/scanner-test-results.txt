@@ -1,0 +1,29 @@
+═══════════════════════════════════════════════════════════════
+  Game.OS — GameScannerService Detection Test
+═══════════════════════════════════════════════════════════════
+  Scanning TestData root: /home/runner/work/Game.OS.Userdata/Game.OS.Userdata/TestData
+
+📀 Detected Games (5):
+───────────────────────────────────────────────────────────────
+  ✅  FakeGame1             [exe]  ../../../../Games/FakeGame1/FakeGame.exe
+  ✅  FakeGame2             [app]  ../../../../Games/FakeGame2/FakeGame2.app
+  ✅  FakeGame3             [elf]  ../../../../Games/FakeGame3/FakeGame
+  ✅  FakeGame4             [exe]  ../../../../Games/FakeGame4/FakeGame4.exe
+  ✅  FakeGame5             [elf]  ../../../../Games/FakeGame5/FakeGame5
+
+📦 Detected Repacks (4):
+───────────────────────────────────────────────────────────────
+  ✅  FakeRepack                           [rar   ]  7 B
+  ✅  FakeRepack                           [zip   ]  10 B
+  ✅  FakeRepack1 / FakeRepack1.zip        [zip   ]  3 B
+  ✅  FakeRepack2 / FakeRepack2.7z         [7z    ]  8 B
+
+🕹️  Detected ROMs (3):
+───────────────────────────────────────────────────────────────
+  ✅  [GBA       ]  FakeGBAGame                [gba  ]  13 B
+  ✅  [PS3       ]  FakePS3Game                [iso  ]  13 B
+  ✅  [SNES      ]  FakeSNESGame               [snes ]  14 B
+
+═══════════════════════════════════════════════════════════════
+  ✅  ALL CHECKS PASSED — Game detection is working correctly!
+═══════════════════════════════════════════════════════════════

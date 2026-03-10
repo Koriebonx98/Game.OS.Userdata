@@ -337,6 +337,15 @@ namespace GameLauncher
             return await _github!.GetMessagesAsync(_username, withUsername, ct);
         }
 
+        // ── App Store (public repository, no auth required) ──────────────────
+        /// <summary>
+        /// Fetch all app entries from the public Koriebonx98/AppStore- repository.
+        /// No authentication is required.
+        /// </summary>
+        public static Task<List<AppStoreEntry>> FetchAppStoreAsync(
+            CancellationToken ct = default)
+            => Services.GitHubDataService.FetchAppStoreAsync(ct);
+
         // ── Games Database (public repository, no auth required) ─────────────
         /// <summary>
         /// Fetch all games for a given platform from the public

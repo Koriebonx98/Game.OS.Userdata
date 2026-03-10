@@ -626,6 +626,47 @@ namespace GameLauncher.Services
 
         public void Dispose() => _http.Dispose();
 
+        // ── Public App Store (no auth required) ──────────────────────────────
+
+        /// <summary>
+        /// Raw URL for the App Store data file in the public Koriebonx98/AppStore- repository.
+        /// </summary>
+        private static readonly string AppStoreDataUrl =
+            "https://raw.githubusercontent.com/Koriebonx98/AppStore-/main/data.json";
+
+        /// <summary>Cached in-memory copy of the App Store entry list.</summary>
+        private static List<AppStoreEntry>? _appStoreCache;
+
+        /// <summary>
+        /// Fetches all app entries from the public Koriebonx98/AppStore- repository.
+        /// Results are cached in memory for the session lifetime.
+        /// </summary>
+        public static async Task<List<AppStoreEntry>> FetchAppStoreAsync(
+            CancellationToken ct = default)
+        {
+            if (_appStoreCache != null)
+                return _appStoreCache;
+
+            try
+            {
+                var resp = await _rawHttp.GetAsync(AppStoreDataUrl, ct);
+                if (!resp.IsSuccessStatusCode)
+                    return new List<AppStoreEntry>();
+
+                var json = await resp.Content.ReadAsStringAsync(ct);
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var entries = JsonSerializer.Deserialize<List<AppStoreEntry>>(json, opts)
+                              ?? new List<AppStoreEntry>();
+
+                _appStoreCache = entries;
+                return entries;
+            }
+            catch
+            {
+                return new List<AppStoreEntry>();
+            }
+        }
+
         // ── Public Games Database (no auth required) ──────────────────────────
 
         /// <summary>
@@ -694,6 +735,24 @@ namespace GameLauncher.Services
                 string file = Path.Combine(DbCacheDir, $"{platform}.json");
                 File.WriteAllText(file, JsonSerializer.Serialize(games,
                     new JsonSerializerOptions { WriteIndented = false }));
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Removes the cached game list for <paramref name="platform"/> from both the
+        /// in-memory and disk caches so the next call to <see cref="FetchGamesDatabaseAsync"/>
+        /// re-fetches fresh data from GitHub.
+        /// </summary>
+        public static void InvalidatePlatformCache(string platform)
+        {
+            lock (_dbMemoryCache)
+                _dbMemoryCache.Remove(platform);
+
+            try
+            {
+                string file = Path.Combine(DbCacheDir, $"{platform}.json");
+                if (File.Exists(file)) File.Delete(file);
             }
             catch { }
         }
