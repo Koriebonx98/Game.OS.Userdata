@@ -192,7 +192,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FriendsVm.LoadDemo();
 
         // Open the inline conversation for screenshot purposes
-        FriendsVm.OpenConversationDemoAsync();
+        FriendsVm.OpenConversationDemo();
 
         // Skip the login screen
         ShowLogin = false;

@@ -87,7 +87,7 @@ public partial class FriendsViewModel : ViewModelBase
     /// Pre-opens a demo conversation with realistic messages for screenshot mode.
     /// Called after <see cref="LoadDemo"/> so the Friends page shows an active inbox.
     /// </summary>
-    public void OpenConversationDemoAsync()
+    public void OpenConversationDemo()
     {
         ConversationFriend = "NintendoFan42";
         ConversationMessages.Clear();
