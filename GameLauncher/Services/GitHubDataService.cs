@@ -625,6 +625,98 @@ namespace GameLauncher.Services
 
         public void Dispose() => _http.Dispose();
 
+        // ── Public Games Database (no auth required) ──────────────────────────
+
+        /// <summary>
+        /// Base URL for raw content in the public Koriebonx98/Games.Database repository.
+        /// Mirrors <c>GAMES_DB_RAW_BASE</c> in script.js.
+        /// </summary>
+        public static readonly string GamesDbRawBase =
+            "https://raw.githubusercontent.com/Koriebonx98/Games.Database/main";
+
+        /// <summary>
+        /// The known platforms in the Games.Database repository.
+        /// Mirrors <c>GAMES_DB_PLATFORMS</c> in script.js.
+        /// </summary>
+        public static readonly string[] GamesDbPlatforms =
+            { "PC", "PS3", "PS4", "Switch", "Xbox 360" };
+
+        // Shared HttpClient for public raw.githubusercontent.com fetches (no auth needed).
+        // Static lifetime matches the application: a static HttpClient is intentionally not
+        // disposed — it is safe to share for the process lifetime and disposing would cause
+        // ObjectDisposedException on subsequent requests.
+        private static readonly HttpClient _rawHttp = CreateRawHttpClient();
+
+        private static HttpClient CreateRawHttpClient()
+        {
+            var c = new HttpClient();
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+            return c;
+        }
+
+        /// <summary>
+        /// Fetch all games for a given platform from the public Games.Database repository.
+        /// Mirrors <c>fetchGamesDbPlatform(platform)</c> in script.js.
+        /// Returns an empty list when the platform file does not exist (404).
+        /// </summary>
+        public static async Task<List<DatabaseGame>> FetchGamesDatabaseAsync(
+            string platform, CancellationToken ct = default)
+        {
+            var url  = $"{GamesDbRawBase}/{Uri.EscapeDataString(platform)}.Games.json";
+            var resp = await _rawHttp.GetAsync(url, ct);
+
+            if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return new List<DatabaseGame>();
+
+            if (!resp.IsSuccessStatusCode)
+                throw new GameOsException(
+                    (int)resp.StatusCode,
+                    $"Failed to load {platform} games: HTTP {(int)resp.StatusCode}");
+
+            using var stream = await resp.Content.ReadAsStreamAsync(ct);
+            using var doc    = await JsonDocument.ParseAsync(stream, cancellationToken: ct);
+            var root = doc.RootElement;
+
+            // Detect the JSON format used by the Games.Database:
+            //   { "Games": [...] }  — primary format
+            //   { "games": [...] }  — alternate casing
+            //   [...]               — root array
+            // Mirrors the three-case detection in fetchGamesDbPlatform() (script.js).
+            JsonElement gamesArray;
+            if (root.ValueKind == JsonValueKind.Array)
+            {
+                gamesArray = root;
+            }
+            else if (root.ValueKind == JsonValueKind.Object &&
+                     (root.TryGetProperty("Games", out gamesArray) ||
+                      root.TryGetProperty("games", out gamesArray)))
+            {
+                // gamesArray is set by the first successful TryGetProperty call
+            }
+            else
+            {
+                return new List<DatabaseGame>();
+            }
+
+            var result = new List<DatabaseGame>();
+            foreach (var item in gamesArray.EnumerateArray())
+            {
+                var title = item.TryGetProperty("Title", out var t) ? t.GetString() : null;
+                if (string.IsNullOrWhiteSpace(title))
+                    continue; // skip non-game / empty entries
+
+                result.Add(new DatabaseGame
+                {
+                    Title    = title,
+                    TitleId  = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  : null,
+                    CoverUrl = item.TryGetProperty("CoverUrl", out var cu)  ? cu.GetString()   : null,
+                    AppId    = item.TryGetProperty("appid", out var aid) &&
+                               aid.ValueKind == JsonValueKind.Number         ? aid.GetInt64()  : null,
+                });
+            }
+            return result;
+        }
+
         // ── GitHub API response models ─────────────────────────────────────────
         private sealed class GitHubFileResponse
         {

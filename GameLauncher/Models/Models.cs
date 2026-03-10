@@ -191,4 +191,13 @@ namespace GameLauncher.Models
         public string ExecutablePath { get; set; } = "";
         public string ExecutableType { get; set; } = "";
     }
+
+    /// <summary>A game entry from the public Koriebonx98/Games.Database repository.</summary>
+    public class DatabaseGame
+    {
+        [JsonPropertyName("Title")]    public string? Title   { get; set; }
+        [JsonPropertyName("TitleID")]  public string? TitleId { get; set; }
+        [JsonPropertyName("CoverUrl")] public string? CoverUrl { get; set; }
+        [JsonPropertyName("appid")]    public long?   AppId   { get; set; }
+    }
 }

@@ -181,5 +181,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _scanner.Dispose();
         (_client as IDisposable)?.Dispose();
+        StoreVm.Dispose();
     }
 }

@@ -106,13 +106,27 @@
                        Foreground="#3fb950" FontSize="13"/>
         </Border>
 
+        <!-- Loading indicator -->
+        <Border Background="#161b22" CornerRadius="6" Padding="14,10"
+                Margin="0,0,0,16"
+                IsVisible="{Binding IsLoading}">
+            <StackPanel Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="⏳" FontSize="16" VerticalAlignment="Center"/>
+                <TextBlock Text="{Binding LoadingMessage}"
+                           Foreground="#8b949e" FontSize="13"
+                           VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
         <!-- Featured banner -->
         <TextBlock Text="⭐  Featured &amp; New Releases"
-                   Classes="section-header" Margin="0,0,0,12"/>
+                   Classes="section-header" Margin="0,0,0,12"
+                   IsVisible="{Binding HasFeatured}"/>
 
         <ScrollViewer HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Disabled"
-                      Margin="0,0,0,28">
+                      Margin="0,0,0,28"
+                      IsVisible="{Binding HasFeatured}">
             <ItemsControl ItemsSource="{Binding Featured}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -190,16 +204,27 @@
             </ItemsControl>
         </ScrollViewer>
 
-        <!-- Genre filter + heading -->
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+        <!-- Platform selector + Genre filter + heading -->
+        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
             <TextBlock Grid.Column="0"
-                       Text="All Games" Classes="section-header"
+                       Text="Browse Games" Classes="section-header"
                        VerticalAlignment="Center" Margin="0"/>
             <ComboBox Grid.Column="1"
+                      ItemsSource="{Binding Platforms}"
+                      SelectedItem="{Binding SelectedPlatform}"
+                      Width="150" Margin="0,0,8,0"
+                      ToolTip.Tip="Filter by platform"/>
+            <ComboBox Grid.Column="2"
                       ItemsSource="{Binding Genres}"
                       SelectedItem="{Binding FilterGenre}"
                       Width="180"/>
         </Grid>
+
+        <!-- Games count label -->
+        <TextBlock Text="{Binding BrowseCountLabel}"
+                   FontSize="12" Foreground="#8b949e"
+                   Margin="0,0,0,14"
+                   IsVisible="{Binding BrowseCountLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
         <!-- Full catalogue -->
         <ItemsControl ItemsSource="{Binding FilteredStore}">

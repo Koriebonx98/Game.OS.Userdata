@@ -337,6 +337,24 @@ namespace GameLauncher
             return await _github!.GetMessagesAsync(_username, withUsername, ct);
         }
 
+        // ── Games Database (public repository, no auth required) ─────────────
+        /// <summary>
+        /// Fetch all games for a given platform from the public
+        /// Koriebonx98/Games.Database repository.
+        /// Mirrors <c>fetchGamesDbPlatform(platform)</c> in script.js.
+        /// No authentication is required — the repository is public.
+        /// </summary>
+        public static Task<List<DatabaseGame>> FetchGamesDatabaseAsync(
+            string platform, CancellationToken ct = default)
+            => Services.GitHubDataService.FetchGamesDatabaseAsync(platform, ct);
+
+        /// <summary>
+        /// The known platforms in the Games.Database repository.
+        /// Mirrors <c>GAMES_DB_PLATFORMS</c> in script.js.
+        /// </summary>
+        public static IReadOnlyList<string> GamesDbPlatforms
+            => Services.GitHubDataService.GamesDbPlatforms;
+
         // ── Health check ──────────────────────────────────────────────────────
         /// <summary>
         /// Returns true when the data backend is reachable.
