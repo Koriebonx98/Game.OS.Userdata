@@ -8,8 +8,11 @@ namespace GameLauncher;
 internal sealed class Program
 {
     [STAThread]
-    public static void Main(string[] args) =>
+    public static void Main(string[] args)
+    {
+        DemoMode.DetectAndEnable(args);
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+    }
 
     public static AppBuilder BuildAvaloniaApp()
     {

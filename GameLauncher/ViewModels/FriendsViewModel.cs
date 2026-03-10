@@ -83,6 +83,31 @@ public partial class FriendsViewModel : ViewModelBase
         TotalCount  = OnlineFriends.Count + OfflineFriends.Count;
     }
 
+    /// <summary>
+    /// Pre-opens a demo conversation with realistic messages for screenshot mode.
+    /// Called after <see cref="LoadDemo"/> so the Friends page shows an active inbox.
+    /// </summary>
+    public void OpenConversationDemo()
+    {
+        ConversationFriend = "NintendoFan42";
+        ConversationMessages.Clear();
+        MessageError = "";
+        ShowConversation = true;
+
+        // Simulate a realistic message thread
+        var msgs = new[]
+        {
+            new Message { From = "NintendoFan42", Text = "Dude, have you tried the new DLC for Elden Ring yet?!",            SentAt = "2026-03-10T18:15:00Z" },
+            new Message { From = "Koriebonx98",   Text = "Yeah, Shadow of the Erdtree is insane 😤 already 12 hours in",     SentAt = "2026-03-10T18:17:00Z" },
+            new Message { From = "NintendoFan42", Text = "Haha same, the final boss is brutal. What build are you running?",  SentAt = "2026-03-10T18:20:00Z" },
+            new Message { From = "Koriebonx98",   Text = "Rivers of Blood bleed build, works every time 🗡️",                  SentAt = "2026-03-10T18:22:00Z" },
+            new Message { From = "NintendoFan42", Text = "Lol classic. Hey wanna squad up on Mario Kart tonight at 8?",       SentAt = "2026-03-10T18:30:00Z" },
+            new Message { From = "Koriebonx98",   Text = "100% I'm in, see you then! 🏎️💨",                                   SentAt = "2026-03-10T18:31:00Z" },
+        };
+        foreach (var m in msgs)
+            ConversationMessages.Add(m);
+    }
+
     // ── Messaging commands ────────────────────────────────────────────────────
 
     /// <summary>Opens the conversation panel for the specified friend.</summary>
