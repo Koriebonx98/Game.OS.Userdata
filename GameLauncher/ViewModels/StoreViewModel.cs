@@ -2,15 +2,18 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
 
 namespace GameLauncher.ViewModels;
 
-public partial class StoreViewModel : ViewModelBase
+public partial class StoreViewModel : ViewModelBase, IDisposable
 {
-    private List<StoreGame> _allStore = new();
+    private List<StoreGame> _allStore     = new();
+    private List<StoreGame> _allStoreBase = new(); // curated catalog, restored on "All"
     private List<Game>      _library  = new();
     private UserProfile     _profile  = new();
     private GameOsClient    _client   = new();
@@ -18,6 +21,16 @@ public partial class StoreViewModel : ViewModelBase
     [ObservableProperty] private string  _searchText = "";
     [ObservableProperty] private string  _filterGenre = "All";
     [ObservableProperty] private string? _statusMessage;
+
+    // ── Platform selector ─────────────────────────────────────────────────
+    [ObservableProperty] private string _selectedPlatform = "All";
+    [ObservableProperty] private bool   _isLoading        = false;
+    [ObservableProperty] private string _loadingMessage   = "";
+    [ObservableProperty] private string _browseCountLabel = "";
+
+    /// <summary>Platforms available in the Games.Database (plus "All" for the curated catalog).</summary>
+    public ObservableCollection<string> Platforms { get; } = new()
+        { "All", "PC", "PS3", "PS4", "Switch", "Xbox 360" };
 
     // ── Admin catalog management ──────────────────────────────────────────
     [ObservableProperty] private bool   _isAdmin      = false;
@@ -37,6 +50,13 @@ public partial class StoreViewModel : ViewModelBase
     /// </summary>
     private const int RealDatabaseTotal = 165_095;
 
+    /// <summary>
+    /// Maximum number of game cards to render at once in the UI.
+    /// Prevents the WrapPanel from rendering 150,000+ items for large platforms.
+    /// The search box can be used to narrow the results below this threshold.
+    /// </summary>
+    private const int MaxDisplayedGames = 300;
+
     [ObservableProperty] private int    _totalCatalogCount = 0;
     [ObservableProperty] private string _catalogCountLabel = "";
 
@@ -49,6 +69,9 @@ public partial class StoreViewModel : ViewModelBase
     public ObservableCollection<StoreGame> FilteredStore { get; } = new();
     public ObservableCollection<string>    Genres        { get; } = new();
 
+    /// <summary>True when Featured contains at least one game.</summary>
+    public bool HasFeatured => Featured.Count > 0;
+
     /// <summary>Invoked when the user clicks a store game card.</summary>
     public Action<StoreGame>? OnOpenDetail { get; set; }
 
@@ -56,7 +79,8 @@ public partial class StoreViewModel : ViewModelBase
                      UserProfile profile, GameOsClient client, bool isAdmin,
                      int totalCatalogCount = RealDatabaseTotal)
     {
-        _allStore = new List<StoreGame>(store); // work on a copy so admin changes are session-scoped
+        _allStoreBase = new List<StoreGame>(store); // keep the curated catalog
+        _allStore     = new List<StoreGame>(store); // work on a copy so admin changes are session-scoped
         _library  = library;
         _profile  = profile;
         _client   = client;
@@ -64,6 +88,11 @@ public partial class StoreViewModel : ViewModelBase
 
         TotalCatalogCount = totalCatalogCount;
         CatalogCountLabel = $"{totalCatalogCount:N0}+ games in the database";
+
+        // Reset to curated "All" view (if already "All" the setter is a no-op;
+        // if coming back from a different platform, LoadPlatformAsync("All") runs
+        // synchronously to restore the curated catalog before RebuildCollections below).
+        SelectedPlatform = "All";
 
         RebuildCollections();
     }
@@ -73,18 +102,87 @@ public partial class StoreViewModel : ViewModelBase
         Featured.Clear();
         foreach (var g in _allStore.Where(s => s.IsFeatured))
             Featured.Add(g);
+        OnPropertyChanged(nameof(HasFeatured));
 
         Genres.Clear();
         Genres.Add("All");
         foreach (var genre in _allStore.Select(s => s.Genre).Distinct().OrderBy(g => g))
             Genres.Add(genre);
 
-        FilterGenre = "All";
-        ApplyFilter();
+        FilterGenre = "All"; // resets genre filter; callback fires ApplyFilter() if changed
+        ApplyFilter();       // always re-apply in case FilterGenre was already "All"
     }
 
     partial void OnSearchTextChanged(string value)   => ApplyFilter();
     partial void OnFilterGenreChanged(string value)  => ApplyFilter();
+
+    // Cancellation source for in-flight platform loads
+    private CancellationTokenSource _loadCts = new();
+
+    partial void OnSelectedPlatformChanged(string value)
+    {
+        // Cancel any previous in-flight load and start a new one
+        _loadCts.Cancel();
+        _loadCts.Dispose();
+        _loadCts = new CancellationTokenSource();
+        _ = LoadPlatformAsync(value, _loadCts.Token);
+    }
+
+    private async Task LoadPlatformAsync(
+        string platform, CancellationToken ct)
+    {
+        if (platform == "All")
+        {
+            // Restore curated catalog instantly — no network needed
+            _allStore = new List<StoreGame>(_allStoreBase);
+            RebuildCollections();
+            return;
+        }
+
+        IsLoading      = true;
+        LoadingMessage = $"Loading {platform} games…";
+        StatusMessage  = null;
+        FilteredStore.Clear();
+        Featured.Clear();
+        OnPropertyChanged(nameof(HasFeatured));
+
+        try
+        {
+            var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform, ct);
+            if (ct.IsCancellationRequested) return;
+
+            _allStore = dbGames
+                .Select(g => new StoreGame
+                {
+                    Title    = g.Title ?? "",
+                    Platform = platform,
+                    Genre    = "Unknown",
+                    Price    = "N/A",
+                    Rating   = 0,
+                    CoverUrl = g.CoverUrl,
+                })
+                .ToList();
+
+            RebuildCollections();
+        }
+        catch (OperationCanceledException)
+        {
+            // Platform changed before load completed — silently discard
+        }
+        catch (Exception ex)
+        {
+            if (!ct.IsCancellationRequested)
+                StatusMessage = $"Failed to load {platform} games: {ex.Message}";
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                IsLoading      = false;
+                LoadingMessage = "";
+            }
+        }
+    }
 
     private void ApplyFilter()
     {
@@ -99,8 +197,22 @@ public partial class StoreViewModel : ViewModelBase
                 s.Title.Contains(SearchText, System.StringComparison.OrdinalIgnoreCase) ||
                 s.Genre.Contains(SearchText, System.StringComparison.OrdinalIgnoreCase));
 
-        foreach (var g in results.OrderByDescending(s => s.Rating))
+        // Materialize once to get the total count, then sort and take the display page.
+        var allMatches = results.ToList();
+        int total = allMatches.Count;
+        int shown = Math.Min(total, MaxDisplayedGames);
+
+        foreach (var g in allMatches
+            .OrderByDescending(s => s.Rating)
+            .ThenBy(s => s.Title, StringComparer.OrdinalIgnoreCase)
+            .Take(shown))
             FilteredStore.Add(g);
+
+        BrowseCountLabel = total == 0
+            ? ""
+            : shown < total
+                ? $"Showing {shown:N0} of {total:N0} games — search to filter"
+                : $"{total:N0} game{(total == 1 ? "" : "s")}";
     }
 
     public bool IsOwned(string title) =>
@@ -211,5 +323,11 @@ public partial class StoreViewModel : ViewModelBase
         _allStore.RemoveAll(s => s.Title == game.Title && s.Platform == game.Platform);
         RebuildCollections();
         StatusMessage = $"✓  '{game.Title}' removed from the catalog (this session only).";
+    }
+
+    public void Dispose()
+    {
+        _loadCts.Cancel();
+        _loadCts.Dispose();
     }
 }
