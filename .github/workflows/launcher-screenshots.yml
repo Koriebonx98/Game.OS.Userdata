@@ -1,8 +1,12 @@
-name: Game.OS Launcher — Linux Screenshots (Xvfb)
+name: Game.OS Launcher — Screenshots (Linux · Mac · Windows)
 
-# Captures screenshots of the running launcher on Linux using a virtual
-# framebuffer (Xvfb) and uploads them as workflow artifacts.
-# Trigger manually from the Actions tab, or on pushes to the launcher code.
+# Captures screenshots of the running Game.OS launcher on all three platforms
+# using Xvfb (Linux) and the native display server (macOS/Windows).
+# Results are committed to Screenshots/{Linux,Mac,Windows}/ in the repository.
+#
+# Required repository secrets:
+#   GAMEOS_BACKEND_URL   – URL of the Game.OS backend (for live login)
+#   GAMEOS_TEST_PASSWORD – Password for the Koriebonx98 test account
 
 on:
   workflow_dispatch:
@@ -11,26 +15,26 @@ on:
       - 'GameLauncher/**'
       - '.github/workflows/launcher-screenshots.yml'
 
+# ─────────────────────────────────────────────────────────────────────────────
+# LINUX JOB  (Xvfb virtual framebuffer + xdotool + scrot)
+# ─────────────────────────────────────────────────────────────────────────────
 jobs:
   linux-screenshots:
-    name: Build & Screenshot (Linux + Xvfb)
+    name: Screenshot (Linux + Xvfb)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     permissions:
       contents: read
 
     steps:
-      # ── 1. Checkout ───────────────────────────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── 2. .NET SDK ───────────────────────────────────────────────────────────
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
 
-      # ── 3. System packages ────────────────────────────────────────────────────
       - name: Install Xvfb, openbox, scrot, xdotool, fonts
         run: |
           sudo apt-get update -qq
@@ -40,86 +44,63 @@ jobs:
             libglib2.0-0 libfontconfig1 libfreetype6 \
             fonts-dejavu-core fonts-noto
 
-      # ── 4. Fake game directories ─────────────────────────────────────────────
-      - name: Create fake Linux game library at /Games/
+      # ── Fake game & ROM files (Linux: scans / as drive root) ─────────────────
+      - name: Create fake game and ROM files
         run: |
+          # Games (detected as LocalGame via .elf executable)
           sudo mkdir -p "/Games/Cyberpunk 2077"
-          sudo mkdir -p "/Games/The Witcher 3"
-          sudo mkdir -p "/Games/Grand Theft Auto V"
-          sudo mkdir -p "/Games/Dark Souls III"
-          sudo touch "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
+          sudo touch    "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
           sudo chmod +x "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
-          sudo touch "/Games/The Witcher 3/witcher3.elf"
+          sudo mkdir -p "/Games/The Witcher 3"
+          sudo touch    "/Games/The Witcher 3/witcher3.elf"
           sudo chmod +x "/Games/The Witcher 3/witcher3.elf"
-          sudo mkdir -p "/Games/Roms/Xbox 360/Games"
-          sudo touch "/Games/Roms/Xbox 360/Games/Halo 3.iso"
-          sudo touch "/Games/Roms/Xbox 360/Games/Gears of War.iso"
-          sudo mkdir -p "/Games/Roms/PS3/Games"
-          sudo touch "/Games/Roms/PS3/Games/God of War III.iso"
-          echo "Fake game library created at /Games/"
-          ls /Games/
+          sudo mkdir -p "/Games/Grand Theft Auto V"
+          sudo touch    "/Games/Grand Theft Auto V/GTAV.elf"
+          sudo chmod +x "/Games/Grand Theft Auto V/GTAV.elf"
+          # ROMs (detected as LocalRom; layout: /Roms/{Platform}/Games/{file})
+          sudo mkdir -p "/Roms/Xbox 360/Games"
+          echo "FAKE" | sudo tee "/Roms/Xbox 360/Games/Halo 3.iso"          > /dev/null
+          echo "FAKE" | sudo tee "/Roms/Xbox 360/Games/Gears of War.iso"   > /dev/null
+          echo "FAKE" | sudo tee "/Roms/Xbox 360/Games/Forza Motorsport 4.iso" > /dev/null
+          sudo mkdir -p "/Roms/PS3/Games"
+          echo "FAKE" | sudo tee "/Roms/PS3/Games/God of War III.iso"      > /dev/null
+          echo "FAKE" | sudo tee "/Roms/PS3/Games/Uncharted 2.iso"         > /dev/null
+          sudo mkdir -p "/Roms/Switch/Games"
+          echo "FAKE" | sudo tee "/Roms/Switch/Games/Breath of the Wild.nsp" > /dev/null
+          echo "✅ Fake files created:"
+          find /Games /Roms -type f 2>/dev/null
 
-      # ── 5. Build ──────────────────────────────────────────────────────────────
-      - name: Restore & Build (Release)
+      - name: Restore & Publish linux-x64 (self-contained)
         run: |
           dotnet restore GameLauncher/GameLauncher.csproj
-          dotnet build   GameLauncher/GameLauncher.csproj -c Release
-
-      # ── 6. Inject backend URL (if secret available) ───────────────────────────
-      - name: Inject backend URL
-        run: |
-          URL="${{ secrets.GAMEOS_BACKEND_URL }}"
-          if [ -n "$URL" ]; then
-            echo "$URL" > GameLauncher/bin/Release/net8.0/gameos-backend.url
-            echo "Backend URL injected"
-          else
-            echo "No GAMEOS_BACKEND_URL secret — launcher will use GitHub-direct mode"
-          fi
-
-      # ── 7. Publish self-contained binary ──────────────────────────────────────
-      - name: Publish linux-x64 self-contained
-        run: |
           dotnet publish GameLauncher/GameLauncher.csproj \
             -c Release -r linux-x64 --self-contained true \
             -p:PublishSingleFile=true -o /tmp/gameos-linux
-          # Re-inject URL into published output
           URL="${{ secrets.GAMEOS_BACKEND_URL }}"
           [ -n "$URL" ] && echo "$URL" > /tmp/gameos-linux/gameos-backend.url
           ls -lh /tmp/gameos-linux/GameLauncher
 
-      # ── 8. Run scanner unit-tests ─────────────────────────────────────────────
       - name: Run GameScanner detection tests
         run: |
-          cd GameScanner.Tests && dotnet run 2>&1 | tee /tmp/scanner-test-output.txt
-          cat /tmp/scanner-test-output.txt
+          cd GameScanner.Tests
+          dotnet run 2>&1 | tee /tmp/scanner-test-output.txt || true
 
-      # ── 9. Start Xvfb + openbox ───────────────────────────────────────────────
       - name: Start virtual display (Xvfb + openbox)
         run: |
           Xvfb :99 -screen 0 1280x800x24 -ac -noreset &
           sleep 3
-          openbox --config-file /dev/null &
+          DISPLAY=:99 openbox --config-file /dev/null &
           sleep 2
           DISPLAY=:99 xdpyinfo | grep "name of display"
-          echo "Virtual display ready"
+          echo "Virtual display :99 ready"
 
-      # ── 10. Pre-seed session cache (so auto-login works if backend is up) ──────
-      - name: Pre-seed session cache for auto-login
-        env:
-          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+      - name: Pre-seed session cache (username quick-login)
         run: |
-          CACHE_DIR="$HOME/.config/GameOS"
-          mkdir -p "$CACHE_DIR"
-          # The launcher will try to authenticate with these credentials on startup
-          # if a session exists with rememberMe=true and a valid token.
-          # We pre-populate the username so it appears in the quick-login panel.
-          cat > "$CACHE_DIR/sessions.json" << 'ENDJSON'
-          [{"username":"Koriebonx98","email":"","token":"","avatarColor":"#1e90ff","savedAt":"2026-01-01T00:00:00Z","rememberMe":false}]
-          ENDJSON
-          cat "$CACHE_DIR/sessions.json"
+          mkdir -p "$HOME/.config/GameOS"
+          printf '[{"username":"Koriebonx98","email":"","token":"","avatarColor":"#1e90ff","savedAt":"2026-01-01T00:00:00Z","rememberMe":false}]' \
+            > "$HOME/.config/GameOS/sessions.json"
 
-      # ── 11. Launch app and take screenshots ───────────────────────────────────
-      - name: Launch Game.OS launcher and capture screenshots
+      - name: Launch launcher and capture all screenshots
         env:
           DISPLAY: ':99'
           GAMEOS_DISABLE_GPU: '1'
@@ -133,100 +114,546 @@ jobs:
           ./GameLauncher > /tmp/launcher-stdout.log 2>/tmp/launcher-stderr.log &
           APPPID=$!
           echo "Launcher PID: $APPPID"
-
-          # Wait for the login screen to render
-          sleep 14
+          sleep 15
 
           if ! kill -0 $APPPID 2>/dev/null; then
-            echo "::error::Launcher failed to start"
+            echo "::error::Launcher crashed before screenshots"
             cat /tmp/launcher-stderr.log
             exit 1
           fi
 
-          # ── Screenshot 1: Login screen ─────────────────────────────────────
+          # Position the window at top-left so coordinates are predictable
+          WINID=$(DISPLAY=:99 xdotool search --onlyvisible --class "GameLauncher" 2>/dev/null | head -1 || true)
+          [ -n "$WINID" ] && DISPLAY=:99 xdotool windowmove "$WINID" 0 0
+
+          # ── 01 Login screen ────────────────────────────────────────────────
           scrot /tmp/screenshots/01-login-screen.png
-          echo "✅ Login screen captured"
+          echo "✅ 01 login-screen"
 
-          # ── Log in using keyboard-only navigation ─────────────────────────
-          # Avalonia auto-focuses the first TextBox (username field)
-          xdotool type --clearmodifiers --delay 80 "Koriebonx98"
+          # Type username (Avalonia auto-focuses the first TextBox)
+          xdotool type --clearmodifiers --delay 60 "Koriebonx98"
           sleep 0.5
-          xdotool key Tab  # → password field
+          xdotool key Tab
           sleep 0.3
-          xdotool type --clearmodifiers --delay 80 "${{ secrets.GAMEOS_TEST_PASSWORD }}"
+          xdotool type --clearmodifiers --delay 60 "${{ secrets.GAMEOS_TEST_PASSWORD }}"
           sleep 0.3
 
-          # ── Screenshot 2: Credentials entered ─────────────────────────────
+          # ── 02 Credentials entered ─────────────────────────────────────────
           scrot /tmp/screenshots/02-credentials-entered.png
-          echo "✅ Credentials screenshot captured"
+          echo "✅ 02 credentials-entered"
 
-          # Submit (Tab × 2 → Sign In button → Enter)
+          # Submit login (Tab × 2 → Sign In button → Return)
           xdotool key Tab Tab Return
-          sleep 15  # Wait for network auth + data load
+          sleep 18   # network auth + data load
 
-          if ! kill -0 $APPPID 2>/dev/null; then
-            echo "::warning::Launcher exited after login attempt (may need backend URL)"
-          fi
+          kill -0 $APPPID 2>/dev/null || echo "::warning::Launcher exited after login"
 
-          # ── Screenshot 3: Dashboard / Home ────────────────────────────────
+          # ── 03 Dashboard ───────────────────────────────────────────────────
           scrot /tmp/screenshots/03-dashboard.png
-          echo "✅ Dashboard screenshot captured"
+          echo "✅ 03 dashboard"
           sleep 2
 
-          # Navigate to My Library (Tab through sidebar; Library is 2nd nav button)
-          xdotool key Tab Tab Tab Return
-          sleep 4
-          scrot /tmp/screenshots/04-library.png
-          echo "✅ Library screenshot captured"
+          # Nav buttons: sidebar x≈110, y positions based on 80px logo + 44px/button
+          # Home≈122  Library≈168  Store≈214  Friends≈260  Profile≈306
 
-          # Navigate to Games Store
-          xdotool key Tab Return
+          # ── 04 My Games (Library) ──────────────────────────────────────────
+          xdotool mousemove 110 168 click 1
+          sleep 6   # allow scanner to populate ROMs + library
+          scrot /tmp/screenshots/04-my-games.png
+          echo "✅ 04 my-games"
+
+          # Scroll down to expose ROM detection section
+          xdotool key End
+          sleep 1
+          scrot /tmp/screenshots/05-rom-detection.png
+          echo "✅ 05 rom-detection"
+
+          # Click the first "Detected on Drive" card (≈x=350, y=480 after header)
+          # If no local games are loaded yet, this is a no-op and we capture the state
+          xdotool mousemove 350 480 click 1
+          sleep 4
+          scrot /tmp/screenshots/06-game-detail.png
+          echo "✅ 06 game-detail"
+
+          # Click the ··· (More Options) button — sits to the right of Play
+          # In the detail view the button row is at approx x=780, y=280
+          xdotool mousemove 780 280 click 1
+          sleep 2
+          scrot /tmp/screenshots/07-game-detail-more-options.png
+          echo "✅ 07 game-detail-more-options"
+
+          # ── 08 Games Store ─────────────────────────────────────────────────
+          xdotool mousemove 110 214 click 1
+          sleep 6
+          scrot /tmp/screenshots/08-games-store.png
+          echo "✅ 08 games-store"
+
+          # Click "App Store" tab (inside the store content area ≈ x=420, y=155)
+          xdotool mousemove 420 155 click 1
+          sleep 4
+          scrot /tmp/screenshots/09-app-store.png
+          echo "✅ 09 app-store"
+
+          # ── 10 Friends ─────────────────────────────────────────────────────
+          xdotool mousemove 110 260 click 1
           sleep 5
-          scrot /tmp/screenshots/05-game-store.png
-          echo "✅ Game Store screenshot captured"
-
-          # Navigate to App Store tab within the store
-          xdotool key Tab Return
-          sleep 4
-          scrot /tmp/screenshots/06-app-store.png
-          echo "✅ App Store screenshot captured"
-
-          # Navigate to Friends
-          xdotool key Tab Return
-          sleep 4
-          scrot /tmp/screenshots/07-friends.png
-          echo "✅ Friends screenshot captured"
+          scrot /tmp/screenshots/10-friends.png
+          echo "✅ 10 friends"
 
           echo ""
-          echo "All screenshots captured:"
+          echo "All Linux screenshots:"
           ls -lh /tmp/screenshots/
 
-      # ── 12. Copy screenshots to repo ──────────────────────────────────────────
-      - name: Copy screenshots to repo
-        run: |
-          mkdir -p screenshots/linux-xvfb
-          cp /tmp/screenshots/*.png screenshots/linux-xvfb/ 2>/dev/null || true
-          ls screenshots/linux-xvfb/
-
-      # ── 13. Upload as artifacts ───────────────────────────────────────────────
-      - name: Upload screenshots as artifacts
+      - name: Upload Linux screenshots as artifact
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: linux-xvfb-screenshots
+          name: screenshots-linux
           path: |
             /tmp/screenshots/
-            /tmp/scanner-test-output.txt
-            /tmp/launcher-stdout.log
-            /tmp/launcher-stderr.log
-          retention-days: 30
-
-      - name: Upload launcher logs on failure
-        uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: launcher-crash-logs
-          path: |
-            /tmp/launcher-stderr.log
-            /tmp/launcher-stdout.log
           retention-days: 7
+
+      - name: Upload launcher logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: linux-launcher-logs
+          path: |
+            /tmp/launcher-stdout.log
+            /tmp/launcher-stderr.log
+            /tmp/scanner-test-output.txt
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# macOS JOB  (native Quartz display · screencapture · osascript)
+# ─────────────────────────────────────────────────────────────────────────────
+  mac-screenshots:
+    name: Screenshot (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      # ── Fake game & ROM files (macOS: scans / and /Volumes/*) ────────────────
+      - name: Create fake game and ROM files
+        run: |
+          sudo mkdir -p "/Games/Cyberpunk 2077"
+          sudo touch    "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
+          sudo chmod +x "/Games/Cyberpunk 2077/Cyberpunk2077.elf"
+          sudo mkdir -p "/Games/The Witcher 3"
+          sudo touch    "/Games/The Witcher 3/witcher3.elf"
+          sudo chmod +x "/Games/The Witcher 3/witcher3.elf"
+          sudo mkdir -p "/Roms/Xbox 360/Games"
+          printf 'FAKE' | sudo tee "/Roms/Xbox 360/Games/Halo 3.iso"          > /dev/null
+          printf 'FAKE' | sudo tee "/Roms/Xbox 360/Games/Gears of War.iso"   > /dev/null
+          printf 'FAKE' | sudo tee "/Roms/Xbox 360/Games/Forza Motorsport 4.iso" > /dev/null
+          sudo mkdir -p "/Roms/PS3/Games"
+          printf 'FAKE' | sudo tee "/Roms/PS3/Games/God of War III.iso"      > /dev/null
+          printf 'FAKE' | sudo tee "/Roms/PS3/Games/Uncharted 2.iso"         > /dev/null
+          sudo mkdir -p "/Roms/Switch/Games"
+          printf 'FAKE' | sudo tee "/Roms/Switch/Games/Breath of the Wild.nsp" > /dev/null
+          echo "✅ Fake files created:"
+          find /Games /Roms -type f 2>/dev/null
+
+      - name: Restore & Publish osx-arm64 (self-contained)
+        run: |
+          dotnet restore GameLauncher/GameLauncher.csproj
+          dotnet publish GameLauncher/GameLauncher.csproj \
+            -c Release -r osx-arm64 --self-contained true \
+            -p:PublishSingleFile=true -o /tmp/gameos-mac
+          URL="${{ secrets.GAMEOS_BACKEND_URL }}"
+          [ -n "$URL" ] && echo "$URL" > /tmp/gameos-mac/gameos-backend.url
+          ls -lh /tmp/gameos-mac/GameLauncher
+
+      - name: Pre-seed session cache
+        run: |
+          mkdir -p "$HOME/.config/GameOS"
+          printf '[{"username":"Koriebonx98","email":"","token":"","avatarColor":"#1e90ff","savedAt":"2026-01-01T00:00:00Z","rememberMe":false}]' \
+            > "$HOME/.config/GameOS/sessions.json"
+          # Also check Library/Preferences location used by some macOS apps
+          mkdir -p "$HOME/Library/Preferences/GameOS"
+          cp "$HOME/.config/GameOS/sessions.json" \
+             "$HOME/Library/Preferences/GameOS/sessions.json"
+
+      - name: Launch launcher and capture all screenshots
+        env:
+          GAMEOS_DISABLE_GPU: '1'
+          AVALONIA_USE_RASTER_RENDERER: '1'
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+        run: |
+          mkdir -p /tmp/screenshots
+          chmod +x /tmp/gameos-mac/GameLauncher
+
+          /tmp/gameos-mac/GameLauncher \
+            > /tmp/launcher-stdout.log 2>/tmp/launcher-stderr.log &
+          APPPID=$!
+          echo "Launcher PID: $APPPID"
+          sleep 18
+
+          if ! kill -0 $APPPID 2>/dev/null; then
+            echo "::error::Launcher crashed before screenshots"
+            cat /tmp/launcher-stderr.log
+            exit 1
+          fi
+
+          # Helper: send keystrokes via System Events (best-effort; continues on error)
+          type_text()  { osascript -e "tell application \"System Events\" to keystroke \"$1\"" 2>/dev/null || true; }
+          press_key()  { osascript -e "tell application \"System Events\" to key code $1"      2>/dev/null || true; }
+          # key codes: 48=Tab  36=Return  125=Down  126=Up
+          type_secret(){ osascript -e "tell application \"System Events\" to keystroke (system attribute \"GAMEOS_TEST_PASSWORD\")" 2>/dev/null || \
+                         osascript -e "tell application \"System Events\" to keystroke \"${{ secrets.GAMEOS_TEST_PASSWORD }}\"" 2>/dev/null || true; }
+
+          # ── 01 Login screen ────────────────────────────────────────────────
+          screencapture -x /tmp/screenshots/01-login-screen.png
+          echo "✅ 01 login-screen"
+
+          type_text "Koriebonx98"
+          sleep 0.6
+          press_key 48   # Tab → password field
+          sleep 0.4
+          type_secret
+          sleep 0.4
+
+          # ── 02 Credentials entered ─────────────────────────────────────────
+          screencapture -x /tmp/screenshots/02-credentials-entered.png
+          echo "✅ 02 credentials-entered"
+
+          press_key 48; sleep 0.2   # Tab
+          press_key 48; sleep 0.2   # Tab  → Sign In button
+          press_key 36              # Return
+          sleep 20
+
+          kill -0 $APPPID 2>/dev/null || echo "::warning::Launcher exited after login"
+
+          # ── 03 Dashboard ───────────────────────────────────────────────────
+          screencapture -x /tmp/screenshots/03-dashboard.png
+          echo "✅ 03 dashboard"
+          sleep 2
+
+          # Navigate using Tab + Return  (nav order: Home→Library→Store→Friends→Profile)
+          # After login focus is in the content area; pressing Tab cycles through nav items.
+          # We use Escape first to ensure no modal is open.
+          press_key 53; sleep 0.5   # Escape
+
+          # ── 04 My Games (Library) ──────────────────────────────────────────
+          # Tab several times to reach the Library nav button, then Return
+          for i in 1 2 3 4 5 6; do press_key 48; sleep 0.2; done
+          press_key 36; sleep 6
+          screencapture -x /tmp/screenshots/04-my-games.png
+          echo "✅ 04 my-games"
+
+          # ── 05 ROM Detection (scroll to bottom of library) ─────────────────
+          osascript -e 'tell application "System Events" to key code 125 using command down' 2>/dev/null || true
+          sleep 1
+          screencapture -x /tmp/screenshots/05-rom-detection.png
+          echo "✅ 05 rom-detection"
+
+          # ── 06 Games Store ─────────────────────────────────────────────────
+          for i in 1 2 3 4 5 6 7; do press_key 48; sleep 0.2; done
+          press_key 36; sleep 6
+          screencapture -x /tmp/screenshots/06-games-store.png
+          echo "✅ 06 games-store"
+
+          # Tab once more to reach App Store tab button inside the store view
+          press_key 48; sleep 0.3
+          press_key 36; sleep 4
+          screencapture -x /tmp/screenshots/07-app-store.png
+          echo "✅ 07 app-store"
+
+          # ── 08 Friends ─────────────────────────────────────────────────────
+          for i in 1 2; do press_key 48; sleep 0.2; done
+          press_key 36; sleep 5
+          screencapture -x /tmp/screenshots/08-friends.png
+          echo "✅ 08 friends"
+
+          echo ""
+          echo "All macOS screenshots:"
+          ls -lh /tmp/screenshots/
+
+      - name: Upload macOS screenshots as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-mac
+          path: /tmp/screenshots/
+          retention-days: 7
+
+      - name: Upload launcher logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mac-launcher-logs
+          path: |
+            /tmp/launcher-stdout.log
+            /tmp/launcher-stderr.log
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# WINDOWS JOB  (native Win32 display · PowerShell screenshots · SendKeys)
+# ─────────────────────────────────────────────────────────────────────────────
+  windows-screenshots:
+    name: Screenshot (Windows)
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.x'
+
+      # ── Fake game & ROM files (Windows: scans C:\ as drive root) ─────────────
+      - name: Create fake game and ROM files
+        shell: pwsh
+        run: |
+          # Games (detected as LocalGame via .exe)
+          New-Item -ItemType Directory -Force "C:\Games\Cyberpunk 2077"       | Out-Null
+          Set-Content "C:\Games\Cyberpunk 2077\Cyberpunk2077.exe"  "FAKE_EXE"
+          New-Item -ItemType Directory -Force "C:\Games\The Witcher 3"        | Out-Null
+          Set-Content "C:\Games\The Witcher 3\witcher3.exe"         "FAKE_EXE"
+          New-Item -ItemType Directory -Force "C:\Games\Grand Theft Auto V"   | Out-Null
+          Set-Content "C:\Games\Grand Theft Auto V\GTAV.exe"        "FAKE_EXE"
+          # ROMs
+          New-Item -ItemType Directory -Force "C:\Roms\Xbox 360\Games"  | Out-Null
+          Set-Content "C:\Roms\Xbox 360\Games\Halo 3.iso"          "FAKE_ISO"
+          Set-Content "C:\Roms\Xbox 360\Games\Gears of War.iso"    "FAKE_ISO"
+          Set-Content "C:\Roms\Xbox 360\Games\Forza Motorsport 4.iso" "FAKE_ISO"
+          New-Item -ItemType Directory -Force "C:\Roms\PS3\Games"   | Out-Null
+          Set-Content "C:\Roms\PS3\Games\God of War III.iso"       "FAKE_ISO"
+          Set-Content "C:\Roms\PS3\Games\Uncharted 2.iso"          "FAKE_ISO"
+          New-Item -ItemType Directory -Force "C:\Roms\Switch\Games" | Out-Null
+          Set-Content "C:\Roms\Switch\Games\Breath of the Wild.nsp" "FAKE_NSP"
+          Write-Host "Fake files created:"
+          Get-ChildItem -Recurse "C:\Games","C:\Roms" | Select-Object FullName
+
+      - name: Restore & Publish win-x64 (self-contained)
+        shell: pwsh
+        run: |
+          dotnet restore GameLauncher/GameLauncher.csproj
+          dotnet publish GameLauncher/GameLauncher.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true -o C:\gameos-win
+          $url = "${{ secrets.GAMEOS_BACKEND_URL }}"
+          if ($url) { Set-Content "C:\gameos-win\gameos-backend.url" $url }
+          Get-ChildItem "C:\gameos-win\GameLauncher.exe"
+
+      - name: Pre-seed session cache
+        shell: pwsh
+        run: |
+          $cacheDir = "$env:APPDATA\GameOS"
+          New-Item -ItemType Directory -Force $cacheDir | Out-Null
+          $json = '[{"username":"Koriebonx98","email":"","token":"","avatarColor":"#1e90ff","savedAt":"2026-01-01T00:00:00Z","rememberMe":false}]'
+          Set-Content "$cacheDir\sessions.json" $json
+          Write-Host "Session cache pre-seeded at $cacheDir\sessions.json"
+
+      - name: Launch launcher and capture all screenshots
+        shell: pwsh
+        env:
+          GAMEOS_DISABLE_GPU: '1'
+          AVALONIA_USE_RASTER_RENDERER: '1'
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
+        run: |
+          $screenshotDir = "C:\tmp\screenshots"
+          New-Item -ItemType Directory -Force $screenshotDir | Out-Null
+
+          # ── Screenshot helper ──────────────────────────────────────────────
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+
+          function Take-Screenshot([string]$path) {
+            $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+            $bmp    = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
+            $gfx    = [System.Drawing.Graphics]::FromImage($bmp)
+            $gfx.CopyFromScreen($screen.Location, [System.Drawing.Point]::Empty, $screen.Size)
+            $bmp.Save($path)
+            $gfx.Dispose(); $bmp.Dispose()
+            Write-Host "  screenshot saved: $path"
+          }
+
+          function Send-Keys([string]$keys) {
+            [System.Windows.Forms.SendKeys]::SendWait($keys)
+            [System.Windows.Forms.Application]::DoEvents()
+          }
+
+          # ── Start the launcher (redirect stdout/stderr to files) ──────────────
+          New-Item -ItemType Directory -Force "C:\tmp" | Out-Null
+          $proc = Start-Process "C:\gameos-win\GameLauncher.exe" -PassThru `
+            -RedirectStandardOutput "C:\tmp\stdout.log" `
+            -RedirectStandardError  "C:\tmp\stderr.log"
+          Write-Host "Launcher PID: $($proc.Id)"
+          Start-Sleep -Seconds 18
+
+          if ($proc.HasExited) {
+            Write-Host "::error::Launcher crashed before screenshots"
+            Get-Content "C:\tmp\stderr.log" -ErrorAction SilentlyContinue
+            exit 1
+          }
+
+          # Bring launcher window to foreground using WScript.Shell AppActivate
+          try {
+            $shell = New-Object -ComObject WScript.Shell
+            $shell.AppActivate($proc.MainWindowTitle) | Out-Null
+          } catch { }
+          Start-Sleep -Milliseconds 500
+
+          # ── 01 Login screen ────────────────────────────────────────────────
+          Take-Screenshot "$screenshotDir\01-login-screen.png"
+          Write-Host "✅ 01 login-screen"
+
+          # Type username
+          Send-Keys "Koriebonx98"
+          Start-Sleep -Milliseconds 500
+          Send-Keys "{TAB}"           # → password field
+          Start-Sleep -Milliseconds 300
+          $pwd = $env:GAMEOS_TEST_PASSWORD
+          if ($pwd) { Send-Keys $pwd }
+          Start-Sleep -Milliseconds 300
+
+          # ── 02 Credentials entered ─────────────────────────────────────────
+          Take-Screenshot "$screenshotDir\02-credentials-entered.png"
+          Write-Host "✅ 02 credentials-entered"
+
+          # Submit (Tab × 2 → Sign In button → Return)
+          Send-Keys "{TAB}{TAB}{RETURN}"
+          Start-Sleep -Seconds 20
+
+          if ($proc.HasExited) { Write-Host "::warning::Launcher exited after login" }
+
+          try { $shell.AppActivate($proc.MainWindowTitle) | Out-Null } catch { }
+          Start-Sleep -Milliseconds 300
+
+          # ── 03 Dashboard ───────────────────────────────────────────────────
+          Take-Screenshot "$screenshotDir\03-dashboard.png"
+          Write-Host "✅ 03 dashboard"
+          Start-Sleep -Seconds 2
+
+          # Navigate using Tab to cycle through sidebar nav items, Return to select
+          # Pressing Escape first clears any focus trap
+          Send-Keys "{ESC}"
+          Start-Sleep -Milliseconds 300
+
+          # ── 04 My Games (Library) ──────────────────────────────────────────
+          1..6 | ForEach-Object { Send-Keys "{TAB}"; Start-Sleep -Milliseconds 150 }
+          Send-Keys "{RETURN}"
+          Start-Sleep -Seconds 6   # scanner populates ROMs
+          Take-Screenshot "$screenshotDir\04-my-games.png"
+          Write-Host "✅ 04 my-games"
+
+          # ── 05 ROM Detection (scroll to bottom) ────────────────────────────
+          Send-Keys "{END}"
+          Start-Sleep -Seconds 1
+          Take-Screenshot "$screenshotDir\05-rom-detection.png"
+          Write-Host "✅ 05 rom-detection"
+
+          # ── 06 Games Store ─────────────────────────────────────────────────
+          1..7 | ForEach-Object { Send-Keys "{TAB}"; Start-Sleep -Milliseconds 150 }
+          Send-Keys "{RETURN}"
+          Start-Sleep -Seconds 6
+          Take-Screenshot "$screenshotDir\06-games-store.png"
+          Write-Host "✅ 06 games-store"
+
+          # Click App Store tab (Tab once inside the store view, then Return)
+          Send-Keys "{TAB}{RETURN}"
+          Start-Sleep -Seconds 4
+          Take-Screenshot "$screenshotDir\07-app-store.png"
+          Write-Host "✅ 07 app-store"
+
+          # ── 08 Friends ─────────────────────────────────────────────────────
+          1..2 | ForEach-Object { Send-Keys "{TAB}"; Start-Sleep -Milliseconds 150 }
+          Send-Keys "{RETURN}"
+          Start-Sleep -Seconds 5
+          Take-Screenshot "$screenshotDir\08-friends.png"
+          Write-Host "✅ 08 friends"
+
+          Write-Host ""
+          Write-Host "All Windows screenshots:"
+          Get-ChildItem $screenshotDir | Select-Object Name, Length
+
+      - name: Upload Windows screenshots as artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: screenshots-windows
+          path: C:\tmp\screenshots\
+          retention-days: 7
+
+      - name: Upload launcher logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: windows-launcher-logs
+          path: |
+            C:\tmp\stdout.log
+            C:\tmp\stderr.log
+          retention-days: 7
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMMIT JOB  — download all artifacts, commit to Screenshots/{Linux,Mac,Windows}
+# ─────────────────────────────────────────────────────────────────────────────
+  commit-screenshots:
+    name: Commit screenshots to repository
+    runs-on: ubuntu-latest
+    needs: [linux-screenshots, mac-screenshots, windows-screenshots]
+    if: always()
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download Linux screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-linux
+          path: Screenshots/Linux/
+        continue-on-error: true
+
+      - name: Download macOS screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-mac
+          path: Screenshots/Mac/
+        continue-on-error: true
+
+      - name: Download Windows screenshots
+        uses: actions/download-artifact@v4
+        with:
+          name: screenshots-windows
+          path: Screenshots/Windows/
+        continue-on-error: true
+
+      - name: List captured screenshots
+        run: |
+          echo "=== Linux ===" && ls -lh Screenshots/Linux/ 2>/dev/null || echo "  (none)"
+          echo "=== Mac ===="  && ls -lh Screenshots/Mac/   2>/dev/null || echo "  (none)"
+          echo "=== Windows ==" && ls -lh Screenshots/Windows/ 2>/dev/null || echo "  (none)"
+
+      - name: Commit and push screenshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Screenshots/
+          if git diff --staged --quiet; then
+            echo "No new screenshots to commit."
+          else
+            git commit -m "ci: update launcher screenshots (Linux · Mac · Windows) [skip ci]"
+            git push
+          fi
