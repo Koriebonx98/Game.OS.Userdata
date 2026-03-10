@@ -55,7 +55,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFriends));
     }
 
-    public MainViewModel()
+    public MainViewModel() : this(false, false, "dashboard") { }
+
+    public MainViewModel(bool demoMode, string demoPage) : this(demoMode, false, demoPage) { }
+
+    public MainViewModel(bool demoMode, bool liveLoginMode, string demoPage)
     {
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
@@ -86,9 +90,149 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanner.RomsUpdated    += roms    => LibraryVm.UpdateRoms(roms);
         _ = _scanner.StartAsync();
 
-        // Attempt silent auto-login from cached session (mirrors web localStorage restore)
-        _ = LoginVm.TryAutoLoginAsync();
+        if (demoMode)
+            // Post to the UI thread so the window has time to initialise first
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadDemoSession(demoPage));
+        else if (liveLoginMode)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                _ = LiveLoginAsync(demoPage));
+        else
+            _ = LoginVm.TryAutoLoginAsync();
 
+    }
+
+    /// <summary>
+    /// Populates all views with demo data from <see cref="GameCatalog"/> so the full
+    /// application UI can be explored without a live backend connection.
+    /// Invoked when the app is started with <c>--demo</c>.
+    /// </summary>
+    private void LoadDemoSession(string page)
+    {
+        var profile = new UserProfile
+        {
+            Username  = "Koriebonx98",
+            Email     = "korie@gameos.io",
+            CreatedAt = "2024-01-15T00:00:00Z",
+        };
+
+        // Demo library — use the static GameCatalog metadata
+        var library = new List<Game>(GameCatalog.Metadata);
+
+        // Demo achievements
+        var achievements = new List<Achievement>
+        {
+            new Achievement { Platform = "PS5",    GameTitle = "God of War Ragnarök", AchievementId = "ach1", Name = "Father and Son",   Description = "Complete the main story.",         UnlockedAt = "2025-02-06T18:00:00Z" },
+            new Achievement { Platform = "PS5",    GameTitle = "God of War Ragnarök", AchievementId = "ach2", Name = "The Realms Await", Description = "Visit all Nine Realms.",           UnlockedAt = "2025-02-07T12:00:00Z" },
+            new Achievement { Platform = "PS5",    GameTitle = "God of War Ragnarök", AchievementId = "ach3", Name = "Spartan Rage",     Description = "Use Rage mode 10 times.",          UnlockedAt = "2025-02-08T10:00:00Z" },
+            new Achievement { Platform = "PC",     GameTitle = "Elden Ring",          AchievementId = "ach4", Name = "Elden Lord",       Description = "Become the Elden Lord.",           UnlockedAt = "2025-02-14T22:00:00Z" },
+            new Achievement { Platform = "PC",     GameTitle = "Baldur's Gate 3",     AchievementId = "ach5", Name = "Absolute Power",   Description = "Reach Act 3 conclusion.",          UnlockedAt = "2025-03-05T10:00:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Mario Kart 8 Deluxe", AchievementId = "ach6", Name = "First Place",      Description = "Win a race in first place.",       UnlockedAt = "2025-06-02T15:00:00Z" },
+            new Achievement { Platform = "Switch", GameTitle = "Zelda: TOTK",         AchievementId = "ach7", Name = "Hero of Hyrule",   Description = "Defeat Calamity Ganon.",           UnlockedAt = "2025-04-18T20:00:00Z" },
+            new Achievement { Platform = "PC",     GameTitle = "Cyberpunk 2077",       AchievementId = "ach8", Name = "Night City Legend", Description = "Reach street cred level 50.",    UnlockedAt = "2025-01-12T14:00:00Z" },
+        };
+
+        // Attach demo achievements + trailer to the God of War Ragnarök library entry
+        var gow = library.FirstOrDefault(g =>
+            g.Title.Contains("God of War", StringComparison.OrdinalIgnoreCase));
+        if (gow != null)
+        {
+            gow.GameAchievements = achievements
+                .Where(a => a.GameTitle == "God of War Ragnarök").ToList();
+            gow.TrailerUrl ??= "https://youtu.be/EE-4GvjKcfs";
+        }
+
+        OnLoginSuccess(profile, library, achievements);
+
+        if (page == "gamedetail")
+        {
+            // Navigate to library then open God of War detail (with achievements + trailer)
+            ActivePage = "library";
+            var detailGame = gow ?? library.First();
+            OpenDetailFromGame(detailGame);
+        }
+        else
+        {
+            ActivePage = page;
+        }
+    }
+
+    /// <summary>
+    /// Authenticates with the real Game.OS backend using credentials from environment
+    /// variables (<c>GAMEOS_USERNAME</c> + <c>GAMEOS_PASSWORD</c>) and loads the
+    /// real account data.  Intended for CI screenshot pipelines — set the env vars
+    /// via repository secrets, then run the launcher with <c>--live-login</c>.
+    /// </summary>
+    private async Task LiveLoginAsync(string page)
+    {
+        string username = Environment.GetEnvironmentVariable("GAMEOS_USERNAME") ?? "";
+        string password = Environment.GetEnvironmentVariable("GAMEOS_PASSWORD") ?? "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            // Fall back to demo mode so the app still starts visually
+            System.Diagnostics.Debug.WriteLine(
+                "[LiveLogin] GAMEOS_USERNAME or GAMEOS_PASSWORD not set — falling back to demo mode.");
+            LoadDemoSession(page);
+            return;
+        }
+
+        ShowLogin = true;
+        LoginVm.Username     = username;
+        LoginVm.IsLoading    = true;
+        LoginVm.ErrorMessage = "";
+
+        try
+        {
+            var profile      = await _client.LoginAsync(username, password);
+            var games        = await _client.GetGamesAsync();
+            var achievements = await _client.GetAchievementsAsync();
+
+            // Enrich games with metadata from GameCatalog (same as LoginViewModel.EnrichGames)
+            foreach (var g in games)
+            {
+                var meta = GameCatalog.Metadata.FirstOrDefault(m =>
+                    string.Equals(m.Title, g.Title, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(m.Platform, g.Platform, StringComparison.OrdinalIgnoreCase));
+                if (meta == null) continue;
+                if (string.IsNullOrEmpty(g.CoverUrl))      g.CoverUrl      = meta.CoverUrl;
+                if (string.IsNullOrEmpty(g.CoverColor))    g.CoverColor    = meta.CoverColor;
+                if (string.IsNullOrEmpty(g.CoverGradient)) g.CoverGradient = meta.CoverGradient;
+                if (!g.Rating.HasValue && meta.Rating.HasValue) g.Rating   = meta.Rating;
+                if (string.IsNullOrEmpty(g.Genre))         g.Genre         = meta.Genre;
+                if (string.IsNullOrEmpty(g.Description))   g.Description   = meta.Description;
+                g.Screenshots ??= meta.Screenshots;
+                g.GameAchievements = achievements
+                    .Where(a => string.Equals(a.GameTitle, g.Title,
+                                              StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(a.Platform, g.Platform,
+                                              StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            OnLoginSuccess(profile, games, achievements);
+
+            if (page == "gamedetail")
+            {
+                ActivePage = "library";
+                var first = games.FirstOrDefault();
+                if (first != null) OpenDetailFromGame(first);
+            }
+            else if (!string.IsNullOrEmpty(page) && page != "dashboard")
+            {
+                ActivePage = page;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LiveLogin] Login failed: {ex.Message}");
+            LoginVm.ErrorMessage = "Login failed. Please check your credentials and try again.";
+            LoginVm.IsLoading    = false;
+            // Still show login page with the error visible
+        }
+        finally
+        {
+            LoginVm.IsLoading = false;
+        }
     }
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,
