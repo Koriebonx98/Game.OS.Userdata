@@ -55,9 +55,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFriends));
     }
 
-    public MainViewModel() : this(false, "dashboard") { }
+    public MainViewModel() : this(false, false, "dashboard") { }
 
-    public MainViewModel(bool demoMode, string demoPage)
+    public MainViewModel(bool demoMode, string demoPage) : this(demoMode, false, demoPage) { }
+
+    public MainViewModel(bool demoMode, bool liveLoginMode, string demoPage)
     {
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
@@ -91,6 +93,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (demoMode)
             // Post to the UI thread so the window has time to initialise first
             Avalonia.Threading.Dispatcher.UIThread.Post(() => LoadDemoSession(demoPage));
+        else if (liveLoginMode)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                _ = LiveLoginAsync(demoPage));
         else
             _ = LoginVm.TryAutoLoginAsync();
 
@@ -148,6 +153,85 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         else
         {
             ActivePage = page;
+        }
+    }
+
+    /// <summary>
+    /// Authenticates with the real Game.OS backend using credentials from environment
+    /// variables (<c>GAMEOS_USERNAME</c> + <c>GAMEOS_PASSWORD</c>) and loads the
+    /// real account data.  Intended for CI screenshot pipelines — set the env vars
+    /// via repository secrets, then run the launcher with <c>--live-login</c>.
+    /// </summary>
+    private async Task LiveLoginAsync(string page)
+    {
+        string username = Environment.GetEnvironmentVariable("GAMEOS_USERNAME") ?? "";
+        string password = Environment.GetEnvironmentVariable("GAMEOS_PASSWORD") ?? "";
+
+        if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(password))
+        {
+            // Fall back to demo mode so the app still starts visually
+            System.Diagnostics.Debug.WriteLine(
+                "[LiveLogin] GAMEOS_USERNAME or GAMEOS_PASSWORD not set — falling back to demo mode.");
+            LoadDemoSession(page);
+            return;
+        }
+
+        ShowLogin = true;
+        LoginVm.Username     = username;
+        LoginVm.IsLoading    = true;
+        LoginVm.ErrorMessage = "";
+
+        try
+        {
+            var profile      = await _client.LoginAsync(username, password);
+            var games        = await _client.GetGamesAsync();
+            var achievements = await _client.GetAchievementsAsync();
+
+            // Enrich games with metadata from GameCatalog (same as LoginViewModel.EnrichGames)
+            foreach (var g in games)
+            {
+                var meta = GameCatalog.Metadata.FirstOrDefault(m =>
+                    string.Equals(m.Title, g.Title, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(m.Platform, g.Platform, StringComparison.OrdinalIgnoreCase));
+                if (meta == null) continue;
+                if (string.IsNullOrEmpty(g.CoverUrl))      g.CoverUrl      = meta.CoverUrl;
+                if (string.IsNullOrEmpty(g.CoverColor))    g.CoverColor    = meta.CoverColor;
+                if (string.IsNullOrEmpty(g.CoverGradient)) g.CoverGradient = meta.CoverGradient;
+                if (!g.Rating.HasValue && meta.Rating.HasValue) g.Rating   = meta.Rating;
+                if (string.IsNullOrEmpty(g.Genre))         g.Genre         = meta.Genre;
+                if (string.IsNullOrEmpty(g.Description))   g.Description   = meta.Description;
+                g.Screenshots ??= meta.Screenshots;
+                g.GameAchievements = achievements
+                    .Where(a => string.Equals(a.GameTitle, g.Title,
+                                              StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(a.Platform, g.Platform,
+                                              StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+            }
+
+            OnLoginSuccess(profile, games, achievements);
+
+            if (page == "gamedetail")
+            {
+                ActivePage = "library";
+                var first = games.FirstOrDefault();
+                if (first != null) OpenDetailFromGame(first);
+            }
+            else if (!string.IsNullOrEmpty(page) && page != "dashboard")
+            {
+                ActivePage = page;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[LiveLogin] Login failed: {ex.Message}");
+            LoginVm.ErrorMessage = "Login failed. Please check your credentials and try again.";
+            LoginVm.IsLoading    = false;
+            // Still show login page with the error visible
+        }
+        finally
+        {
+            LoginVm.IsLoading = false;
         }
     }
 

@@ -13,6 +13,15 @@ internal sealed class Program
     internal static bool   DemoMode { get; private set; }
 
     /// <summary>
+    /// Set by the <c>--live-login</c> command-line flag.
+    /// When true the app reads <c>GAMEOS_USERNAME</c> and <c>GAMEOS_PASSWORD</c>
+    /// from environment variables, authenticates against the real Game.OS backend
+    /// (configured via <c>GAMEOS_BACKEND_URL</c>), and loads the real account data.
+    /// Intended for automated screenshot capture in CI pipelines.
+    /// </summary>
+    internal static bool   LiveLoginMode { get; private set; }
+
+    /// <summary>
     /// Set by <c>--page=&lt;name&gt;</c>.  Determines which page is shown first
     /// in demo mode: dashboard · library · store · friends · profile · gamedetail.
     /// </summary>
@@ -23,8 +32,9 @@ internal sealed class Program
     {
         foreach (var arg in args)
         {
-            if (arg == "--demo")           DemoMode = true;
-            if (arg.StartsWith("--page=")) DemoPage = arg[7..];
+            if (arg == "--demo")           DemoMode      = true;
+            if (arg == "--live-login")     LiveLoginMode = true;
+            if (arg.StartsWith("--page=")) DemoPage      = arg[7..];
         }
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
     }
