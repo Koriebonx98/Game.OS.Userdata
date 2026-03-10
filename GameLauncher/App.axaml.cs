@@ -14,8 +14,12 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var mainVm = new MainViewModel();
-            desktop.MainWindow = new MainWindow { DataContext = mainVm };
+            var mainVm = new MainViewModel(Program.DemoMode, Program.DemoPage);
+            var win = new MainWindow { DataContext = mainVm };
+            // In demo mode use a taller window so more content is visible
+            if (Program.DemoMode)
+                win.Height = 1350;
+            desktop.MainWindow = win;
         }
         base.OnFrameworkInitializationCompleted();
     }
