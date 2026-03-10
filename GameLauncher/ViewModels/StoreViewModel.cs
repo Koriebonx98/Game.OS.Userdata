@@ -32,6 +32,19 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     public ObservableCollection<string> Platforms { get; } = new()
         { "All", "PC", "PS3", "PS4", "Switch", "Xbox 360" };
 
+    // ── Tab navigation: Games Store vs App Store ──────────────────────────
+    [ObservableProperty] private bool _isGamesTab    = true;
+    [ObservableProperty] private bool _isAppStoreTab = false;
+
+    [ObservableProperty] private string _appStoreSearchText = "";
+    [ObservableProperty] private string _appStoreGenreFilter = "All";
+    public ObservableCollection<AppStoreEntry> AllAppStoreEntries    { get; } = new();
+    public ObservableCollection<AppStoreEntry> FilteredAppStoreEntries { get; } = new();
+    public ObservableCollection<string>        AppStoreGenres        { get; } = new();
+
+    partial void OnAppStoreSearchTextChanged(string value)  => ApplyAppStoreFilter();
+    partial void OnAppStoreGenreFilterChanged(string value) => ApplyAppStoreFilter();
+
     // ── Admin catalog management ──────────────────────────────────────────
     [ObservableProperty] private bool   _isAdmin      = false;
     [ObservableProperty] private bool   _showAdminForm = false;
@@ -55,7 +68,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// Prevents the WrapPanel from rendering 150,000+ items for large platforms.
     /// The search box can be used to narrow the results below this threshold.
     /// </summary>
-    private const int MaxDisplayedGames = 300;
+    private const int MaxDisplayedGames = 2000;
 
     [ObservableProperty] private int    _totalCatalogCount = 0;
     [ObservableProperty] private string _catalogCountLabel = "";
@@ -95,6 +108,92 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         SelectedPlatform = "All";
 
         RebuildCollections();
+
+        // Eagerly load App Store in the background
+        _ = LoadAppStoreAsync();
+    }
+
+    [RelayCommand]
+    private void SwitchToGamesTab()
+    {
+        IsGamesTab    = true;
+        IsAppStoreTab = false;
+    }
+
+    [RelayCommand]
+    private void SwitchToAppStoreTab()
+    {
+        IsGamesTab    = false;
+        IsAppStoreTab = true;
+        if (AllAppStoreEntries.Count == 0)
+            _ = LoadAppStoreAsync();
+    }
+
+    private async Task LoadAppStoreAsync()
+    {
+        try
+        {
+            var entries = await GameOsClient.FetchAppStoreAsync();
+            AllAppStoreEntries.Clear();
+            foreach (var e in entries)
+                AllAppStoreEntries.Add(e);
+
+            // Build genre list
+            AppStoreGenres.Clear();
+            AppStoreGenres.Add("All");
+            foreach (var genre in entries.Select(e => e.Genre).Distinct().OrderBy(g => g))
+                AppStoreGenres.Add(genre);
+
+            AppStoreGenreFilter = "All";
+            ApplyAppStoreFilter();
+        }
+        catch { /* best-effort */ }
+    }
+
+    private void ApplyAppStoreFilter()
+    {
+        FilteredAppStoreEntries.Clear();
+        var results = AllAppStoreEntries.AsEnumerable();
+
+        if (AppStoreGenreFilter != "All")
+            results = results.Where(e => e.Genre == AppStoreGenreFilter);
+
+        if (!string.IsNullOrWhiteSpace(AppStoreSearchText))
+            results = results.Where(e =>
+                e.Name.Contains(AppStoreSearchText, StringComparison.OrdinalIgnoreCase) ||
+                e.Genre.Contains(AppStoreSearchText, StringComparison.OrdinalIgnoreCase) ||
+                e.Platform.Contains(AppStoreSearchText, StringComparison.OrdinalIgnoreCase));
+
+        foreach (var e in results.OrderBy(e => e.Genre).ThenBy(e => e.Name))
+            FilteredAppStoreEntries.Add(e);
+    }
+
+    [RelayCommand]
+    private void OpenAppUrl(AppStoreEntry? app)
+    {
+        if (app == null || string.IsNullOrEmpty(app.Url)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = app.Url,
+                UseShellExecute = true,
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Clears the disk cache for the current platform and re-fetches from GitHub.</summary>
+    [RelayCommand]
+    private void RefreshPlatform()
+    {
+        if (SelectedPlatform == "All") return;
+        // Force a fresh fetch by removing the platform from the in-memory cache
+        Services.GitHubDataService.InvalidatePlatformCache(SelectedPlatform);
+        // Re-trigger the load
+        var platform = SelectedPlatform;
+        SelectedPlatform = "All"; // reset first to ensure the setter fires
+        SelectedPlatform = platform;
     }
 
     private void RebuildCollections()

@@ -10,10 +10,14 @@
     <StackPanel Margin="32,28,32,28" Spacing="0">
 
         <!-- Header -->
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Games Store" Classes="page-title"/>
-                <StackPanel Orientation="Horizontal" Spacing="8">
+                <TextBlock Text="Games Store" Classes="page-title"
+                           IsVisible="{Binding IsGamesTab}"/>
+                <TextBlock Text="App Store" Classes="page-title"
+                           IsVisible="{Binding IsAppStoreTab}"/>
+                <StackPanel Orientation="Horizontal" Spacing="8"
+                            IsVisible="{Binding IsGamesTab}">
                     <TextBlock Text="Discover and add games to your library"
                                Classes="page-subtitle"/>
                     <TextBlock Text="·" Classes="page-subtitle"/>
@@ -22,13 +26,68 @@
                                Foreground="#1f6feb"
                                IsVisible="{Binding HasCatalogCount}"/>
                 </StackPanel>
+                <TextBlock Text="Browse and download apps, emulators, and tools"
+                           Classes="page-subtitle"
+                           IsVisible="{Binding IsAppStoreTab}"/>
             </StackPanel>
             <TextBox Grid.Column="1"
                      Classes="form-input"
                      Text="{Binding SearchText}"
                      Watermark="🔍  Search store…"
-                     Width="240" VerticalAlignment="Center"/>
+                     Width="240" VerticalAlignment="Center"
+                     IsVisible="{Binding IsGamesTab}"/>
+            <TextBox Grid.Column="1"
+                     Classes="form-input"
+                     Text="{Binding AppStoreSearchText}"
+                     Watermark="🔍  Search apps…"
+                     Width="240" VerticalAlignment="Center"
+                     IsVisible="{Binding IsAppStoreTab}"/>
         </Grid>
+
+        <!-- ── Tab selector ── -->
+        <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,0,20">
+            <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
+                    Background="#1f6feb"
+                    Command="{Binding SwitchToGamesTabCommand}"
+                    IsVisible="{Binding IsGamesTab}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="🎮" FontSize="14"/>
+                    <TextBlock Text="Games Store" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                </StackPanel>
+            </Button>
+            <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
+                    Background="#21262d"
+                    Command="{Binding SwitchToGamesTabCommand}"
+                    IsVisible="{Binding IsAppStoreTab}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="🎮" FontSize="14"/>
+                    <TextBlock Text="Games Store" FontSize="13" FontWeight="SemiBold" Foreground="#8b949e"/>
+                </StackPanel>
+            </Button>
+            <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
+                    Background="#21262d"
+                    Command="{Binding SwitchToAppStoreTabCommand}"
+                    IsVisible="{Binding IsGamesTab}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="📦" FontSize="14"/>
+                    <TextBlock Text="App Store" FontSize="13" FontWeight="SemiBold" Foreground="#8b949e"/>
+                </StackPanel>
+            </Button>
+            <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
+                    Background="#1f6feb"
+                    Command="{Binding SwitchToAppStoreTabCommand}"
+                    IsVisible="{Binding IsAppStoreTab}">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                    <TextBlock Text="📦" FontSize="14"/>
+                    <TextBlock Text="App Store" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                </StackPanel>
+            </Button>
+        </StackPanel>
+
+        <!-- ══════════════════════════════════════════════════════════
+             GAMES STORE TAB
+        ══════════════════════════════════════════════════════════ -->
+        <StackPanel IsVisible="{Binding IsGamesTab}" Spacing="0">
 
         <!-- ══ ADMIN PANEL ══ (only visible to Admin.GameOS account) -->
         <Border IsVisible="{Binding IsAdmin}"
@@ -205,16 +264,23 @@
         </ScrollViewer>
 
         <!-- Platform selector + Genre filter + heading -->
-        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,6">
+        <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
             <TextBlock Grid.Column="0"
                        Text="Browse Games" Classes="section-header"
                        VerticalAlignment="Center" Margin="0"/>
-            <ComboBox Grid.Column="1"
+            <Button Grid.Column="1" Classes="btn-secondary" Padding="10,6"
+                    Margin="0,0,8,0"
+                    ToolTip.Tip="Force re-fetch games for this platform"
+                    Command="{Binding RefreshPlatformCommand}"
+                    IsVisible="{Binding SelectedPlatform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                🔄
+            </Button>
+            <ComboBox Grid.Column="2"
                       ItemsSource="{Binding Platforms}"
                       SelectedItem="{Binding SelectedPlatform}"
                       Width="150" Margin="0,0,8,0"
                       ToolTip.Tip="Filter by platform"/>
-            <ComboBox Grid.Column="2"
+            <ComboBox Grid.Column="3"
                       ItemsSource="{Binding Genres}"
                       SelectedItem="{Binding FilterGenre}"
                       Width="180"/>
@@ -296,6 +362,93 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        </StackPanel>
+        <!-- end IsGamesTab -->
+
+        <!-- ══════════════════════════════════════════════════════════
+             APP STORE TAB
+        ══════════════════════════════════════════════════════════ -->
+        <StackPanel IsVisible="{Binding IsAppStoreTab}" Spacing="0">
+
+            <!-- Genre filter -->
+            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+                <TextBlock Grid.Column="0" Text="Browse Apps"
+                           Classes="section-header" VerticalAlignment="Center" Margin="0"/>
+                <ComboBox Grid.Column="1"
+                          ItemsSource="{Binding AppStoreGenres}"
+                          SelectedItem="{Binding AppStoreGenreFilter}"
+                          Width="180"/>
+            </Grid>
+
+            <!-- App cards -->
+            <ItemsControl ItemsSource="{Binding FilteredAppStoreEntries}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:AppStoreEntry">
+                        <Border Background="#161b22" CornerRadius="10"
+                                Width="200" Margin="0,0,12,12">
+                            <StackPanel>
+                                <!-- Cover image -->
+                                <Border Height="120" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                    <views:CoverImage
+                                        ImageUrl="{Binding RawImageUrl}"
+                                        FallbackText="{Binding Name}"
+                                        FallbackGradient="#1e1b4b,#312e81"
+                                        SubText="{Binding Genre}"
+                                        LetterFontSize="48"
+                                        ImageCornerRadius="10,10,0,0"
+                                        Height="120"/>
+                                </Border>
+                                <!-- Info -->
+                                <Border Padding="12,10">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="{Binding Name}"
+                                                   FontSize="13" FontWeight="SemiBold"
+                                                   Foreground="White" TextWrapping="Wrap"
+                                                   MaxLines="2"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                            <Border CornerRadius="3" Padding="5,2" Background="#1f6feb">
+                                                <TextBlock Text="{Binding Genre}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="White"/>
+                                            </Border>
+                                        </StackPanel>
+                                        <TextBlock Text="{Binding Platform}"
+                                                   FontSize="11" Foreground="#8b949e"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding EmulatorPlatforms}"
+                                                   FontSize="10" Foreground="#3fb950"
+                                                   IsVisible="{Binding EmulatorPlatforms, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <Button Classes="btn-primary"
+                                                Padding="8,5" Margin="0,4,0,0"
+                                                HorizontalAlignment="Stretch"
+                                                HorizontalContentAlignment="Center"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenAppUrlCommand}"
+                                                CommandParameter="{Binding}">
+                                            📥 Get App
+                                        </Button>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Loading indicator for App Store -->
+            <TextBlock Text="Loading apps…"
+                       Foreground="#8b949e" FontSize="13"
+                       HorizontalAlignment="Center" Margin="0,24,0,0"
+                       IsVisible="{Binding !FilteredAppStoreEntries.Count}"/>
+
+        </StackPanel>
+        <!-- end IsAppStoreTab -->
 
     </StackPanel>
 </UserControl>

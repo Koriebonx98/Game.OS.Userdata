@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Text.Json.Serialization;
 
@@ -224,6 +225,68 @@ namespace GameLauncher.Models
         public string FreeSpaceLabel{ get; set; } = "";
         /// <summary>Whether the Games folder already exists on this drive.</summary>
         public bool   GamesExists   { get; set; }
+    }
+
+    // ── Game launch settings (saved locally per game title) ───────────────────
+
+    /// <summary>
+    /// Per-game launch settings persisted locally by <see cref="GameLauncher.Services.GameSettingsService"/>.
+    /// Stores the preferred executable, launch arguments, and pre/post-launch entries.
+    /// </summary>
+    public class GameSettings
+    {
+        [JsonPropertyName("gameTitle")]   public string  GameTitle   { get; set; } = "";
+        /// <summary>Full path to the preferred .exe or .bat used to launch this game.</summary>
+        [JsonPropertyName("exePath")]     public string? ExePath     { get; set; }
+        /// <summary>Command-line arguments passed to the executable on launch.</summary>
+        [JsonPropertyName("exeArgs")]     public string? ExeArgs     { get; set; }
+        /// <summary>Apps/scripts to run <b>before</b> the game launches.</summary>
+        [JsonPropertyName("preLaunch")]   public List<LaunchEntry> PreLaunch  { get; set; } = new();
+        /// <summary>Apps/scripts to run <b>after</b> the game exits.</summary>
+        [JsonPropertyName("postLaunch")]  public List<LaunchEntry> PostLaunch { get; set; } = new();
+    }
+
+    /// <summary>
+    /// One pre- or post-launch entry: an executable/script path with optional arguments
+    /// and a human-readable label.
+    /// </summary>
+    public class LaunchEntry
+    {
+        [JsonPropertyName("label")]     public string  Label     { get; set; } = "";
+        [JsonPropertyName("path")]      public string  Path      { get; set; } = "";
+        [JsonPropertyName("arguments")] public string? Arguments { get; set; }
+    }
+
+    // ── App Store entry (from Koriebonx98/AppStore- repository) ──────────────
+
+    /// <summary>An application entry from the public Koriebonx98/AppStore- repository.</summary>
+    public class AppStoreEntry
+    {
+        [JsonPropertyName("Name")]               public string  Name              { get; set; } = "";
+        [JsonPropertyName("GameName")]           public string  GameName          { get; set; } = "";
+        [JsonPropertyName("Url")]                public string  Url               { get; set; } = "";
+        [JsonPropertyName("Image")]              public string? Image             { get; set; }
+        [JsonPropertyName("Genre")]              public string  Genre             { get; set; } = "";
+        [JsonPropertyName("Type")]               public string  Type              { get; set; } = "";
+        [JsonPropertyName("Platform")]           public string  Platform          { get; set; } = "";
+        [JsonPropertyName("Desc")]               public string? Description       { get; set; }
+        [JsonPropertyName("Emulator Platforms")] public string? EmulatorPlatforms { get; set; }
+
+        /// <summary>
+        /// Converts the GitHub HTML image URL (blob/main/…) to a raw.githubusercontent.com URL
+        /// so Avalonia's Image control can download it directly.
+        /// </summary>
+        public string? RawImageUrl
+        {
+            get
+            {
+                if (string.IsNullOrEmpty(Image)) return null;
+                // https://github.com/Owner/Repo/blob/main/path → https://raw.githubusercontent.com/Owner/Repo/main/path
+                return Image
+                    .Replace("https://github.com/", "https://raw.githubusercontent.com/", StringComparison.Ordinal)
+                    .Replace("/blob/", "/", StringComparison.Ordinal);
+            }
+        }
     }
 
     /// <summary>A game entry from the public Koriebonx98/Games.Database repository.</summary>

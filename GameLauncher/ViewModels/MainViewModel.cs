@@ -103,6 +103,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Create the per-user data folder hierarchy beneath the executable
         UserDataService.CreateUserFolders(profile.Username);
 
+        // Update presence so the user appears "Online" to friends (mirrors the web app)
+        _ = _client.UpdatePresenceAsync();
+
         DashboardVm.Load(profile, library, achievements);
         LibraryVm.Load(library);
         StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
