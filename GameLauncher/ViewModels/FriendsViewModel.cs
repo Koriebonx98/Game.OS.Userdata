@@ -12,6 +12,7 @@ namespace GameLauncher.ViewModels;
 /// View-model for the Friends screen.  Loads the friend list and incoming
 /// requests from the Game.OS backend API, or shows demo friend data when
 /// running in demo mode (no backend connected).
+/// Also manages the inline direct-message conversation panel.
 /// </summary>
 public partial class FriendsViewModel : ViewModelBase
 {
@@ -19,6 +20,15 @@ public partial class FriendsViewModel : ViewModelBase
     [ObservableProperty] private int    _totalCount;
     [ObservableProperty] private bool   _isLoading  = false;
     [ObservableProperty] private string _errorMessage = "";
+
+    // ── Messaging panel ───────────────────────────────────────────────────────
+    [ObservableProperty] private bool   _showConversation;
+    [ObservableProperty] private string _conversationFriend = "";
+    [ObservableProperty] private string _newMessageText     = "";
+    [ObservableProperty] private bool   _isSendingMessage;
+    [ObservableProperty] private string _messageError       = "";
+
+    public ObservableCollection<Message> ConversationMessages { get; } = new();
 
     public bool HasNoFriends => TotalCount == 0 && !IsLoading;
 
@@ -72,6 +82,82 @@ public partial class FriendsViewModel : ViewModelBase
         OnlineCount = OnlineFriends.Count;
         TotalCount  = OnlineFriends.Count + OfflineFriends.Count;
     }
+
+    // ── Messaging commands ────────────────────────────────────────────────────
+
+    /// <summary>Opens the conversation panel for the specified friend.</summary>
+    [RelayCommand]
+    private async Task OpenConversation(string friendUsername)
+    {
+        if (string.IsNullOrEmpty(friendUsername)) return;
+
+        ConversationFriend = friendUsername;
+        ConversationMessages.Clear();
+        MessageError = "";
+        ShowConversation = true;
+
+        if (_client == null) return;
+
+        try
+        {
+            var messages = await _client.GetMessagesAsync(friendUsername);
+            ConversationMessages.Clear();
+            foreach (var m in messages)
+                ConversationMessages.Add(m);
+        }
+        catch (Exception ex)
+        {
+            MessageError = $"Could not load messages: {ex.Message}";
+        }
+    }
+
+    /// <summary>Sends the current message to the active conversation partner.</summary>
+    [RelayCommand]
+    private async Task SendMessage()
+    {
+        if (string.IsNullOrWhiteSpace(NewMessageText) || string.IsNullOrEmpty(ConversationFriend))
+            return;
+        if (_client == null) return;
+
+        IsSendingMessage = true;
+        MessageError     = "";
+        string text      = NewMessageText.Trim();
+        NewMessageText   = "";
+
+        try
+        {
+            await _client.SendMessageAsync(ConversationFriend, text);
+
+            // Append the sent message to the local conversation immediately
+            ConversationMessages.Add(new Message
+            {
+                From   = _username,
+                Text   = text,
+                SentAt = DateTimeOffset.UtcNow.ToString("o"),
+            });
+        }
+        catch (Exception ex)
+        {
+            MessageError   = $"Send failed: {ex.Message}";
+            NewMessageText = text; // restore so the user can retry
+        }
+        finally
+        {
+            IsSendingMessage = false;
+        }
+    }
+
+    /// <summary>Closes the conversation panel.</summary>
+    [RelayCommand]
+    private void CloseConversation()
+    {
+        ShowConversation = false;
+        ConversationFriend = "";
+        ConversationMessages.Clear();
+        MessageError = "";
+    }
+
+    // ── Friend list loading ───────────────────────────────────────────────────
 
     private async Task LoadAsync()
     {

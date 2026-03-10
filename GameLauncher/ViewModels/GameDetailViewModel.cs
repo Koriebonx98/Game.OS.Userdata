@@ -1,5 +1,7 @@
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -58,10 +60,17 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool _isInstalled;
     /// <summary>True when a repack archive is available to install (but game is not yet installed).</summary>
     [ObservableProperty] private bool _isRepack;
-    /// <summary>File path of the repack archive, used by the Install command.</summary>
+    /// <summary>File path of the repack archive/folder/setup, used by the Install command.</summary>
     [ObservableProperty] private string _repackPath = "";
     /// <summary>Display label for the repack archive size.</summary>
     [ObservableProperty] private string _repackSizeLabel = "";
+    /// <summary>True when the repack is a folder with a setup installer (Setup.exe).</summary>
+    [ObservableProperty] private bool _isSetupRepack;
+    /// <summary>True when the repack is an archive and we should show a drive-selection picker.</summary>
+    [ObservableProperty] private bool _showDrivePicker;
+
+    /// <summary>Available drives for archive-repack installation.</summary>
+    public ObservableCollection<InstallDriveOption> InstallDrives { get; } = new();
 
     public ObservableCollection<string> DriveLabels { get; } = new();
 
@@ -121,20 +130,121 @@ public partial class GameDetailViewModel : ViewModelBase
         catch { /* best-effort */ }
     }
 
-    /// <summary>Opens the repack archive with the system extractor (or explorer).</summary>
+    /// <summary>
+    /// Installs the repack.
+    /// - If the repack is a folder containing Setup.exe: runs Setup.exe directly.
+    /// - If the repack is an archive (.zip/.rar/.7z): populates the drive-selection
+    ///   picker so the user can choose where to extract the game.
+    /// - Otherwise: opens the archive with the system extractor.
+    /// </summary>
     [RelayCommand]
     private void InstallRepack()
     {
         if (!IsRepack || string.IsNullOrEmpty(RepackPath)) return;
+
+        // Folder repack with Setup.exe — run installer directly
+        if (IsSetupRepack)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName        = RepackPath, // already the Setup.exe path
+                    UseShellExecute = true
+                });
+            }
+            catch { /* best-effort */ }
+            return;
+        }
+
+        // Archive repack — show drive picker so user can choose install location
+        string ext = Path.GetExtension(RepackPath).ToLowerInvariant();
+        bool isArchive = ext is ".zip" or ".rar" or ".7z";
+        if (isArchive)
+        {
+            PopulateInstallDrives();
+            ShowDrivePicker = InstallDrives.Count > 0;
+            if (!ShowDrivePicker)
+            {
+                // No Games folder found on any drive — fall back to opening the archive
+                OpenWithSystem(RepackPath);
+            }
+            return;
+        }
+
+        // Fallback: open with system handler
+        OpenWithSystem(RepackPath);
+    }
+
+    /// <summary>
+    /// Called when the user selects a drive from the install-drive picker.
+    /// Opens the archive with the system extractor — the user completes the
+    /// extraction manually to the chosen Games folder.
+    /// </summary>
+    [RelayCommand]
+    private void SelectInstallDrive(InstallDriveOption? option)
+    {
+        if (option == null) return;
+        ShowDrivePicker = false;
+
+        // Ensure the Games folder exists on the target drive
+        try { Directory.CreateDirectory(option.GamesFolderPath); } catch { }
+
+        // Open the archive file — the user extracts to the displayed Games folder
+        OpenWithSystem(RepackPath);
+    }
+
+    /// <summary>Dismisses the drive-picker without installing.</summary>
+    [RelayCommand]
+    private void CancelInstall() => ShowDrivePicker = false;
+
+    private static void OpenWithSystem(string path)
+    {
         try
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName        = RepackPath,
+                FileName        = path,
                 UseShellExecute = true
             });
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Discovers all drives that already have a Games folder, plus drives that
+    /// are ready (have free space) for one to be created, for the drive picker.
+    /// </summary>
+    private void PopulateInstallDrives()
+    {
+        InstallDrives.Clear();
+        try
+        {
+            var drives = DriveInfo.GetDrives().Where(d => d.IsReady);
+
+            foreach (var drive in drives)
+            {
+                try
+                {
+                    string gamesPath = Path.Combine(drive.RootDirectory.FullName, "Games");
+                    bool   exists    = Directory.Exists(gamesPath);
+                    long   free      = drive.AvailableFreeSpace;
+                    string freeLabel = free >= 1_073_741_824
+                        ? $"{free / 1_073_741_824.0:F1} GB free"
+                        : $"{free / 1_048_576.0:F0} MB free";
+
+                    InstallDrives.Add(new InstallDriveOption
+                    {
+                        DriveRoot      = drive.RootDirectory.FullName,
+                        GamesFolderPath= gamesPath,
+                        FreeSpaceLabel = freeLabel,
+                        GamesExists    = exists,
+                    });
+                }
+                catch { /* skip inaccessible drive */ }
+            }
+        }
+        catch { }
     }
 
     /// <summary>Opens the game folder in the system file manager.</summary>
@@ -239,9 +349,11 @@ public partial class GameDetailViewModel : ViewModelBase
         Screenshots.Clear();
         HasScreenshots = false;
         PopulateAchievements(null);
-        IsLocalGame    = true;
-        IsInstalled    = true;
-        IsRepack       = false;
+        IsLocalGame     = true;
+        IsInstalled     = true;
+        IsRepack        = false;
+        IsSetupRepack   = false;
+        ShowDrivePicker = false;
         RepackPath     = "";
         RepackSizeLabel = "";
 
@@ -311,6 +423,8 @@ public partial class GameDetailViewModel : ViewModelBase
             // Repack archive available — show Install button
             IsInstalled      = false;
             IsRepack         = true;
+            IsSetupRepack    = repack.FileType == "setup";
+            ShowDrivePicker  = false;
             RepackPath       = repack.FilePath;
             RepackSizeLabel  = repack.SizeLabel;
             _driveInstances  = new List<LocalGameDriveEntry>();
@@ -323,6 +437,8 @@ public partial class GameDetailViewModel : ViewModelBase
             // Neither installed nor a repack — no action buttons
             IsInstalled      = false;
             IsRepack         = false;
+            IsSetupRepack    = false;
+            ShowDrivePicker  = false;
             RepackPath       = "";
             RepackSizeLabel  = "";
             _driveInstances  = new List<LocalGameDriveEntry>();

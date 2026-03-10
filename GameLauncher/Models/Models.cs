@@ -192,6 +192,40 @@ namespace GameLauncher.Models
         public string ExecutableType { get; set; } = "";
     }
 
+    /// <summary>A locally found ROM file for a non-PC platform.</summary>
+    public class LocalRom
+    {
+        public string Title        { get; set; } = "";
+        public string Platform     { get; set; } = "";
+        public string FilePath     { get; set; } = "";
+        public string FileType     { get; set; } = ""; // e.g. "iso", "gb", "snes"
+        public long   SizeBytes    { get; set; }
+
+        private string? _sizeLabel;
+        public string SizeLabel =>
+            _sizeLabel ??=
+                SizeBytes >= 1_073_741_824 ? $"{SizeBytes / 1_073_741_824.0:F1} GB" :
+                SizeBytes >= 1_048_576     ? $"{SizeBytes / 1_048_576.0:F0} MB"     :
+                SizeBytes >= 1_024         ? $"{SizeBytes / 1_024.0:F0} KB"         :
+                $"{SizeBytes} B";
+    }
+
+    /// <summary>
+    /// A drive that has (or can have) a Games folder, shown in the
+    /// install-drive picker when extracting a zip/rar repack.
+    /// </summary>
+    public class InstallDriveOption
+    {
+        /// <summary>Drive root path (e.g. "C:\", "/dev/sdb1").</summary>
+        public string DriveRoot     { get; set; } = "";
+        /// <summary>Full path to the Games folder on this drive.</summary>
+        public string GamesFolderPath { get; set; } = "";
+        /// <summary>Human-readable free-space label (e.g. "120 GB free").</summary>
+        public string FreeSpaceLabel{ get; set; } = "";
+        /// <summary>Whether the Games folder already exists on this drive.</summary>
+        public bool   GamesExists   { get; set; }
+    }
+
     /// <summary>A game entry from the public Koriebonx98/Games.Database repository.</summary>
     public class DatabaseGame
     {
