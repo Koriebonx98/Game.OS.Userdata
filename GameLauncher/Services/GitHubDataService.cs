@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -654,6 +655,49 @@ namespace GameLauncher.Services
             return c;
         }
 
+        // ── Games Database cache ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Persistent disk-cache directory for platform game lists.
+        /// Mirrors the browser's cache so the store loads instantly after the first fetch.
+        /// </summary>
+        private static readonly string DbCacheDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "GameOS", "GamesDbCache");
+
+        /// <summary>How long a disk-cached platform file remains valid before a re-fetch.</summary>
+        private static readonly TimeSpan DbCacheTtl = TimeSpan.FromHours(24);
+
+        /// <summary>In-memory session cache: platform → game list (instant after first load).</summary>
+        private static readonly Dictionary<string, List<DatabaseGame>> _dbMemoryCache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private static List<DatabaseGame>? TryLoadDiskCache(string platform)
+        {
+            try
+            {
+                string file = Path.Combine(DbCacheDir, $"{platform}.json");
+                if (!File.Exists(file)) return null;
+                if (File.GetLastWriteTimeUtc(file) < DateTime.UtcNow - DbCacheTtl) return null;
+                var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                var games = JsonSerializer.Deserialize<List<DatabaseGame>>(File.ReadAllText(file), opts);
+                return games?.Count > 0 ? games : null;
+            }
+            catch { return null; }
+        }
+
+        private static void SaveDiskCache(string platform, List<DatabaseGame> games)
+        {
+            try
+            {
+                Directory.CreateDirectory(DbCacheDir);
+                string file = Path.Combine(DbCacheDir, $"{platform}.json");
+                File.WriteAllText(file, JsonSerializer.Serialize(games,
+                    new JsonSerializerOptions { WriteIndented = false }));
+            }
+            catch { }
+        }
+
         /// <summary>
         /// Fetch all games for a given platform from the public Games.Database repository.
         /// Mirrors <c>fetchGamesDbPlatform(platform)</c> in script.js.
@@ -662,6 +706,22 @@ namespace GameLauncher.Services
         public static async Task<List<DatabaseGame>> FetchGamesDatabaseAsync(
             string platform, CancellationToken ct = default)
         {
+            // 1. In-memory cache — instant for platform switches within the same session
+            lock (_dbMemoryCache)
+            {
+                if (_dbMemoryCache.TryGetValue(platform, out var mem))
+                    return mem;
+            }
+
+            // 2. Disk cache — fast on subsequent app launches (avoids re-download)
+            var disk = TryLoadDiskCache(platform);
+            if (disk != null)
+            {
+                lock (_dbMemoryCache) _dbMemoryCache[platform] = disk;
+                return disk;
+            }
+
+            // 3. Network fetch
             var url  = $"{GamesDbRawBase}/{Uri.EscapeDataString(platform)}.Games.json";
             var resp = await _rawHttp.GetAsync(url, ct);
 
@@ -705,15 +765,72 @@ namespace GameLauncher.Services
                 if (string.IsNullOrWhiteSpace(title))
                     continue; // skip non-game / empty entries
 
+                // Cover URL — check CoverUrl, then image, then cover_url (mirrors getGameCoverUrl in script.js)
+                string? coverUrl =
+                    item.TryGetProperty("CoverUrl", out var cu)  && cu.ValueKind == JsonValueKind.String ? cu.GetString() :
+                    item.TryGetProperty("image",    out var img) && img.ValueKind == JsonValueKind.String ? img.GetString() :
+                    item.TryGetProperty("cover_url",out var cov) && cov.ValueKind == JsonValueKind.String ? cov.GetString() :
+                    null;
+
+                // Description — check both casings (mirrors game.Description || game.description in script.js)
+                string? description =
+                    item.TryGetProperty("Description", out var d1) && d1.ValueKind == JsonValueKind.String ? d1.GetString() :
+                    item.TryGetProperty("description", out var d2) && d2.ValueKind == JsonValueKind.String ? d2.GetString() :
+                    null;
+
+                // Trailer — first element of the trailers array
+                string? trailerUrl = null;
+                if (item.TryGetProperty("trailers", out var tr) && tr.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var elem in tr.EnumerateArray())
+                    {
+                        if (elem.ValueKind == JsonValueKind.String)
+                        { trailerUrl = elem.GetString(); break; }
+                    }
+                }
+
+                // Achievements URL
+                string? achievementsUrl =
+                    item.TryGetProperty("achievementsUrl", out var au) && au.ValueKind == JsonValueKind.String
+                    ? au.GetString() : null;
+
+                // Screenshots / background images
+                List<string>? screenshots = null;
+                if (item.TryGetProperty("background_images", out var bi) && bi.ValueKind == JsonValueKind.Array)
+                {
+                    screenshots = new List<string>();
+                    foreach (var elem in bi.EnumerateArray())
+                    {
+                        if (elem.ValueKind == JsonValueKind.String)
+                        {
+                            var s = elem.GetString();
+                            if (!string.IsNullOrEmpty(s)) screenshots.Add(s);
+                        }
+                    }
+                    if (screenshots.Count == 0) screenshots = null;
+                }
+
                 result.Add(new DatabaseGame
                 {
-                    Title    = title,
-                    TitleId  = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  : null,
-                    CoverUrl = item.TryGetProperty("CoverUrl", out var cu)  ? cu.GetString()   : null,
-                    AppId    = item.TryGetProperty("appid", out var aid) &&
-                               aid.ValueKind == JsonValueKind.Number         ? aid.GetInt64()  : null,
+                    Title           = title,
+                    TitleId         = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  : null,
+                    CoverUrl        = coverUrl,
+                    AppId           = item.TryGetProperty("appid", out var aid) &&
+                                      aid.ValueKind == JsonValueKind.Number       ? aid.GetInt64()    : null,
+                    Description     = description,
+                    TrailerUrl      = trailerUrl,
+                    AchievementsUrl = achievementsUrl,
+                    Screenshots     = screenshots,
                 });
             }
+
+            // Store in both caches so future calls (same session or next launch) are instant
+            lock (_dbMemoryCache) _dbMemoryCache[platform] = result;
+            // Write to disk on a background thread; SaveDiskCache swallows all exceptions so
+            // this fire-and-forget is intentional and safe — a failed write just means the
+            // next launch re-fetches from the network.
+            _ = Task.Run(() => SaveDiskCache(platform, result), CancellationToken.None);
+
             return result;
         }
 
