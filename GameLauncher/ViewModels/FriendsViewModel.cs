@@ -42,6 +42,9 @@ public partial class FriendsViewModel : ViewModelBase
     private GameOsClient? _client;
     private string        _username = "";
 
+    /// <summary>Invoked when the user clicks "View Profile" on a friend row.</summary>
+    public System.Action<string>? OnViewFriendProfile { get; set; }
+
     public void Load(GameOsClient client, string username)
     {
         _client   = client;
@@ -109,6 +112,14 @@ public partial class FriendsViewModel : ViewModelBase
     }
 
     // ── Messaging commands ────────────────────────────────────────────────────
+
+    /// <summary>Navigates to the friend's profile page.</summary>
+    [RelayCommand]
+    private void ViewFriendProfile(string friendUsername)
+    {
+        if (!string.IsNullOrEmpty(friendUsername))
+            OnViewFriendProfile?.Invoke(friendUsername);
+    }
 
     /// <summary>Opens the conversation panel for the specified friend.</summary>
     [RelayCommand]

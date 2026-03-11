@@ -758,6 +758,75 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Checks the GitHub API to see whether the cached platform JSON files are
+        /// up-to-date.  For each platform whose cached SHA differs from the current
+        /// HEAD SHA on GitHub, the disk and in-memory caches are invalidated so the
+        /// next <see cref="FetchGamesDatabaseAsync"/> call re-downloads fresh data.
+        ///
+        /// This mirrors the web app checking <c>?t=Date.now()</c> on every load;
+        /// here we use a lightweight Contents API call (returns only metadata, not
+        /// the full file body) to minimise bandwidth.
+        /// </summary>
+        public static async Task CheckForUpdatesAsync(
+            string[]? platforms = null, CancellationToken ct = default)
+        {
+            platforms ??= GamesDbPlatforms;
+            foreach (var platform in platforms)
+            {
+                try
+                {
+                    // GitHub Contents API returns the blob SHA for the file — tiny response
+                    var metaUrl = $"https://api.github.com/repos/Koriebonx98/Games.Database/contents/{Uri.EscapeDataString(platform)}.Games.json";
+                    using var req = new System.Net.Http.HttpRequestMessage(System.Net.Http.HttpMethod.Get, metaUrl);
+                    req.Headers.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+                    req.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+
+                    using var resp = await _rawHttp.SendAsync(req, ct);
+                    if (!resp.IsSuccessStatusCode) continue;
+
+                    var json = await resp.Content.ReadAsStringAsync(ct);
+                    using var doc = JsonDocument.Parse(json);
+
+                    if (!doc.RootElement.TryGetProperty("sha", out var shaEl)) continue;
+                    var remoteSha = shaEl.GetString();
+                    if (string.IsNullOrEmpty(remoteSha)) continue;
+
+                    // Compare with stored SHA
+                    var cachedSha = TryLoadCachedSha(platform);
+                    if (!string.Equals(cachedSha, remoteSha, StringComparison.OrdinalIgnoreCase))
+                    {
+                        // Cache is stale — invalidate so the next fetch pulls fresh data
+                        System.Diagnostics.Debug.WriteLine(
+                            $"[GitHubDataService] {platform} cache is stale (remote SHA changed). Invalidating.");
+                        InvalidatePlatformCache(platform);
+                        SaveCachedSha(platform, remoteSha);
+                    }
+                }
+                catch { /* best-effort — do not block startup on a network error */ }
+            }
+        }
+
+        private static string? TryLoadCachedSha(string platform)
+        {
+            try
+            {
+                var path = Path.Combine(DbCacheDir, $"{platform}.sha");
+                return File.Exists(path) ? File.ReadAllText(path).Trim() : null;
+            }
+            catch { return null; }
+        }
+
+        private static void SaveCachedSha(string platform, string sha)
+        {
+            try
+            {
+                Directory.CreateDirectory(DbCacheDir);
+                File.WriteAllText(Path.Combine(DbCacheDir, $"{platform}.sha"), sha);
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Fetch all games for a given platform from the public Games.Database repository.
         /// Mirrors <c>fetchGamesDbPlatform(platform)</c> in script.js.
         /// Returns an empty list when the platform file does not exist (404).

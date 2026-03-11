@@ -26,19 +26,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private List<Achievement> _achievements = new();
 
     // ── Child view models ──────────────────────────────────────────────────
-    public LoginViewModel     LoginVm     { get; }
-    public DashboardViewModel DashboardVm { get; }
-    public LibraryViewModel   LibraryVm   { get; }
-    public StoreViewModel     StoreVm     { get; }
-    public ProfileViewModel   ProfileVm   { get; }
-    public FriendsViewModel   FriendsVm   { get; }
-    public GameDetailViewModel DetailVm   { get; }
+    public LoginViewModel     LoginVm          { get; }
+    public DashboardViewModel DashboardVm      { get; }
+    public LibraryViewModel   LibraryVm        { get; }
+    public StoreViewModel     StoreVm          { get; }
+    public ProfileViewModel   ProfileVm        { get; }
+    public ProfileViewModel   FriendProfileVm  { get; }
+    public FriendsViewModel   FriendsVm        { get; }
+    public GameDetailViewModel DetailVm        { get; }
 
     // ── Navigation state ───────────────────────────────────────────────────
-    [ObservableProperty] private bool _showLogin    = true;
-    [ObservableProperty] private bool _showMain     = false;
-    [ObservableProperty] private bool _showDetail   = false;
-    [ObservableProperty] private string _activePage = "dashboard";
+    [ObservableProperty] private bool _showLogin         = true;
+    [ObservableProperty] private bool _showMain          = false;
+    [ObservableProperty] private bool _showDetail        = false;
+    [ObservableProperty] private bool _showFriendProfile = false;
+    [ObservableProperty] private string _activePage      = "dashboard";
+    /// <summary>Username of the friend currently being viewed (shown in the friend-profile overlay).</summary>
+    [ObservableProperty] private string _viewingFriendName = "";
 
     public bool IsHome        => ActivePage == "dashboard";
     public bool IsLibrary     => ActivePage == "library";
@@ -60,13 +64,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
 
-        LoginVm     = new LoginViewModel(_client, _sessionCache);
-        DashboardVm = new DashboardViewModel();
-        LibraryVm   = new LibraryViewModel();
-        StoreVm     = new StoreViewModel();
-        ProfileVm   = new ProfileViewModel();
-        FriendsVm   = new FriendsViewModel();
-        DetailVm    = new GameDetailViewModel();
+        LoginVm        = new LoginViewModel(_client, _sessionCache);
+        DashboardVm    = new DashboardViewModel();
+        LibraryVm      = new LibraryViewModel();
+        StoreVm        = new StoreViewModel();
+        ProfileVm      = new ProfileViewModel();
+        FriendProfileVm= new ProfileViewModel();
+        FriendsVm      = new FriendsViewModel();
+        DetailVm       = new GameDetailViewModel();
 
         DetailVm.OnClose = () => ShowDetail = false;
 
@@ -78,7 +83,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
+        LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
+        FriendsVm.OnViewFriendProfile = OpenFriendProfile;
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
@@ -86,6 +93,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanner.RepacksUpdated += repacks => LibraryVm.UpdateRepacks(repacks);
         _scanner.RomsUpdated    += roms    => LibraryVm.UpdateRoms(roms);
         _ = _scanner.StartAsync();
+
+        // On startup, check if any cached platform JSON files are outdated and
+        // invalidate stale ones so the next database fetch pulls fresh data.
+        // Mirrors the web app always fetching with ?t=Date.now() cache-busting.
+        _ = Services.GitHubDataService.CheckForUpdatesAsync();
 
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
         _ = LoginVm.TryAutoLoginAsync();
@@ -222,6 +234,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ProfileVm.Load(profile, library, achievements, isAdmin);
         FriendsVm.Load(_client, profile.Username);
 
+        // Asynchronously enrich library games with cover/desc/trailer from Games.Database.
+        // This fills in PS3, Switch, Xbox 360 (and any other platform) games whose
+        // metadata was not stored server-side or is missing — mirrors the web app's
+        // openGameModalFromLibrary logic that calls fetchGamesDbPlatform(platform).
+        _ = EnrichLibraryFromDatabaseAsync(library);
+
         ShowLogin = false;
         ShowMain  = true;
         ActivePage = "dashboard";
@@ -268,6 +286,52 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowDetail = true;
     }
 
+    /// <summary>
+    /// Opens the friend-profile overlay for the specified username.
+    /// Fetches the friend's profile and library from the backend, then displays
+    /// them in the <see cref="FriendProfileVm"/> overlay — mirroring the web
+    /// app navigating to <c>profile.html?user=username</c>.
+    /// </summary>
+    private void OpenFriendProfile(string friendUsername)
+    {
+        if (string.IsNullOrEmpty(friendUsername)) return;
+        ViewingFriendName  = friendUsername;
+        ShowFriendProfile  = true;
+        // Load placeholder data immediately, then enrich asynchronously
+        FriendProfileVm.LoadPlaceholder(friendUsername);
+        _ = LoadFriendProfileAsync(friendUsername);
+    }
+
+    [RelayCommand]
+    private void CloseFriendProfile()
+    {
+        ShowFriendProfile = false;
+        ViewingFriendName = "";
+    }
+
+    private async Task LoadFriendProfileAsync(string friendUsername)
+    {
+        try
+        {
+            var profile  = await _client.GetFriendProfileAsync(friendUsername) ?? new UserProfile { Username = friendUsername };
+            var games    = await _client.GetFriendGamesAsync(friendUsername);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                FriendProfileVm.Load(profile, games, new List<Achievement>(), false));
+        }
+        catch { /* best-effort — placeholder already visible */ }
+    }
+
+    private void OpenDetailFromLocalRom(LocalRom rom)
+    {
+        // Show ROM info immediately so the UI is responsive
+        DetailVm.LoadFromLocalRom(rom);
+        ShowDetail = true;
+
+        // Asynchronously enrich with cover art / description / screenshots / achievements
+        // from the platform-specific Games.Database (PS3, Switch, Xbox 360, etc.)
+        _ = EnrichLocalGameDetailAsync(rom.Title, rom.Platform);
+    }
+
     private void OpenDetailFromLocalGame(LocalGame game)
     {
         // Show basic info immediately so the UI is responsive
@@ -275,7 +339,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowDetail = true;
 
         // Asynchronously enrich with cover/description/trailer from Games.Database
-        _ = EnrichLocalGameDetailAsync(game.Title);
+        _ = EnrichLocalGameDetailAsync(game.Title, "PC");
     }
 
     private void OpenDetailFromLocalRepack(LocalRepack repack)
@@ -288,21 +352,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // from the Games.Database — same enrichment as installed local games.
         // StripRepackMarkers is applied inside EnrichLocalGameDetailAsync via
         // FindDatabaseGame, so "[FitGirl Repack]" suffixes are stripped automatically.
-        _ = EnrichLocalGameDetailAsync(repack.Title);
+        _ = EnrichLocalGameDetailAsync(repack.Title, "PC");
     }
 
     /// <summary>
-    /// Looks up <paramref name="localTitle"/> in the PC Games.Database and, if found,
-    /// enriches the currently-open detail panel with cover, description, trailer and
-    /// screenshots — the same data shown on the website.
+    /// Looks up <paramref name="localTitle"/> in the specified platform's Games.Database and,
+    /// if found, enriches the currently-open detail panel with cover, description, trailer,
+    /// screenshots and achievements — the same data shown on the website.
     /// Title matching handles Windows-safe folder names such as
     /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II".
     /// </summary>
-    private async Task EnrichLocalGameDetailAsync(string localTitle)
+    private async Task EnrichLocalGameDetailAsync(string localTitle, string platform)
     {
         try
         {
-            var dbGames = await GameOsClient.FetchGamesDatabaseAsync("PC");
+            var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
             var dbGame  = FindDatabaseGame(dbGames, localTitle);
             if (dbGame != null)
             {
@@ -311,6 +375,75 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
         }
         catch { /* best-effort — basic info already displayed */ }
+    }
+
+    /// <summary>
+    /// After login, enriches library games that are missing cover art / description /
+    /// trailer with data from the public Games.Database — mirrors the web app's
+    /// <c>openGameModalFromLibrary → fetchGamesDbPlatform(platform)</c> flow.
+    /// Groups games by platform to minimise API calls; results are cached on disk
+    /// so subsequent launches are instant.
+    /// </summary>
+    private async Task EnrichLibraryFromDatabaseAsync(List<Game> library)
+    {
+        // Only enrich games that are still missing visual metadata
+        var toEnrich = library
+            .Where(g => string.IsNullOrEmpty(g.CoverUrl)
+                     || string.IsNullOrEmpty(g.Description))
+            .ToList();
+
+        if (toEnrich.Count == 0) return;
+
+        // Group by platform so we fetch each platform database at most once
+        var platforms = toEnrich
+            .Select(g => g.Platform)
+            .Where(p => !string.IsNullOrEmpty(p))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        foreach (var platform in platforms)
+        {
+            try
+            {
+                var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
+                if (dbGames.Count == 0) continue;
+
+                var platformGames = toEnrich
+                    .Where(g => string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+
+                bool anyUpdated = false;
+                foreach (var game in platformGames)
+                {
+                    var dbGame = FindDatabaseGame(dbGames, game.Title);
+                    if (dbGame == null) continue;
+
+                    // Only fill in fields that are still empty
+                    if (string.IsNullOrEmpty(game.CoverUrl) && !string.IsNullOrEmpty(dbGame.CoverUrl))
+                    { game.CoverUrl = dbGame.CoverUrl; anyUpdated = true; }
+                    if (string.IsNullOrEmpty(game.Description) && !string.IsNullOrEmpty(dbGame.Description))
+                    { game.Description = dbGame.Description; anyUpdated = true; }
+                    if (string.IsNullOrEmpty(game.TrailerUrl) && !string.IsNullOrEmpty(dbGame.TrailerUrl))
+                    { game.TrailerUrl = dbGame.TrailerUrl; anyUpdated = true; }
+                    if ((game.Screenshots == null || game.Screenshots.Count == 0)
+                        && dbGame.Screenshots != null && dbGame.Screenshots.Count > 0)
+                    { game.Screenshots = dbGame.Screenshots; anyUpdated = true; }
+                    if (!string.IsNullOrEmpty(dbGame.TitleId) && string.IsNullOrEmpty(game.TitleId))
+                    { game.TitleId = dbGame.TitleId; anyUpdated = true; }
+                }
+
+                // Refresh the library UI once per platform batch if anything changed
+                if (anyUpdated)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        LibraryVm.Load(_library);
+                        DashboardVm.Load(_profile, _library, _achievements);
+                    });
+                }
+            }
+            catch { /* best-effort — library is still usable without enrichment */ }
+        }
     }
 
     /// <summary>

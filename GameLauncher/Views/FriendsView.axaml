@@ -103,7 +103,7 @@
                     <DataTemplate x:DataType="models:FriendEntry">
                         <Border Background="#161b22" CornerRadius="10"
                                 Padding="16,12" Margin="0,0,0,8">
-                            <Grid ColumnDefinitions="48,*,Auto">
+                            <Grid ColumnDefinitions="48,*,Auto,Auto">
                                 <!-- Avatar with status dot -->
                                 <Panel Grid.Column="0" Width="40" Height="40">
                                     <Border Width="40" Height="40" CornerRadius="20"
@@ -141,8 +141,16 @@
                                                    IsVisible="{Binding IsAway}"/>
                                     </StackPanel>
                                 </StackPanel>
-                                <!-- Message button -->
+                                <!-- View Profile button -->
                                 <Button Grid.Column="2" Classes="btn-secondary"
+                                        Padding="10,7" VerticalAlignment="Center"
+                                        Margin="0,0,8,0"
+                                        Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
+                                        CommandParameter="{Binding Username}">
+                                    👤 Profile
+                                </Button>
+                                <!-- Message button -->
+                                <Button Grid.Column="3" Classes="btn-secondary"
                                         Padding="12,7" VerticalAlignment="Center"
                                         Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
                                         CommandParameter="{Binding Username}">
@@ -164,7 +172,7 @@
                         <Border Background="#161b22" CornerRadius="10"
                                 Padding="16,12" Margin="0,0,0,8"
                                 Opacity="0.7">
-                            <Grid ColumnDefinitions="48,*,Auto">
+                            <Grid ColumnDefinitions="48,*,Auto,Auto">
                                 <!-- Avatar -->
                                 <Border Grid.Column="0" Width="40" Height="40"
                                         CornerRadius="20" Background="#21262d">
@@ -185,8 +193,16 @@
                                         <Run Text="{Binding LastSeen}"/>
                                     </TextBlock>
                                 </StackPanel>
-                                <!-- Message button -->
+                                <!-- View Profile button -->
                                 <Button Grid.Column="2" Classes="btn-secondary"
+                                        Padding="10,7" VerticalAlignment="Center"
+                                        Margin="0,0,8,0"
+                                        Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
+                                        CommandParameter="{Binding Username}">
+                                    👤 Profile
+                                </Button>
+                                <!-- Message button -->
+                                <Button Grid.Column="3" Classes="btn-secondary"
                                         Padding="12,7" VerticalAlignment="Center"
                                         Opacity="0.6"
                                         Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"

@@ -94,10 +94,21 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Command-line arguments for the selected executable.</summary>
     [ObservableProperty] private string _settingsExeArgs = "";
 
+    /// <summary>ROM file path used when launching via an emulator (for non-PC platforms).</summary>
+    [ObservableProperty] private string _settingsRomPath = "";
+
+    /// <summary>True when this game is a ROM (non-PC) and shows the Rom Select field.</summary>
+    [ObservableProperty] private bool _isRom;
+
     /// <summary>Path typed by the user when adding a new pre-launch entry.</summary>
     [ObservableProperty] private string _newPreLaunchPath  = "";
     [ObservableProperty] private string _newPreLaunchArgs  = "";
     [ObservableProperty] private string _newPreLaunchLabel = "";
+
+    /// <summary>Path typed by the user when adding a new during-launch entry.</summary>
+    [ObservableProperty] private string _newDuringLaunchPath  = "";
+    [ObservableProperty] private string _newDuringLaunchArgs  = "";
+    [ObservableProperty] private string _newDuringLaunchLabel = "";
 
     /// <summary>Path typed by the user when adding a new post-launch entry.</summary>
     [ObservableProperty] private string _newPostLaunchPath  = "";
@@ -107,8 +118,9 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Status message shown at the bottom of the settings panel.</summary>
     [ObservableProperty] private string _settingsStatus = "";
 
-    public ObservableCollection<LaunchEntry> PreLaunchEntries  { get; } = new();
-    public ObservableCollection<LaunchEntry> PostLaunchEntries { get; } = new();
+    public ObservableCollection<LaunchEntry> PreLaunchEntries    { get; } = new();
+    public ObservableCollection<LaunchEntry> DuringLaunchEntries { get; } = new();
+    public ObservableCollection<LaunchEntry> PostLaunchEntries   { get; } = new();
 
     /// <summary>Opens the settings panel and loads any saved settings for the current game.</summary>
     private void OpenSettings()
@@ -118,6 +130,7 @@ public partial class GameDetailViewModel : ViewModelBase
         // Apply saved exe path (prefer saved > auto-detected)
         SettingsExePath = saved.ExePath ?? "";
         SettingsExeArgs = saved.ExeArgs ?? "";
+        SettingsRomPath = saved.RomPath ?? "";
 
         // If no saved exe path but we have a detected one, pre-fill it
         if (string.IsNullOrEmpty(SettingsExePath) && _driveInstances.Count > 0)
@@ -130,18 +143,25 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var e in saved.PreLaunch)
             PreLaunchEntries.Add(e);
 
+        DuringLaunchEntries.Clear();
+        foreach (var e in saved.DuringLaunch)
+            DuringLaunchEntries.Add(e);
+
         PostLaunchEntries.Clear();
         foreach (var e in saved.PostLaunch)
             PostLaunchEntries.Add(e);
 
-        NewPreLaunchPath  = "";
-        NewPreLaunchArgs  = "";
-        NewPreLaunchLabel = "";
-        NewPostLaunchPath  = "";
-        NewPostLaunchArgs  = "";
-        NewPostLaunchLabel = "";
-        SettingsStatus    = "";
-        ShowSettings      = true;
+        NewPreLaunchPath    = "";
+        NewPreLaunchArgs    = "";
+        NewPreLaunchLabel   = "";
+        NewDuringLaunchPath  = "";
+        NewDuringLaunchArgs  = "";
+        NewDuringLaunchLabel = "";
+        NewPostLaunchPath   = "";
+        NewPostLaunchArgs   = "";
+        NewPostLaunchLabel  = "";
+        SettingsStatus      = "";
+        ShowSettings        = true;
     }
 
     [RelayCommand]
@@ -149,11 +169,13 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         var settings = new GameSettings
         {
-            GameTitle  = Title,
-            ExePath    = string.IsNullOrWhiteSpace(SettingsExePath) ? null : SettingsExePath.Trim(),
-            ExeArgs    = string.IsNullOrWhiteSpace(SettingsExeArgs)  ? null : SettingsExeArgs.Trim(),
-            PreLaunch  = PreLaunchEntries.ToList(),
-            PostLaunch = PostLaunchEntries.ToList(),
+            GameTitle    = Title,
+            ExePath      = string.IsNullOrWhiteSpace(SettingsExePath) ? null : SettingsExePath.Trim(),
+            ExeArgs      = string.IsNullOrWhiteSpace(SettingsExeArgs)  ? null : SettingsExeArgs.Trim(),
+            RomPath      = string.IsNullOrWhiteSpace(SettingsRomPath)  ? null : SettingsRomPath.Trim(),
+            PreLaunch    = PreLaunchEntries.ToList(),
+            DuringLaunch = DuringLaunchEntries.ToList(),
+            PostLaunch   = PostLaunchEntries.ToList(),
         };
         GameSettingsService.Save(settings);
         SettingsStatus = "✓  Settings saved.";
@@ -187,6 +209,29 @@ public partial class GameDetailViewModel : ViewModelBase
     private void RemovePreLaunch(LaunchEntry? entry)
     {
         if (entry != null) PreLaunchEntries.Remove(entry);
+    }
+
+    [RelayCommand]
+    private void AddDuringLaunch()
+    {
+        if (string.IsNullOrWhiteSpace(NewDuringLaunchPath)) return;
+        DuringLaunchEntries.Add(new LaunchEntry
+        {
+            Label     = string.IsNullOrWhiteSpace(NewDuringLaunchLabel)
+                            ? System.IO.Path.GetFileName(NewDuringLaunchPath.Trim())
+                            : NewDuringLaunchLabel.Trim(),
+            Path      = NewDuringLaunchPath.Trim(),
+            Arguments = string.IsNullOrWhiteSpace(NewDuringLaunchArgs) ? null : NewDuringLaunchArgs.Trim(),
+        });
+        NewDuringLaunchPath  = "";
+        NewDuringLaunchArgs  = "";
+        NewDuringLaunchLabel = "";
+    }
+
+    [RelayCommand]
+    private void RemoveDuringLaunch(LaunchEntry? entry)
+    {
+        if (entry != null) DuringLaunchEntries.Remove(entry);
     }
 
     [RelayCommand]
@@ -544,6 +589,7 @@ public partial class GameDetailViewModel : ViewModelBase
         Price         = game.Price;
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
+        IsRom         = false;
 
         PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
@@ -551,6 +597,10 @@ public partial class GameDetailViewModel : ViewModelBase
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
+
+        // Load achievements from the database URL when not already populated
+        if (!HasAchievements && !string.IsNullOrEmpty(game.AchievementsUrl))
+            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
         ApplyInstallState(localGame, repack);
     }
@@ -576,6 +626,7 @@ public partial class GameDetailViewModel : ViewModelBase
         ReleaseYear   = game.ReleaseYear;
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
+        IsRom         = false;
 
         PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
@@ -583,6 +634,10 @@ public partial class GameDetailViewModel : ViewModelBase
         IsLocalGame       = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
+
+        // Load achievements from the database URL when available
+        if (!string.IsNullOrEmpty(game.AchievementsUrl))
+            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
         ApplyInstallState(localGame, repack);
     }
@@ -604,6 +659,7 @@ public partial class GameDetailViewModel : ViewModelBase
         RatingStars       = "—";
         Price             = null;
         CoverUrl          = null;
+        IsRom             = false;
         _databaseDescription = null;
 
         PopulateTrailer(null);
@@ -659,6 +715,7 @@ public partial class GameDetailViewModel : ViewModelBase
         RatingStars       = "—";
         Price             = null;
         CoverUrl          = null;
+        IsRom             = false;
         _databaseDescription = null;
 
         Description = $"Repack archive ready to install  ·  {repack.SizeLabel}";
@@ -682,6 +739,66 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveDriveLabel   = "";
         ActiveDrivePath    = "";
         ActiveExeType      = "";
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Populate from a locally detected LocalRom (ROM file for non-PC platform)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Sets up the detail overlay for a ROM file found on disk.
+    /// Shows basic title/platform/size info immediately; the caller should follow
+    /// up with <see cref="MainViewModel.EnrichLocalGameDetailAsync"/> to pull
+    /// real cover art, description, screenshots and achievements from the
+    /// platform-specific Games.Database (PS3, Switch, Xbox 360, etc.).
+    /// </summary>
+    public void LoadFromLocalRom(LocalRom rom)
+    {
+        Title             = rom.Title;
+        Platform          = rom.Platform;
+        Genre             = "";
+        CoverGradient     = "#0d1f3c,#1a3264";
+        RatingStars       = "—";
+        Price             = null;
+        CoverUrl          = null;
+        IsRom             = true;
+        _databaseDescription = null;
+
+        Description = $"ROM file  ·  {rom.SizeLabel}  ·  {rom.FilePath}";
+
+        PopulateTrailer(null);
+        Screenshots.Clear();
+        HasScreenshots = false;
+        PopulateAchievements(null);
+
+        IsLocalGame      = true;
+        IsInstalled      = true;   // ROM is "installed" (the file exists on disk)
+        IsRepack         = false;
+        IsSetupRepack    = false;
+        ShowDrivePicker  = false;
+        RepackPath       = "";
+        RepackSizeLabel  = "";
+
+        // Store the ROM's directory as the "folder path" so the Open Folder button works
+        _driveInstances = new List<LocalGameDriveEntry>
+        {
+            new LocalGameDriveEntry
+            {
+                DriveRoot      = System.IO.Path.GetPathRoot(rom.FilePath) ?? "",
+                FolderPath     = System.IO.Path.GetDirectoryName(rom.FilePath) ?? "",
+                ExecutablePath = rom.FilePath,
+                ExecutableType = rom.FileType,
+            }
+        };
+        DriveLabels.Clear();
+        foreach (var d in _driveInstances)
+            DriveLabels.Add(d.DriveRoot);
+
+        HasMultipleDrives  = false;
+        SelectedDriveIndex = 0;
+        ActiveDriveLabel   = _driveInstances[0].DriveRoot;
+        ActiveDrivePath    = _driveInstances[0].FolderPath;
+        ActiveExeType      = rom.FileType.ToUpperInvariant();
     }
 
 
@@ -782,6 +899,61 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulateTrailer(dbGame.TrailerUrl);
         PopulateScreenshots(dbGame.Screenshots);
+
+        // Load achievements from the AchievementsUrl if we don't already have them
+        if (!HasAchievements && !string.IsNullOrEmpty(dbGame.AchievementsUrl))
+            _ = FetchAndDisplayAchievementsAsync(dbGame.AchievementsUrl);
+    }
+
+    /// <summary>
+    /// Fetches the achievements JSON from the given URL and populates the
+    /// Achievements collection.  Mirrors <c>_loadAchievementsInModal</c> in script.js.
+    /// </summary>
+    private async System.Threading.Tasks.Task FetchAndDisplayAchievementsAsync(string url)
+    {
+        try
+        {
+            using var http = new System.Net.Http.HttpClient();
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+            var json = await http.GetStringAsync(url);
+            if (string.IsNullOrWhiteSpace(json)) return;
+
+            var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            // Achievements JSON can be a root array or { "achievements": [...] }
+            System.Text.Json.JsonElement arr;
+            if (root.ValueKind == System.Text.Json.JsonValueKind.Array)
+                arr = root;
+            else if (root.TryGetProperty("achievements", out var sub) && sub.ValueKind == System.Text.Json.JsonValueKind.Array)
+                arr = sub;
+            else
+                return;
+
+            var list = new List<Achievement>();
+            foreach (var item in arr.EnumerateArray())
+            {
+                string name = TryGetStringProp(item, "name", "Name");
+                string desc = TryGetStringProp(item, "description", "Description");
+                string icon = TryGetStringProp(item, "iconUrl", "IconUrl");
+
+                if (string.IsNullOrEmpty(name)) continue;
+                list.Add(new Achievement
+                {
+                    Name        = name,
+                    Description = desc,
+                    IconUrl     = string.IsNullOrEmpty(icon) ? null : icon,
+                });
+            }
+
+            if (list.Count > 0)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    PopulateAchievements(list));
+            }
+        }
+        catch { /* best-effort */ }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -832,5 +1004,19 @@ public partial class GameDetailViewModel : ViewModelBase
         AchievementsLabel = HasAchievements
             ? $"🏆  Achievements  ({Achievements.Count})"
             : "🏆  Achievements";
+    }
+
+    /// <summary>
+    /// Returns the string value of the first matching property from an element,
+    /// trying each key in order (case-sensitive).  Returns "" when none match.
+    /// </summary>
+    private static string TryGetStringProp(System.Text.Json.JsonElement el, params string[] keys)
+    {
+        foreach (var key in keys)
+        {
+            if (el.TryGetProperty(key, out var val))
+                return val.GetString() ?? "";
+        }
+        return "";
     }
 }

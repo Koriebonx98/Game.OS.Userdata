@@ -194,6 +194,41 @@ namespace GameLauncher
             return await _github!.GetGamesAsync(_username, ct);
         }
 
+        /// <summary>
+        /// Fetches the public profile for any user by username (no authentication required
+        /// in GitHub-direct mode).  Used to show a friend's profile page.
+        /// </summary>
+        public async Task<UserProfile?> GetFriendProfileAsync(
+            string username, CancellationToken ct = default)
+        {
+            try
+            {
+                if (_github != null)
+                    return await _github.GetProfileAsync(username, ct);
+
+                // Backend mode: re-use the public profile endpoint if the backend exposes it;
+                // otherwise fall back to a minimal stub so the UI always has something to show.
+                return new UserProfile { Username = username };
+            }
+            catch { return new UserProfile { Username = username }; }
+        }
+
+        /// <summary>
+        /// Fetches the game library for any user by username (no authentication required
+        /// in GitHub-direct mode).  Used to show a friend's library on their profile page.
+        /// </summary>
+        public async Task<List<Game>> GetFriendGamesAsync(
+            string username, CancellationToken ct = default)
+        {
+            try
+            {
+                if (_github != null)
+                    return await _github.GetGamesAsync(username, ct);
+                return new List<Game>();
+            }
+            catch { return new List<Game>(); }
+        }
+
         public async Task AddGameAsync(
             Game game, CancellationToken ct = default)
         {

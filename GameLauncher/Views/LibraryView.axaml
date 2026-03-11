@@ -116,7 +116,7 @@
                     </Border>
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding LocalGames}">
+                <ItemsControl ItemsSource="{Binding FilteredLocalGames}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -193,7 +193,7 @@
                     </Border>
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding ReadyToInstall}">
+                <ItemsControl ItemsSource="{Binding FilteredRepacks}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -261,7 +261,7 @@
                     </Border>
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding LocalRoms}">
+                <ItemsControl ItemsSource="{Binding FilteredRoms}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
@@ -269,7 +269,10 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:LocalRom">
-                            <Border Classes="game-card" Width="170" Margin="0,0,10,10">
+                            <Button Classes="game-card-btn"
+                                    Width="170" Margin="0,0,10,10"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenRomDetailCommand}"
+                                    CommandParameter="{Binding}">
                                 <StackPanel>
                                     <!-- ROM art -->
                                     <Border Height="100" CornerRadius="10,10,0,0">
@@ -308,7 +311,7 @@
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>
-                            </Border>
+                            </Button>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
