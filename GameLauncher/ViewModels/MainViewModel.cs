@@ -19,6 +19,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly GameOsClient        _client;
     private readonly GameScannerService  _scanner;
     private readonly SessionCacheService _sessionCache;
+    private readonly PlaytimeService     _playtimeSvc = new();
 
     // ── Session data ───────────────────────────────────────────────────────
     private UserProfile     _profile      = new();
@@ -78,6 +79,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DetailVm       = new GameDetailViewModel();
 
         DetailVm.OnClose = () => ShowDetail = false;
+
+        // Wire playtime tracking: when a game is launched from the detail view,
+        // pass the process to the PlaytimeService to record the session.
+        DetailVm.OnRequestPlaytimeTracking = (proc, title, platform) =>
+            _playtimeSvc.TrackProcess(proc, title, platform, _library);
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
 
@@ -805,5 +811,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _scanner.Dispose();
         (_client as IDisposable)?.Dispose();
         StoreVm.Dispose();
+        _playtimeSvc.Dispose();
     }
 }

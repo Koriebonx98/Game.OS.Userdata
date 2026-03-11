@@ -95,111 +95,79 @@
             </Grid>
         </Border>
 
-        <!-- Recently Played (cloud library) -->
-        <TextBlock Text="Recently Played" Classes="section-header"/>
-
-        <ItemsControl ItemsSource="{Binding RecentGames}" Margin="0,0,0,24">
-            <ItemsControl.ItemsPanel>
-                <ItemsPanelTemplate>
-                    <WrapPanel/>
-                </ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:Game">
-                    <Button Classes="game-card-btn"
-                            Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
-                            CommandParameter="{Binding}">
-                        <StackPanel>
-                            <!-- Cover art -->
-                            <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
-                                <views:CoverImage
-                                    ImageUrl="{Binding CoverUrl}"
-                                    FallbackText="{Binding Title}"
-                                    FallbackGradient="{Binding CoverGradient}"
-                                    SubText="{Binding Platform}"
-                                    LetterFontSize="44"
-                                    ImageCornerRadius="10,10,0,0"
-                                    Height="110"/>
-                            </Border>
-                            <!-- Info -->
-                            <Border Padding="10,8,10,10">
-                                <StackPanel Spacing="3">
-                                    <TextBlock Text="{Binding Title}"
-                                               Classes="game-card-title"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="{Binding Platform}"
-                                                   Classes="game-card-meta"/>
-                                        <TextBlock Text="•" Classes="game-card-meta"/>
-                                        <TextBlock Text="{Binding Genre}"
-                                                   Classes="game-card-meta"/>
-                                    </StackPanel>
-                                    <TextBlock Text="{Binding RatingStars}"
-                                               FontSize="11" Foreground="#f1c40f"/>
-                                    <TextBlock Text="{Binding PlaytimeLabel}"
-                                               FontSize="10" Foreground="#0ea5e9"
-                                               IsVisible="{Binding PlaytimeLabel,
-                                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Button>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
-
-        <!-- Continue Playing (locally detected ROMs + installed games) -->
-        <StackPanel IsVisible="{Binding HasRecentLocalGames}" Margin="0,0,0,24">
+        <!-- Continue Playing (locally detected ROMs + installed games that have been played) -->
+        <StackPanel Margin="0,0,0,24">
             <TextBlock Text="Continue Playing" Classes="section-header"/>
-            <ItemsControl ItemsSource="{Binding RecentLocalGames}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:LocalGameCardVm">
-                        <Button Classes="game-card-btn"
-                                Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
-                                CommandParameter="{Binding}">
-                            <StackPanel>
-                                <!-- Cover art -->
-                                <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
-                                    <views:CoverImage
-                                        ImageUrl="{Binding CoverUrl}"
-                                        FallbackText="{Binding EffectiveTitle}"
-                                        FallbackGradient="{Binding CoverGradient}"
-                                        SubText="{Binding Platform}"
-                                        LetterFontSize="44"
-                                        ImageCornerRadius="10,10,0,0"
-                                        Height="110"/>
-                                </Border>
-                                <!-- Info -->
-                                <Border Padding="10,8,10,10">
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="{Binding EffectiveTitle}"
-                                                   Classes="game-card-title"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <Border CornerRadius="3" Padding="5,2"
-                                                    Background="#1f6feb" HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding Platform}"
-                                                           FontSize="10" FontWeight="Bold"
-                                                           Foreground="White"/>
-                                            </Border>
-                                            <Border CornerRadius="3" Padding="5,2"
-                                                    Background="{Binding KindBackground}"
-                                                    HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding KindLabel}"
-                                                           FontSize="10" FontWeight="Bold"
-                                                           Foreground="{Binding KindForeground}"/>
-                                            </Border>
+            <StackPanel IsVisible="{Binding HasRecentLocalGames}">
+                <ItemsControl ItemsSource="{Binding RecentLocalGames}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocalGameCardVm">
+                            <Button Classes="game-card-btn"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <!-- Cover art -->
+                                    <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                        <views:CoverImage
+                                            ImageUrl="{Binding CoverUrl}"
+                                            FallbackText="{Binding EffectiveTitle}"
+                                            FallbackGradient="{Binding CoverGradient}"
+                                            SubText="{Binding Platform}"
+                                            LetterFontSize="44"
+                                            ImageCornerRadius="10,10,0,0"
+                                            Height="110"/>
+                                    </Border>
+                                    <!-- Info -->
+                                    <Border Padding="10,8,10,10">
+                                        <StackPanel Spacing="3">
+                                            <TextBlock Text="{Binding EffectiveTitle}"
+                                                       Classes="game-card-title"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <Border CornerRadius="3" Padding="5,2"
+                                                        Background="#1f6feb" HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding Platform}"
+                                                               FontSize="10" FontWeight="Bold"
+                                                               Foreground="White"/>
+                                                </Border>
+                                                <Border CornerRadius="3" Padding="5,2"
+                                                        Background="{Binding KindBackground}"
+                                                        HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding KindLabel}"
+                                                               FontSize="10" FontWeight="Bold"
+                                                               Foreground="{Binding KindForeground}"/>
+                                                </Border>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding PlaytimeLabel}"
+                                                       FontSize="10" Foreground="#0ea5e9"
+                                                       IsVisible="{Binding PlaytimeLabel,
+                                                           Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                         </StackPanel>
-                                    </StackPanel>
-                                </Border>
-                            </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            <!-- Empty state: no games played yet -->
+            <Border IsVisible="{Binding !HasRecentLocalGames}"
+                    Background="#161b22" CornerRadius="10"
+                    Padding="24,20" Margin="0,4,0,0">
+                <StackPanel HorizontalAlignment="Center" Spacing="8">
+                    <TextBlock Text="🎮" FontSize="32" HorizontalAlignment="Center"/>
+                    <TextBlock Text="No games played yet"
+                               FontSize="14" FontWeight="SemiBold"
+                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Launch a game to see it here"
+                               FontSize="12" Foreground="#484f58"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Recent Achievements -->

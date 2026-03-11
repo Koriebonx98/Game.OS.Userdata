@@ -13,12 +13,16 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Handles global keyboard navigation.
+    /// Handles global keyboard and gamepad navigation.
     /// Xbox / PlayStation controllers connected via XInput/DirectInput are reported
     /// as standard keyboard keys by Windows:
-    ///   Escape / B-button  → close overlays
+    ///   Escape / B-button  → close overlays / go back
+    ///   Enter / A-button   → activate / confirm (passthrough to focused control)
     ///   PageUp  / LB       → navigate to previous sidebar page
     ///   PageDown / RB      → navigate to next sidebar page
+    ///   Left / Right       → navigate between sidebar pages (when not in detail)
+    ///   Up / Down          → scroll the active content (passthrough)
+    ///   F5                 → refresh / reload library
     /// </summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -28,6 +32,7 @@ public partial class MainWindow : Window
         {
             // Navigate back from a detail or friend-profile overlay
             case Key.Escape:
+            case Key.BrowserBack:
                 if (vm.ShowDetail)
                 {
                     vm.DetailVm.CloseCommand.Execute(null);
@@ -57,7 +62,32 @@ public partial class MainWindow : Window
                     e.Handled = true;
                 }
                 break;
+
+            // Left arrow → previous sidebar section (when not in a text input)
+            case Key.Left:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+                {
+                    NavigatePrev(vm);
+                    e.Handled = true;
+                }
+                break;
+
+            // Right arrow → next sidebar section (when not in a text input)
+            case Key.Right:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+                {
+                    NavigateNext(vm);
+                    e.Handled = true;
+                }
+                break;
         }
+    }
+
+    /// <summary>Returns true when a TextBox or similar input control has keyboard focus.</summary>
+    private bool IsTextInputFocused()
+    {
+        var focused = FocusManager?.GetFocusedElement();
+        return focused is TextBox or NumericUpDown;
     }
 
     private static readonly string[] _navPages =
