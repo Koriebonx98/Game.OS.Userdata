@@ -21,13 +21,28 @@ TestData/
 │   │   └── FakeGame4.exe                   # Windows .exe (MZ header, 64 bytes)
 │   └── FakeGame5/
 │       └── FakeGame5                       # Linux ELF binary (ELF magic, chmod +x)
-└── Repacks/
-    ├── FakeRepack.zip                       # Fake ZIP archive (PK header)
-    ├── FakeRepack.rar                       # Fake RAR archive (Rar! header)
-    ├── FakeRepack1/
-    │   └── FakeRepack1.zip                  # Sub-folder ZIP repack
-    └── FakeRepack2/
-        └── FakeRepack2.7z                   # Sub-folder 7-Zip repack (7z header)
+├── Repacks/
+│   ├── FakeRepack.zip                       # Fake ZIP archive (PK header)
+│   ├── FakeRepack.rar                       # Fake RAR archive (Rar! header)
+│   ├── FakeRepack1/
+│   │   └── FakeRepack1.zip                  # Sub-folder ZIP repack
+│   ├── FakeRepack2/
+│   │   └── FakeRepack2.7z                   # Sub-folder 7-Zip repack (7z header)
+│   ├── A-Way-Out-SteamRIP.zip               # Archive with scene suffix → normalised to "A Way Out"
+│   ├── FakeGame1.zip                        # Repack for a game also in Games/ → IsInstalledGame=true
+│   └── FakeGame3WithUpdate/
+│       ├── setup.zip                        # Main repack archive
+│       └── Update/                          # Update sub-folder → HasUpdate=true
+│           └── update.zip
+└── Roms/
+    ├── GBA/Games/
+    │   └── FakeGBAGame/FakeGBAGame.gba
+    ├── PS3/Games/
+    │   └── FakePS3Game/FakePS3Game.iso
+    └── SNES/Games/
+        ├── FakeSNESGame.snes                # No region tag
+        ├── FakeSNESGame (Europe).snes       # Region tag stripped → merged into FakeSNESGame
+        └── FakeSNESGame (USA).snes          # Region tag stripped → merged into FakeSNESGame
 ```
 
 ## Running the Detection Test
@@ -46,14 +61,35 @@ Expected output:
   ✅  FakeGame4   [exe]  ...
   ✅  FakeGame5   [elf]  ...
 
-📦 Detected Repacks (4):
-  ✅  FakeRepack           [rar]  ...
-  ✅  FakeRepack           [zip]  ...
-  ✅  FakeRepack1 / ...    [zip]  ...
-  ✅  FakeRepack2 / ...    [7z]   ...
+📦 Detected Repacks (7):
+  ✅  A Way Out             [zip]  ...   ← "A-Way-Out-SteamRIP" normalised
+  ✅  FakeGame1             [zip]  ...   ← IsInstalledGame=true
+  ✅  FakeGame3WithUpdate / setup.zip [zip] ...  ← HasUpdate=true
+  ✅  FakeRepack            [rar]  ...
+  ✅  FakeRepack            [zip]  ...
+  ✅  FakeRepack1 / ...     [zip]  ...
+  ✅  FakeRepack2 / ...     [7z]   ...
 
-✅  ALL CHECKS PASSED — Game detection is working correctly!
+🕹️  Detected ROMs (3):
+  ✅  [GBA]   FakeGBAGame   [gba]  ...
+  ✅  [PS3]   FakePS3Game   [iso]  ...
+  ✅  [SNES]  FakeSNESGame  [snes] ...  regions=[USA,Europe]  +2 more
+
+🔧 Archive Title Normalisation:
+  ✅  A-Way-Out-SteamRIP.zip → "A Way Out"
+
+📂 Repack + Update Detection:
+  ✅  FakeGame3WithUpdate has Update: .../Update
+
+🏷️  IsInstalledGame Detection:
+  ✅  FakeGame1.zip is marked IsInstalledGame=true (also in Games/)
+
+═══════════════════════════════════════════════════════════════
+  ✅  ALL CHECKS PASSED — Game detection is working correctly!
+═══════════════════════════════════════════════════════════════
 ```
+
+Exit code `0` = all checks passed. Exit code `1` = failure.
 
 ## Fake File Headers
 

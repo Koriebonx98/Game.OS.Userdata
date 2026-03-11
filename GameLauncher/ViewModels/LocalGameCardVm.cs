@@ -41,13 +41,25 @@ public partial class LocalGameCardVm : ViewModelBase
 
     public string KindLabel =>
         SourceRom    != null ? "ROM"    :
+        SourceRepack != null && SourceRepack.IsInstalledGame ? "Installed" :
         SourceRepack != null ? "Repack" : "Installed";
 
     public string KindBackground =>
         SourceRom    != null ? "#1f3a6e" :
+        SourceRepack != null && SourceRepack.IsInstalledGame ? "#1a5e34" :
         SourceRepack != null ? "#5c3800" : "#1a5e34";
 
     public string KindForeground =>
         SourceRom    != null ? "#58a6ff" :
+        SourceRepack != null && SourceRepack.IsInstalledGame ? "#3fb950" :
         SourceRepack != null ? "#e3b341" : "#3fb950";
+
+    /// <summary>Comma-separated region tags for ROM entries (e.g. "Europe, USA"). Empty for non-ROM cards.</summary>
+    public string RegionsLabel =>
+        SourceRom?.Regions.Count > 0
+            ? string.Join(", ", SourceRom.Regions)
+            : "";
+
+    /// <summary>True when this repack has an "Update" sub-directory available to install alongside it.</summary>
+    public bool HasUpdate => SourceRepack?.HasUpdate == true;
 }
