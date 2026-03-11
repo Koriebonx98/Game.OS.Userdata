@@ -80,6 +80,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Wire up OpenDetail from child VMs
         DashboardVm.OnOpenDetail      = OpenDetailFromGame;
         DashboardVm.OnOpenStoreDetail = OpenDetailFromStoreGame;
+        DashboardVm.OnOpenLocalDetail = OpenDetailFromMyGameCard;
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
@@ -90,9 +91,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
-        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); _ = EnrichMyGamesListAsync(); };
-        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  _ = EnrichMyGamesListAsync(); };
-        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        _ = EnrichMyGamesListAsync(); };
+        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
+        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
+        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
         _ = _scanner.StartAsync();
 
         // On startup, check if any cached platform JSON files are outdated and
@@ -232,16 +233,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Update presence so the user appears "Online" to friends (mirrors the web app)
         _ = _client.UpdatePresenceAsync();
 
-        DashboardVm.Load(profile, library, achievements);
+        var localCards = LibraryVm.GetMyGameSources()
+            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
+            .Where(c => c != null)
+            .Cast<LocalGameCardVm>()
+            .ToList();
+
+        DashboardVm.Load(profile, library, achievements, localCards);
         LibraryVm.Load(library);
         StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
         FriendsVm.Load(_client, profile.Username);
 
         // Asynchronously enrich library games with cover/desc/trailer from Games.Database.
-        // This fills in PS3, Switch, Xbox 360 (and any other platform) games whose
-        // metadata was not stored server-side or is missing — mirrors the web app's
-        // openGameModalFromLibrary logic that calls fetchGamesDbPlatform(platform).
         _ = EnrichLibraryFromDatabaseAsync(library);
 
         // Pre-fetch cover art for the unified My Games cards (scanner may already
@@ -251,6 +255,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowLogin = false;
         ShowMain  = true;
         ActivePage = "dashboard";
+    }
+
+    /// <summary>
+    /// Refreshes the dashboard's "Continue Playing" local games section after
+    /// the scanner detects new ROMs or local games.
+    /// </summary>
+    private void RefreshDashboardLocalGames()
+    {
+        if (!ShowMain) return; // not logged in yet
+        var localCards = LibraryVm.GetMyGameSources()
+            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
+            .Where(c => c != null)
+            .Cast<LocalGameCardVm>()
+            .ToList();
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            DashboardVm.Load(_profile, _library, _achievements, localCards));
     }
 
     [RelayCommand]
@@ -337,7 +357,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Asynchronously enrich with cover art / description / screenshots / achievements
         // from the platform-specific Games.Database (PS3, Switch, Xbox 360, etc.)
-        _ = EnrichLocalGameDetailAsync(rom.Title, rom.Platform);
+        // Pass TitleID for precise matching of PS3/PS4/Switch folder-named ROMs.
+        _ = EnrichLocalGameDetailAsync(rom.Title, rom.Platform, rom.TitleId);
     }
 
     private void OpenDetailFromLocalGame(LocalGame game)
@@ -403,26 +424,37 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             var byPlatform = sources
                 .GroupBy(s => s.Platform, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Select(s => s.Title).ToList(),
-                              StringComparer.OrdinalIgnoreCase);
+                .ToDictionary(
+                    g => g.Key,
+                    g => g.Select(s => (s.Title, s.TitleId)).ToList(),
+                    StringComparer.OrdinalIgnoreCase);
 
-            foreach (var (platform, titles) in byPlatform)
+            foreach (var (platform, entries) in byPlatform)
             {
                 try
                 {
                     var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
                     if (dbGames.Count == 0) continue;
 
-                    foreach (var title in titles)
+                    foreach (var (title, titleId) in entries)
                     {
-                        var db = FindDatabaseGame(dbGames, title);
+                        var db = FindDatabaseGame(dbGames, title, titleId);
                         if (db == null || string.IsNullOrEmpty(db.CoverUrl)) continue;
                         var card = LibraryVm.FindMyGameCard(title, platform);
                         if (card != null && string.IsNullOrEmpty(card.CoverUrl))
                         {
-                            string coverUrl = db.CoverUrl;
-                            Avalonia.Threading.Dispatcher.UIThread.Post(
-                                () => card.CoverUrl = coverUrl);
+                            string coverUrl   = db.CoverUrl;
+                            string? realTitle = (!string.IsNullOrEmpty(titleId) && db.Title != null)
+                                                ? db.Title : null;
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                            {
+                                card.CoverUrl = coverUrl;
+                                if (!string.IsNullOrEmpty(realTitle) &&
+                                    !string.Equals(card.Title, realTitle, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    card.DisplayTitle = realTitle;
+                                }
+                            });
                         }
                     }
                 }
@@ -439,12 +471,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Title matching handles Windows-safe folder names such as
     /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II".
     /// </summary>
-    private async Task EnrichLocalGameDetailAsync(string localTitle, string platform)
+    private async Task EnrichLocalGameDetailAsync(string localTitle, string platform,
+                                                   string? titleId = null)
     {
         try
         {
             var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
-            var dbGame  = FindDatabaseGame(dbGames, localTitle);
+            var dbGame  = FindDatabaseGame(dbGames, localTitle, titleId);
             if (dbGame != null)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(
@@ -532,7 +565,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     ///   4. After applying both stripping and normalisation.
     /// </summary>
     private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle)
+        => FindDatabaseGame(dbGames, localTitle, null);
+
+    private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle, string? titleId)
     {
+        // 0. TitleID lookup (most precise — works for PS3/PS4/Switch folder-named games)
+        if (!string.IsNullOrEmpty(titleId))
+        {
+            var byTitleId = dbGames.FirstOrDefault(g =>
+                string.Equals(g.TitleId, titleId, StringComparison.OrdinalIgnoreCase));
+            if (byTitleId != null) return byTitleId;
+        }
+
         var exact = dbGames.FirstOrDefault(g =>
             string.Equals(g.Title, localTitle, StringComparison.OrdinalIgnoreCase));
         if (exact != null) return exact;

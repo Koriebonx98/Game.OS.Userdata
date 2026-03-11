@@ -189,6 +189,8 @@ namespace GameLauncher.Models
         public string?       TrailerUrl      { get; set; }
         /// <summary>Link to the achievements JSON file in the Games.Database.</summary>
         public string?       AchievementsUrl { get; set; }
+        /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
+        public string?       StorePageUrl    { get; set; }
         public string        RatingStars     =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));
@@ -211,6 +213,8 @@ namespace GameLauncher.Models
         public string FilePath     { get; set; } = "";
         public string FileType     { get; set; } = ""; // e.g. "iso", "gb", "snes"
         public long   SizeBytes    { get; set; }
+        /// <summary>Platform-specific title ID (e.g. PS3: BLUS30305, Switch: 0100ADC022586000) extracted from the folder/file name when it matches a known TitleID pattern.</summary>
+        public string? TitleId     { get; set; }
         /// <summary>Region/language tags extracted from the ROM filename, e.g. ["Europe", "USA"].</summary>
         public List<string> Regions         { get; set; } = new();
         /// <summary>Additional file paths when multiple ROM files share the same base title (e.g. multi-disk or multi-region).</summary>
@@ -335,6 +339,8 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Background/screenshot image URLs (from background_images array).</summary>
         public List<string>? Screenshots     { get; set; }
+        /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop, PlayStation Store).</summary>
+        public string?       StorePageUrl    { get; set; }
     }
 
     /// <summary>

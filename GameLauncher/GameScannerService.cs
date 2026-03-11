@@ -231,6 +231,7 @@ public sealed class GameScannerService : IDisposable
     /// Scans <paramref name="driveRoot"/>/Roms for non-PC ROM files.
     /// Expected layout: Roms/{PlatformName}/Games/{RomFile}
     ///                   or Roms/{PlatformName}/Games/{GameName}/{RomFile}
+    ///                   or Roms/{PlatformName}/Games/{TitleID}/  (PS3/PS4/Switch folder-based)
     /// </summary>
     private static void ScanRomsDir(string driveRoot, List<LocalRom> results)
     {
@@ -244,6 +245,51 @@ public sealed class GameScannerService : IDisposable
                 string platform = NormalizePlatform(Path.GetFileName(platformDir));
                 string gamesDir = Path.Combine(platformDir, "Games");
                 if (!Directory.Exists(gamesDir)) continue;
+
+                // ── Folder-based games (e.g. PS3/PS4 $TitleID folders that contain game data) ──
+                // Scan top-level sub-folders that look like a TitleID and contain no ROM file at their root.
+                try
+                {
+                    foreach (var subDir in Directory.EnumerateDirectories(gamesDir))
+                    {
+                        string folderName = Path.GetFileName(subDir);
+                        string? titleId   = ExtractTitleId(folderName, platform);
+
+                        // Only treat as a "folder game" when the entire sub-folder is a TitleID
+                        // AND the folder itself has no ROM file at its immediate level.
+                        // (Folders that happen to contain a ROM will be picked up below.)
+                        if (titleId == null) continue;
+
+                        bool hasRomInRoot = Directory
+                            .EnumerateFiles(subDir, "*", SearchOption.TopDirectoryOnly)
+                            .Any(f => IsRomFile(Path.GetExtension(f).ToLowerInvariant()));
+                        if (hasRomInRoot) continue; // will be scanned as a normal ROM file below
+
+                        long size = 0;
+                        try
+                        {
+                            size = new DirectoryInfo(subDir)
+                                .EnumerateFiles("*", SearchOption.AllDirectories)
+                                .Sum(f => { try { return f.Length; } catch { return 0L; } });
+                        }
+                        catch { }
+
+                        // Use the folder name as a placeholder title; MainViewModel's enrichment
+                        // will replace it with the real game name via TitleID database lookup.
+                        results.Add(new LocalRom
+                        {
+                            Title    = folderName,
+                            TitleId  = titleId,
+                            Platform = platform,
+                            FilePath = subDir,
+                            FileType = "folder",
+                            SizeBytes= size,
+                            Regions  = new List<string>(),
+                        });
+                    }
+                }
+                catch (UnauthorizedAccessException) { }
+                catch (IOException) { }
 
                 try
                 {
@@ -271,9 +317,14 @@ public sealed class GameScannerService : IDisposable
                         // and collect them as separate metadata, just like platform tags.
                         var (cleanTitle, regions) = ParseRomTitle(rawTitle);
 
+                        // Detect if the raw title (pre-region-strip) looks like a TitleID
+                        string? titleId = ExtractTitleId(rawTitle, platform)
+                                       ?? ExtractTitleId(cleanTitle, platform);
+
                         results.Add(new LocalRom
                         {
-                            Title    = cleanTitle,
+                            Title    = string.IsNullOrWhiteSpace(cleanTitle) ? rawTitle : cleanTitle,
+                            TitleId  = titleId,
                             Platform = platform,
                             FilePath = entry,
                             FileType = ext.TrimStart('.'),
@@ -290,6 +341,54 @@ public sealed class GameScannerService : IDisposable
         catch (IOException) { }
     }
 
+    // ── TitleID detection ──────────────────────────────────────────────────
+
+    // PS3 / PS4 / PSP TitleID: four uppercase letters + five digits (e.g. BLUS30305, CUSA00572)
+    private static readonly Regex _ps3TitleIdRegex =
+        new(@"^[A-Z]{4}\d{5}$", RegexOptions.Compiled);
+
+    // Switch TitleID: 16 hex digits, optionally wrapped in brackets (e.g. 0100ADC022586000 or [0100ADC022586000])
+    private static readonly Regex _switchTitleIdRegex =
+        new(@"^\[?([0-9A-Fa-f]{16})\]?$", RegexOptions.Compiled);
+
+    // Switch ROM filenames that embed a TitleID: "Game Title [0100ADC022586000][v0]"
+    private static readonly Regex _switchEmbeddedTitleIdRegex =
+        new(@"\[([0-9A-Fa-f]{16})\]", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Returns the TitleID if <paramref name="name"/> is (or contains) a platform-specific
+    /// TitleID, or <see langword="null"/> if no TitleID is detected.
+    /// </summary>
+    internal static string? ExtractTitleId(string name, string platform)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+
+        string trimmed = name.Trim();
+
+        // PS3 / PS4: standalone TitleID folder/file name
+        if ((string.Equals(platform, "PS3",  StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(platform, "PS4",  StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(platform, "PSP",  StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(platform, "PS Vita", StringComparison.OrdinalIgnoreCase)) &&
+            _ps3TitleIdRegex.IsMatch(trimmed))
+        {
+            return trimmed.ToUpperInvariant();
+        }
+
+        // Switch: standalone TitleID (with or without brackets)
+        if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase))
+        {
+            var m = _switchTitleIdRegex.Match(trimmed);
+            if (m.Success) return m.Groups[1].Value.ToUpperInvariant();
+
+            // Also extract embedded TitleID from "Game Title [0100ADC022586000][v0]" style names
+            var em = _switchEmbeddedTitleIdRegex.Match(trimmed);
+            if (em.Success) return em.Groups[1].Value.ToUpperInvariant();
+        }
+
+        return null;
+    }
+
     // ── ROM extension list ─────────────────────────────────────────────────
 
     private static readonly HashSet<string> _romExtensions = new(StringComparer.OrdinalIgnoreCase)
@@ -298,6 +397,8 @@ public sealed class GameScannerService : IDisposable
         ".zip", ".7z", ".rar",
         // Sony / Microsoft
         ".iso", ".bin", ".cue", ".xex", ".xiso",
+        // Xbox 360 archive format
+        ".zar",
         // Nintendo Switch
         ".nsp", ".xci", ".nsz", ".xcz",
         // Nintendo (other)
