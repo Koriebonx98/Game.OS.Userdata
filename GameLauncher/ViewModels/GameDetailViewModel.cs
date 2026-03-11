@@ -945,6 +945,14 @@ public partial class GameDetailViewModel : ViewModelBase
             Description          = dbGame.Description;
         }
 
+        // Populate genre if not already set (Xbox 360 and enriched databases include this)
+        if (!string.IsNullOrEmpty(dbGame.Genre) && string.IsNullOrEmpty(Genre))
+            Genre = dbGame.Genre;
+
+        // Populate release year if not already set
+        if (!string.IsNullOrEmpty(dbGame.ReleaseYear) && string.IsNullOrEmpty(ReleaseYear))
+            ReleaseYear = dbGame.ReleaseYear;
+
         // Populate store URL from database (overrides any previously derived one)
         if (!string.IsNullOrEmpty(dbGame.StorePageUrl) || dbGame.AppId.HasValue || !string.IsNullOrEmpty(dbGame.TitleId))
             PopulateStoreUrl(dbGame.StorePageUrl, Platform, dbGame.TitleId ?? (dbGame.AppId.HasValue ? dbGame.AppId.Value.ToString() : null));
