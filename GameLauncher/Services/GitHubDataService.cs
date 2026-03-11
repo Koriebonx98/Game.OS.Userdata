@@ -905,11 +905,14 @@ namespace GameLauncher.Services
             var result = new List<DatabaseGame>();
             foreach (var item in gamesArray.EnumerateArray())
             {
-                // Title — try multiple casings / field names to handle different platform JSON formats
+                // Title — try multiple casings / field names to handle different platform JSON formats.
+                // Switch and PS3 use "game_name"; Xbox 360 uses "title" (lowercase); PC/PS4 use "Title".
+                // Mirrors: game.Title || game.game_name || game.title in script.js
                 var title =
-                    item.TryGetProperty("Title", out var t)  && t.ValueKind  == JsonValueKind.String ? t.GetString()  :
-                    item.TryGetProperty("title", out var t2) && t2.ValueKind == JsonValueKind.String ? t2.GetString() :
-                    item.TryGetProperty("name",  out var t3) && t3.ValueKind == JsonValueKind.String ? t3.GetString() :
+                    item.TryGetProperty("Title",     out var t)  && t.ValueKind  == JsonValueKind.String ? t.GetString()  :
+                    item.TryGetProperty("game_name", out var t2) && t2.ValueKind == JsonValueKind.String ? t2.GetString() :
+                    item.TryGetProperty("title",     out var t3) && t3.ValueKind == JsonValueKind.String ? t3.GetString() :
+                    item.TryGetProperty("name",      out var t4) && t4.ValueKind == JsonValueKind.String ? t4.GetString() :
                     null;
                 if (string.IsNullOrWhiteSpace(title))
                     continue; // skip non-game / empty entries
@@ -926,6 +929,8 @@ namespace GameLauncher.Services
                     item.TryGetProperty("Description", out var d1) && d1.ValueKind == JsonValueKind.String ? d1.GetString() :
                     item.TryGetProperty("description", out var d2) && d2.ValueKind == JsonValueKind.String ? d2.GetString() :
                     null;
+                // Treat empty strings as null so callers don't overwrite real descriptions with blanks
+                if (string.IsNullOrWhiteSpace(description)) description = null;
 
                 // Trailer — first element of the trailers array
                 string? trailerUrl = null;
@@ -973,11 +978,67 @@ namespace GameLauncher.Services
                     if (screenshots.Count == 0) screenshots = null;
                 }
 
+                // TitleID — mirrors: game.TitleID || game.title_id || game.titleid || game.id in script.js
+                // Switch/PS3 use "title_id"; Xbox 360 uses "titleid" (no separator); PS4/PC use "TitleID".
+                string? titleId =
+                    item.TryGetProperty("TitleID",   out var tid)  && tid.ValueKind  == JsonValueKind.String ? tid.GetString()  :
+                    item.TryGetProperty("TitleId",   out var tid2) && tid2.ValueKind == JsonValueKind.String ? tid2.GetString() :
+                    item.TryGetProperty("title_id",  out var tid3) && tid3.ValueKind == JsonValueKind.String ? tid3.GetString() :
+                    item.TryGetProperty("titleid",   out var tid4) && tid4.ValueKind == JsonValueKind.String ? tid4.GetString() :
+                    item.TryGetProperty("id",        out var tid5) && tid5.ValueKind == JsonValueKind.String ? tid5.GetString() :
+                    appId.HasValue ? appId.Value.ToString() : null;
+
+                // Genre — Xbox 360 and some enriched databases include this field
+                string? genre =
+                    item.TryGetProperty("Genre",  out var gen1) && gen1.ValueKind == JsonValueKind.String ? gen1.GetString() :
+                    item.TryGetProperty("genre",  out var gen2) && gen2.ValueKind == JsonValueKind.String ? gen2.GetString() :
+                    null;
+                if (string.IsNullOrWhiteSpace(genre)) genre = null;
+
+                // Release year — extract from ReleaseDate ("2020-06-19" → "2020") or releaseDate field
+                string? releaseYear = null;
+                if (item.TryGetProperty("ReleaseDate", out var rd1) && rd1.ValueKind == JsonValueKind.String)
+                {
+                    var s = rd1.GetString();
+                    if (!string.IsNullOrEmpty(s) && s.Length >= 4) releaseYear = s[..4];
+                }
+                else if (item.TryGetProperty("releaseDate", out var rd2) && rd2.ValueKind == JsonValueKind.String)
+                {
+                    var s = rd2.GetString();
+                    if (!string.IsNullOrEmpty(s) && s.Length >= 4) releaseYear = s[..4];
+                }
+                else if (item.TryGetProperty("ReleaseYear", out var ry1))
+                {
+                    releaseYear = ry1.ValueKind == JsonValueKind.String  ? ry1.GetString() :
+                                  ry1.ValueKind == JsonValueKind.Number  ? ry1.GetInt32().ToString() : null;
+                }
+                if (string.IsNullOrWhiteSpace(releaseYear)) releaseYear = null;
+
+                // AlternateNames — used for fuzzy title matching
+                // Mirrors: game.AlternateNames || game.alternate_names in script.js
+                List<string>? alternateNames = null;
+                var altProp = item.TryGetProperty("AlternateNames", out var an1) ? an1 :
+                              item.TryGetProperty("alternate_names", out var an2) ? an2 : default;
+                if (altProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var elem in altProp.EnumerateArray())
+                    {
+                        if (elem.ValueKind == JsonValueKind.String)
+                        {
+                            var s = elem.GetString();
+                            if (!string.IsNullOrEmpty(s))
+                            {
+                                alternateNames ??= new List<string>();
+                                alternateNames.Add(s);
+                            }
+                        }
+                    }
+                }
+
                 result.Add(new DatabaseGame
                 {
                     Title           = title,
-                    TitleId         = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  :
-                                      item.TryGetProperty("TitleId", out var tid2) ? tid2.GetString() : null,
+                    TitleId         = titleId,
                     CoverUrl        = coverUrl,
                     AppId           = appId,
                     Description     = description,
@@ -985,6 +1046,9 @@ namespace GameLauncher.Services
                     AchievementsUrl = achievementsUrl,
                     Screenshots     = screenshots,
                     StorePageUrl    = storePageUrl,
+                    Genre           = genre,
+                    ReleaseYear     = releaseYear,
+                    AlternateNames  = alternateNames,
                 });
             }
 

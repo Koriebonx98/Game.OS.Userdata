@@ -288,11 +288,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private void OpenDetailFromGame(Game game)
     {
-        // Check if this game is installed locally or has a repack available
-        LocalGame? localGame = LibraryVm.LocalGames
-            .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+        // Only match local PC games when the library game is also a PC game.
+        // Without this check, a cloud library entry like "God of War" (PS4) would
+        // incorrectly be shown as "installed" if the user has a PC folder called "God of War".
+        LocalGame? localGame = string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase)
+            ? LibraryVm.LocalGames
+                .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase))
+            : null;
         LocalRepack? repack = null;
-        if (localGame == null)
+        if (localGame == null && string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
             repack = LibraryVm.ReadyToInstall
                 .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
 
@@ -302,11 +306,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private void OpenDetailFromStoreGame(StoreGame game)
     {
-        // Check if this store game is installed locally or has a repack available
-        LocalGame? localGame = LibraryVm.LocalGames
-            .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+        // Only match local PC games when the store game is also a PC game.
+        // Non-PC store games should never show a PC local game as "installed".
+        LocalGame? localGame = string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase)
+            ? LibraryVm.LocalGames
+                .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase))
+            : null;
         LocalRepack? repack = null;
-        if (localGame == null)
+        if (localGame == null && string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
             repack = LibraryVm.ReadyToInstall
                 .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
 
@@ -540,6 +547,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     { game.Screenshots = dbGame.Screenshots; anyUpdated = true; }
                     if (!string.IsNullOrEmpty(dbGame.TitleId) && string.IsNullOrEmpty(game.TitleId))
                     { game.TitleId = dbGame.TitleId; anyUpdated = true; }
+                    if (string.IsNullOrEmpty(game.Genre) && !string.IsNullOrEmpty(dbGame.Genre))
+                    { game.Genre = dbGame.Genre; anyUpdated = true; }
                 }
 
                 // Refresh the library UI once per platform batch if anything changed
@@ -559,10 +568,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Tries to match a local game folder title against the Games.Database.
     /// Attempts (in order):
-    ///   1. Exact case-insensitive match.
-    ///   2. After removing [Repack] / [repack] style markers.
-    ///   3. After applying NormalizeGameTitle (Windows " - " → ": " and HTML entities).
-    ///   4. After applying both stripping and normalisation.
+    ///   1. TitleID lookup (most precise).
+    ///   2. Exact case-insensitive match.
+    ///   3. After removing trademark/copyright symbols (™, ®, ©).
+    ///   4. After removing [Repack] / [repack] style markers.
+    ///   5. After applying NormalizeGameTitle (Windows " - " → ": " and HTML entities).
+    ///   6. After applying both stripping and normalisation.
+    ///   7. Against each game's AlternateNames list.
     /// </summary>
     private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle)
         => FindDatabaseGame(dbGames, localTitle, null);
@@ -577,11 +589,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (byTitleId != null) return byTitleId;
         }
 
+        // 1. Exact case-insensitive match
         var exact = dbGames.FirstOrDefault(g =>
             string.Equals(g.Title, localTitle, StringComparison.OrdinalIgnoreCase));
         if (exact != null) return exact;
 
-        // Strip [Repack] / [repack] / "[FitGirl Repack]" style suffixes
+        // 2. Strip trademark/copyright/registered symbols (e.g. "Mario Kart™ 8 Deluxe" → "Mario Kart 8 Deluxe")
+        string noSymbols = PlatformHelper.StripSpecialSymbols(localTitle);
+        if (!string.Equals(noSymbols, localTitle, StringComparison.Ordinal))
+        {
+            var byNoSymbols = dbGames.FirstOrDefault(g =>
+                string.Equals(PlatformHelper.StripSpecialSymbols(g.Title ?? ""), noSymbols, StringComparison.OrdinalIgnoreCase));
+            if (byNoSymbols != null) return byNoSymbols;
+        }
+
+        // 3. Strip [Repack] / [repack] / "[FitGirl Repack]" style suffixes
         string stripped = StripRepackMarkers(localTitle);
         if (!string.Equals(stripped, localTitle, StringComparison.Ordinal))
         {
@@ -590,7 +612,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (byStripped != null) return byStripped;
         }
 
-        // Normalise Windows-safe title separators and HTML entities
+        // 4. Normalise Windows-safe title separators and HTML entities
         string normalized = NormalizeGameTitle(localTitle);
         if (!string.Equals(normalized, localTitle, StringComparison.Ordinal))
         {
@@ -599,13 +621,24 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (byNorm != null) return byNorm;
         }
 
-        // Try stripping + normalising together
+        // 5. Try stripping + normalising together
         string strippedNorm = NormalizeGameTitle(stripped);
         if (!string.Equals(strippedNorm, localTitle, StringComparison.Ordinal))
         {
-            return dbGames.FirstOrDefault(g =>
+            var byStrippedNorm = dbGames.FirstOrDefault(g =>
                 string.Equals(g.Title, strippedNorm, StringComparison.OrdinalIgnoreCase));
+            if (byStrippedNorm != null) return byStrippedNorm;
         }
+
+        // 6. Match against AlternateNames (e.g. "GoW" → "God of War", "TLOU2" → "The Last of Us Part II")
+        var byAltName = dbGames.FirstOrDefault(g =>
+            g.AlternateNames != null &&
+            g.AlternateNames.Any(alt =>
+                string.Equals(alt, localTitle,  StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(alt, noSymbols,   StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(alt, stripped,    StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(alt, normalized,  StringComparison.OrdinalIgnoreCase)));
+        if (byAltName != null) return byAltName;
 
         return null;
     }

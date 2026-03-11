@@ -218,10 +218,16 @@ public partial class LibraryViewModel : ViewModelBase
         // ROMs → platform from the ROM itself
         // Skip ROMs whose title + platform already exist in the cloud library to avoid
         // showing the same game twice (once from the library JSON, once from the local scan).
+        // Use fuzzy comparison (strip ™/®/© symbols) to handle official titles like
+        // "Mario Kart™ 8 Deluxe" (cloud) vs "Mario Kart 8 Deluxe" (local folder).
         foreach (var r in _allRoms)
         {
             if (cloudByPlatform.TryGetValue(r.Platform, out var cloudTitles) &&
-                cloudTitles.Contains(r.Title))
+                (cloudTitles.Contains(r.Title) ||
+                 cloudTitles.Any(ct => string.Equals(
+                     PlatformHelper.StripSpecialSymbols(ct),
+                     PlatformHelper.StripSpecialSymbols(r.Title),
+                     StringComparison.OrdinalIgnoreCase))))
                 continue;
 
             _allMyGames.Add(new LocalGameCardVm

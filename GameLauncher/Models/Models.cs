@@ -341,6 +341,12 @@ namespace GameLauncher.Models
         public List<string>? Screenshots     { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop, PlayStation Store).</summary>
         public string?       StorePageUrl    { get; set; }
+        /// <summary>Game genre (e.g. "Action", "RPG"). Present in Xbox 360 and enriched databases.</summary>
+        public string?       Genre           { get; set; }
+        /// <summary>Release year string (e.g. "2020"), extracted from ReleaseDate or releaseDate field.</summary>
+        public string?       ReleaseYear     { get; set; }
+        /// <summary>Alternate / known titles for fuzzy matching (e.g. ["GoW", "God of War 2018"]).</summary>
+        public List<string>? AlternateNames  { get; set; }
     }
 
     /// <summary>
@@ -358,17 +364,34 @@ namespace GameLauncher.Models
         /// </para>
         /// Canonical names (e.g. "Xbox 360", "Switch") pass through unchanged.
         /// </summary>
+        /// <summary>
+        /// Removes trademark (™), registered trademark (®), and copyright (©) Unicode symbols
+        /// from a game title for fuzzy matching purposes.
+        /// For example: "Mario Kart™ 8 Deluxe" → "Mario Kart 8 Deluxe".
+        /// </summary>
+        public static string StripSpecialSymbols(string title)
+        {
+            if (string.IsNullOrEmpty(title)) return title;
+            return _specialSymbolRegex.Replace(title, "").Trim();
+        }
+
+        // Matches ™ (U+2122), ® (U+00AE), © (U+00A9)
+        private static readonly System.Text.RegularExpressions.Regex _specialSymbolRegex =
+            new(@"[™®©]", System.Text.RegularExpressions.RegexOptions.Compiled);
+
         public static string NormalizePlatform(string platform)
         {
             if (string.IsNullOrEmpty(platform)) return platform;
-            return platform switch
+            // Case-insensitive comparison so user folder names like
+            // "Sony - Playstation 4" (lowercase 's') map correctly to "PS4".
+            return platform.ToLowerInvariant() switch
             {
-                "Microsoft - Xbox 360" => "Xbox 360",
-                "Microsoft - Xbox One" => "Xbox One",
-                "Nintendo - Switch"    => "Switch",
-                "Sony - PlayStation 3" => "PS3",
-                "Sony - PlayStation 4" => "PS4",
-                "Sony - PlayStation 5" => "PS5",
+                "microsoft - xbox 360" => "Xbox 360",
+                "microsoft - xbox one" => "Xbox One",
+                "nintendo - switch"    => "Switch",
+                "sony - playstation 3" => "PS3",
+                "sony - playstation 4" => "PS4",
+                "sony - playstation 5" => "PS5",
                 _                      => platform,
             };
         }
