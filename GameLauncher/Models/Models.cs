@@ -386,13 +386,18 @@ namespace GameLauncher.Models
             // "Sony - Playstation 4" (lowercase 's') map correctly to "PS4".
             return platform.ToLowerInvariant() switch
             {
-                "microsoft - xbox 360" => "Xbox 360",
-                "microsoft - xbox one" => "Xbox One",
-                "nintendo - switch"    => "Switch",
-                "sony - playstation 3" => "PS3",
-                "sony - playstation 4" => "PS4",
-                "sony - playstation 5" => "PS5",
-                _                      => platform,
+                "microsoft - xbox 360"    => "Xbox 360",
+                "microsoft - xbox one"    => "Xbox One",
+                "nintendo - switch"       => "Switch",
+                "sony - playstation"      => "PS1",
+                "sony - playstation 2"    => "PS2",
+                "sony - playstation 3"    => "PS3",
+                "sony - playstation 4"    => "PS4",
+                "sony - playstation 5"    => "PS5",
+                "sony - psp"              => "PSP",
+                "sony - ps vita"          => "PS Vita",
+                "sony - playstation vita" => "PS Vita",
+                _                         => platform,
             };
         }
     }

@@ -363,6 +363,15 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
+        <!-- Load More button — shown when there are more games beyond the current display limit -->
+        <Button Classes="btn-secondary"
+                Content="⬇  Load More Games"
+                HorizontalAlignment="Center"
+                Margin="0,16,0,8"
+                Padding="24,10"
+                IsVisible="{Binding HasMoreGames}"
+                Command="{Binding LoadMoreCommand}"/>
+
         </StackPanel>
         <!-- end IsGamesTab -->
 

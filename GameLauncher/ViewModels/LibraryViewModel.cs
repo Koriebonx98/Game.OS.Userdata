@@ -215,13 +215,32 @@ public partial class LibraryViewModel : ViewModelBase
             });
         }
 
+        // Build a lookup of cloud library games by (normalizedPlatform, titleId) for
+        // deduplication of folder-based ROMs (PS3/PS4/Switch) that use TitleID as folder name.
+        var cloudByPlatformTitleId = _allGames
+            .Where(g => !string.IsNullOrEmpty(g.TitleId))
+            .GroupBy(g => GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform),
+                     StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                grp => grp.Key,
+                grp => new HashSet<string>(grp.Select(g => g.TitleId!), StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+
         // ROMs → platform from the ROM itself
         // Skip ROMs whose title + platform already exist in the cloud library to avoid
         // showing the same game twice (once from the library JSON, once from the local scan).
         // Use fuzzy comparison (strip ™/®/© symbols) to handle official titles like
         // "Mario Kart™ 8 Deluxe" (cloud) vs "Mario Kart 8 Deluxe" (local folder).
+        // Also deduplicate by TitleID for PS3/PS4/Switch folder-based ROMs where
+        // the ROM folder name is the TitleID (e.g. "CUSA00572") not the game title.
         foreach (var r in _allRoms)
         {
+            // Deduplicate by TitleID when the ROM has one (folder-based PS3/PS4/Switch)
+            if (!string.IsNullOrEmpty(r.TitleId) &&
+                cloudByPlatformTitleId.TryGetValue(r.Platform, out var cloudTitleIds) &&
+                cloudTitleIds.Contains(r.TitleId))
+                continue;
+
             if (cloudByPlatform.TryGetValue(r.Platform, out var cloudTitles) &&
                 (cloudTitles.Contains(r.Title) ||
                  cloudTitles.Any(ct => string.Equals(

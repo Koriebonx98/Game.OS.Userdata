@@ -300,8 +300,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             repack = LibraryVm.ReadyToInstall
                 .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
 
-        DetailVm.LoadFromGame(game, localGame, repack);
+        // For non-PC platforms, check whether a matching ROM is found on a local drive
+        // so the detail view shows a Play button even when the game was added to the
+        // cloud library manually via the web interface.
+        LocalRom? localRom = null;
+        if (localGame == null && repack == null &&
+            !string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+            localRom = FindMatchingRom(game.Title, game.Platform, game.TitleId);
+
+        DetailVm.LoadFromGame(game, localGame, repack, localRom);
         ShowDetail = true;
+
+        // Enrich achievements for non-PC library games whose AchievementsUrl may not
+        // have been stored when the game was added to the library.
+        if (!string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrEmpty(game.AchievementsUrl))
+            _ = EnrichGameAchievementsAsync(game);
     }
 
     private void OpenDetailFromStoreGame(StoreGame game)
@@ -317,7 +331,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             repack = LibraryVm.ReadyToInstall
                 .FirstOrDefault(r => r.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
 
-        DetailVm.LoadFromStoreGame(game, localGame, repack);
+        // For non-PC platforms, check whether a matching ROM is on a local drive
+        LocalRom? localRom = null;
+        if (localGame == null && repack == null &&
+            !string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+            localRom = FindMatchingRom(game.Title, game.Platform, null);
+
+        DetailVm.LoadFromStoreGame(game, localGame, repack, localRom);
         ShowDetail = true;
     }
 
@@ -414,7 +434,57 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Background task that pre-fetches cover art for every card in the unified
+    /// Finds the first local ROM that matches the given title/platform/titleId combination.
+    /// Used to detect whether a cloud library game (added via web) is also present as a
+    /// ROM file on a local drive, so the detail view can show a Play button.
+    /// </summary>
+    private LocalRom? FindMatchingRom(string title, string platform, string? titleId)
+    {
+        string normalizedPlatform = Models.PlatformHelper.NormalizePlatform(platform);
+        return LibraryVm.LocalRoms.FirstOrDefault(r =>
+            string.Equals(r.Platform, normalizedPlatform, StringComparison.OrdinalIgnoreCase) &&
+            (// 1. TitleID match (most precise — PS3/PS4/Switch folder-based ROMs)
+             (!string.IsNullOrEmpty(titleId) &&
+              string.Equals(r.TitleId, titleId, StringComparison.OrdinalIgnoreCase)) ||
+             // 2. Exact title match
+             string.Equals(r.Title, title, StringComparison.OrdinalIgnoreCase) ||
+             // 3. Fuzzy match stripping trademark/copyright symbols
+             string.Equals(
+                 Models.PlatformHelper.StripSpecialSymbols(r.Title),
+                 Models.PlatformHelper.StripSpecialSymbols(title),
+                 StringComparison.OrdinalIgnoreCase)));
+    }
+
+    /// <summary>
+    /// Looks up <paramref name="game"/>'s achievements URL in the Games.Database and,
+    /// if found, stores it on the game object and triggers achievement loading in the
+    /// currently-open detail panel (if it's still showing this game).
+    /// Called when a non-PC cloud library game is opened and its AchievementsUrl is empty —
+    /// this covers games that were added before achievementsUrl was stored in the library.
+    /// </summary>
+    private async Task EnrichGameAchievementsAsync(Game game)
+    {
+        try
+        {
+            var dbGames = await GameOsClient.FetchGamesDatabaseAsync(game.Platform);
+            var dbGame  = FindDatabaseGame(dbGames, game.Title, game.TitleId);
+            if (string.IsNullOrEmpty(dbGame?.AchievementsUrl)) return;
+
+            // Persist for future opens within this session
+            game.AchievementsUrl = dbGame.AchievementsUrl;
+
+            // If the detail panel is still showing this game, trigger achievement loading
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (!DetailVm.HasAchievements &&
+                    string.Equals(DetailVm.Title, game.Title, StringComparison.OrdinalIgnoreCase))
+                    _ = DetailVm.FetchAndDisplayAchievementsAsync(dbGame.AchievementsUrl!);
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
+
     /// "My Games" list from the Games.Database.  Groups cards by platform to
     /// minimise API calls; results are cached on disk (24 h TTL) so subsequent
     /// launches are instant.  Updates each <see cref="LocalGameCardVm.CoverUrl"/>
@@ -446,23 +516,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     foreach (var (title, titleId) in entries)
                     {
                         var db = FindDatabaseGame(dbGames, title, titleId);
-                        if (db == null || string.IsNullOrEmpty(db.CoverUrl)) continue;
+                        if (db == null) continue;
+
                         var card = LibraryVm.FindMyGameCard(title, platform);
-                        if (card != null && string.IsNullOrEmpty(card.CoverUrl))
+                        if (card == null) continue;
+
+                        // Resolve the real game title for TitleID-based ROM cards
+                        // (e.g. a PS4 folder named "CUSA00572" → "God of War Ragnarök").
+                        // This must be updated regardless of whether we have a cover URL.
+                        string? realTitle = (!string.IsNullOrEmpty(titleId) &&
+                                             db.Title != null &&
+                                             !string.Equals(card.Title, db.Title, StringComparison.OrdinalIgnoreCase))
+                                            ? db.Title : null;
+
+                        string? coverUrl = string.IsNullOrEmpty(card.CoverUrl)
+                                           ? db.CoverUrl : null;
+
+                        // Only post an update if there is actually something new to set
+                        if (coverUrl == null && realTitle == null) continue;
+
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
-                            string coverUrl   = db.CoverUrl;
-                            string? realTitle = (!string.IsNullOrEmpty(titleId) && db.Title != null)
-                                                ? db.Title : null;
-                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                            {
+                            if (!string.IsNullOrEmpty(coverUrl))
                                 card.CoverUrl = coverUrl;
-                                if (!string.IsNullOrEmpty(realTitle) &&
-                                    !string.Equals(card.Title, realTitle, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    card.DisplayTitle = realTitle;
-                                }
-                            });
-                        }
+
+                            if (!string.IsNullOrEmpty(realTitle))
+                                card.DisplayTitle = realTitle;
+                        });
                     }
                 }
                 catch { /* best-effort per platform */ }
@@ -503,10 +583,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task EnrichLibraryFromDatabaseAsync(List<Game> library)
     {
-        // Only enrich games that are still missing visual metadata
+        // Enrich games that are missing any visual metadata or the achievements URL
         var toEnrich = library
             .Where(g => string.IsNullOrEmpty(g.CoverUrl)
-                     || string.IsNullOrEmpty(g.Description))
+                     || string.IsNullOrEmpty(g.Description)
+                     || string.IsNullOrEmpty(g.AchievementsUrl))
             .ToList();
 
         if (toEnrich.Count == 0) return;
@@ -549,6 +630,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     { game.TitleId = dbGame.TitleId; anyUpdated = true; }
                     if (string.IsNullOrEmpty(game.Genre) && !string.IsNullOrEmpty(dbGame.Genre))
                     { game.Genre = dbGame.Genre; anyUpdated = true; }
+                    // Enrich achievements URL so non-PC games show achievements when opened
+                    if (string.IsNullOrEmpty(game.AchievementsUrl) && !string.IsNullOrEmpty(dbGame.AchievementsUrl))
+                    { game.AchievementsUrl = dbGame.AchievementsUrl; anyUpdated = true; }
                 }
 
                 // Refresh the library UI once per platform batch if anything changed
