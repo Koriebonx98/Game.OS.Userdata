@@ -38,6 +38,13 @@
                     <TextBlock Text="Platforms" Classes="stat-label"/>
                 </StackPanel>
             </Border>
+            <Border Classes="stat-tile">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="{Binding TotalPlaytimeLabel}"
+                               Classes="stat-number" Foreground="#0ea5e9"/>
+                    <TextBlock Text="Playtime" Classes="stat-label"/>
+                </StackPanel>
+            </Border>
         </StackPanel>
 
         <!-- Hero Featured Game -->
@@ -88,8 +95,8 @@
             </Grid>
         </Border>
 
-        <!-- Recently Added (cloud library) -->
-        <TextBlock Text="Recently Added" Classes="section-header"/>
+        <!-- Recently Played (cloud library) -->
+        <TextBlock Text="Recently Played" Classes="section-header"/>
 
         <ItemsControl ItemsSource="{Binding RecentGames}" Margin="0,0,0,24">
             <ItemsControl.ItemsPanel>
@@ -128,6 +135,10 @@
                                     </StackPanel>
                                     <TextBlock Text="{Binding RatingStars}"
                                                FontSize="11" Foreground="#f1c40f"/>
+                                    <TextBlock Text="{Binding PlaytimeLabel}"
+                                               FontSize="10" Foreground="#0ea5e9"
+                                               IsVisible="{Binding PlaytimeLabel,
+                                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                 </StackPanel>
                             </Border>
                         </StackPanel>

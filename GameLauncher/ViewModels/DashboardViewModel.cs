@@ -15,6 +15,7 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _gamesCount;
     [ObservableProperty] private int _achievementsCount;
     [ObservableProperty] private int _platformsCount;
+    [ObservableProperty] private string _totalPlaytimeLabel = "";
 
     // Hero featured game
     [ObservableProperty] private StoreGame? _featuredGame;
@@ -42,6 +43,12 @@ public partial class DashboardViewModel : ViewModelBase
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
+        // Total playtime across all games
+        int totalMinutes = library.Sum(g => g.PlaytimeMinutes);
+        TotalPlaytimeLabel = totalMinutes >= 60
+            ? $"{totalMinutes / 60}h {totalMinutes % 60}m"
+            : totalMinutes > 0 ? $"{totalMinutes}m" : "0m";
+
         string hour = System.DateTime.Now.Hour switch
         {
             < 12 => "Good morning",
@@ -50,8 +57,21 @@ public partial class DashboardViewModel : ViewModelBase
         };
         Greeting = $"{hour}, {profile.Username}!";
 
+        // Recently Played: games with a LastPlayedAt date come first (desc),
+        // then fall back to AddedAt so newly added games still appear when no play session exists.
         RecentGames.Clear();
-        foreach (var g in library.OrderByDescending(g => g.AddedAt).Take(8))
+        var recentlyPlayed = library
+            .Where(g => !string.IsNullOrEmpty(g.LastPlayedAt))
+            .OrderByDescending(g => g.LastPlayedAt)
+            .Take(8)
+            .ToList();
+
+        var notPlayed = library
+            .Where(g => string.IsNullOrEmpty(g.LastPlayedAt))
+            .OrderByDescending(g => g.AddedAt)
+            .ToList();
+
+        foreach (var g in recentlyPlayed.Concat(notPlayed).Take(8))
             RecentGames.Add(g);
 
         RecentAchievements.Clear();

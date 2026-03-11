@@ -25,7 +25,9 @@ public partial class LibraryViewModel : ViewModelBase
 
     // ── Cloud library ──────────────────────────────────────────────────────
     public ObservableCollection<Game>   FilteredGames { get; } = new();
-    public ObservableCollection<string> Platforms     { get; } = new();
+    public ObservableCollection<string>         Platforms     { get; } = new();
+    /// <summary>Rich platform chips with icon, count, and selected state for the UI.</summary>
+    public ObservableCollection<PlatformChipVm> PlatformChips { get; } = new();
 
     // ── Local drive detection ──────────────────────────────────────────────
     [ObservableProperty] private bool _hasLocalGames;
@@ -130,7 +132,13 @@ public partial class LibraryViewModel : ViewModelBase
             .ToList();
     }
 
-    partial void OnFilterPlatformChanged(string value) => ApplyFilter();
+    partial void OnFilterPlatformChanged(string value)
+    {
+        // Update chip selection state
+        foreach (var chip in PlatformChips)
+            chip.IsSelected = string.Equals(chip.Name, value, StringComparison.OrdinalIgnoreCase);
+        ApplyFilter();
+    }
     partial void OnSearchTextChanged(string value)     => ApplyFilter();
 
     [RelayCommand]
@@ -282,8 +290,43 @@ public partial class LibraryViewModel : ViewModelBase
         // Restore or reset the filter selection
         FilterPlatform = Platforms.Contains(current) ? current : "All";
 
+        // Rebuild rich platform chips with game counts
+        RebuildPlatformChips();
+
         // Update total count: cloud + local games + repacks + roms
         TotalGames = _allGames.Count + _allLocalGames.Count + _allRepacks.Count + _allRoms.Count;
+    }
+
+    /// <summary>Rebuilds PlatformChips from the current Platforms list with counts.</summary>
+    private void RebuildPlatformChips()
+    {
+        // Build a count map: how many games per platform
+        var countMap = _allGames
+            .GroupBy(g => GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform),
+                     StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var r in _allRoms)
+        {
+            countMap.TryGetValue(r.Platform, out int existing);
+            countMap[r.Platform] = existing + 1;
+        }
+        int pcCount = _allLocalGames.Count + _allRepacks.Count;
+        if (pcCount > 0)
+        {
+            countMap.TryGetValue("PC", out int existingPc);
+            countMap["PC"] = existingPc + pcCount;
+        }
+
+        int total = countMap.Values.Sum();
+
+        PlatformChips.Clear();
+        PlatformChips.Add(new PlatformChipVm("All", total, FilterPlatform == "All"));
+        foreach (var p in Platforms.Skip(1))
+        {
+            countMap.TryGetValue(p, out int count);
+            PlatformChips.Add(new PlatformChipVm(p, count, FilterPlatform == p));
+        }
     }
 
     private void ApplyFilter()
@@ -359,4 +402,40 @@ public partial class LibraryViewModel : ViewModelBase
         // Recalculate total to reflect filtered counts
         TotalGames = _allGames.Count + _allLocalGames.Count + _allRepacks.Count + _allRoms.Count;
     }
+}
+
+/// <summary>A platform filter chip shown above the library grid.</summary>
+public partial class PlatformChipVm : ViewModelBase
+{
+    public string Name       { get; }
+    public string Icon       { get; }
+    public bool   HasIcon    => !string.IsNullOrEmpty(Icon);
+    public int    GameCount  { get; }
+
+    [ObservableProperty] private bool _isSelected;
+
+    public PlatformChipVm(string name, int count, bool selected = false)
+    {
+        Name       = name;
+        GameCount  = count;
+        IsSelected = selected;
+        Icon       = PlatformChipVm.GetIcon(name);
+    }
+
+    public static string GetIcon(string platform) => platform switch
+    {
+        "All"       => "🌐",
+        "PC"        => "🖥",
+        "PS1"       => "🎮",
+        "PS2"       => "🎮",
+        "PS3"       => "🎮",
+        "PS4"       => "🎮",
+        "PS5"       => "🎮",
+        "PSP"       => "🎮",
+        "PS Vita"   => "🎮",
+        "Xbox 360"  => "🟢",
+        "Xbox One"  => "🟢",
+        "Switch"    => "🕹",
+        _           => "",
+    };
 }

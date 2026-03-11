@@ -33,6 +33,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public ProfileViewModel   ProfileVm        { get; }
     public ProfileViewModel   FriendProfileVm  { get; }
     public FriendsViewModel   FriendsVm        { get; }
+    public SettingsViewModel  SettingsVm       { get; }
     public GameDetailViewModel DetailVm        { get; }
 
     // ── Navigation state ───────────────────────────────────────────────────
@@ -49,6 +50,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public bool IsStore       => ActivePage == "store";
     public bool IsProfile     => ActivePage == "profile";
     public bool IsFriends     => ActivePage == "friends";
+    public bool IsSettings    => ActivePage == "settings";
 
     partial void OnActivePageChanged(string value)
     {
@@ -57,6 +59,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsStore));
         OnPropertyChanged(nameof(IsProfile));
         OnPropertyChanged(nameof(IsFriends));
+        OnPropertyChanged(nameof(IsSettings));
     }
 
     public MainViewModel()
@@ -71,6 +74,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ProfileVm      = new ProfileViewModel();
         FriendProfileVm= new ProfileViewModel();
         FriendsVm      = new FriendsViewModel();
+        SettingsVm     = new SettingsViewModel();
         DetailVm       = new GameDetailViewModel();
 
         DetailVm.OnClose = () => ShowDetail = false;
@@ -229,6 +233,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Create the per-user data folder hierarchy beneath the executable
         UserDataService.CreateUserFolders(profile.Username);
+
+        // Apply stored playtime data to the library so the dashboard shows accurate totals
+        PlaytimeService.ApplyStoredPlaytime(library);
 
         // Update presence so the user appears "Online" to friends (mirrors the web app)
         _ = _client.UpdatePresenceAsync();

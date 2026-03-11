@@ -21,6 +21,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("coverUrl")]           public string?       CoverUrl           { get; set; }
         [JsonPropertyName("screenshots")]        public List<string>? Screenshots        { get; set; }
         [JsonPropertyName("addedAt")]            public string        AddedAt            { get; set; } = "";
+        [JsonPropertyName("lastPlayedAt")]       public string?       LastPlayedAt       { get; set; }
+        [JsonPropertyName("playtimeMinutes")]    public int           PlaytimeMinutes    { get; set; }
         [JsonPropertyName("genre")]              public string?       Genre              { get; set; }
         [JsonPropertyName("description")]        public string?       Description        { get; set; }
         [JsonPropertyName("rating")]             public double?       Rating             { get; set; }
@@ -38,6 +40,11 @@ namespace GameLauncher.Models
         [JsonIgnore] public string   RatingStars   =>
             Rating.HasValue ? new string('★', (int)System.Math.Round(Rating.Value / 2.0))
                               + new string('☆', 5 - (int)System.Math.Round(Rating.Value / 2.0)) : "—";
+        /// <summary>Human-readable playtime string, e.g. "3h 20m" or "45m".</summary>
+        [JsonIgnore] public string PlaytimeLabel =>
+            PlaytimeMinutes >= 60
+                ? $"{PlaytimeMinutes / 60}h {PlaytimeMinutes % 60}m"
+                : PlaytimeMinutes > 0 ? $"{PlaytimeMinutes}m" : "";
     }
 
     public class ModLink
@@ -400,5 +407,41 @@ namespace GameLauncher.Models
                 _                         => platform,
             };
         }
+    }
+
+    // ── Emulator Settings ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Per-platform emulator configuration persisted locally.
+    /// Used by the Settings page so users can configure which emulator to
+    /// use for each non-PC platform (PS1, PS2, PS3, PS4, Switch, etc.).
+    /// </summary>
+    public class EmulatorSettings
+    {
+        [JsonPropertyName("platform")]       public string  Platform      { get; set; } = "";
+        /// <summary>Full path to the emulator executable.</summary>
+        [JsonPropertyName("emulatorPath")]   public string  EmulatorPath  { get; set; } = "";
+        /// <summary>Command-line arguments template; use {rom} as placeholder for the ROM path.</summary>
+        [JsonPropertyName("arguments")]      public string  Arguments     { get; set; } = "{rom}";
+        /// <summary>Optional name label for display (e.g. "PCSX2 2.x", "Ryujinx").</summary>
+        [JsonPropertyName("emulatorName")]   public string  EmulatorName  { get; set; } = "";
+        /// <summary>Whether this emulator is enabled and should be used to launch ROMs.</summary>
+        [JsonPropertyName("enabled")]        public bool    Enabled       { get; set; } = true;
+    }
+
+    // ── Playtime session ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A single recorded play session stored locally.
+    /// Accumulated into <see cref="Game.PlaytimeMinutes"/> and used to set
+    /// <see cref="Game.LastPlayedAt"/>.
+    /// </summary>
+    public class PlaySession
+    {
+        [JsonPropertyName("platform")]       public string Platform     { get; set; } = "";
+        [JsonPropertyName("title")]          public string Title        { get; set; } = "";
+        [JsonPropertyName("startedAt")]      public string StartedAt    { get; set; } = "";
+        [JsonPropertyName("endedAt")]        public string EndedAt      { get; set; } = "";
+        [JsonPropertyName("minutes")]        public int    Minutes      { get; set; }
     }
 }
