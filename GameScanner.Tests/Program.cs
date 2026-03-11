@@ -164,6 +164,36 @@ class Program
 
         // ── NEW FEATURE CHECKS ─────────────────────────────────────────────────
 
+        // Platform name normalisation: "Microsoft - Xbox 360" → "Xbox 360", "Nintendo - Switch" → "Switch"
+        Console.WriteLine("🗂️  Platform Name Normalisation:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var halo2Rom = detectedRoms.FirstOrDefault(r =>
+            string.Equals(r.Title, "Halo 2", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase));
+        if (halo2Rom != null)
+        {
+            Console.WriteLine("  ✅  Roms/Microsoft - Xbox 360/ → Platform=\"Xbox 360\"");
+        }
+        else
+        {
+            Console.WriteLine("  ❌  Roms/Microsoft - Xbox 360/ was NOT normalised to Platform=\"Xbox 360\"");
+            passed = false;
+        }
+
+        var odysseyRom = detectedRoms.FirstOrDefault(r =>
+            string.Equals(r.Title, "Super Mario Odyssey", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Platform, "Switch", StringComparison.OrdinalIgnoreCase));
+        if (odysseyRom != null)
+        {
+            Console.WriteLine("  ✅  Roms/Nintendo - Switch/ → Platform=\"Switch\"");
+        }
+        else
+        {
+            Console.WriteLine("  ❌  Roms/Nintendo - Switch/ was NOT normalised to Platform=\"Switch\"");
+            passed = false;
+        }
+        Console.WriteLine();
+
         // Archive title normalisation: "A-Way-Out-SteamRIP.zip" → "A Way Out"
         Console.WriteLine("🔧 Archive Title Normalisation:");
         Console.WriteLine("───────────────────────────────────────────────────────────────");

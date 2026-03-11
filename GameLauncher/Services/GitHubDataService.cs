@@ -699,6 +699,18 @@ namespace GameLauncher.Services
         // ── Games Database cache ──────────────────────────────────────────────
 
         /// <summary>
+        /// Maps verbose RetroArch/Libretro-style platform folder names to the canonical
+        /// Games.Database platform identifiers used in URL paths.
+        /// <para>
+        /// Examples: "Microsoft - Xbox 360" → "Xbox 360", "Nintendo - Switch" → "Switch",
+        /// "Sony - PlayStation 3" → "PS3".
+        /// </para>
+        /// Canonical names (e.g. "Xbox 360", "Switch") pass through unchanged.
+        /// </summary>
+        internal static string NormalizePlatform(string platform)
+            => Models.PlatformHelper.NormalizePlatform(platform);
+
+        /// <summary>
         /// Persistent disk-cache directory for platform game lists.
         /// Mirrors the browser's cache so the store loads instantly after the first fetch.
         /// </summary>
@@ -834,6 +846,10 @@ namespace GameLauncher.Services
         public static async Task<List<DatabaseGame>> FetchGamesDatabaseAsync(
             string platform, CancellationToken ct = default)
         {
+            // Normalise verbose RetroArch-style names ("Microsoft - Xbox 360" → "Xbox 360")
+            // so they map to the correct Games.Database URL and cache key.
+            platform = NormalizePlatform(platform);
+
             // 1. In-memory cache — instant for platform switches within the same session
             lock (_dbMemoryCache)
             {
