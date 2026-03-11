@@ -240,10 +240,14 @@ namespace GameLauncher.Models
         [JsonPropertyName("exePath")]     public string? ExePath     { get; set; }
         /// <summary>Command-line arguments passed to the executable on launch.</summary>
         [JsonPropertyName("exeArgs")]     public string? ExeArgs     { get; set; }
+        /// <summary>Full path to the ROM file used when launching via an emulator.</summary>
+        [JsonPropertyName("romPath")]     public string? RomPath     { get; set; }
         /// <summary>Apps/scripts to run <b>before</b> the game launches.</summary>
-        [JsonPropertyName("preLaunch")]   public List<LaunchEntry> PreLaunch  { get; set; } = new();
+        [JsonPropertyName("preLaunch")]   public List<LaunchEntry> PreLaunch    { get; set; } = new();
+        /// <summary>Apps/scripts to run <b>during</b> the game (e.g. overlay or server).</summary>
+        [JsonPropertyName("duringLaunch")]public List<LaunchEntry> DuringLaunch { get; set; } = new();
         /// <summary>Apps/scripts to run <b>after</b> the game exits.</summary>
-        [JsonPropertyName("postLaunch")]  public List<LaunchEntry> PostLaunch { get; set; } = new();
+        [JsonPropertyName("postLaunch")]  public List<LaunchEntry> PostLaunch   { get; set; } = new();
     }
 
     /// <summary>

@@ -15,6 +15,8 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainVm = new MainViewModel();
+            if (DemoMode.IsEnabled)
+                mainVm.LoadDemo();
             desktop.MainWindow = new MainWindow { DataContext = mainVm };
         }
         base.OnFrameworkInitializationCompleted();

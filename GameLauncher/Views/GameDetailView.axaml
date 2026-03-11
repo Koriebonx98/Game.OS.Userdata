@@ -302,9 +302,9 @@
                         <!-- ── Executable / ROM selection ── -->
                         <Border Background="#21262d" CornerRadius="8" Padding="16,12">
                             <StackPanel Spacing="10">
-                                <TextBlock Text="🎯  Executable / Launch File"
+                                <TextBlock Text="🎯  Executable / Launch File  (Exe Select)"
                                            FontSize="13" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock Text="Path to the .exe, .bat, or ROM file used to launch this game."
+                    <TextBlock Text="Path to the .exe, .bat, or PS1 script used to launch this game."
                                            FontSize="11" Foreground="#8b949e"/>
                                 <TextBox Text="{Binding SettingsExePath}"
                                          Watermark="C:\Games\GameTitle\game.exe"
@@ -318,6 +318,19 @@
                                          Background="#0d1117" Foreground="White"
                                          BorderBrush="#30363d" CornerRadius="6"
                                          Padding="10,8" FontSize="12"/>
+
+                                <!-- ROM Select — only shown for non-PC platforms -->
+                                <StackPanel Spacing="6" IsVisible="{Binding IsRom}">
+                                    <TextBlock Text="🕹  ROM File  (Rom Select)"
+                                               FontSize="13" FontWeight="Bold" Foreground="#58a6ff"/>
+                                    <TextBlock Text="Path to the ROM file passed to the emulator above."
+                                               FontSize="11" Foreground="#8b949e"/>
+                                    <TextBox Text="{Binding SettingsRomPath}"
+                                             Watermark="/Roms/PS3/Games/GameTitle.iso"
+                                             Background="#0d1117" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="10,8" FontSize="12"/>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
@@ -356,7 +369,7 @@
                                 <!-- Add new entry form -->
                                 <StackPanel Spacing="6">
                                     <TextBox Text="{Binding NewPreLaunchPath}"
-                                             Watermark="Path to app/script/bat…"
+                                             Watermark="Path to app/script/bat/ps1…"
                                              Background="#0d1117" Foreground="White"
                                              BorderBrush="#30363d" CornerRadius="6"
                                              Padding="8,6" FontSize="12"/>
@@ -383,12 +396,74 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- ── During-launch entries ── -->
+                        <Border Background="#21262d" CornerRadius="8" Padding="16,12">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="⏯  During Launch  (runs alongside the game)"
+                                           FontSize="13" FontWeight="Bold" Foreground="#58a6ff"/>
+                                <TextBlock Text="e.g. game server, online fix, overlay that must stay running while game is running."
+                                           FontSize="11" Foreground="#8b949e"/>
+
+                                <!-- Existing entries -->
+                                <ItemsControl ItemsSource="{Binding DuringLaunchEntries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:LaunchEntry">
+                                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                                                <StackPanel Grid.Column="0" Spacing="2">
+                                                    <TextBlock Text="{Binding Label}"
+                                                               FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="White"/>
+                                                    <TextBlock Text="{Binding Path}"
+                                                               FontSize="11" Foreground="#8b949e"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="1" Padding="8,4"
+                                                        Classes="btn-secondary"
+                                                        Foreground="#f85149"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].DataContext.RemoveDuringLaunchCommand}"
+                                                        CommandParameter="{Binding}">✕</Button>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Add new entry form -->
+                                <StackPanel Spacing="6">
+                                    <TextBox Text="{Binding NewDuringLaunchPath}"
+                                             Watermark="Path to app/script/bat/ps1…"
+                                             Background="#0d1117" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="8,6" FontSize="12"/>
+                                    <Grid ColumnDefinitions="*,*">
+                                        <TextBox Grid.Column="0" Text="{Binding NewDuringLaunchArgs}"
+                                                 Watermark="Arguments (optional)"
+                                                 Background="#0d1117" Foreground="White"
+                                                 BorderBrush="#30363d" CornerRadius="6"
+                                                 Padding="8,6" FontSize="12"
+                                                 Margin="0,0,4,0"/>
+                                        <TextBox Grid.Column="1" Text="{Binding NewDuringLaunchLabel}"
+                                                 Watermark="Label (e.g. Game Server)"
+                                                 Background="#0d1117" Foreground="White"
+                                                 BorderBrush="#30363d" CornerRadius="6"
+                                                 Padding="8,6" FontSize="12"
+                                                 Margin="4,0,0,0"/>
+                                    </Grid>
+                                    <Button Classes="btn-secondary" Padding="12,6"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding AddDuringLaunchCommand}">
+                                        + Add During-Launch Entry
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
                         <!-- ── Post-launch entries ── -->
                         <Border Background="#21262d" CornerRadius="8" Padding="16,12">
                             <StackPanel Spacing="10">
                                 <TextBlock Text="⏹  Post-Launch  (runs after the game exits)"
                                            FontSize="13" FontWeight="Bold" Foreground="#f1c40f"/>
-                                <TextBlock Text="e.g. close Steam, stop a VPN, run a backup script."
+                                <TextBlock Text="e.g. close Steam/Epic, stop a VPN, run a backup script."
                                            FontSize="11" Foreground="#8b949e"/>
 
                                 <!-- Existing entries -->
@@ -418,7 +493,7 @@
                                 <!-- Add new entry form -->
                                 <StackPanel Spacing="6">
                                     <TextBox Text="{Binding NewPostLaunchPath}"
-                                             Watermark="Path to app/script/bat…"
+                                             Watermark="Path to app/script/bat/ps1…"
                                              Background="#0d1117" Foreground="White"
                                              BorderBrush="#30363d" CornerRadius="6"
                                              Padding="8,6" FontSize="12"/>

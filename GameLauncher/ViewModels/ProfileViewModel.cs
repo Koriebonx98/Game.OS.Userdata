@@ -40,4 +40,21 @@ public partial class ProfileViewModel : ViewModelBase
         foreach (var a in achievements.OrderByDescending(a => a.UnlockedAt))
             AllAchievements.Add(a);
     }
+
+    /// <summary>
+    /// Loads a placeholder state while the real profile data is being fetched.
+    /// Called immediately when opening a friend's profile so something shows right away.
+    /// </summary>
+    public void LoadPlaceholder(string username)
+    {
+        Username          = username;
+        Email             = "";
+        GamesCount        = 0;
+        AchievementsCount = 0;
+        AvatarInitial     = username.Length > 0 ? username[0].ToString().ToUpper() : "?";
+        IsAdmin           = false;
+        ModeBadge         = "LIVE";
+        MemberSince       = "Loading…";
+        AllAchievements.Clear();
+    }
 }
