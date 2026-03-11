@@ -524,7 +524,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         // Resolve the real game title for TitleID-based ROM cards
                         // (e.g. a PS4 folder named "CUSA00572" → "God of War Ragnarök").
                         // This must be updated regardless of whether we have a cover URL.
-                        string? realTitle = (!string.IsNullOrEmpty(titleId) && db.Title != null)
+                        string? realTitle = (!string.IsNullOrEmpty(titleId) &&
+                                             db.Title != null &&
+                                             !string.Equals(card.Title, db.Title, StringComparison.OrdinalIgnoreCase))
                                             ? db.Title : null;
 
                         string? coverUrl = string.IsNullOrEmpty(card.CoverUrl)
@@ -538,11 +540,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             if (!string.IsNullOrEmpty(coverUrl))
                                 card.CoverUrl = coverUrl;
 
-                            if (!string.IsNullOrEmpty(realTitle) &&
-                                !string.Equals(card.Title, realTitle, StringComparison.OrdinalIgnoreCase))
-                            {
+                            if (!string.IsNullOrEmpty(realTitle))
                                 card.DisplayTitle = realTitle;
-                            }
                         });
                     }
                 }

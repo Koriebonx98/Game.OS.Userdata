@@ -78,7 +78,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     /// <summary>Current upper limit on how many games are shown. Increases with each "Load More" click.</summary>
     private int _displayLimit = MaxDisplayedGames;
-    public  int  DisplayLimit
+    public int DisplayLimit
     {
         get => _displayLimit;
         private set { _displayLimit = value; OnPropertyChanged(); }

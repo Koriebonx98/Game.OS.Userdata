@@ -1003,6 +1003,11 @@ public partial class GameDetailViewModel : ViewModelBase
     /// Fetches the achievements JSON from the given URL and populates the
     /// Achievements collection.  Mirrors <c>_loadAchievementsInModal</c> in script.js.
     /// </summary>
+    /// <remarks>
+    /// Marked <c>internal</c> so <see cref="MainViewModel.EnrichGameAchievementsAsync"/>
+    /// can trigger achievement loading for non-PC cloud library games whose
+    /// <c>AchievementsUrl</c> was not stored when the game was added to the library.
+    /// </remarks>
     internal async System.Threading.Tasks.Task FetchAndDisplayAchievementsAsync(string url)
     {
         try
