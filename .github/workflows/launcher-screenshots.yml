@@ -302,30 +302,36 @@ jobs:
 
       - name: Create placeholder ROM and Repack files for scanner detection
         run: |
-          # ROMs — {driveRoot}/Roms/{Platform}/Games/  (scanner scans / on macOS)
-          sudo mkdir -p "/Roms/Xbox 360/Games"
-          printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Halo 3.iso"               >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Gears of War.iso"        >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Forza Motorsport 4.iso"  >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Halo Reach.iso"          >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/Xbox 360/Games/Red Dead Redemption.iso" >/dev/null
-          sudo mkdir -p "/Roms/PS3/Games"
-          printf 'placeholder' | sudo tee "/Roms/PS3/Games/God of War III.iso"           >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/PS3/Games/Uncharted 2.iso"              >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/PS3/Games/The Last of Us.iso"           >/dev/null
-          sudo mkdir -p "/Roms/Switch/Games"
-          printf 'placeholder' | sudo tee "/Roms/Switch/Games/Breath of the Wild.nsp"    >/dev/null
-          printf 'placeholder' | sudo tee "/Roms/Switch/Games/Mario Kart 8 Deluxe.nsp"  >/dev/null
-          sudo mkdir -p "/Roms/PS4/Games"
-          printf 'placeholder' | sudo tee "/Roms/PS4/Games/God of War.pkg"               >/dev/null
-          # Repacks — {driveRoot}/Repacks/  (scanner scans / on macOS)
-          sudo mkdir -p "/Repacks"
-          printf 'placeholder' | sudo tee "/Repacks/Elden Ring.iso"                      >/dev/null
-          printf 'placeholder' | sudo tee "/Repacks/Baldurs Gate 3.zip"                  >/dev/null
-          printf 'placeholder' | sudo tee "/Repacks/Cyberpunk 2077.iso"                  >/dev/null
-          printf 'placeholder' | sudo tee "/Repacks/God of War.iso"                      >/dev/null
-          echo "=== ROMs ===" && find /Roms -type f
-          echo "=== Repacks ===" && find /Repacks -type f
+          # macOS root filesystem (/) is read-only (SIP).
+          # Create a 100 MB HFS+ RAM disk so the scanner picks it up via /Volumes/*.
+          DISK=$(hdiutil attach -nomount ram://204800)
+          diskutil eraseDisk HFS+ GameOS "${DISK}"
+          DRIVE=/Volumes/GameOS
+
+          # ROMs — {DRIVE}/Roms/{Platform}/Games/
+          mkdir -p "${DRIVE}/Roms/Xbox 360/Games"
+          printf 'placeholder' > "${DRIVE}/Roms/Xbox 360/Games/Halo 3.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/Xbox 360/Games/Gears of War.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/Xbox 360/Games/Forza Motorsport 4.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/Xbox 360/Games/Halo Reach.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/Xbox 360/Games/Red Dead Redemption.iso"
+          mkdir -p "${DRIVE}/Roms/PS3/Games"
+          printf 'placeholder' > "${DRIVE}/Roms/PS3/Games/God of War III.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/PS3/Games/Uncharted 2.iso"
+          printf 'placeholder' > "${DRIVE}/Roms/PS3/Games/The Last of Us.iso"
+          mkdir -p "${DRIVE}/Roms/Switch/Games"
+          printf 'placeholder' > "${DRIVE}/Roms/Switch/Games/Breath of the Wild.nsp"
+          printf 'placeholder' > "${DRIVE}/Roms/Switch/Games/Mario Kart 8 Deluxe.nsp"
+          mkdir -p "${DRIVE}/Roms/PS4/Games"
+          printf 'placeholder' > "${DRIVE}/Roms/PS4/Games/God of War.pkg"
+          # Repacks — {DRIVE}/Repacks/
+          mkdir -p "${DRIVE}/Repacks"
+          printf 'placeholder' > "${DRIVE}/Repacks/Elden Ring.iso"
+          printf 'placeholder' > "${DRIVE}/Repacks/Baldurs Gate 3.zip"
+          printf 'placeholder' > "${DRIVE}/Repacks/Cyberpunk 2077.iso"
+          printf 'placeholder' > "${DRIVE}/Repacks/God of War.iso"
+          echo "=== ROMs ===" && find "${DRIVE}/Roms" -type f
+          echo "=== Repacks ===" && find "${DRIVE}/Repacks" -type f
 
       - name: Restore & Publish osx-arm64
         run: |
@@ -564,7 +570,7 @@ jobs:
           ss "$ssDir\02-login-credentials.png"
 
           # Tab → Remember Me, Tab → Sign In button, Return → submit
-          keys "{TAB}{TAB}{RETURN}"
+          keys "{TAB}{TAB}{ENTER}"
           Write-Host "Waiting for auth + data load (35s)…"
           Start-Sleep -Seconds 35
           if ($proc.HasExited) { Write-Host "::warning::Launcher exited after login" }
@@ -579,45 +585,45 @@ jobs:
 
           # 04 My Library — sidebar nav item 2
           1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{RETURN}"; Start-Sleep -Seconds 10
+          keys "{ENTER}"; Start-Sleep -Seconds 10
           ss "$ssDir\04-my-games.png"
 
           # 05 Repacks (Ready to Install) — Page Down to show section
           keys "{NEXT}"; Start-Sleep -Seconds 1
           ss "$ssDir\05-repacks-ready-to-install.png"
           # Tab to first repack card and open its detail
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 6
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 6
           ss "$ssDir\06-repack-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
           # 07 ROMs — go back to library, scroll to end
           1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{RETURN}"; Start-Sleep -Seconds 4
+          keys "{ENTER}"; Start-Sleep -Seconds 4
           keys "{END}"; Start-Sleep -Seconds 1
           ss "$ssDir\07-roms-detected.png"
           # 08 ROM detail — Tab to first ROM card and open
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
           ss "$ssDir\08-rom-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
           # 09 Games Store — sidebar nav item 3
           1..3 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{RETURN}"; Start-Sleep -Seconds 10
+          keys "{ENTER}"; Start-Sleep -Seconds 10
           ss "$ssDir\09-games-store.png"
           # 10 App Store tab
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
           ss "$ssDir\10-app-store.png"
 
           # 11 Friends — sidebar nav item 4
           1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{RETURN}"; Start-Sleep -Seconds 8
+          keys "{ENTER}"; Start-Sleep -Seconds 8
           ss "$ssDir\11-friends.png"
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
           ss "$ssDir\12-friends-conversation.png"
 
           # 13 Profile — sidebar nav item 5
           1..5 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{RETURN}"; Start-Sleep -Seconds 5
+          keys "{ENTER}"; Start-Sleep -Seconds 5
           ss "$ssDir\13-profile.png"
 
           Write-Host "=== Windows screenshots ===" && Get-ChildItem $ssDir | Select-Object Name, Length
