@@ -304,7 +304,8 @@ jobs:
         run: |
           # macOS root filesystem (/) is read-only (SIP).
           # Create a 100 MB HFS+ RAM disk so the scanner picks it up via /Volumes/*.
-          DISK=$(hdiutil attach -nomount ram://204800)
+          # Strip trailing whitespace from hdiutil output (it pads the device path).
+          DISK=$(hdiutil attach -nomount ram://204800 | xargs)
           diskutil eraseDisk HFS+ GameOS "${DISK}"
           DRIVE=/Volumes/GameOS
 
@@ -589,7 +590,7 @@ jobs:
           ss "$ssDir\04-my-games.png"
 
           # 05 Repacks (Ready to Install) — Page Down to show section
-          keys "{NEXT}"; Start-Sleep -Seconds 1
+          keys "{PGDN}"; Start-Sleep -Seconds 1
           ss "$ssDir\05-repacks-ready-to-install.png"
           # Tab to first repack card and open its detail
           keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 6
