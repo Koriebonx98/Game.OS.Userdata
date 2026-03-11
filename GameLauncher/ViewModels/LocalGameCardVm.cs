@@ -14,6 +14,17 @@ public partial class LocalGameCardVm : ViewModelBase
     /// <summary>Display title shown on the card.</summary>
     public string Title    { get; init; } = "";
 
+    /// <summary>
+    /// Overridden display title (e.g. resolved from a TitleID via the Games.Database).
+    /// When non-null, the UI shows this value instead of <see cref="Title"/>.
+    /// </summary>
+    [ObservableProperty] private string? _displayTitle;
+
+    /// <summary>The title to show in the UI: DisplayTitle when set, otherwise Title.</summary>
+    public string EffectiveTitle => DisplayTitle ?? Title;
+
+    partial void OnDisplayTitleChanged(string? value) => OnPropertyChanged(nameof(EffectiveTitle));
+
     /// <summary>Platform tag used by the platform filter ("PC", "PS3", "Switch", etc.).</summary>
     public string Platform { get; init; } = "";
 

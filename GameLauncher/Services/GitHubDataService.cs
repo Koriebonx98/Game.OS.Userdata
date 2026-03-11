@@ -905,7 +905,12 @@ namespace GameLauncher.Services
             var result = new List<DatabaseGame>();
             foreach (var item in gamesArray.EnumerateArray())
             {
-                var title = item.TryGetProperty("Title", out var t) ? t.GetString() : null;
+                // Title — try multiple casings / field names to handle different platform JSON formats
+                var title =
+                    item.TryGetProperty("Title", out var t)  && t.ValueKind  == JsonValueKind.String ? t.GetString()  :
+                    item.TryGetProperty("title", out var t2) && t2.ValueKind == JsonValueKind.String ? t2.GetString() :
+                    item.TryGetProperty("name",  out var t3) && t3.ValueKind == JsonValueKind.String ? t3.GetString() :
+                    null;
                 if (string.IsNullOrWhiteSpace(title))
                     continue; // skip non-game / empty entries
 
@@ -938,6 +943,20 @@ namespace GameLauncher.Services
                     item.TryGetProperty("achievementsUrl", out var au) && au.ValueKind == JsonValueKind.String
                     ? au.GetString() : null;
 
+                // Store page URL — explicit field or construct from appid
+                string? storePageUrl =
+                    item.TryGetProperty("storeUrl",   out var su1) && su1.ValueKind == JsonValueKind.String ? su1.GetString() :
+                    item.TryGetProperty("store_url",  out var su2) && su2.ValueKind == JsonValueKind.String ? su2.GetString() :
+                    item.TryGetProperty("StoreUrl",   out var su3) && su3.ValueKind == JsonValueKind.String ? su3.GetString() :
+                    null;
+
+                // AppId (Steam) — construct store URL if not already set
+                long? appId =
+                    item.TryGetProperty("appid", out var aid) && aid.ValueKind == JsonValueKind.Number
+                    ? aid.GetInt64() : null;
+                if (string.IsNullOrEmpty(storePageUrl) && appId.HasValue && appId.Value > 0)
+                    storePageUrl = $"https://store.steampowered.com/app/{appId.Value}/";
+
                 // Screenshots / background images
                 List<string>? screenshots = null;
                 if (item.TryGetProperty("background_images", out var bi) && bi.ValueKind == JsonValueKind.Array)
@@ -957,14 +976,15 @@ namespace GameLauncher.Services
                 result.Add(new DatabaseGame
                 {
                     Title           = title,
-                    TitleId         = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  : null,
+                    TitleId         = item.TryGetProperty("TitleID", out var tid)  ? tid.GetString()  :
+                                      item.TryGetProperty("TitleId", out var tid2) ? tid2.GetString() : null,
                     CoverUrl        = coverUrl,
-                    AppId           = item.TryGetProperty("appid", out var aid) &&
-                                      aid.ValueKind == JsonValueKind.Number       ? aid.GetInt64()    : null,
+                    AppId           = appId,
                     Description     = description,
                     TrailerUrl      = trailerUrl,
                     AchievementsUrl = achievementsUrl,
                     Screenshots     = screenshots,
+                    StorePageUrl    = storePageUrl,
                 });
             }
 

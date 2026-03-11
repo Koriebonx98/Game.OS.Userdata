@@ -27,6 +27,15 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string? _coverUrl;
     [ObservableProperty] private string? _coverGradient;
 
+    // ── Regions / Language (for ROM games) ───────────────────────────────────
+    [ObservableProperty] private string  _regionsLabel  = "";
+    [ObservableProperty] private bool    _hasRegions;
+
+    // ── Store page link ───────────────────────────────────────────────────────
+    [ObservableProperty] private string? _storePageUrl;
+    [ObservableProperty] private bool    _hasStoreUrl;
+    [ObservableProperty] private string  _storeButtonLabel = "🛒  View in Store";
+
     // ── Trailer ───────────────────────────────────────────────────────────────
     /// <summary>YouTube trailer URL from the real Games.Database (e.g. https://youtu.be/…).</summary>
     [ObservableProperty] private string? _trailerUrl;
@@ -39,8 +48,20 @@ public partial class GameDetailViewModel : ViewModelBase
 
     // ── Achievements ──────────────────────────────────────────────────────────
     public ObservableCollection<Achievement> Achievements { get; } = new();
+    /// <summary>Subset of Achievements currently visible (respects ShowAllAchievements flag).</summary>
+    public ObservableCollection<Achievement> VisibleAchievements { get; } = new();
     [ObservableProperty] private bool   _hasAchievements;
     [ObservableProperty] private string _achievementsLabel = "";
+    /// <summary>When false, only the first <see cref="AchievementsPreviewCount"/> achievements are shown.</summary>
+    [ObservableProperty] private bool   _showAllAchievements = false;
+    [ObservableProperty] private bool   _hasMoreAchievements = false;
+    private const int AchievementsPreviewCount = 6;
+
+    partial void OnShowAllAchievementsChanged(bool value) => RefreshVisibleAchievements();
+
+    [RelayCommand]
+    private void ToggleShowAllAchievements()
+        => ShowAllAchievements = !ShowAllAchievements;
 
     // ── Local game / drive info ───────────────────────────────────────────────
     [ObservableProperty] private bool   _isLocalGame;
@@ -348,6 +369,22 @@ public partial class GameDetailViewModel : ViewModelBase
         catch { /* best-effort */ }
     }
 
+    /// <summary>Opens the game's store page URL in the system's default browser.</summary>
+    [RelayCommand]
+    private void OpenStorePage()
+    {
+        if (string.IsNullOrEmpty(StorePageUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = StorePageUrl,
+                UseShellExecute = true
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
     /// <summary>Launches the installed game executable.</summary>
     [RelayCommand]
     private void LaunchGame()
@@ -592,6 +629,8 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
         IsRom         = false;
+        PopulateRegions(null);
+        PopulateStoreUrl(null, game.Platform, null);
 
         PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
@@ -631,6 +670,8 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
         IsRom         = false;
+        PopulateRegions(null);
+        PopulateStoreUrl(game.StorePageUrl, game.Platform, null);
 
         PopulateTrailer(game.TrailerUrl);
         PopulateScreenshots(game.Screenshots);
@@ -667,6 +708,8 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl          = null;
         IsRom             = false;
         _databaseDescription = null;
+        PopulateRegions(null);
+        PopulateStoreUrl(null, "PC", null);
 
         PopulateTrailer(null);
         Screenshots.Clear();
@@ -725,6 +768,8 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl          = null;
         IsRom             = false;
         _databaseDescription = null;
+        PopulateRegions(null);
+        PopulateStoreUrl(null, "PC", null);
 
         Description = $"Repack archive ready to install  ·  {repack.SizeLabel}";
 
@@ -749,17 +794,6 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveExeType      = "";
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Populate from a locally detected LocalRom (ROM file for non-PC platform)
-    // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Sets up the detail overlay for a ROM file found on disk.
-    /// Shows basic title/platform/size info immediately; the caller should follow
-    /// up with <see cref="MainViewModel.EnrichLocalGameDetailAsync"/> to pull
-    /// real cover art, description, screenshots and achievements from the
-    /// platform-specific Games.Database (PS3, Switch, Xbox 360, etc.).
-    /// </summary>
     public void LoadFromLocalRom(LocalRom rom)
     {
         ShowSettings    = false;
@@ -774,7 +808,11 @@ public partial class GameDetailViewModel : ViewModelBase
         IsRom             = true;
         _databaseDescription = null;
 
-        Description = $"ROM file  ·  {rom.SizeLabel}  ·  {rom.FilePath}";
+        // Populate region/language metadata from the ROM file
+        PopulateRegions(rom.Regions.Count > 0 ? rom.Regions : null);
+        PopulateStoreUrl(null, rom.Platform, rom.TitleId);
+
+        Description = $"ROM file  ·  {rom.SizeLabel}";
 
         PopulateTrailer(null);
         Screenshots.Clear();
@@ -907,6 +945,10 @@ public partial class GameDetailViewModel : ViewModelBase
             Description          = dbGame.Description;
         }
 
+        // Populate store URL from database (overrides any previously derived one)
+        if (!string.IsNullOrEmpty(dbGame.StorePageUrl) || dbGame.AppId.HasValue || !string.IsNullOrEmpty(dbGame.TitleId))
+            PopulateStoreUrl(dbGame.StorePageUrl, Platform, dbGame.TitleId ?? (dbGame.AppId.HasValue ? dbGame.AppId.Value.ToString() : null));
+
         PopulateTrailer(dbGame.TrailerUrl);
         PopulateScreenshots(dbGame.Screenshots);
 
@@ -1011,9 +1053,97 @@ public partial class GameDetailViewModel : ViewModelBase
         if (achievements != null)
             foreach (var a in achievements) Achievements.Add(a);
         HasAchievements   = Achievements.Count > 0;
+        ShowAllAchievements = false;
+        HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
         AchievementsLabel = HasAchievements
             ? $"🏆  Achievements  ({Achievements.Count})"
             : "🏆  Achievements";
+        RefreshVisibleAchievements();
+    }
+
+    private void RefreshVisibleAchievements()
+    {
+        VisibleAchievements.Clear();
+        var source = ShowAllAchievements
+            ? Achievements
+            : Achievements.Take(AchievementsPreviewCount);
+        foreach (var a in source)
+            VisibleAchievements.Add(a);
+        HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
+    }
+
+    private void PopulateRegions(List<string>? regions)
+    {
+        if (regions != null && regions.Count > 0)
+        {
+            RegionsLabel = string.Join(" · ", regions);
+            HasRegions   = true;
+        }
+        else
+        {
+            RegionsLabel = "";
+            HasRegions   = false;
+        }
+    }
+
+    /// <summary>
+    /// Builds the store page URL based on the platform, app ID, or title ID.
+    /// Platform → URL format:
+    ///   PC (Steam): https://store.steampowered.com/app/{AppId}/
+    ///   PS3/PS4:    https://store.playstation.com/en-gb/product/{TitleId}
+    ///   Switch:     https://www.nintendo.com/search/#q={title}
+    ///   Xbox 360:   https://marketplace.xbox.com/en-US/Product/{TitleId}
+    /// </summary>
+    private void PopulateStoreUrl(string? explicitUrl, string platform, string? idHint)
+    {
+        string? url = explicitUrl;
+
+        if (string.IsNullOrEmpty(url))
+        {
+            bool isPlayStation = platform is "PS3" or "PS4" or "PS5";
+            bool isXbox        = platform is "Xbox 360" or "Xbox One";
+
+            if (!string.IsNullOrEmpty(idHint))
+            {
+                if (string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase))
+                {
+                    // idHint is AppId (Steam)
+                    if (long.TryParse(idHint, out long appId) && appId > 0)
+                        url = $"https://store.steampowered.com/app/{appId}/";
+                }
+                else if (isPlayStation)
+                {
+                    url = $"https://store.playstation.com/en-gb/product/{idHint}";
+                }
+                else if (isXbox)
+                {
+                    url = $"https://www.xbox.com/en-GB/search?q={Uri.EscapeDataString(Title)}";
+                }
+            }
+
+            if (string.IsNullOrEmpty(url))
+            {
+                // Fallback: search by title on the platform's storefront
+                if (!string.IsNullOrEmpty(Title))
+                {
+                    if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase))
+                        url = $"https://www.nintendo.com/search/#q={Uri.EscapeDataString(Title)}";
+                    else if (isXbox)
+                        url = $"https://www.xbox.com/en-GB/search?q={Uri.EscapeDataString(Title)}";
+                }
+            }
+        }
+
+        StorePageUrl   = url;
+        HasStoreUrl    = !string.IsNullOrEmpty(url);
+        StoreButtonLabel = platform switch
+        {
+            "PC"                => "🎮  View on Steam",
+            "PS3" or "PS4" or "PS5" => "🛒  PlayStation Store",
+            "Switch"            => "🛒  Nintendo eShop",
+            "Xbox 360" or "Xbox One" => "🛒  Xbox Store",
+            _                   => "🛒  View in Store",
+        };
     }
 
     /// <summary>

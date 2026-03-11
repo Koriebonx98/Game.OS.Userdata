@@ -119,13 +119,13 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Returns a snapshot of all platform/title pairs in the My Games list so
+    /// Returns a snapshot of all platform/title/titleId tuples in the My Games list so
     /// MainViewModel can enrich cover art without accessing private fields.
     /// </summary>
-    public IReadOnlyList<(string Title, string Platform)> GetMyGameSources()
+    public IReadOnlyList<(string Title, string Platform, string? TitleId)> GetMyGameSources()
     {
         return _allMyGames
-            .Select(c => (c.Title, c.Platform))
+            .Select(c => (c.Title, c.Platform, c.SourceRom?.TitleId))
             .Distinct()
             .ToList();
     }
@@ -177,6 +177,16 @@ public partial class LibraryViewModel : ViewModelBase
         var installedTitles = new HashSet<string>(
             _allLocalGames.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
 
+        // Build a lookup of cloud library games by (normalizedPlatform, title) so we can
+        // skip local ROM entries that are already represented in the cloud library.
+        var cloudByPlatform = _allGames
+            .GroupBy(g => GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform),
+                     StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                grp => grp.Key,
+                grp => new HashSet<string>(grp.Select(g => g.Title), StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+
         // LocalGames → platform = "PC"
         foreach (var g in _allLocalGames)
             _allMyGames.Add(new LocalGameCardVm
@@ -206,7 +216,14 @@ public partial class LibraryViewModel : ViewModelBase
         }
 
         // ROMs → platform from the ROM itself
+        // Skip ROMs whose title + platform already exist in the cloud library to avoid
+        // showing the same game twice (once from the library JSON, once from the local scan).
         foreach (var r in _allRoms)
+        {
+            if (cloudByPlatform.TryGetValue(r.Platform, out var cloudTitles) &&
+                cloudTitles.Contains(r.Title))
+                continue;
+
             _allMyGames.Add(new LocalGameCardVm
             {
                 Title          = r.Title,
@@ -214,6 +231,7 @@ public partial class LibraryViewModel : ViewModelBase
                 CoverGradient  = "#0d1f3c,#1a3264",
                 SourceRom      = r,
             });
+        }
     }
 
     /// <summary>Rebuilds the Platforms filter list from all game sources combined.</summary>
@@ -222,7 +240,7 @@ public partial class LibraryViewModel : ViewModelBase
         var current = FilterPlatform;
 
         var platforms = _allGames
-            .Select(g => g.Platform)
+            .Select(g => GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform))
             .Concat(_allRoms.Select(r => r.Platform))
             .Concat(_allLocalGames.Select(_ => "PC"))
             .Concat(_allRepacks.Select(_ => "PC"))
@@ -253,7 +271,8 @@ public partial class LibraryViewModel : ViewModelBase
         var cloudResults = _allGames.AsEnumerable();
         if (plat != "All")
             cloudResults = cloudResults.Where(g =>
-                string.Equals(g.Platform, plat, StringComparison.OrdinalIgnoreCase));
+                string.Equals(GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform),
+                               plat, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(search))
             cloudResults = cloudResults.Where(g =>
                 g.Title.Contains(search, StringComparison.OrdinalIgnoreCase));

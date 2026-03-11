@@ -76,6 +76,15 @@
                                 <TextBlock Text="{Binding ReleaseYear}"
                                            FontSize="12" Foreground="#8b949e"/>
                             </Border>
+                            <!-- Region/Language badge for ROM games -->
+                            <Border CornerRadius="4" Padding="10,4" Background="#1a3a1a"
+                                    IsVisible="{Binding HasRegions}">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="🌍" FontSize="10" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding RegionsLabel}"
+                                               FontSize="11" Foreground="#3fb950"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- Rating -->
@@ -140,6 +149,17 @@
                                        FontSize="11" Foreground="#8b949e"
                                        IsVisible="{Binding RepackSizeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>
+
+                        <!-- ── Store page button ── -->
+                        <Button Classes="btn-secondary"
+                                Padding="20,10" Margin="0,10,0,0"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding HasStoreUrl}"
+                                Command="{Binding OpenStorePageCommand}">
+                            <TextBlock Text="{Binding StoreButtonLabel}"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="#58a6ff"/>
+                        </Button>
 
                         <!-- ── Drive picker (shown after clicking Install on an archive) ── -->
                         <Border IsVisible="{Binding ShowDrivePicker}"
@@ -668,7 +688,7 @@
                     <StackPanel Spacing="14">
                         <TextBlock Text="{Binding AchievementsLabel}"
                                    Classes="section-header" Margin="0"/>
-                        <ItemsControl ItemsSource="{Binding Achievements}">
+                        <ItemsControl ItemsSource="{Binding VisibleAchievements}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate>
                                     <WrapPanel/>
@@ -707,6 +727,20 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+                        <!-- More / Less button -->
+                        <Button Classes="btn-secondary" Padding="14,8"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding HasMoreAchievements}"
+                                Command="{Binding ToggleShowAllAchievementsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="▼  Show More Achievements"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           IsVisible="{Binding !ShowAllAchievements}"/>
+                                <TextBlock Text="▲  Show Less"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           IsVisible="{Binding ShowAllAchievements}"/>
+                            </StackPanel>
+                        </Button>
                     </StackPanel>
                 </Border>
 

@@ -264,6 +264,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                     TrailerUrl      = g.TrailerUrl,
                     AchievementsUrl = g.AchievementsUrl,
                     Screenshots     = g.Screenshots,
+                    StorePageUrl    = g.StorePageUrl,
                 })
                 .ToList();
 
