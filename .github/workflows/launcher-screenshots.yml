@@ -153,13 +153,33 @@ jobs:
         run: |
           mkdir -p /tmp/ss
 
-          # ── Layout constants (verified against live 1280×800 Xvfb render) ──────
-          # Sidebar nav (220 px wide, logo height 80 px):
+          # ── Layout constants (1280×800 Xvfb, measured from live screenshots) ──
+          # Sidebar nav (220 px wide):
           #   Home:        x=110  y=147
           #   My Library:  x=110  y=200
           #   Games Store: x=110  y=253
           #   Friends:     x=110  y=306
           #   Profile:     x=110  y=359
+          #
+          # Library content (x starts at 252 = sidebar 220 + StackPanel margin 32):
+          #   Game-card col-1 centre: x=337 (card width 170, margin 12)
+          #   Repack-card col-1 centre: x=352 (card width 200, margin 10)
+          #   ROM-card col-1 centre:   x=337 (card width 170, margin 10)
+          #
+          # Scroll note: xdotool key Next/End do NOT scroll in Avalonia because the
+          # outer ScrollViewer has no keyboard focus after clicking a sidebar button.
+          # Fix: hover mouse over content area then use button-5 (wheel-down) events
+          # which work regardless of focus.
+          #   • 3 wheel clicks ≈ 144 px scroll → "Ready to Install" row visible
+          #   • 30 wheel clicks caps at max-scroll (~799 px) → ROMs section visible
+          #
+          # Repack card (Height=90 image + ~71 info = 161 px total):
+          #   After 3×48 px = 144 px scroll: card-top ≈ y=586, card-centre ≈ y=666
+          # ROM card (Height=100 image + ~88 info = 188 px total):
+          #   After max scroll (799 px): ROM row-1 top ≈ y=178, image-centre ≈ y=228
+          #
+          # Friends Message button: far-right column of each friend-row, x≈1200
+          #   First friend-row centre: y≈190
 
           cd /tmp/gameos-linux
           ./GameLauncher > /tmp/launcher.log 2>&1 &
@@ -172,7 +192,14 @@ jobs:
 
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          ss() { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
+          ss()     { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
+          # Scroll the main ScrollViewer using mouse-wheel events (button 5 = wheel-down).
+          # The mouse must be over the content area; no keyboard focus required.
+          wheel_down() {
+            local n=${1:-3}
+            DISPLAY=:99 xdotool mousemove 750 400
+            for i in $(seq 1 "$n"); do DISPLAY=:99 xdotool click 5; sleep 0.08; done
+          }
 
           # 01 Dashboard — auto-login lands here (no login screen shown)
           ss /tmp/ss/01-dashboard.png
@@ -183,29 +210,33 @@ jobs:
           sleep 10
           ss /tmp/ss/02-my-games.png
 
-          # 03 Ready to Install (Repacks section) — Page Down
-          DISPLAY=:99 xdotool key Next
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-down events ≈ 144 px → brings "Ready to Install" row into view
+          wheel_down 3
           sleep 1
           ss /tmp/ss/03-repacks-ready-to-install.png
 
           # 04 Repack Detail — click the first repack card
-          DISPLAY=:99 xdotool mousemove 300 480 click 1
+          # col-1 x=352; after 144 px scroll, repack card-centre ≈ y=666
+          DISPLAY=:99 xdotool mousemove 352 666 click 1
           sleep 6
           ss /tmp/ss/04-repack-detail.png
 
-          # Close detail
+          # Close detail (Back button shown; Escape also works in Avalonia overlay)
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 05 ROM Detection — go back to library and scroll to bottom
+          # 05 ROM Detection — back to library, then scroll to very bottom
+          # 30 wheel-down events caps at max-scroll (~799 px); ROMs section visible
           DISPLAY=:99 xdotool mousemove 110 200 click 1
           sleep 3
-          DISPLAY=:99 xdotool key End
+          wheel_down 30
           sleep 1
           ss /tmp/ss/05-roms-detected.png
 
-          # 06 ROM Detail — click a ROM card
-          DISPLAY=:99 xdotool mousemove 300 560 click 1
+          # 06 ROM Detail — click the first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          DISPLAY=:99 xdotool mousemove 337 228 click 1
           sleep 5
           ss /tmp/ss/06-rom-detail.png
 
@@ -224,12 +255,17 @@ jobs:
           ss /tmp/ss/08-app-store.png
 
           # 09 Friends — nav at x=110, y=306
+          # Increased wait: FriendsViewModel.LoadAsync() fetches friends list via
+          # GitHub API (multiple calls); 15 s gives the data time to arrive on Linux
           DISPLAY=:99 xdotool mousemove 110 306 click 1
-          sleep 8
+          sleep 15
           ss /tmp/ss/09-friends.png
 
-          # 10 Friends — click first friend's Message button (≈x=640, y=290)
-          DISPLAY=:99 xdotool mousemove 640 290 click 1
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # The button is in Grid.Column="3" (far-right) of the friend-row.
+          # Content-area starts at x=252; row is full-width; Message button ≈ x=1200.
+          # First friend-row centre ≈ y=190 (after Friends header + section header).
+          DISPLAY=:99 xdotool mousemove 1200 190 click 1
           sleep 5
           ss /tmp/ss/10-friends-conversation.png
 
@@ -378,9 +414,42 @@ jobs:
           sleep 30
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          tap()       { osascript -e "tell application \"System Events\" to key code $1"      2>/dev/null || true; }
-          ss()        { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
-          # Key codes: 48=Tab 36=Return 53=Escape 121=PageDown 119=End
+          tap()  { osascript -e "tell application \"System Events\" to key code $1" 2>/dev/null || true; }
+          ss()   { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
+          # Key codes: 48=Tab 36=Return 53=Escape
+
+          # Scroll the main ScrollViewer AND click at screen coordinates via Quartz.
+          # tap key-code 121 (PageDown) / 119 (End) do NOT scroll because the outer
+          # ScrollViewer has no keyboard focus after Tab-navigating the sidebar.
+          # "osascript click at {x,y}" is not a valid System Events command.
+          # CGEvent APIs work regardless of focus and use the same coordinate space
+          # as screencapture (screen coords, top-left origin, y increases downward).
+          mac_wheel_down() {
+            local n=${1:-3} px=${2:-48}
+            python3 - "$n" "$px" << 'PYEOF'
+          import sys, time, Quartz
+          n, px = int(sys.argv[1]), int(sys.argv[2])
+          for _ in range(n):
+              ev = Quartz.CGEventCreateScrollWheelEvent(
+                      None, Quartz.kCGScrollEventUnitPixel, 1, -px)
+              Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+              time.sleep(0.08)
+          PYEOF
+          }
+          mac_click() {
+            local x=$1 y=$2
+            python3 - "$x" "$y" << 'PYEOF'
+          import sys, time, Quartz
+          x, y = int(sys.argv[1]), int(sys.argv[2])
+          dn = Quartz.CGEventCreateMouseEvent(
+                  None, Quartz.kCGEventLeftMouseDown, (x, y), Quartz.kCGMouseButtonLeft)
+          up = Quartz.CGEventCreateMouseEvent(
+                  None, Quartz.kCGEventLeftMouseUp,   (x, y), Quartz.kCGMouseButtonLeft)
+          Quartz.CGEventPost(Quartz.kCGHIDEventTap, dn)
+          time.sleep(0.05)
+          Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
+          PYEOF
+          }
 
           # 01 Dashboard — auto-login lands here (no login screen shown)
           ss /tmp/ss/01-dashboard.png
@@ -391,20 +460,29 @@ jobs:
           for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 10
           ss /tmp/ss/02-my-games.png
 
-          # 03 Repacks (Ready to Install) — Page Down
-          tap 121; sleep 1
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-down events × 48 px = 144 px → brings repack row into view
+          mac_wheel_down 3 48
+          sleep 1
           ss /tmp/ss/03-repacks-ready-to-install.png
-          # Tab to first repack card and open
-          tap 48; sleep 0.4; tap 36; sleep 6
+
+          # 04 Repack Detail — click first repack card
+          # col-1 x=352; after 144 px scroll, repack card-centre ≈ y=666
+          mac_click 352 666; sleep 6
           ss /tmp/ss/04-repack-detail.png
           tap 53; sleep 0.4  # close detail
 
-          # 05 ROMs — back to library, scroll to end
+          # 05 ROMs — back to library, scroll to very bottom (ROMs section)
+          # 30 wheel-down events caps at max-scroll (~799 px); ROMs visible from y≈130
           tap 53; sleep 0.3
           for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 4
-          tap 119; sleep 1  # End key
+          mac_wheel_down 30 48
+          sleep 1
           ss /tmp/ss/05-roms-detected.png
-          tap 48; sleep 0.4; tap 36; sleep 5
+
+          # 06 ROM Detail — click first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          mac_click 337 228; sleep 5
           ss /tmp/ss/06-rom-detail.png
           tap 53; sleep 0.4
 
@@ -415,11 +493,14 @@ jobs:
           tap 48; sleep 0.4; tap 36; sleep 5
           ss /tmp/ss/08-app-store.png
 
-          # 09 Friends
+          # 09 Friends — increased wait for GitHub API data load
           tap 53; sleep 0.3
-          for i in $(seq 1 4); do tap 48; sleep 0.2; done; tap 36; sleep 8
+          for i in $(seq 1 4); do tap 48; sleep 0.2; done; tap 36; sleep 15
           ss /tmp/ss/09-friends.png
-          tap 48; sleep 0.4; tap 36; sleep 5
+
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # Button is in far-right column of each friend row (x≈1200, y≈190)
+          mac_click 1200 190; sleep 5
           ss /tmp/ss/10-friends-conversation.png
 
           # 11 Profile
@@ -552,6 +633,13 @@ jobs:
 
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
+
+          # P/Invoke helpers — placed in a single-line string to avoid YAML
+          # block-scalar indentation issues with PowerShell @'...'@ here-strings.
+          # SendKeys {PGDN}/{END} do NOT scroll Avalonia's ScrollViewer because focus
+          # stays on the last-clicked sidebar button, not the viewer itself.
+          Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class GameOSMouse { [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, int d, int e); public const uint WHEEL=0x800,LDOWN=0x0002,LUP=0x0004; public static void ScrollDown(int n){SetCursorPos(750,400);for(int i=0;i<n;i++){mouse_event(WHEEL,0,0,-120,0);System.Threading.Thread.Sleep(80);}} public static void ClickAt(int x,int y){SetCursorPos(x,y);System.Threading.Thread.Sleep(100);mouse_event(LDOWN,0,0,0,0);mouse_event(LUP,0,0,0,0);}}'
+
           function ss([string]$path) {
               $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
               $b = New-Object System.Drawing.Bitmap($s.Width, $s.Height)
@@ -587,21 +675,27 @@ jobs:
           keys "{ENTER}"; Start-Sleep -Seconds 10
           ss "$ssDir\02-my-games.png"
 
-          # 03 Repacks (Ready to Install) — Page Down to show section
-          keys "{PGDN}"; Start-Sleep -Seconds 1
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-detents × ~48 px = ~144 px → brings repack row into view
+          [GameOSMouse]::ScrollDown(3); Start-Sleep -Seconds 1
           ss "$ssDir\03-repacks-ready-to-install.png"
-          # Tab to first repack card and open its detail
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 6
+
+          # 04 Repack Detail — click first repack card
+          # col-1 x=352; after ~144 px scroll, repack card-centre ≈ y=666
+          [GameOSMouse]::ClickAt(352, 666); Start-Sleep -Seconds 6
           ss "$ssDir\04-repack-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
-          # 05 ROMs — go back to library, scroll to end
+          # 05 ROMs — back to library, scroll to very bottom (ROMs section)
+          # 30 wheel-detents caps at max-scroll (~799 px); ROMs visible from y≈130
           1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{ENTER}"; Start-Sleep -Seconds 4
-          keys "{END}"; Start-Sleep -Seconds 1
+          [GameOSMouse]::ScrollDown(30); Start-Sleep -Seconds 1
           ss "$ssDir\05-roms-detected.png"
-          # 06 ROM detail — Tab to first ROM card and open
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
+
+          # 06 ROM detail — click first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          [GameOSMouse]::ClickAt(337, 228); Start-Sleep -Seconds 5
           ss "$ssDir\06-rom-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
@@ -614,10 +708,14 @@ jobs:
           ss "$ssDir\08-app-store.png"
 
           # 09 Friends — sidebar nav item 4
+          # Increased wait: LoadAsync() fetches friends via GitHub API (multiple calls)
           1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{ENTER}"; Start-Sleep -Seconds 8
+          keys "{ENTER}"; Start-Sleep -Seconds 15
           ss "$ssDir\09-friends.png"
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
+
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # Button is in far-right column of each friend row (x≈1200, y≈190)
+          [GameOSMouse]::ClickAt(1200, 190); Start-Sleep -Seconds 5
           ss "$ssDir\10-friends-conversation.png"
 
           # 11 Profile — sidebar nav item 5
