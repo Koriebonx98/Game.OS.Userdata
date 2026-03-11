@@ -57,16 +57,30 @@ namespace GameLauncher
         {
             if (BackendApiService.IsConfigured)
             {
+                // Explicit backend URL configured (env var or gameos-backend.url file).
                 _backend = new BackendApiService();
                 System.Diagnostics.Debug.WriteLine(
                     $"[GameOsClient] Backend mode — {BackendApiService.BackendUrl}");
             }
-            else
+            else if (!string.IsNullOrEmpty(GitHubDataService.GitHubToken))
             {
+                // GitHub PAT available (env var or gameos-token.dat file) — use
+                // GitHub-direct mode, mirroring the web frontend's GitHub path.
                 _github = new GitHubDataService();
                 System.Diagnostics.Debug.WriteLine(
-                    $"[GameOsClient] GitHub-direct mode — " +
-                    (string.IsNullOrEmpty(GitHubDataService.GitHubToken) ? "no token" : "token configured"));
+                    "[GameOsClient] GitHub-direct mode — token configured");
+            }
+            else
+            {
+                // No explicit configuration — fall back to the local backend on
+                // http://localhost:3000.  This is the developer-build path:
+                //   cd backend && npm install && node index.js
+                // then launch the app and log in normally.
+                // The BackendApiService constructor already defaults to localhost:3000
+                // when BackendUrl is null, so this just wires it up.
+                _backend = new BackendApiService();
+                System.Diagnostics.Debug.WriteLine(
+                    "[GameOsClient] Localhost fallback mode — trying http://localhost:3000");
             }
         }
 
@@ -92,8 +106,10 @@ namespace GameLauncher
                 return profile;
             }
 
-            // GitHub-direct mode
-            var ghProfile = await _github!.GetProfileAsync(username, ct)
+            // GitHub-direct mode (_github is always non-null when _backend is null)
+            if (_github == null)
+                throw new GameOsException(503, "Authentication service unavailable.");
+            var ghProfile = await _github.GetProfileAsync(username, ct)
                 ?? throw new GameOsException(404,
                     "Account not found. Please log in again.");
             _username = ghProfile.Username;
@@ -120,21 +136,10 @@ namespace GameLauncher
                 return profile;
             }
 
-            // GitHub-direct mode — requires a PAT bundled in gameos-token.dat
-            if (string.IsNullOrEmpty(GitHubDataService.GitHubToken))
-                throw new GameOsException(503,
-                    "Game.OS is not configured for login.\n\n" +
-                    "Download the pre-built launcher from GitHub Actions:\n" +
-                    "  Actions → Build & Live-Login Test → GameOS-Launcher-win-x64\n" +
-                    "(it has the backend URL baked in and works immediately).\n\n" +
-                    "Building from Visual Studio? Start the local backend first:\n" +
-                    "  cd backend && npm install && node index.js\n" +
-                    "The launcher will auto-connect to http://localhost:3000.\n\n" +
-                    "Or set the GAMEOS_BACKEND_URL environment variable to your\n" +
-                    "deployed backend server URL (e.g. https://gameos.up.railway.app),\n" +
-                    "or set GAMEOS_GITHUB_TOKEN to your GitHub Personal Access Token.");
-
-            var ghProfile = await _github!.VerifyLoginAsync(usernameOrEmail, password, ct)
+            // GitHub-direct mode (_github is always non-null when _backend is null)
+            if (_github == null)
+                throw new GameOsException(503, "Authentication service unavailable.");
+            var ghProfile = await _github.VerifyLoginAsync(usernameOrEmail, password, ct)
                 ?? throw new GameOsException(401,
                     "Invalid username/email or password.");
             _username = ghProfile.Username;
