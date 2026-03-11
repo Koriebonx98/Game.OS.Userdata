@@ -724,9 +724,10 @@ public partial class GameDetailViewModel : ViewModelBase
                     {
                         var psi = new System.Diagnostics.ProcessStartInfo
                         {
-                            FileName        = emuSettings.EmulatorPath,
-                            Arguments       = args,
-                            UseShellExecute = false,
+                            FileName         = emuSettings.EmulatorPath,
+                            Arguments        = args,
+                            UseShellExecute  = false,
+                            WorkingDirectory = System.IO.Path.GetDirectoryName(emuSettings.EmulatorPath) ?? "",
                         };
                         romProc = System.Diagnostics.Process.Start(psi);
 
@@ -772,8 +773,9 @@ public partial class GameDetailViewModel : ViewModelBase
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName        = exePath,
-                    UseShellExecute = true,
+                    FileName         = exePath,
+                    UseShellExecute  = true,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exePath) ?? "",
                 };
                 if (!string.IsNullOrEmpty(exeArgs))
                     psi.Arguments = exeArgs;
@@ -810,8 +812,9 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName        = path,
-                UseShellExecute = true,
+                FileName         = path,
+                UseShellExecute  = true,
+                WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? "",
             };
             if (!string.IsNullOrEmpty(args))
                 psi.Arguments = args;
