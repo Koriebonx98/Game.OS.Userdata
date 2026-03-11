@@ -313,12 +313,31 @@ public sealed class GameScannerService : IDisposable
                             ? Path.GetFileNameWithoutExtension(entry)
                             : Path.GetFileName(parent);
 
+                        // When the immediate parent folder IS a TitleID (e.g. CUSA00207 inside
+                        // "Blood Borne/CUSA00207/"), use the grandparent folder as the game title
+                        // so the real game name is shown instead of the raw TitleID.
+                        string? parentTitleId = ExtractTitleId(rawTitle, platform);
+                        if (parentTitleId != null)
+                        {
+                            string grandParent = Path.GetDirectoryName(parent) ?? "";
+                            string grandParentName = Path.GetFileName(grandParent);
+                            if (!string.IsNullOrWhiteSpace(grandParentName) &&
+                                !string.Equals(Path.GetFullPath(grandParent),
+                                               Path.GetFullPath(gamesDir),
+                                               StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Use grandparent (game name folder) as the display title
+                                rawTitle = grandParentName;
+                            }
+                        }
+
                         // Strip region tags (e.g. "(Europe)", "(USA)") from the title
                         // and collect them as separate metadata, just like platform tags.
                         var (cleanTitle, regions) = ParseRomTitle(rawTitle);
 
                         // Detect if the raw title (pre-region-strip) looks like a TitleID
-                        string? titleId = ExtractTitleId(rawTitle, platform)
+                        string? titleId = parentTitleId
+                                       ?? ExtractTitleId(rawTitle, platform)
                                        ?? ExtractTitleId(cleanTitle, platform);
 
                         results.Add(new LocalRom

@@ -1,0 +1,147 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel"
+             Background="#0d1117">
+
+    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="32,28,32,28" Spacing="0">
+
+            <!-- Header -->
+            <TextBlock Text="Settings" Classes="page-title" Margin="0,0,0,4"/>
+            <TextBlock Text="Configure emulators, paths, and launcher preferences."
+                       Classes="page-subtitle" Margin="0,0,0,28"/>
+
+            <!-- ── Emulator Configuration ── -->
+            <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                <StackPanel Spacing="16">
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
+                        <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="Emulator Setup" FontSize="17" FontWeight="Bold"
+                                   Foreground="#e6edf3" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="Set the emulator executable for each platform. Use {rom} in Arguments as the ROM path placeholder."
+                               FontSize="12" Foreground="#8b949e" Margin="0,0,0,8"/>
+
+                    <!-- Column headers -->
+                    <Grid ColumnDefinitions="130,*,160,80,50" Margin="0,0,0,4">
+                        <TextBlock Grid.Column="0" Text="Platform"
+                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                        <TextBlock Grid.Column="1" Text="Emulator Executable"
+                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                        <TextBlock Grid.Column="2" Text="Arguments"
+                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                        <TextBlock Grid.Column="3" Text="Name (optional)"
+                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                        <TextBlock Grid.Column="4" Text="On"
+                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"
+                                   HorizontalAlignment="Center"/>
+                    </Grid>
+
+                    <Rectangle Height="1" Fill="#21262d"/>
+
+                    <!-- Emulator rows -->
+                    <ItemsControl ItemsSource="{Binding EmulatorRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:EmulatorRowVm">
+                                <Grid ColumnDefinitions="130,*,160,80,50"
+                                      Margin="0,4,0,4">
+                                    <!-- Platform name -->
+                                    <Border Grid.Column="0"
+                                            Background="#1f6feb"
+                                            CornerRadius="4" Padding="8,4"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Platform}"
+                                                   FontSize="11" FontWeight="Bold"
+                                                   Foreground="White"/>
+                                    </Border>
+
+                                    <!-- Emulator path -->
+                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="8,0">
+                                        <TextBox Grid.Column="0"
+                                                 Classes="form-input"
+                                                 Text="{Binding EmulatorPath}"
+                                                 Watermark="Path to emulator .exe…"
+                                                 FontSize="12"
+                                                 VerticalAlignment="Center"/>
+                                        <Button Grid.Column="1"
+                                                Classes="btn-secondary"
+                                                Content="Browse…"
+                                                FontSize="11"
+                                                Padding="8,6"
+                                                Margin="4,0,0,0"
+                                                Command="{Binding $parent[UserControl].DataContext.BrowseEmulatorCommand}"
+                                                CommandParameter="{Binding}"
+                                                VerticalAlignment="Center"/>
+                                    </Grid>
+
+                                    <!-- Arguments -->
+                                    <TextBox Grid.Column="2"
+                                             Classes="form-input"
+                                             Text="{Binding Arguments}"
+                                             Watermark="{}{rom}"
+                                             FontSize="12"
+                                             Margin="0,0,8,0"
+                                             VerticalAlignment="Center"/>
+
+                                    <!-- Emulator name -->
+                                    <TextBox Grid.Column="3"
+                                             Classes="form-input"
+                                             Text="{Binding EmulatorName}"
+                                             Watermark="Optional"
+                                             FontSize="12"
+                                             Margin="0,0,8,0"
+                                             VerticalAlignment="Center"/>
+
+                                    <!-- Enabled toggle -->
+                                    <CheckBox Grid.Column="4"
+                                              IsChecked="{Binding Enabled}"
+                                              HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ── Save Button + Status ── -->
+            <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                <Button Classes="btn-primary"
+                        Content="💾  Save Settings"
+                        Command="{Binding SaveCommand}"
+                        Width="180"/>
+                <TextBlock Text="{Binding StatusMessage}"
+                           Foreground="#3fb950"
+                           FontSize="13"
+                           VerticalAlignment="Center"
+                           IsVisible="{Binding IsSaveSuccess}"/>
+            </StackPanel>
+
+            <!-- ── Playtime Info ── -->
+            <Border Background="#161b22" CornerRadius="10" Padding="24,20">
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
+                        <TextBlock Text="⏱" FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="Playtime Tracking" FontSize="17" FontWeight="Bold"
+                                   Foreground="#e6edf3" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                        Game.OS automatically tracks how long you play each game.
+                        Sessions are recorded when you launch a game from this launcher and
+                        the process exits. Playtime totals appear on game cards and the Home dashboard.
+                    </TextBlock>
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                        Data is stored locally at %APPDATA%\Game.OS\Playtime\sessions.json.
+                    </TextBlock>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

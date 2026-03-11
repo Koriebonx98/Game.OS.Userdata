@@ -291,11 +291,30 @@
         <Setter Property="Background" Value="#21262d"/>
     </Style>
 
-    <!-- ─── Error text ─── -->
-    <Style Selector="TextBlock.error-text">
-        <Setter Property="Foreground" Value="#f85149"/>
+    <!-- ─── Platform Filter Chip ─── -->
+    <Style Selector="Button.platform-chip">
+        <Setter Property="Background" Value="#21262d"/>
+        <Setter Property="Foreground" Value="#8b949e"/>
+        <Setter Property="CornerRadius" Value="20"/>
+        <Setter Property="BorderBrush" Value="#30363d"/>
+        <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="FontSize" Value="12"/>
-        <Setter Property="Margin" Value="0,4,0,0"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,0,4,0"/>
+    </Style>
+
+    <Style Selector="Button.platform-chip:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2d333b"/>
+    </Style>
+
+    <Style Selector="Button.platform-chip.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1f6feb"/>
+    </Style>
+
+    <Style Selector="Button.platform-chip.active">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="#388bfd"/>
     </Style>
 
 </Styles>

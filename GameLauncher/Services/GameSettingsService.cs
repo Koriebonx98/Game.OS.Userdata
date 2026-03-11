@@ -21,6 +21,8 @@ namespace GameLauncher.Services
         private static readonly JsonSerializerOptions _jsonOpts =
             new JsonSerializerOptions { WriteIndented = true };
 
+        private static readonly char[] _invalidFileNameChars = Path.GetInvalidFileNameChars();
+
         /// <summary>
         /// Loads saved settings for the given game title.
         /// Returns a default (empty) <see cref="GameSettings"/> when no file exists.
@@ -61,7 +63,7 @@ namespace GameLauncher.Services
             // title to prevent collisions between sanitised names (e.g. "Game:One"
             // and "GameOne" would otherwise produce the same filename).
             var safe = string.Concat(title.Select(c =>
-                Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+                _invalidFileNameChars.Contains(c) ? '_' : c));
             if (string.IsNullOrWhiteSpace(safe)) safe = "unknown";
 
             // Append first 8 chars of a stable SHA-256 hash of the original title
