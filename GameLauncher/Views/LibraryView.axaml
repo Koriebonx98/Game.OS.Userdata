@@ -100,191 +100,45 @@
             </ItemsControl.ItemTemplate>
         </ItemsControl>
 
-        <!-- ══ Detected on Drive ══ -->
-        <Border IsVisible="{Binding HasLocalGames}"
+        <!-- ══ My Games (LocalGames + Repacks + ROMs unified) ══ -->
+        <Border IsVisible="{Binding HasMyGames}"
                 Margin="0,32,0,0" Padding="0,0,0,12">
             <StackPanel Spacing="14">
                 <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="💿" FontSize="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="Detected on Drive"
+                    <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
+                    <TextBlock Text="My Games"
                                FontSize="18" FontWeight="Bold"
                                Foreground="#e6edf3" VerticalAlignment="Center"/>
                     <Border CornerRadius="10" Padding="8,3" Background="#238636"
                             VerticalAlignment="Center">
-                        <TextBlock Text="{Binding LocalGames.Count}"
+                        <TextBlock Text="{Binding FilteredMyGames.Count}"
                                    FontSize="12" FontWeight="Bold" Foreground="White"/>
                     </Border>
                 </StackPanel>
 
-                <ItemsControl ItemsSource="{Binding FilteredLocalGames}">
+                <ItemsControl ItemsSource="{Binding FilteredMyGames}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <WrapPanel/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="models:LocalGame">
+                        <DataTemplate x:DataType="vm:LocalGameCardVm">
                             <Button Classes="game-card-btn"
                                     Width="170" Margin="0,0,10,10"
-                                    Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
                                     CommandParameter="{Binding}">
                                 <StackPanel>
-                                    <!-- Drive art -->
-                                    <Border Height="100" CornerRadius="10,10,0,0">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                                <GradientStop Color="#0d2137" Offset="0"/>
-                                                <GradientStop Color="#163d5e" Offset="1"/>
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        <StackPanel HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center" Spacing="4">
-                                            <TextBlock Text="💿" FontSize="32"
-                                                       HorizontalAlignment="Center"/>
-                                            <!-- Drive count badge -->
-                                            <Border CornerRadius="8" Padding="6,2"
-                                                    Background="#238636"
-                                                    HorizontalAlignment="Center"
-                                                    IsVisible="{Binding HasMultipleDrives}">
-                                                <TextBlock Text="{Binding DriveCountLabel}"
-                                                           FontSize="10" FontWeight="Bold"
-                                                           Foreground="White"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </Border>
-                                    <!-- Info -->
-                                    <Border Padding="10,8,10,10">
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding Title}"
-                                                       Classes="game-card-title"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <Border CornerRadius="3" Padding="5,2"
-                                                    Background="#1a5e34" HorizontalAlignment="Left">
-                                                <TextBlock Text="{Binding ExecutableType, StringFormat='{}• {0}'}"
-                                                           FontSize="10" FontWeight="Bold"
-                                                           Foreground="#3fb950"/>
-                                            </Border>
-                                            <TextBlock Text="{Binding DriveRoot}"
-                                                       FontSize="10" Foreground="#8b949e"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
-
-        <!-- ══ Ready to Install ══ -->
-        <Border IsVisible="{Binding HasRepacks}"
-                Margin="0,32,0,0" Padding="0,0,0,12">
-            <StackPanel Spacing="14">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="📦" FontSize="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="Ready to Install"
-                               FontSize="18" FontWeight="Bold"
-                               Foreground="#e6edf3" VerticalAlignment="Center"/>
-                    <Border CornerRadius="10" Padding="8,3" Background="#9e6a03"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding ReadyToInstall.Count}"
-                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
-                    </Border>
-                </StackPanel>
-
-                <ItemsControl ItemsSource="{Binding FilteredRepacks}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="models:LocalRepack">
-                            <Button Classes="game-card-btn"
-                                    Width="200" Margin="0,0,10,10"
-                                    Command="{Binding $parent[UserControl].DataContext.OpenRepackDetailCommand}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel>
-                                    <!-- Repack art -->
-                                    <Border Height="90" CornerRadius="10,10,0,0">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                                <GradientStop Color="#2d1b00" Offset="0"/>
-                                                <GradientStop Color="#5c3800" Offset="1"/>
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        <TextBlock Text="📦" FontSize="36"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
-                                    </Border>
-                                    <!-- Info -->
-                                    <Border Padding="10,8,10,10">
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding Title}"
-                                                       Classes="game-card-title"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                                <Border CornerRadius="3" Padding="5,2"
-                                                        Background="#5c3800" HorizontalAlignment="Left">
-                                                    <TextBlock Text="{Binding FileType, StringFormat='{}.{0}'}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="#e3b341"/>
-                                                </Border>
-                                                <TextBlock Text="{Binding SizeLabel}"
-                                                           FontSize="10" Foreground="#8b949e"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
-
-        <!-- ══ ROMs ══ -->
-        <Border IsVisible="{Binding HasRoms}"
-                Margin="0,32,0,0" Padding="0,0,0,12">
-            <StackPanel Spacing="14">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="🕹" FontSize="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="ROMs"
-                               FontSize="18" FontWeight="Bold"
-                               Foreground="#e6edf3" VerticalAlignment="Center"/>
-                    <Border CornerRadius="10" Padding="8,3" Background="#1f3a6e"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding LocalRoms.Count}"
-                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
-                    </Border>
-                </StackPanel>
-
-                <ItemsControl ItemsSource="{Binding FilteredRoms}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="models:LocalRom">
-                            <Button Classes="game-card-btn"
-                                    Width="170" Margin="0,0,10,10"
-                                    Command="{Binding $parent[UserControl].DataContext.OpenRomDetailCommand}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel>
-                                    <!-- ROM art -->
-                                    <Border Height="100" CornerRadius="10,10,0,0">
-                                        <Border.Background>
-                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                                <GradientStop Color="#0d1f3c" Offset="0"/>
-                                                <GradientStop Color="#1a3264" Offset="1"/>
-                                            </LinearGradientBrush>
-                                        </Border.Background>
-                                        <TextBlock Text="🕹" FontSize="32"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
+                                    <!-- Cover art (real image if available, gradient placeholder otherwise) -->
+                                    <Border Height="130" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                        <views:CoverImage
+                                            ImageUrl="{Binding CoverUrl}"
+                                            FallbackText="{Binding Title}"
+                                            FallbackGradient="{Binding CoverGradient}"
+                                            SubText="{Binding Platform}"
+                                            LetterFontSize="48"
+                                            ImageCornerRadius="10,10,0,0"
+                                            Height="130"/>
                                     </Border>
                                     <!-- Info -->
                                     <Border Padding="10,8,10,10">
@@ -293,21 +147,22 @@
                                                        Classes="game-card-title"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <!-- Platform badge -->
                                                 <Border CornerRadius="3" Padding="5,2"
-                                                        Background="#1f3a6e" HorizontalAlignment="Left">
+                                                        Background="#1f6feb" HorizontalAlignment="Left">
                                                     <TextBlock Text="{Binding Platform}"
                                                                FontSize="10" FontWeight="Bold"
-                                                               Foreground="#58a6ff"/>
+                                                               Foreground="White"/>
                                                 </Border>
+                                                <!-- Kind badge (Installed / Repack / ROM) -->
                                                 <Border CornerRadius="3" Padding="5,2"
-                                                        Background="#21262d" HorizontalAlignment="Left">
-                                                    <TextBlock Text="{Binding FileType, StringFormat='{}.{0}'}"
+                                                        Background="{Binding KindBackground}"
+                                                        HorizontalAlignment="Left">
+                                                    <TextBlock Text="{Binding KindLabel}"
                                                                FontSize="10" FontWeight="Bold"
-                                                               Foreground="#8b949e"/>
+                                                               Foreground="{Binding KindForeground}"/>
                                                 </Border>
                                             </StackPanel>
-                                            <TextBlock Text="{Binding SizeLabel}"
-                                                       FontSize="10" Foreground="#8b949e"/>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

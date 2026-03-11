@@ -15,6 +15,9 @@ public partial class LibraryViewModel : ViewModelBase
     private List<LocalRepack> _allRepacks     = new();
     private List<LocalRom>    _allRoms        = new();
 
+    // ── Unified "My Games" list (LocalGames + Repacks + ROMs) ─────────────
+    private List<LocalGameCardVm> _allMyGames = new();
+
     [ObservableProperty] private string _filterPlatform = "All";
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private int    _totalGames;
@@ -27,14 +30,17 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private bool _hasLocalGames;
     [ObservableProperty] private bool _hasRepacks;
     [ObservableProperty] private bool _hasRoms;
+    [ObservableProperty] private bool _hasMyGames;
     // Raw (unfiltered) sources — kept so filter can re-apply on the full list
     public ObservableCollection<LocalGame>   LocalGames     { get; } = new();
     public ObservableCollection<LocalRepack> ReadyToInstall { get; } = new();
     public ObservableCollection<LocalRom>    LocalRoms      { get; } = new();
     // Filtered views shown in the UI
-    public ObservableCollection<LocalGame>   FilteredLocalGames  { get; } = new();
-    public ObservableCollection<LocalRepack> FilteredRepacks     { get; } = new();
-    public ObservableCollection<LocalRom>    FilteredRoms        { get; } = new();
+    public ObservableCollection<LocalGame>         FilteredLocalGames  { get; } = new();
+    public ObservableCollection<LocalRepack>        FilteredRepacks     { get; } = new();
+    public ObservableCollection<LocalRom>           FilteredRoms        { get; } = new();
+    /// <summary>Unified filtered list combining LocalGames + Repacks + ROMs for "My Games".</summary>
+    public ObservableCollection<LocalGameCardVm>    FilteredMyGames     { get; } = new();
 
     /// <summary>Invoked when the user clicks a cloud game card.</summary>
     public Action<Game>?        OnOpenDetail       { get; set; }
@@ -44,6 +50,8 @@ public partial class LibraryViewModel : ViewModelBase
     public Action<LocalRepack>? OnOpenRepackDetail { get; set; }
     /// <summary>Invoked when the user clicks a ROM card.</summary>
     public Action<LocalRom>?    OnOpenRomDetail    { get; set; }
+    /// <summary>Invoked when the user clicks any card in the unified My Games section.</summary>
+    public Action<LocalGameCardVm>? OnOpenMyGameDetail { get; set; }
 
     public void Load(List<Game> games)
     {
@@ -63,6 +71,7 @@ public partial class LibraryViewModel : ViewModelBase
             LocalGames.Clear();
             foreach (var g in games) LocalGames.Add(g);
             HasLocalGames = LocalGames.Count > 0;
+            RebuildMyGames();
             RebuildPlatforms();
             ApplyFilter();
         });
@@ -77,6 +86,7 @@ public partial class LibraryViewModel : ViewModelBase
             ReadyToInstall.Clear();
             foreach (var r in repacks) ReadyToInstall.Add(r);
             HasRepacks = ReadyToInstall.Count > 0;
+            RebuildMyGames();
             ApplyFilter();
         });
     }
@@ -90,9 +100,33 @@ public partial class LibraryViewModel : ViewModelBase
             LocalRoms.Clear();
             foreach (var r in roms) LocalRoms.Add(r);
             HasRoms = LocalRoms.Count > 0;
+            RebuildMyGames();
             RebuildPlatforms();
             ApplyFilter();
         });
+    }
+
+    /// <summary>
+    /// Called by MainViewModel after background cover-art enrichment updates a card's
+    /// CoverUrl and CoverGradient from the Games.Database.
+    /// </summary>
+    public LocalGameCardVm? FindMyGameCard(string title, string platform)
+    {
+        return _allMyGames.FirstOrDefault(c =>
+            string.Equals(c.Title, title, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(c.Platform, platform, StringComparison.OrdinalIgnoreCase));
+    }
+
+    /// <summary>
+    /// Returns a snapshot of all platform/title pairs in the My Games list so
+    /// MainViewModel can enrich cover art without accessing private fields.
+    /// </summary>
+    public IReadOnlyList<(string Title, string Platform)> GetMyGameSources()
+    {
+        return _allMyGames
+            .Select(c => (c.Title, c.Platform))
+            .Distinct()
+            .ToList();
     }
 
     partial void OnFilterPlatformChanged(string value) => ApplyFilter();
@@ -125,7 +159,49 @@ public partial class LibraryViewModel : ViewModelBase
         if (rom != null) OnOpenRomDetail?.Invoke(rom);
     }
 
+    [RelayCommand]
+    private void OpenMyGameDetail(LocalGameCardVm? card)
+    {
+        if (card != null) OnOpenMyGameDetail?.Invoke(card);
+    }
+
     // ── Private helpers ────────────────────────────────────────────────────
+
+    /// <summary>Rebuilds _allMyGames from the current three source lists.</summary>
+    private void RebuildMyGames()
+    {
+        _allMyGames.Clear();
+
+        // LocalGames → platform = "PC"
+        foreach (var g in _allLocalGames)
+            _allMyGames.Add(new LocalGameCardVm
+            {
+                Title          = g.Title,
+                Platform       = "PC",
+                CoverGradient  = "#0d2137,#163d5e",
+                SourceGame     = g,
+            });
+
+        // Repacks → platform = "PC"
+        foreach (var r in _allRepacks)
+            _allMyGames.Add(new LocalGameCardVm
+            {
+                Title          = r.Title,
+                Platform       = "PC",
+                CoverGradient  = "#2d1b00,#5c3800",
+                SourceRepack   = r,
+            });
+
+        // ROMs → platform from the ROM itself
+        foreach (var r in _allRoms)
+            _allMyGames.Add(new LocalGameCardVm
+            {
+                Title          = r.Title,
+                Platform       = r.Platform,
+                CoverGradient  = "#0d1f3c,#1a3264",
+                SourceRom      = r,
+            });
+    }
 
     /// <summary>Rebuilds the Platforms filter list from all game sources combined.</summary>
     private void RebuildPlatforms()
@@ -171,7 +247,7 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var g in cloudResults.OrderByDescending(g => g.Rating ?? 0))
             FilteredGames.Add(g);
 
-        // ── Local installed games (assumed PC) ────────────────────────────
+        // ── Local installed games (assumed PC) — kept for legacy use ──────
         FilteredLocalGames.Clear();
         if (plat == "All" || string.Equals(plat, "PC", StringComparison.OrdinalIgnoreCase))
         {
@@ -184,7 +260,7 @@ public partial class LibraryViewModel : ViewModelBase
         }
         HasLocalGames = FilteredLocalGames.Count > 0;
 
-        // ── Repacks (assumed PC) ──────────────────────────────────────────
+        // ── Repacks (assumed PC) — kept for legacy use ────────────────────
         FilteredRepacks.Clear();
         if (plat == "All" || string.Equals(plat, "PC", StringComparison.OrdinalIgnoreCase))
         {
@@ -197,7 +273,7 @@ public partial class LibraryViewModel : ViewModelBase
         }
         HasRepacks = FilteredRepacks.Count > 0;
 
-        // ── ROMs ──────────────────────────────────────────────────────────
+        // ── ROMs — kept for legacy use ────────────────────────────────────
         FilteredRoms.Clear();
         var romResults = _allRoms.AsEnumerable();
         if (plat != "All")
@@ -209,6 +285,19 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var r in romResults.OrderBy(r => r.Title))
             FilteredRoms.Add(r);
         HasRoms = FilteredRoms.Count > 0;
+
+        // ── Unified My Games (LocalGames + Repacks + ROMs) ────────────────
+        FilteredMyGames.Clear();
+        var myResults = _allMyGames.AsEnumerable();
+        if (plat != "All")
+            myResults = myResults.Where(c =>
+                string.Equals(c.Platform, plat, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(search))
+            myResults = myResults.Where(c =>
+                c.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+        foreach (var c in myResults.OrderBy(c => c.Title))
+            FilteredMyGames.Add(c);
+        HasMyGames = FilteredMyGames.Count > 0;
 
         // Recalculate total to reflect filtered counts
         TotalGames = _allGames.Count + _allLocalGames.Count + _allRepacks.Count + _allRoms.Count;

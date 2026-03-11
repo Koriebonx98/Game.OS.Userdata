@@ -84,14 +84,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
+        LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
-        _scanner.GamesUpdated   += games   => LibraryVm.UpdateLocalGames(games);
-        _scanner.RepacksUpdated += repacks => LibraryVm.UpdateRepacks(repacks);
-        _scanner.RomsUpdated    += roms    => LibraryVm.UpdateRoms(roms);
+        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); _ = EnrichMyGamesListAsync(); };
+        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  _ = EnrichMyGamesListAsync(); };
+        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        _ = EnrichMyGamesListAsync(); };
         _ = _scanner.StartAsync();
 
         // On startup, check if any cached platform JSON files are outdated and
@@ -204,6 +205,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ProfileVm.Load(_profile, _library, _achievements, false);
         FriendsVm.LoadDemo();
 
+        // Pre-fetch cover art for the unified My Games cards
+        _ = EnrichMyGamesListAsync();
+
         // Open the inline conversation for screenshot purposes
         FriendsVm.OpenConversationDemo();
 
@@ -239,6 +243,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // metadata was not stored server-side or is missing — mirrors the web app's
         // openGameModalFromLibrary logic that calls fetchGamesDbPlatform(platform).
         _ = EnrichLibraryFromDatabaseAsync(library);
+
+        // Pre-fetch cover art for the unified My Games cards (scanner may already
+        // have found games before login, so enrich what's there right away).
+        _ = EnrichMyGamesListAsync();
 
         ShowLogin = false;
         ShowMain  = true;
@@ -353,6 +361,75 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // StripRepackMarkers is applied inside EnrichLocalGameDetailAsync via
         // FindDatabaseGame, so "[FitGirl Repack]" suffixes are stripped automatically.
         _ = EnrichLocalGameDetailAsync(repack.Title, "PC");
+    }
+
+    /// <summary>
+    /// Opens the detail overlay for a card from the unified "My Games" section.
+    /// Routes to the correct Load* method based on the card's source type, then
+    /// enriches with real cover art / description / trailer / achievements from
+    /// the Games.Database — the same data the website shows.
+    /// </summary>
+    private void OpenDetailFromMyGameCard(LocalGameCardVm card)
+    {
+        if (card.SourceGame != null)
+        {
+            OpenDetailFromLocalGame(card.SourceGame);
+        }
+        else if (card.SourceRepack != null)
+        {
+            OpenDetailFromLocalRepack(card.SourceRepack);
+        }
+        else if (card.SourceRom != null)
+        {
+            OpenDetailFromLocalRom(card.SourceRom);
+        }
+    }
+
+    /// <summary>
+    /// Background task that pre-fetches cover art for every card in the unified
+    /// "My Games" list from the Games.Database.  Groups cards by platform to
+    /// minimise API calls; results are cached on disk (24 h TTL) so subsequent
+    /// launches are instant.  Updates each <see cref="LocalGameCardVm.CoverUrl"/>
+    /// on the UI thread so card images appear progressively as data loads.
+    /// Works for both real scan mode and demo mode.
+    /// </summary>
+    private async Task EnrichMyGamesListAsync()
+    {
+        try
+        {
+            // Collect unique platforms from all current My Games cards
+            var sources = LibraryVm.GetMyGameSources();
+            if (sources.Count == 0) return;
+
+            var byPlatform = sources
+                .GroupBy(s => s.Platform, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Select(s => s.Title).ToList(),
+                              StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (platform, titles) in byPlatform)
+            {
+                try
+                {
+                    var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
+                    if (dbGames.Count == 0) continue;
+
+                    foreach (var title in titles)
+                    {
+                        var db = FindDatabaseGame(dbGames, title);
+                        if (db == null || string.IsNullOrEmpty(db.CoverUrl)) continue;
+                        var card = LibraryVm.FindMyGameCard(title, platform);
+                        if (card != null && string.IsNullOrEmpty(card.CoverUrl))
+                        {
+                            string coverUrl = db.CoverUrl;
+                            Avalonia.Threading.Dispatcher.UIThread.Post(
+                                () => card.CoverUrl = coverUrl);
+                        }
+                    }
+                }
+                catch { /* best-effort per platform */ }
+            }
+        }
+        catch { /* best-effort — cards already show gradient placeholder */ }
     }
 
     /// <summary>
