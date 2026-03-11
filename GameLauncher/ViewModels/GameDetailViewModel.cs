@@ -616,7 +616,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="game">The cloud library entry.</param>
     /// <param name="localGame">If not null, the game is installed on this drive — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
-    public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null)
+    public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null,
+                             LocalRom? localRom = null)
     {
         ShowSettings    = false;
         ShowDrivePicker = false;
@@ -628,8 +629,8 @@ public partial class GameDetailViewModel : ViewModelBase
         Price         = game.Price;
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
-        IsRom         = false;
-        PopulateRegions(null);
+        IsRom         = localRom != null;
+        PopulateRegions(localRom?.Regions.Count > 0 ? localRom.Regions : null);
         PopulateStoreUrl(null, game.Platform, null);
 
         PopulateTrailer(game.TrailerUrl);
@@ -643,7 +644,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (!HasAchievements && !string.IsNullOrEmpty(game.AchievementsUrl))
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
-        ApplyInstallState(localGame, repack);
+        ApplyInstallState(localGame, repack, localRom);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -656,7 +657,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="game">The store entry.</param>
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
-    public void LoadFromStoreGame(StoreGame game, LocalGame? localGame = null, LocalRepack? repack = null)
+    public void LoadFromStoreGame(StoreGame game, LocalGame? localGame = null, LocalRepack? repack = null,
+                                  LocalRom? localRom = null)
     {
         ShowSettings    = false;
         ShowDrivePicker = false;
@@ -669,8 +671,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ReleaseYear   = game.ReleaseYear;
         CoverUrl      = game.CoverUrl;
         CoverGradient = game.CoverGradient;
-        IsRom         = false;
-        PopulateRegions(null);
+        IsRom         = localRom != null;
+        PopulateRegions(localRom?.Regions.Count > 0 ? localRom.Regions : null);
         PopulateStoreUrl(game.StorePageUrl, game.Platform, null);
 
         PopulateTrailer(game.TrailerUrl);
@@ -684,7 +686,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(game.AchievementsUrl))
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
-        ApplyInstallState(localGame, repack);
+        ApplyInstallState(localGame, repack, localRom);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -854,7 +856,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// Applies installation / repack state shared by <see cref="LoadFromGame"/>
     /// and <see cref="LoadFromStoreGame"/>.
     /// </summary>
-    private void ApplyInstallState(LocalGame? localGame, LocalRepack? repack)
+    private void ApplyInstallState(LocalGame? localGame, LocalRepack? repack, LocalRom? localRom = null)
     {
         if (localGame != null)
         {
@@ -884,6 +886,38 @@ public partial class GameDetailViewModel : ViewModelBase
             HasMultipleDrives  = _driveInstances.Count > 1;
             SelectedDriveIndex = 0;
             RefreshActiveDrive();
+        }
+        else if (localRom != null)
+        {
+            // ROM file is on a local drive — show Play button using the ROM file
+            IsInstalled      = true;
+            IsRom            = true;
+            IsRepack         = false;
+            IsSetupRepack    = false;
+            ShowDrivePicker  = false;
+            RepackPath       = "";
+            RepackSizeLabel  = "";
+
+            _driveInstances = new List<LocalGameDriveEntry>
+            {
+                new LocalGameDriveEntry
+                {
+                    DriveRoot      = System.IO.Path.GetPathRoot(localRom.FilePath) ?? "",
+                    FolderPath     = System.IO.Path.GetDirectoryName(localRom.FilePath) ?? "",
+                    ExecutablePath = localRom.FilePath,
+                    ExecutableType = localRom.FileType,
+                }
+            };
+
+            DriveLabels.Clear();
+            foreach (var d in _driveInstances)
+                DriveLabels.Add(d.DriveRoot);
+
+            HasMultipleDrives  = false;
+            SelectedDriveIndex = 0;
+            ActiveDriveLabel   = _driveInstances[0].DriveRoot;
+            ActiveDrivePath    = _driveInstances[0].FolderPath;
+            ActiveExeType      = localRom.FileType.ToUpperInvariant();
         }
         else if (repack != null)
         {
@@ -969,7 +1003,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// Fetches the achievements JSON from the given URL and populates the
     /// Achievements collection.  Mirrors <c>_loadAchievementsInModal</c> in script.js.
     /// </summary>
-    private async System.Threading.Tasks.Task FetchAndDisplayAchievementsAsync(string url)
+    internal async System.Threading.Tasks.Task FetchAndDisplayAchievementsAsync(string url)
     {
         try
         {

@@ -67,12 +67,22 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// <summary>
     /// Maximum number of game cards to render at once in the UI.
     /// Prevents the WrapPanel from rendering 150,000+ items for large platforms.
-    /// The search box can be used to narrow the results below this threshold.
+    /// The search box can be used to narrow the results below this threshold,
+    /// or the "Load More" button appends the next page of results.
     /// </summary>
     private const int MaxDisplayedGames = 2000;
 
     [ObservableProperty] private int    _totalCatalogCount = 0;
     [ObservableProperty] private string _catalogCountLabel = "";
+    [ObservableProperty] private bool   _hasMoreGames      = false;
+
+    /// <summary>Current upper limit on how many games are shown. Increases with each "Load More" click.</summary>
+    private int _displayLimit = MaxDisplayedGames;
+    public  int  DisplayLimit
+    {
+        get => _displayLimit;
+        private set { _displayLimit = value; OnPropertyChanged(); }
+    }
 
     /// <summary>True once the real catalog count has been loaded; drives the subtitle visibility.</summary>
     public bool HasCatalogCount => TotalCatalogCount > 0;
@@ -213,15 +223,16 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         ApplyFilter();       // always re-apply in case FilterGenre was already "All"
     }
 
-    partial void OnSearchTextChanged(string value)   => ApplyFilter();
-    partial void OnFilterGenreChanged(string value)  => ApplyFilter();
+    partial void OnSearchTextChanged(string value)   { DisplayLimit = MaxDisplayedGames; ApplyFilter(); }
+    partial void OnFilterGenreChanged(string value)  { DisplayLimit = MaxDisplayedGames; ApplyFilter(); }
 
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
 
     partial void OnSelectedPlatformChanged(string value)
     {
-        // Cancel any previous in-flight load and start a new one
+        // Reset pagination and cancel any previous in-flight load
+        DisplayLimit = MaxDisplayedGames;
         _loadCts.Cancel();
         _loadCts.Dispose();
         _loadCts = new CancellationTokenSource();
@@ -310,7 +321,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         // Materialize once to get the total count, then sort and take the display page.
         var allMatches = results.ToList();
         int total = allMatches.Count;
-        int shown = Math.Min(total, MaxDisplayedGames);
+        int shown = Math.Min(total, DisplayLimit);
 
         foreach (var g in allMatches
             .OrderByDescending(s => s.Rating)
@@ -318,11 +329,21 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             .Take(shown))
             FilteredStore.Add(g);
 
+        HasMoreGames = shown < total;
+
         BrowseCountLabel = total == 0
             ? ""
             : shown < total
-                ? $"Showing {shown:N0} of {total:N0} games — search to filter"
+                ? $"Showing {shown:N0} of {total:N0} games — use search to filter or load more below"
                 : $"{total:N0} game{(total == 1 ? "" : "s")}";
+    }
+
+    /// <summary>Appends the next page of games to the current filtered view.</summary>
+    [RelayCommand]
+    private void LoadMore()
+    {
+        DisplayLimit += MaxDisplayedGames;
+        ApplyFilter();
     }
 
     public bool IsOwned(string title) =>
