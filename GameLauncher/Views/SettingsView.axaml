@@ -137,7 +137,7 @@
                         the process exits. Playtime totals appear on game cards and the Home dashboard.
                     </TextBlock>
                     <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
-                        Data is stored locally at %APPDATA%\GameOS\Playtime\sessions.json.
+                        Data is stored locally at %APPDATA%\Game.OS\Playtime\sessions.json.
                     </TextBlock>
                 </StackPanel>
             </Border>

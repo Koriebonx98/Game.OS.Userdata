@@ -59,23 +59,28 @@ public partial class DashboardViewModel : ViewModelBase
 
         // Recently Played: games with a LastPlayedAt date come first (desc),
         // then fall back to AddedAt so newly added games still appear when no play session exists.
+        // Parse ISO 8601 strings to DateTime for correct chronological comparison.
+        static DateTime ParseDate(string? s) =>
+            DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
+                ? dt : DateTime.MinValue;
+
         RecentGames.Clear();
         var recentlyPlayed = library
             .Where(g => !string.IsNullOrEmpty(g.LastPlayedAt))
-            .OrderByDescending(g => g.LastPlayedAt)
+            .OrderByDescending(g => ParseDate(g.LastPlayedAt))
             .Take(8)
             .ToList();
 
         var notPlayed = library
             .Where(g => string.IsNullOrEmpty(g.LastPlayedAt))
-            .OrderByDescending(g => g.AddedAt)
+            .OrderByDescending(g => ParseDate(g.AddedAt))
             .ToList();
 
         foreach (var g in recentlyPlayed.Concat(notPlayed).Take(8))
             RecentGames.Add(g);
 
         RecentAchievements.Clear();
-        foreach (var a in achievements.OrderByDescending(a => a.UnlockedAt).Take(4))
+        foreach (var a in achievements.OrderByDescending(a => ParseDate(a.UnlockedAt)).Take(4))
             RecentAchievements.Add(a);
 
         // Recently detected local games / ROMs — show up to 8 cards ordered by platform then title

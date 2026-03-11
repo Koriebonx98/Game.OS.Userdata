@@ -20,6 +20,8 @@ namespace GameLauncher.Services
         private static readonly JsonSerializerOptions _jsonOpts =
             new JsonSerializerOptions { WriteIndented = true };
 
+        private static readonly char[] _invalidFileNameChars = Path.GetInvalidFileNameChars();
+
         /// <summary>Returns the list of all supported non-PC platforms.</summary>
         public static IReadOnlyList<string> SupportedPlatforms { get; } = new[]
         {
@@ -66,7 +68,7 @@ namespace GameLauncher.Services
         {
             // Sanitise platform name for use as a filename
             var safe = string.Concat(platform.Select(c =>
-                Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+                _invalidFileNameChars.Contains(c) ? '_' : c));
             if (string.IsNullOrWhiteSpace(safe)) safe = "unknown";
             return Path.Combine(SettingsDir, $"{safe}.emu.json");
         }
