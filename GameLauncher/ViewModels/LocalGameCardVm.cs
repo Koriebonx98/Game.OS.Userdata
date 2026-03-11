@@ -73,4 +73,7 @@ public partial class LocalGameCardVm : ViewModelBase
 
     /// <summary>True when this repack has an "Update" sub-directory available to install alongside it.</summary>
     public bool HasUpdate => SourceRepack?.HasUpdate == true;
+
+    /// <summary>Per-game playtime label (e.g. "3h 20m played"). Populated when PlaytimeService data is available.</summary>
+    [ObservableProperty] private string _playtimeLabel = "";
 }

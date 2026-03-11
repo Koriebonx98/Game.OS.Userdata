@@ -5,6 +5,7 @@ using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
@@ -43,11 +44,24 @@ public partial class DashboardViewModel : ViewModelBase
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
-        // Total playtime across all games
+        // Total playtime across all games — show days/hours/minutes breakdown
         int totalMinutes = library.Sum(g => g.PlaytimeMinutes);
-        TotalPlaytimeLabel = totalMinutes >= 60
-            ? $"{totalMinutes / 60}h {totalMinutes % 60}m"
-            : totalMinutes > 0 ? $"{totalMinutes}m" : "0m";
+        if (totalMinutes <= 0)
+        {
+            TotalPlaytimeLabel = "0m";
+        }
+        else
+        {
+            int days  = totalMinutes / 1440;
+            int hours = (totalMinutes % 1440) / 60;
+            int mins  = totalMinutes % 60;
+            if (days > 0)
+                TotalPlaytimeLabel = mins > 0 ? $"{days}d {hours}h {mins}m" : $"{days}d {hours}h";
+            else if (hours > 0)
+                TotalPlaytimeLabel = mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
+            else
+                TotalPlaytimeLabel = $"{mins}m";
+        }
 
         string hour = System.DateTime.Now.Hour switch
         {
@@ -57,8 +71,7 @@ public partial class DashboardViewModel : ViewModelBase
         };
         Greeting = $"{hour}, {profile.Username}!";
 
-        // Recently Played: games with a LastPlayedAt date come first (desc),
-        // then fall back to AddedAt so newly added games still appear when no play session exists.
+        // Recently Played — only games that have actually been played (have LastPlayedAt set)
         // Parse ISO 8601 strings to DateTime for correct chronological comparison.
         static DateTime ParseDate(string? s) =>
             DateTime.TryParse(s, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
@@ -70,25 +83,27 @@ public partial class DashboardViewModel : ViewModelBase
             .OrderByDescending(g => ParseDate(g.LastPlayedAt))
             .Take(8)
             .ToList();
-
-        var notPlayed = library
-            .Where(g => string.IsNullOrEmpty(g.LastPlayedAt))
-            .OrderByDescending(g => ParseDate(g.AddedAt))
-            .ToList();
-
-        foreach (var g in recentlyPlayed.Concat(notPlayed).Take(8))
+        foreach (var g in recentlyPlayed)
             RecentGames.Add(g);
 
         RecentAchievements.Clear();
         foreach (var a in achievements.OrderByDescending(a => ParseDate(a.UnlockedAt)).Take(4))
             RecentAchievements.Add(a);
 
-        // Recently detected local games / ROMs — show up to 8 cards ordered by platform then title
+        // Continue Playing — only local games/ROMs that have been played (have recorded playtime)
         RecentLocalGames.Clear();
         if (localCards != null)
         {
-            foreach (var c in localCards.Take(8))
+            foreach (var c in localCards
+                .Where(c => PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle) > 0)
+                .OrderByDescending(c => PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle))
+                .Take(8))
+            {
+                // Populate playtime label on the card
+                int mins = PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
+                c.PlaytimeLabel = FormatMinutes(mins);
                 RecentLocalGames.Add(c);
+            }
         }
         HasRecentLocalGames = RecentLocalGames.Count > 0;
 
@@ -118,5 +133,18 @@ public partial class DashboardViewModel : ViewModelBase
     private void OpenFeaturedDetail()
     {
         if (FeaturedGame != null) OnOpenStoreDetail?.Invoke(FeaturedGame);
+    }
+
+    private static string FormatMinutes(int minutes)
+    {
+        if (minutes <= 0) return "";
+        int days  = minutes / 1440;
+        int hours = (minutes % 1440) / 60;
+        int mins  = minutes % 60;
+        if (days > 0)
+            return mins > 0 ? $"{days}d {hours}h {mins}m" : $"{days}d {hours}h";
+        if (hours > 0)
+            return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
+        return $"{mins}m";
     }
 }

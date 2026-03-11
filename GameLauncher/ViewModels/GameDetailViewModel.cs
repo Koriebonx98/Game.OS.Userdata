@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -26,6 +27,11 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string? _releaseYear;
     [ObservableProperty] private string? _coverUrl;
     [ObservableProperty] private string? _coverGradient;
+
+    // ── Per-game playtime ─────────────────────────────────────────────────────
+    /// <summary>Human-readable playtime for this specific game, e.g. "3h 20m".</summary>
+    [ObservableProperty] private string _playtimeLabel = "";
+    [ObservableProperty] private bool   _hasPlaytime;
 
     // ── Regions / Language (for ROM games) ───────────────────────────────────
     [ObservableProperty] private string  _regionsLabel  = "";
@@ -353,6 +359,138 @@ public partial class GameDetailViewModel : ViewModelBase
         SettingsStatus = "";
     }
 
+    // ── Copy / Move ROM ───────────────────────────────────────────────────────
+    /// <summary>True when the copy/move destination picker is visible.</summary>
+    [ObservableProperty] private bool   _showCopyMovePicker;
+    /// <summary>"Copy" or "Move" — set when picker is opened.</summary>
+    [ObservableProperty] private string _copyMoveMode = "Copy";
+
+    /// <summary>Available drives for ROM copy/move destination.</summary>
+    public ObservableCollection<InstallDriveOption> CopyMoveDrives { get; } = new();
+
+    [RelayCommand]
+    private void CopyRom()
+    {
+        if (!IsRom) return;
+        CopyMoveMode = "Copy";
+        PopulateCopyMoveDrives();
+        ShowCopyMovePicker = CopyMoveDrives.Count > 0;
+        if (!ShowCopyMovePicker)
+            SettingsStatus = "No drives with a Roms folder found.";
+    }
+
+    [RelayCommand]
+    private void MoveRom()
+    {
+        if (!IsRom) return;
+        CopyMoveMode = "Move";
+        PopulateCopyMoveDrives();
+        ShowCopyMovePicker = CopyMoveDrives.Count > 0;
+        if (!ShowCopyMovePicker)
+            SettingsStatus = "No drives with a Roms folder found.";
+    }
+
+    [RelayCommand]
+    private void SelectCopyMoveDrive(InstallDriveOption? option)
+    {
+        if (option == null) return;
+        ShowCopyMovePicker = false;
+
+        if (_driveInstances.Count == 0) return;
+        string romSource = _driveInstances[0].ExecutablePath ?? "";
+        if (string.IsNullOrEmpty(romSource) || !System.IO.File.Exists(romSource))
+        {
+            SettingsStatus = "ROM file not found.";
+            return;
+        }
+
+        // Destination: Roms/{Platform}/Games/{filename}
+        string romsDest = System.IO.Path.Combine(option.DriveRoot, "Roms", Platform, "Games");
+        try { Directory.CreateDirectory(romsDest); } catch { }
+
+        string destFile = System.IO.Path.Combine(romsDest, System.IO.Path.GetFileName(romSource));
+        _ = ExecuteCopyMoveAsync(romSource, destFile, CopyMoveMode == "Move");
+    }
+
+    [RelayCommand]
+    private void CancelCopyMove() => ShowCopyMovePicker = false;
+
+    private async System.Threading.Tasks.Task ExecuteCopyMoveAsync(string source, string dest, bool move)
+    {
+        SettingsStatus = move ? "Moving ROM…" : "Copying ROM…";
+        try
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                if (move)
+                    System.IO.File.Move(source, dest, overwrite: true);
+                else
+                    System.IO.File.Copy(source, dest, overwrite: true);
+            });
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                SettingsStatus = move ? $"✓  ROM moved to {dest}" : $"✓  ROM copied to {dest}";
+                if (move)
+                {
+                    // Update the displayed path to the new location
+                    ActiveDrivePath = System.IO.Path.GetDirectoryName(dest) ?? ActiveDrivePath;
+                    if (_driveInstances.Count > 0)
+                    {
+                        var entry = _driveInstances[0];
+                        _driveInstances[0] = new LocalGameDriveEntry
+                        {
+                            DriveRoot      = System.IO.Path.GetPathRoot(dest) ?? entry.DriveRoot,
+                            FolderPath     = System.IO.Path.GetDirectoryName(dest) ?? entry.FolderPath,
+                            ExecutablePath = dest,
+                            ExecutableType = entry.ExecutableType,
+                        };
+                    }
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                SettingsStatus = $"Failed: {ex.Message}");
+        }
+    }
+
+    private void PopulateCopyMoveDrives()
+    {
+        CopyMoveDrives.Clear();
+        try
+        {
+            // Skip the drive the ROM is currently on
+            string? currentRoot = _driveInstances.Count > 0
+                ? System.IO.Path.GetPathRoot(_driveInstances[0].ExecutablePath ?? "") : null;
+
+            foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady))
+            {
+                try
+                {
+                    string romsPath  = System.IO.Path.Combine(drive.RootDirectory.FullName, "Roms", Platform, "Games");
+                    string gamesPath = romsPath; // reuse InstallDriveOption.GamesFolderPath for display
+                    bool   exists    = Directory.Exists(romsPath);
+                    long   free      = drive.AvailableFreeSpace;
+                    string freeLabel = free >= 1_073_741_824
+                        ? $"{free / 1_073_741_824.0:F1} GB free"
+                        : $"{free / 1_048_576.0:F0} MB free";
+
+                    CopyMoveDrives.Add(new InstallDriveOption
+                    {
+                        DriveRoot       = drive.RootDirectory.FullName,
+                        GamesFolderPath = gamesPath,
+                        FreeSpaceLabel  = freeLabel,
+                        GamesExists     = exists,
+                    });
+                }
+                catch { }
+            }
+        }
+        catch { }
+    }
+
     /// <summary>Opens the trailer URL in the system's default browser.</summary>
     [RelayCommand]
     private void OpenTrailer()
@@ -398,6 +536,55 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var pre in saved.PreLaunch)
             TryStartProcess(pre.Path, pre.Arguments);
 
+        // ── ROM launch: use configured emulator if available ──────────────────
+        if (IsRom)
+        {
+            // Determine the ROM file path: saved override → auto-detected
+            string romPath = "";
+            if (!string.IsNullOrEmpty(saved.RomPath) && System.IO.File.Exists(saved.RomPath))
+                romPath = saved.RomPath;
+            else if (_driveInstances.Count > 0)
+                romPath = _driveInstances[0].ExecutablePath ?? "";
+
+            if (!string.IsNullOrEmpty(romPath))
+            {
+                var emuSettings = EmulatorSettingsService.Load(Platform);
+                if (!string.IsNullOrEmpty(emuSettings.EmulatorPath)
+                    && System.IO.File.Exists(emuSettings.EmulatorPath)
+                    && emuSettings.Enabled)
+                {
+                    // Replace {rom} placeholder with the ROM path, safely quoting any embedded quotes
+                    string safeRomPath = romPath.Replace("\"", "\\\"");
+                    string args = emuSettings.Arguments.Replace("{rom}", $"\"{safeRomPath}\"");
+                    System.Diagnostics.Process? romProc = null;
+                    try
+                    {
+                        var psi = new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName        = emuSettings.EmulatorPath,
+                            Arguments       = args,
+                            UseShellExecute = false,
+                        };
+                        romProc = System.Diagnostics.Process.Start(psi);
+
+                        // Track playtime for ROM games through the emulator process
+                        if (romProc != null && OnRequestPlaytimeTracking != null)
+                            OnRequestPlaytimeTracking(romProc, Title, Platform);
+                    }
+                    catch { /* best-effort */ }
+
+                    if (saved.PostLaunch.Count > 0)
+                        _ = WatchAndRunPostLaunchAsync(romProc, saved.PostLaunch);
+                    return;
+                }
+
+                // No emulator configured — open ROM file with system handler as fallback
+                OpenWithSystem(romPath);
+            }
+            return;
+        }
+
+        // ── Regular (PC) game launch ──────────────────────────────────────────
         // Determine the executable to launch:
         // Priority: saved settings ExePath → detected drive entry → open folder
         string? exePath = null;
@@ -428,6 +615,10 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (!string.IsNullOrEmpty(exeArgs))
                     psi.Arguments = exeArgs;
                 gameProc = System.Diagnostics.Process.Start(psi);
+
+                // Track playtime for PC games
+                if (gameProc != null && OnRequestPlaytimeTracking != null)
+                    OnRequestPlaytimeTracking(gameProc, Title, Platform);
             }
             catch { /* best-effort */ }
 
@@ -441,6 +632,13 @@ public partial class GameDetailViewModel : ViewModelBase
             OpenWithSystem(ActiveDrivePath);
         }
     }
+
+    /// <summary>
+    /// Callback wired by MainViewModel so the detail view-model can request
+    /// playtime tracking for a launched game process without directly referencing
+    /// the service (keeps the VM testable).
+    /// </summary>
+    public Action<System.Diagnostics.Process, string, string>? OnRequestPlaytimeTracking { get; set; }
 
     private static void TryStartProcess(string path, string? args)
     {
@@ -530,8 +728,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
     /// <summary>
     /// Called when the user selects a drive from the install-drive picker.
-    /// Opens the archive with the system extractor — the user completes the
-    /// extraction manually to the chosen Games folder.
+    /// Extracts .zip archives automatically; for .rar and .7z attempts 7-Zip CLI;
+    /// falls back to opening with the system extractor if 7-Zip is not found.
     /// </summary>
     [RelayCommand]
     private void SelectInstallDrive(InstallDriveOption? option)
@@ -540,15 +738,112 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowDrivePicker = false;
 
         // Ensure the Games folder exists on the target drive
-        try { Directory.CreateDirectory(option.GamesFolderPath); } catch { }
+        string destFolder = Path.Combine(option.GamesFolderPath, Title);
+        try { Directory.CreateDirectory(destFolder); } catch { }
 
-        // Open the archive file — the user extracts to the displayed Games folder
-        OpenWithSystem(RepackPath);
+        string ext = Path.GetExtension(RepackPath).ToLowerInvariant();
+        if (ext == ".zip")
+        {
+            // Use built-in .NET extraction for ZIP archives
+            _ = ExtractZipAsync(RepackPath, destFolder);
+        }
+        else if (ext is ".rar" or ".7z")
+        {
+            // Try 7-Zip CLI; fall back to opening with the system handler
+            if (!TryExtractWith7Zip(RepackPath, destFolder))
+                OpenWithSystem(RepackPath);
+        }
+        else
+        {
+            OpenWithSystem(RepackPath);
+        }
     }
 
     /// <summary>Dismisses the drive-picker without installing.</summary>
     [RelayCommand]
     private void CancelInstall() => ShowDrivePicker = false;
+
+    /// <summary>
+    /// Extracts a ZIP archive to <paramref name="destFolder"/> in a background thread.
+    /// Shows extraction status in <see cref="SettingsStatus"/> when the settings panel is open.
+    /// </summary>
+    private async System.Threading.Tasks.Task ExtractZipAsync(string archivePath, string destFolder)
+    {
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            SettingsStatus = "Extracting ZIP…");
+        try
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+                System.IO.Compression.ZipFile.ExtractToDirectory(archivePath, destFolder, overwriteFiles: true));
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                SettingsStatus = $"✓  Extracted to {destFolder}");
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                SettingsStatus = $"Extraction failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Tries to extract <paramref name="archivePath"/> to <paramref name="destFolder"/>
+    /// using the 7-Zip command-line tool.  Returns false if 7-Zip is not found so
+    /// the caller can fall back to opening with the system handler.
+    /// </summary>
+    private bool TryExtractWith7Zip(string archivePath, string destFolder)
+    {
+        // Locate 7-Zip: common Windows install paths, then fall back to system PATH
+        string? sevenZip = null;
+
+        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
+                System.Runtime.InteropServices.OSPlatform.Windows))
+        {
+            string[] windowsCandidates =
+            [
+                @"C:\Program Files\7-Zip\7z.exe",
+                @"C:\Program Files (x86)\7-Zip\7z.exe",
+            ];
+            sevenZip = windowsCandidates.FirstOrDefault(System.IO.File.Exists);
+        }
+
+        // Fall back to "7z" on PATH (works on Linux/macOS with p7zip installed)
+        sevenZip ??= "7z";
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            SettingsStatus = "Extracting archive with 7-Zip…");
+
+        // Safely escape paths to avoid issues with special characters
+        string safeArchive = archivePath.Replace("\"", "\\\"");
+        string safeDest    = destFolder.Replace("\"", "\\\"");
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName        = sevenZip,
+                    Arguments       = $"x \"{safeArchive}\" -o\"{safeDest}\" -y",
+                    UseShellExecute = false,
+                    CreateNoWindow  = true,
+                };
+                using var proc = System.Diagnostics.Process.Start(psi);
+                if (proc != null)
+                    await proc.WaitForExitAsync();
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    SettingsStatus = $"✓  Extracted to {destFolder}");
+            }
+            catch (Exception ex)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    SettingsStatus = $"Extraction failed: {ex.Message}");
+            }
+        });
+
+        return true;
+    }
 
     private static void OpenWithSystem(string path)
     {
@@ -644,6 +939,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (!HasAchievements && !string.IsNullOrEmpty(game.AchievementsUrl))
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
+        PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
     }
 
@@ -686,6 +982,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (!string.IsNullOrEmpty(game.AchievementsUrl))
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl);
 
+        PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
     }
 
@@ -745,10 +1042,8 @@ public partial class GameDetailViewModel : ViewModelBase
         HasMultipleDrives  = _driveInstances.Count > 1;
         SelectedDriveIndex = 0;
         RefreshActiveDrive();
+        PopulatePlaytime("PC", game.Title);
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Populate from a locally detected LocalRepack (ready-to-install archive)
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -849,6 +1144,7 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveDriveLabel   = _driveInstances[0].DriveRoot;
         ActiveDrivePath    = _driveInstances[0].FolderPath;
         ActiveExeType      = rom.FileType.ToUpperInvariant();
+        PopulatePlaytime(rom.Platform, rom.Title);
     }
 
 
@@ -1092,6 +1388,38 @@ public partial class GameDetailViewModel : ViewModelBase
         if (shots != null)
             foreach (var s in shots) Screenshots.Add(s);
         HasScreenshots = Screenshots.Count > 0;
+    }
+
+    /// <summary>Loads per-game playtime from the PlaytimeService and updates the display label.</summary>
+    private void PopulatePlaytime(string platform, string title)
+    {
+        int minutes = PlaytimeService.GetTotalMinutes(platform, title);
+        if (minutes <= 0)
+        {
+            PlaytimeLabel = "";
+            HasPlaytime   = false;
+            return;
+        }
+
+        if (minutes < 60)
+        {
+            PlaytimeLabel = $"{minutes}m played";
+        }
+        else
+        {
+            int days  = minutes / 1440;
+            int hours = (minutes % 1440) / 60;
+            int mins  = minutes % 60;
+            if (days > 0)
+                PlaytimeLabel = mins > 0
+                    ? $"{days}d {hours}h {mins}m played"
+                    : $"{days}d {hours}h played";
+            else
+                PlaytimeLabel = mins > 0
+                    ? $"{hours}h {mins}m played"
+                    : $"{hours}h played";
+        }
+        HasPlaytime = true;
     }
 
     private void PopulateAchievements(List<Achievement>? achievements)
