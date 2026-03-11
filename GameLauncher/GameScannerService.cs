@@ -241,7 +241,7 @@ public sealed class GameScannerService : IDisposable
         {
             foreach (var platformDir in Directory.EnumerateDirectories(romsPath))
             {
-                string platform = Path.GetFileName(platformDir);
+                string platform = NormalizePlatform(Path.GetFileName(platformDir));
                 string gamesDir = Path.Combine(platformDir, "Games");
                 if (!Directory.Exists(gamesDir)) continue;
 
@@ -615,6 +615,19 @@ public sealed class GameScannerService : IDisposable
         if (string.IsNullOrEmpty(title)) return title;
         return _titleNormRegex.Replace(title, "$1: $2");
     }
+
+    /// <summary>
+    /// Maps verbose RetroArch/Libretro-style platform folder names to the canonical
+    /// Games.Database platform identifiers used in URL paths and the C# model.
+    /// <para>
+    /// Examples: "Microsoft - Xbox 360" → "Xbox 360", "Nintendo - Switch" → "Switch",
+    /// "Sony - PlayStation 3" → "PS3".
+    /// </para>
+    /// If the name is not a known verbose alias the original value is returned unchanged,
+    /// so canonical names like "Xbox 360" and "Switch" pass through unmodified.
+    /// </summary>
+    internal static string NormalizePlatform(string platform)
+        => Models.PlatformHelper.NormalizePlatform(platform);
 
     /// <summary>
     /// Returns the path to an "Update" sub-directory inside a repack folder,

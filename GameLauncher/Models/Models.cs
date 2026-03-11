@@ -336,4 +336,35 @@ namespace GameLauncher.Models
         /// <summary>Background/screenshot image URLs (from background_images array).</summary>
         public List<string>? Screenshots     { get; set; }
     }
+
+    /// <summary>
+    /// Shared helpers for platform name handling, used by both
+    /// <c>GameScannerService</c> and <c>GitHubDataService</c>.
+    /// </summary>
+    public static class PlatformHelper
+    {
+        /// <summary>
+        /// Maps verbose RetroArch/Libretro-style platform folder names to the canonical
+        /// Games.Database platform identifiers used in URL paths and the C# model.
+        /// <para>
+        /// Examples: "Microsoft - Xbox 360" → "Xbox 360", "Nintendo - Switch" → "Switch",
+        /// "Sony - PlayStation 3" → "PS3".
+        /// </para>
+        /// Canonical names (e.g. "Xbox 360", "Switch") pass through unchanged.
+        /// </summary>
+        public static string NormalizePlatform(string platform)
+        {
+            if (string.IsNullOrEmpty(platform)) return platform;
+            return platform switch
+            {
+                "Microsoft - Xbox 360" => "Xbox 360",
+                "Microsoft - Xbox One" => "Xbox One",
+                "Nintendo - Switch"    => "Switch",
+                "Sony - PlayStation 3" => "PS3",
+                "Sony - PlayStation 4" => "PS4",
+                "Sony - PlayStation 5" => "PS5",
+                _                      => platform,
+            };
+        }
+    }
 }
