@@ -150,6 +150,12 @@ namespace GameLauncher.Models
         public string FilePath { get; set; } = "";
         public string FileType { get; set; } = ""; // "zip", "rar", "folder"
         public long   SizeBytes{ get; set; }
+        /// <summary>True when the repack folder contains an "Update" sub-directory (patch/update to apply after installation).</summary>
+        public bool   HasUpdate  { get; set; }
+        /// <summary>Path to the Update sub-directory inside the repack folder, if present.</summary>
+        public string? UpdatePath { get; set; }
+        /// <summary>True when a matching game is also found in the Games folder (i.e. this title is already installed).</summary>
+        public bool   IsInstalledGame { get; set; }
 
         private string? _sizeLabel;
         public string SizeLabel =>
@@ -201,6 +207,10 @@ namespace GameLauncher.Models
         public string FilePath     { get; set; } = "";
         public string FileType     { get; set; } = ""; // e.g. "iso", "gb", "snes"
         public long   SizeBytes    { get; set; }
+        /// <summary>Region/language tags extracted from the ROM filename, e.g. ["Europe", "USA"].</summary>
+        public List<string> Regions         { get; set; } = new();
+        /// <summary>Additional file paths when multiple ROM files share the same base title (e.g. multi-disk or multi-region).</summary>
+        public List<string> AdditionalPaths { get; set; } = new();
 
         private string? _sizeLabel;
         public string SizeLabel =>

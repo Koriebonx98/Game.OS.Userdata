@@ -88,11 +88,13 @@ class Program
         Console.WriteLine("───────────────────────────────────────────────────────────────");
         foreach (var r in detectedRoms.OrderBy(r => r.Platform).ThenBy(r => r.Title))
         {
-            Console.WriteLine($"  ✅  [{r.Platform,-10}]  {r.Title,-25}  [{r.FileType,-5}]  {r.SizeLabel}");
+            string regions = r.Regions.Count > 0 ? $"  regions=[{string.Join(",", r.Regions)}]" : "";
+            string extra   = r.AdditionalPaths.Count > 0 ? $"  +{r.AdditionalPaths.Count} more" : "";
+            Console.WriteLine($"  ✅  [{r.Platform,-10}]  {r.Title,-25}  [{r.FileType,-5}]  {r.SizeLabel}{regions}{extra}");
         }
         Console.WriteLine();
 
-        // Expected: FakeGBAGame (GBA), FakeSNESGame (SNES), FakePS3Game (PS3)
+        // Expected: FakeGBAGame (GBA), FakeSNESGame merged from 3 files with Europe+USA regions (SNES), FakePS3Game (PS3)
         var expectedRoms = new[] {
             ("FakeGBAGame", "GBA"),
             ("FakeSNESGame", "SNES"),
@@ -106,6 +108,82 @@ class Program
                 Console.WriteLine($"  ⚠  ROM not found: {title} ({platform}) — ensure TestData/Roms exists");
             }
         }
+
+        // Verify FakeSNESGame is merged from 3 files and has region tags
+        var snesRom = detectedRoms.FirstOrDefault(r => r.Title == "FakeSNESGame" && r.Platform == "SNES");
+        if (snesRom != null)
+        {
+            int totalFiles = 1 + snesRom.AdditionalPaths.Count;
+            if (totalFiles < 3)
+            {
+                Console.WriteLine($"  ❌  FakeSNESGame: expected 3 files merged, got {totalFiles}");
+                passed = false;
+            }
+            if (!snesRom.Regions.Contains("Europe", StringComparer.OrdinalIgnoreCase) ||
+                !snesRom.Regions.Contains("USA",    StringComparer.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"  ❌  FakeSNESGame: expected regions [Europe, USA], got [{string.Join(", ", snesRom.Regions)}]");
+                passed = false;
+            }
+        }
+
+        // ── NEW FEATURE CHECKS ─────────────────────────────────────────────────
+
+        // Archive title normalisation: "A-Way-Out-SteamRIP.zip" → "A Way Out"
+        Console.WriteLine("🔧 Archive Title Normalisation:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var awayOut = detectedRepacks.FirstOrDefault(r =>
+            string.Equals(r.Title, "A Way Out", StringComparison.OrdinalIgnoreCase));
+        if (awayOut != null)
+        {
+            Console.WriteLine("  ✅  A-Way-Out-SteamRIP.zip → \"A Way Out\"");
+        }
+        else
+        {
+            Console.WriteLine("  ❌  A-Way-Out-SteamRIP.zip was NOT normalised to \"A Way Out\"");
+            passed = false;
+        }
+        Console.WriteLine();
+
+        // Repack with Update subfolder detection
+        Console.WriteLine("📂 Repack + Update Detection:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var repackWithUpdate = detectedRepacks.FirstOrDefault(r =>
+            r.Title.StartsWith("FakeGame3WithUpdate", StringComparison.OrdinalIgnoreCase));
+        if (repackWithUpdate != null && repackWithUpdate.HasUpdate)
+        {
+            Console.WriteLine($"  ✅  FakeGame3WithUpdate has Update: {repackWithUpdate.UpdatePath}");
+        }
+        else if (repackWithUpdate != null)
+        {
+            Console.WriteLine("  ❌  FakeGame3WithUpdate found but HasUpdate=false");
+            passed = false;
+        }
+        else
+        {
+            Console.WriteLine("  ⚠  FakeGame3WithUpdate repack not found — ensure TestData/Repacks/FakeGame3WithUpdate exists");
+        }
+        Console.WriteLine();
+
+        // Repack for installed game detection
+        Console.WriteLine("🏷️  IsInstalledGame Detection:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var fakeGame1Repack = detectedRepacks.FirstOrDefault(r =>
+            string.Equals(r.Title, "FakeGame1", StringComparison.OrdinalIgnoreCase));
+        if (fakeGame1Repack != null && fakeGame1Repack.IsInstalledGame)
+        {
+            Console.WriteLine("  ✅  FakeGame1.zip is marked IsInstalledGame=true (also in Games/)");
+        }
+        else if (fakeGame1Repack != null)
+        {
+            Console.WriteLine("  ❌  FakeGame1.zip found but IsInstalledGame=false");
+            passed = false;
+        }
+        else
+        {
+            Console.WriteLine("  ⚠  FakeGame1 repack not found — ensure TestData/Repacks/FakeGame1.zip exists");
+        }
+        Console.WriteLine();
 
         // ── SUMMARY ───────────────────────────────────────────────────────────
         Console.WriteLine("═══════════════════════════════════════════════════════════════");

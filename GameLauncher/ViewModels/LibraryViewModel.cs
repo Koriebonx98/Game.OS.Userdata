@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using GameLauncher;
 using GameLauncher.Models;
 
 namespace GameLauncher.ViewModels;
@@ -172,6 +173,10 @@ public partial class LibraryViewModel : ViewModelBase
     {
         _allMyGames.Clear();
 
+        // Build a set of installed game titles for deduplication below.
+        var installedTitles = new HashSet<string>(
+            _allLocalGames.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+
         // LocalGames → platform = "PC"
         foreach (var g in _allLocalGames)
             _allMyGames.Add(new LocalGameCardVm
@@ -183,14 +188,22 @@ public partial class LibraryViewModel : ViewModelBase
             });
 
         // Repacks → platform = "PC"
+        // Skip repacks that are already represented as installed LocalGames so the user
+        // doesn't see duplicate cards for the same title.
         foreach (var r in _allRepacks)
+        {
+            if (r.IsInstalledGame && installedTitles.Contains(
+                    GameScannerService.StripRepackMarkers(r.Title)))
+                continue;
+
             _allMyGames.Add(new LocalGameCardVm
             {
                 Title          = r.Title,
                 Platform       = "PC",
-                CoverGradient  = "#2d1b00,#5c3800",
+                CoverGradient  = r.IsInstalledGame ? "#0d2137,#163d5e" : "#2d1b00,#5c3800",
                 SourceRepack   = r,
             });
+        }
 
         // ROMs → platform from the ROM itself
         foreach (var r in _allRoms)

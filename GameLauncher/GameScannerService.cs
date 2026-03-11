@@ -117,7 +117,7 @@ public sealed class GameScannerService : IDisposable
     {
         var foundGamesRaw = new List<LocalGame>();
         var foundRepacks  = new List<LocalRepack>();
-        var foundRoms     = new List<LocalRom>();
+        var foundRomsRaw  = new List<LocalRom>();
 
         await Task.Run(() =>
         {
@@ -126,7 +126,7 @@ public sealed class GameScannerService : IDisposable
                 ct.ThrowIfCancellationRequested();
                 ScanGamesDir(driveRoot, foundGamesRaw);
                 ScanRepacksDir(driveRoot, foundRepacks);
-                ScanRomsDir(driveRoot, foundRoms);
+                ScanRomsDir(driveRoot, foundRomsRaw);
             }
         }, ct);
 
@@ -144,6 +144,39 @@ public sealed class GameScannerService : IDisposable
                 ExecutableType = g.ExecutableType,
             }).ToList();
             foundGames.Add(primary);
+        }
+
+        // Merge ROMs with identical base title + platform into a single entry,
+        // aggregating regions and additional file paths.
+        var foundRoms = new List<LocalRom>();
+        foreach (var grp in foundRomsRaw.GroupBy(
+            r => $"{r.Platform}|{r.Title}", StringComparer.OrdinalIgnoreCase))
+        {
+            var items   = grp.ToList();
+            var primary = items[0];
+            // Use a HashSet for O(1) region deduplication during merging.
+            var regionSet = new HashSet<string>(primary.Regions, StringComparer.OrdinalIgnoreCase);
+            foreach (var extra in items.Skip(1))
+            {
+                foreach (var region in extra.Regions)
+                    if (regionSet.Add(region))
+                        primary.Regions.Add(region);
+                primary.AdditionalPaths.Add(extra.FilePath);
+                primary.SizeBytes += extra.SizeBytes;
+            }
+            foundRoms.Add(primary);
+        }
+
+        // Mark repacks whose cleaned title matches an installed game as "Installed".
+        var gameTitleSet = new HashSet<string>(
+            foundGames.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+        foreach (var repack in foundRepacks)
+        {
+            string cleanTitle = NormalizeGameTitle(StripRepackMarkers(repack.Title));
+            repack.IsInstalledGame =
+                gameTitleSet.Contains(repack.Title) ||
+                gameTitleSet.Contains(StripRepackMarkers(repack.Title)) ||
+                gameTitleSet.Contains(cleanTitle);
         }
 
         await _lock.WaitAsync(ct);
@@ -226,21 +259,26 @@ public sealed class GameScannerService : IDisposable
 
                         // Prefer the parent folder name as the title when the file
                         // is inside a named sub-directory; fall back to the filename.
-                        string parent = Path.GetDirectoryName(entry) ?? gamesDir;
-                        string title  = string.Equals(
-                                            Path.GetFullPath(parent),
-                                            Path.GetFullPath(gamesDir),
-                                            StringComparison.OrdinalIgnoreCase)
+                        string parent   = Path.GetDirectoryName(entry) ?? gamesDir;
+                        string rawTitle = string.Equals(
+                                              Path.GetFullPath(parent),
+                                              Path.GetFullPath(gamesDir),
+                                              StringComparison.OrdinalIgnoreCase)
                             ? Path.GetFileNameWithoutExtension(entry)
                             : Path.GetFileName(parent);
 
+                        // Strip region tags (e.g. "(Europe)", "(USA)") from the title
+                        // and collect them as separate metadata, just like platform tags.
+                        var (cleanTitle, regions) = ParseRomTitle(rawTitle);
+
                         results.Add(new LocalRom
                         {
-                            Title    = title,
+                            Title    = cleanTitle,
                             Platform = platform,
                             FilePath = entry,
                             FileType = ext.TrimStart('.'),
                             SizeBytes= size,
+                            Regions  = regions,
                         });
                     }
                 }
@@ -302,14 +340,26 @@ public sealed class GameScannerService : IDisposable
             // Sub-folders (e.g. Repacks/$RepackFolder)
             foreach (var sub in Directory.EnumerateDirectories(repacksPath))
             {
+                // Detect an "Update" sub-directory within this repack folder.
+                string? updatePath = FindUpdateDir(sub);
+
                 bool foundAny = false;
                 try
                 {
                     foreach (var file in Directory.EnumerateFiles(sub, "*", SearchOption.AllDirectories))
                     {
+                        // Skip files inside the Update sub-directory; they belong to the update,
+                        // not to the main repack archive.
+                        if (updatePath != null &&
+                            file.StartsWith(updatePath, StringComparison.OrdinalIgnoreCase))
+                            continue;
+
                         if (IsRepackArchive(file))
                         {
-                            results.Add(MakeRepack(file, true));
+                            var repack = MakeRepack(file, true);
+                            repack.HasUpdate  = updatePath != null;
+                            repack.UpdatePath = updatePath;
+                            results.Add(repack);
                             foundAny = true;
                         }
                     }
@@ -324,6 +374,8 @@ public sealed class GameScannerService : IDisposable
                             FilePath  = setupExe ?? sub,
                             FileType  = setupExe != null ? "setup" : "folder",
                             SizeBytes = GetDirectorySize(sub),
+                            HasUpdate = updatePath != null,
+                            UpdatePath= updatePath,
                         });
                     }
                 }
@@ -433,9 +485,12 @@ public sealed class GameScannerService : IDisposable
         long size = 0;
         try { size = new FileInfo(filePath).Length; } catch { }
 
+        // For top-level archive files, the raw title is the filename without extension.
+        // Apply NormalizeArchiveTitle to convert "A-Way-Out-SteamRIP" → "A Way Out".
+        // For sub-folder repacks, keep the parent folder name as-is (it's usually already clean).
         string rawTitle = fromSubfolder
             ? $"{Path.GetFileName(Path.GetDirectoryName(filePath))} / {Path.GetFileName(filePath)}"
-            : Path.GetFileNameWithoutExtension(filePath);
+            : NormalizeArchiveTitle(Path.GetFileNameWithoutExtension(filePath));
 
         return new LocalRepack
         {
@@ -455,6 +510,99 @@ public sealed class GameScannerService : IDisposable
                 .Sum(f => f.Length);
         }
         catch { return 0; }
+    }
+
+    // ── ROM region tag parsing ─────────────────────────────────────────────
+
+    // Matches common ROM region/language tags in parentheses, e.g. "(Europe)", "(Jap)".
+    // Listed most-specific first to avoid the two-letter catch-all matching region names
+    // that should be expanded (e.g. "De" for Germany).  The generic two-letter code
+    // alternation is placed last so named regions are matched by their full form first.
+    private static readonly Regex _romRegionRegex = new(
+        @"\s*\((Europe|USA|Japan|Jap|World|Korea|Australia|France|Germany|Spain|Italy|China|Brazil|" +
+        @"Rev\s*[\w.]+|v\d[\d.]*|Beta|Proto|Demo|Sample|Unl|" +
+        @"En|Jp|De|Fr|Es|It|Nl|Pt|Sv|No|Da|Fi|Ko|Zh|Ru|Pl)" +
+        @"\)",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Strips common ROM region/language tags from a raw ROM title and returns
+    /// the clean title plus the list of extracted region strings.
+    /// </summary>
+    internal static (string CleanTitle, List<string> Regions) ParseRomTitle(string rawTitle)
+    {
+        var regions = new List<string>();
+        var matches = _romRegionRegex.Matches(rawTitle);
+        foreach (Match m in matches)
+            regions.Add(m.Groups[1].Value);
+        string clean = _romRegionRegex.Replace(rawTitle, "").Trim();
+        return (clean, regions);
+    }
+
+    // ── Archive filename normalization ─────────────────────────────────────
+
+    // Matches common scene/RIP group suffixes at the end of archive filename stems.
+    // Requires at least one whitespace character before the suffix so that embedded
+    // words such as "FakeRepack" are not incorrectly stripped ("Fake").
+    // This is applied AFTER hyphens and underscores have already been replaced with spaces,
+    // so "A-Way-Out-SteamRIP" becomes "A Way Out SteamRIP" before this runs.
+    // Note: DARKSIDERS listed once; case-insensitive matching handles all case variants.
+    private static readonly Regex _archiveSuffixRegex = new(
+        @"\s+(SteamRIP|Steam\.RIP|GOG|TENOKE|EMPRESS|CODEX|PLAZA|FLT|SKIDROW|" +
+        @"RELOADED|PROPHET|RAZOR1911|RAZOR|CPY|HOODLUM|DARKSIDERS|TiNYiSO|P2P|" +
+        @"DODI|FitGirl|ElAmigos|KaOs|Goldberg|RIP|RePack)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    /// <summary>
+    /// Normalises an archive filename stem into a human-readable game title.
+    /// <list type="bullet">
+    ///   <item>Replaces hyphens and underscores with spaces ("A-Way-Out" → "A Way Out").</item>
+    ///   <item>Strips common scene/RIP group suffixes ("A Way Out SteamRIP" → "A Way Out").</item>
+    ///   <item>Collapses repeated spaces.</item>
+    /// </list>
+    /// </summary>
+    internal static string NormalizeArchiveTitle(string stem)
+    {
+        if (string.IsNullOrEmpty(stem)) return stem;
+        // Replace separators with spaces
+        string result = stem.Replace('-', ' ').Replace('_', ' ');
+        // Strip trailing scene/RIP markers
+        result = _archiveSuffixRegex.Replace(result, "").TrimEnd();
+        // Collapse multiple spaces
+        result = Regex.Replace(result, @"\s{2,}", " ").Trim();
+        return result;
+    }
+
+    // ── Game title normalisation (mirrors MainViewModel.NormalizeGameTitle) ──
+
+    // Compiled once — replaces the first " - " with ": " for subtitle resolution.
+    private static readonly Regex _titleNormRegex =
+        new(@"^(.+?) - (.+)$", RegexOptions.Compiled);
+
+    /// <summary>
+    /// Converts a Windows-safe folder/file name to its canonical game title.
+    /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II"
+    /// </summary>
+    internal static string NormalizeGameTitle(string title)
+    {
+        if (string.IsNullOrEmpty(title)) return title;
+        return _titleNormRegex.Replace(title, "$1: $2");
+    }
+
+    /// <summary>
+    /// Returns the path to an "Update" sub-directory inside a repack folder,
+    /// or <see langword="null"/> if none is found.
+    /// Matches any sub-directory whose name starts with "Update" (case-insensitive).
+    /// </summary>
+    private static string? FindUpdateDir(string repackFolder)
+    {
+        try
+        {
+            return Directory
+                .EnumerateDirectories(repackFolder, "Update*", SearchOption.TopDirectoryOnly)
+                .FirstOrDefault();
+        }
+        catch { return null; }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
