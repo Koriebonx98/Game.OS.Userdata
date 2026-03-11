@@ -127,6 +127,41 @@ class Program
             }
         }
 
+        // Verify ROM with comma-separated language tag "(USA) (En,Ja,Fr,De,Es,It)" is parsed correctly.
+        // Title should be "Shadow the Hedgehog" (region/language parens stripped), not include "(En,Ja,...)".
+        Console.WriteLine("🌐 ROM Comma-Separated Language Tag Parsing:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var shadowRom = detectedRoms.FirstOrDefault(r =>
+            string.Equals(r.Title, "Shadow the Hedgehog", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase));
+        if (shadowRom != null)
+        {
+            Console.WriteLine($"  ✅  'Shadow the Hedgehog (USA) (En,Ja,Fr,De,Es,It).chd' → title=\"{shadowRom.Title}\"  regions=[{string.Join(",", shadowRom.Regions)}]");
+            if (!shadowRom.Regions.Contains("USA", StringComparer.OrdinalIgnoreCase) ||
+                !shadowRom.Regions.Contains("En",  StringComparer.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("  ❌  Shadow the Hedgehog: expected regions to include USA and En");
+                passed = false;
+            }
+        }
+        else
+        {
+            // Look for the un-stripped title to give a better error message
+            var badShadow = detectedRoms.FirstOrDefault(r =>
+                r.Title.Contains("Shadow", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase));
+            if (badShadow != null)
+            {
+                Console.WriteLine($"  ❌  Shadow the Hedgehog: title was NOT fully stripped — got \"{badShadow.Title}\"");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ⚠  Shadow the Hedgehog (Xbox 360) ROM not found — ensure TestData/Roms/Xbox 360/Games/ exists");
+            }
+        }
+        Console.WriteLine();
+
         // ── NEW FEATURE CHECKS ─────────────────────────────────────────────────
 
         // Archive title normalisation: "A-Way-Out-SteamRIP.zip" → "A Way Out"

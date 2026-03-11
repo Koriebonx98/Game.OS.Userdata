@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -253,7 +254,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             _allStore = dbGames
                 .Select(g => new StoreGame
                 {
-                    Title           = g.Title ?? "",
+                    Title           = WebUtility.HtmlDecode(g.Title ?? ""),
                     Platform        = platform,
                     Genre           = "Unknown",
                     Price           = "N/A",
@@ -275,7 +276,12 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             if (!ct.IsCancellationRequested)
+            {
                 StatusMessage = $"Failed to load {platform} games: {ex.Message}";
+                // Restore an empty (but consistent) view so the UI doesn't stay blank
+                _allStore = new List<StoreGame>();
+                RebuildCollections();
+            }
         }
         finally
         {

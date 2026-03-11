@@ -298,10 +298,12 @@ public sealed class GameScannerService : IDisposable
         ".zip", ".7z", ".rar",
         // Sony / Microsoft
         ".iso", ".bin", ".cue", ".xex", ".xiso",
-        // Nintendo
-        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".3ds",
+        // Nintendo Switch
+        ".nsp", ".xci", ".nsz", ".xcz",
+        // Nintendo (other)
+        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro",
         // Other
-        ".elf", ".img", ".chd", ".pbp",
+        ".elf", ".img", ".chd", ".pbp", ".pkg",
     };
 
     private static bool IsRomFile(string ext) => _romExtensions.Contains(ext);
@@ -514,27 +516,42 @@ public sealed class GameScannerService : IDisposable
 
     // ── ROM region tag parsing ─────────────────────────────────────────────
 
-    // Matches common ROM region/language tags in parentheses, e.g. "(Europe)", "(Jap)".
-    // Listed most-specific first to avoid the two-letter catch-all matching region names
-    // that should be expanded (e.g. "De" for Germany).  The generic two-letter code
-    // alternation is placed last so named regions are matched by their full form first.
+    // Token alternation used inside the region regex — listed most-specific first.
+    private const string _regionToken =
+        @"Europe|USA|Japan|Jap|World|Korea|Australia|France|Germany|Spain|Italy|China|Brazil|" +
+        @"Rev\s*[\w.]+|v\d[\d.]*|Beta|Proto|Demo|Sample|Unl|Asia|" +
+        @"En|Ja|Jp|De|Fr|Es|It|Nl|Pt|Sv|No|Da|Fi|Ko|Zh|Ru|Pl|Ar|Tr|Cs|Hu|He|Ro|Sk|Uk";
+
+    // Matches parenthetical ROM tags that contain one or more region/language codes.
+    // Handles both single tags  "(USA)"  and comma-separated lists  "(En,Ja,Fr,De,Es,It)".
+    // The outer group captures the full comma-separated content for later splitting.
     private static readonly Regex _romRegionRegex = new(
-        @"\s*\((Europe|USA|Japan|Jap|World|Korea|Australia|France|Germany|Spain|Italy|China|Brazil|" +
-        @"Rev\s*[\w.]+|v\d[\d.]*|Beta|Proto|Demo|Sample|Unl|" +
-        @"En|Jp|De|Fr|Es|It|Nl|Pt|Sv|No|Da|Fi|Ko|Zh|Ru|Pl)" +
-        @"\)",
+        @"\s*\((" +
+        @"(?:" + _regionToken + @")" +
+        @"(?:[,\s]+(?:" + _regionToken + @"))*" +
+        @")\)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Strips common ROM region/language tags from a raw ROM title and returns
     /// the clean title plus the list of extracted region strings.
+    /// Handles both single tags "(USA)" and comma-separated lists "(En,Ja,Fr,De,Es,It)".
     /// </summary>
     internal static (string CleanTitle, List<string> Regions) ParseRomTitle(string rawTitle)
     {
         var regions = new List<string>();
         var matches = _romRegionRegex.Matches(rawTitle);
         foreach (Match m in matches)
-            regions.Add(m.Groups[1].Value);
+        {
+            // Group 1 may contain comma-separated or space-separated codes
+            foreach (var code in m.Groups[1].Value.Split(
+                new[] { ',', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = code.Trim();
+                if (!string.IsNullOrEmpty(trimmed))
+                    regions.Add(trimmed);
+            }
+        }
         string clean = _romRegionRegex.Replace(rawTitle, "").Trim();
         return (clean, regions);
     }
@@ -547,16 +564,24 @@ public sealed class GameScannerService : IDisposable
     // This is applied AFTER hyphens and underscores have already been replaced with spaces,
     // so "A-Way-Out-SteamRIP" becomes "A Way Out SteamRIP" before this runs.
     // Note: DARKSIDERS listed once; case-insensitive matching handles all case variants.
+    // SteamRIP.com / Steam RIP.com variants are listed before the plain SteamRIP entry.
     private static readonly Regex _archiveSuffixRegex = new(
-        @"\s+(SteamRIP|Steam\.RIP|GOG|TENOKE|EMPRESS|CODEX|PLAZA|FLT|SKIDROW|" +
+        @"\s+(SteamRIP\.com|Steam\.RIP\.com|Steam\s+RIP|SteamRIP|Steam\.RIP|GOG|TENOKE|EMPRESS|CODEX|PLAZA|FLT|SKIDROW|" +
         @"RELOADED|PROPHET|RAZOR1911|RAZOR|CPY|HOODLUM|DARKSIDERS|TiNYiSO|P2P|" +
         @"DODI|FitGirl|ElAmigos|KaOs|Goldberg|RIP|RePack)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // Matches trailing ".com", ".net", ".org", ".io" domain suffixes left after separator replacement
+    // (e.g. "SteamRIP.com" → the domain part was not handled by the suffix regex above).
+    private static readonly Regex _domainSuffixRegex = new(
+        @"\.(com|net|org|io)\s*$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     /// <summary>
     /// Normalises an archive filename stem into a human-readable game title.
     /// <list type="bullet">
     ///   <item>Replaces hyphens and underscores with spaces ("A-Way-Out" → "A Way Out").</item>
+    ///   <item>Strips trailing domain suffixes (.com/.net/.org/.io) left by site-tagged filenames.</item>
     ///   <item>Strips common scene/RIP group suffixes ("A Way Out SteamRIP" → "A Way Out").</item>
     ///   <item>Collapses repeated spaces.</item>
     /// </list>
@@ -566,6 +591,8 @@ public sealed class GameScannerService : IDisposable
         if (string.IsNullOrEmpty(stem)) return stem;
         // Replace separators with spaces
         string result = stem.Replace('-', ' ').Replace('_', ' ');
+        // Strip trailing .com / .net / .org domain suffixes before the scene-group regex runs
+        result = _domainSuffixRegex.Replace(result, "").TrimEnd();
         // Strip trailing scene/RIP markers
         result = _archiveSuffixRegex.Replace(result, "").TrimEnd();
         // Collapse multiple spaces

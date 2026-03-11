@@ -64,7 +64,11 @@ namespace GameLauncher.Models
         [JsonPropertyName("description")]   public string  Description   { get; set; } = "";
         [JsonPropertyName("unlockedAt")]    public string  UnlockedAt    { get; set; } = "";
         /// <summary>Achievement icon image URL from the real Games.Database.</summary>
-        [JsonIgnore] public string? IconUrl { get; set; }
+        [JsonIgnore] public string? IconUrl      { get; set; }
+        /// <summary>True when the achievement has been unlocked (UnlockedAt is non-empty).</summary>
+        [JsonIgnore] public bool    IsUnlocked   => !string.IsNullOrEmpty(UnlockedAt);
+        /// <summary>Opacity used in the UI: 1.0 for unlocked, 0.35 for locked (darkened).</summary>
+        [JsonIgnore] public double  LockedOpacity => IsUnlocked ? 1.0 : 0.35;
     }
 
     public class FriendRequest

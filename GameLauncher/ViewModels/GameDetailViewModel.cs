@@ -581,6 +581,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
     public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null)
     {
+        ShowSettings    = false;
+        ShowDrivePicker = false;
         Title         = game.Title;
         Platform      = game.Platform;
         Genre         = game.Genre    ?? "";
@@ -617,6 +619,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
     public void LoadFromStoreGame(StoreGame game, LocalGame? localGame = null, LocalRepack? repack = null)
     {
+        ShowSettings    = false;
+        ShowDrivePicker = false;
         Title         = game.Title;
         Platform      = game.Platform;
         Genre         = game.Genre;
@@ -652,6 +656,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromLocalGame(LocalGame game)
     {
+        ShowSettings    = false;
+        ShowDrivePicker = false;
         Title             = game.Title;
         Platform          = "PC";
         Genre             = "";
@@ -708,6 +714,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     public void LoadFromLocalRepack(LocalRepack repack)
     {
+        ShowSettings    = false;
+        ShowDrivePicker = false;
         Title             = repack.Title;
         Platform          = "PC";
         Genre             = "";
@@ -754,6 +762,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     public void LoadFromLocalRom(LocalRom rom)
     {
+        ShowSettings    = false;
+        ShowDrivePicker = false;
         Title             = rom.Title;
         Platform          = rom.Platform;
         Genre             = "";
