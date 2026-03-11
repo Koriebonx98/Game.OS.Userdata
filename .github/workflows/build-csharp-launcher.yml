@@ -374,7 +374,7 @@ jobs:
 
       - name: Upload GUI screenshots artifact
         if: env.BACKEND_STARTED == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: csharp-launcher-screenshots
           path: /tmp/launcher-screenshots/
@@ -446,14 +446,14 @@ jobs:
 
       - name: Upload test results artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: csharp-launcher-login-test-results
           path: /tmp/launcher-test-results/
           retention-days: 30
 
       - name: Upload Windows exe artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: GameOS-Launcher-win-x64
           path: /tmp/GameOS-Launcher-win-x64/

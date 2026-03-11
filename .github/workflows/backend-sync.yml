@@ -119,7 +119,7 @@ jobs:
           cp "$ARTIFACT" /tmp/backend-snapshot
 
       - name: Upload config snapshot artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: backend-config-snapshot
           path: /tmp/backend-snapshot
