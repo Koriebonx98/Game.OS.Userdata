@@ -678,7 +678,8 @@
                                 <DataTemplate x:DataType="models:Achievement">
                                     <Border Background="#161b22" CornerRadius="8"
                                             Padding="12,10" Margin="0,0,8,8"
-                                            Width="260">
+                                            Width="260"
+                                            Opacity="{Binding LockedOpacity}">
                                         <StackPanel Orientation="Horizontal" Spacing="10">
                                             <!-- Achievement icon -->
                                             <Border Width="40" Height="40" CornerRadius="6"
