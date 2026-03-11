@@ -134,48 +134,55 @@ jobs:
           ./GameLauncher > /tmp/launcher.log 2>&1 &
           APP=$!
           echo "PID: $APP"
-          sleep 16
+          sleep 20
 
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
           ss() { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
 
-          # Focus the launcher window before sending any input
-          WID=$(DISPLAY=:99 xdotool search --onlyvisible --name '' 2>/dev/null | head -1)
-          if [ -n "$WID" ]; then
-            DISPLAY=:99 xdotool windowfocus --sync "$WID"
-            sleep 0.5
-          fi
+          # ── Layout constants (verified against live 1280×800 Xvfb render) ──────
+          # Login form (no sidebar — full window):
+          #   Username input centre:  x=640  y=420
+          #   Password  input centre: x=640  y=492
+          #   Sign In button centre:  x=640  y=595
+          # Sidebar nav (220 px wide, logo height 80 px):
+          #   Home:        x=110  y=147
+          #   My Library:  x=110  y=200
+          #   Games Store: x=110  y=253
+          #   Friends:     x=110  y=306
+          #   Profile:     x=110  y=359
 
           # 01 Login screen
           ss /tmp/ss/01-login-screen.png
 
-          # Click the username field (centre-left of window ≈ x=540, y=340 in a 1280×800 window)
-          DISPLAY=:99 xdotool mousemove 540 340 click 1
-          sleep 0.3
-          DISPLAY=:99 xdotool type --clearmodifiers --delay 60 "Koriebonx98"
+          # Click the username field (centre of input box — verified)
+          DISPLAY=:99 xdotool mousemove 640 420 click 1
+          sleep 0.5
+          DISPLAY=:99 xdotool type --clearmodifiers --delay 80 "Koriebonx98"
+          sleep 0.5
+          # Click password field directly instead of using Tab
+          DISPLAY=:99 xdotool mousemove 640 492 click 1
           sleep 0.4
-          DISPLAY=:99 xdotool key Tab
-          sleep 0.3
-          DISPLAY=:99 xdotool type --clearmodifiers --delay 60 "${GAMEOS_TEST_PASSWORD}"
-          sleep 0.3
+          DISPLAY=:99 xdotool type --clearmodifiers --delay 80 "${GAMEOS_TEST_PASSWORD}"
+          sleep 0.4
 
-          # 02 Credentials entered
+          # 02 Credentials entered (Koriebonx98 / real password)
           ss /tmp/ss/02-login-credentials.png
 
-          DISPLAY=:99 xdotool key Tab Tab Return
-          echo "Waiting for auth + data load (22s)…"
-          sleep 22
+          # Click Sign In button (centre verified via pixel scan)
+          DISPLAY=:99 xdotool mousemove 640 595 click 1
+          echo "Waiting for auth + data load (35s)…"
+          sleep 35
 
-          kill -0 $APP 2>/dev/null || echo "::warning::Launcher may have exited"
+          kill -0 $APP 2>/dev/null || { echo "::warning::Launcher exited after login"; cat /tmp/launcher.log | tail -20; }
 
           # 03 Dashboard
           ss /tmp/ss/03-dashboard.png
           sleep 2
 
-          # 04 My Games (Library) — nav button at x≈110, y≈168
-          DISPLAY=:99 xdotool mousemove 110 168 click 1
-          sleep 8
+          # 04 My Games (Library) — nav button verified at x=110, y=200
+          DISPLAY=:99 xdotool mousemove 110 200 click 1
+          sleep 10
           ss /tmp/ss/04-my-games.png
 
           # 05 Ready to Install (Repacks section) — scroll down to show it
@@ -184,54 +191,53 @@ jobs:
           ss /tmp/ss/05-repacks-ready-to-install.png
 
           # 06 Repack Detail — click the first repack card
-          # Repacks appear below the local games section; click a card ≈x=300, y=540
-          DISPLAY=:99 xdotool mousemove 300 540 click 1
-          sleep 5
+          DISPLAY=:99 xdotool mousemove 300 480 click 1
+          sleep 6
           ss /tmp/ss/06-repack-detail.png
 
           # Close detail
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 07 ROM Detection — scroll to bottom of library
-          DISPLAY=:99 xdotool mousemove 110 168 click 1
-          sleep 2
+          # 07 ROM Detection — go back to library and scroll to bottom
+          DISPLAY=:99 xdotool mousemove 110 200 click 1
+          sleep 3
           DISPLAY=:99 xdotool key End
           sleep 1
           ss /tmp/ss/07-roms-detected.png
 
           # 08 ROM Detail — click a ROM card
-          DISPLAY=:99 xdotool mousemove 300 600 click 1
-          sleep 4
+          DISPLAY=:99 xdotool mousemove 300 560 click 1
+          sleep 5
           ss /tmp/ss/08-rom-detail.png
 
           # Close detail
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 09 Games Store — nav at x≈110, y≈214
-          DISPLAY=:99 xdotool mousemove 110 214 click 1
-          sleep 8
+          # 09 Games Store — nav verified at x=110, y=253
+          DISPLAY=:99 xdotool mousemove 110 253 click 1
+          sleep 10
           ss /tmp/ss/09-games-store.png
 
-          # 10 App Store tab inside the store page ≈x=420, y=155
+          # 10 App Store tab (inside store page) ≈x=420, y=155
           DISPLAY=:99 xdotool mousemove 420 155 click 1
           sleep 5
           ss /tmp/ss/10-app-store.png
 
-          # 11 Friends — nav at x≈110, y≈260
-          DISPLAY=:99 xdotool mousemove 110 260 click 1
-          sleep 6
+          # 11 Friends — nav verified at x=110, y=306
+          DISPLAY=:99 xdotool mousemove 110 306 click 1
+          sleep 8
           ss /tmp/ss/11-friends.png
 
-          # 12 Friends conversation (click Message button on first friend ≈x=640, y=280)
-          DISPLAY=:99 xdotool mousemove 640 280 click 1
-          sleep 4
+          # 12 Friends — click first friend's Message button (≈x=640, y=290)
+          DISPLAY=:99 xdotool mousemove 640 290 click 1
+          sleep 5
           ss /tmp/ss/12-friends-conversation.png
 
-          # 13 Profile — nav at x≈110, y≈306
-          DISPLAY=:99 xdotool mousemove 110 306 click 1
-          sleep 4
+          # 13 Profile — nav verified at x=110, y=359
+          DISPLAY=:99 xdotool mousemove 110 359 click 1
+          sleep 5
           ss /tmp/ss/13-profile.png
 
           echo "=== Linux screenshots ==="
@@ -351,58 +357,68 @@ jobs:
           PASS="${GAMEOS_TEST_PASSWORD}"
           # Key codes: 48=Tab 36=Return 53=Escape 121=PageDown 119=End
 
+          # 01 Login screen
           ss /tmp/ss/01-login-screen.png
-          send_text "Koriebonx98"; sleep 0.4
-          tap 48; sleep 0.3
+          # Username field gets focus automatically as first focusable element
+          send_text "Koriebonx98"; sleep 0.5
+          tap 48; sleep 0.4   # Tab → password field
           osascript -e "tell application \"System Events\" to keystroke \"${PASS}\"" 2>/dev/null || true
-          sleep 0.3
-          ss /tmp/ss/02-login-credentials.png
-          tap 48; sleep 0.2; tap 48; sleep 0.2; tap 36
-          echo "Waiting for auth + data load (24s)…"; sleep 24
-          kill -0 $APP 2>/dev/null || echo "::warning::Launcher may have exited"
+          sleep 0.4
 
+          # 02 Credentials entered
+          ss /tmp/ss/02-login-credentials.png
+
+          # Tab → Remember Me checkbox, Tab → Sign In button, Return → click
+          tap 48; sleep 0.2; tap 48; sleep 0.2; tap 36
+          echo "Waiting for auth + data load (35s)…"; sleep 35
+          kill -0 $APP 2>/dev/null || { echo "::warning::Launcher exited after login"; cat /tmp/launcher.log | tail -20; }
+
+          # 03 Dashboard
           ss /tmp/ss/03-dashboard.png
           sleep 2
-          tap 53; sleep 0.3
 
-          # My Games — Tab to Library nav
-          for i in $(seq 1 6); do tap 48; sleep 0.15; done; tap 36; sleep 8
+          # 04 My Library — navigate via keyboard (Tab through sidebar items)
+          # Sidebar: Home(1) Library(2) Store(3) Friends(4) Profile(5)
+          # From dashboard content, shift-tab back to sidebar then tab forward
+          tap 53; sleep 0.3  # Escape to clear any focus
+          for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 10
           ss /tmp/ss/04-my-games.png
 
-          # Repacks (Ready to Install) — Page Down to reveal section
+          # 05 Repacks (Ready to Install) — Page Down
           tap 121; sleep 1
           ss /tmp/ss/05-repacks-ready-to-install.png
-          # Click first repack card (Tab to it, Return to open)
-          tap 48; sleep 0.3; tap 36; sleep 5
+          # Tab to first repack card and open
+          tap 48; sleep 0.4; tap 36; sleep 6
           ss /tmp/ss/06-repack-detail.png
-          tap 53; sleep 0.3  # close detail
+          tap 53; sleep 0.4  # close detail
 
-          # ROMs — navigate back to library and scroll to end
+          # 07 ROMs — back to library, scroll to end
           tap 53; sleep 0.3
-          for i in $(seq 1 6); do tap 48; sleep 0.15; done; tap 36; sleep 3
+          for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 4
           tap 119; sleep 1  # End key
           ss /tmp/ss/07-roms-detected.png
+          tap 48; sleep 0.4; tap 36; sleep 5
+          ss /tmp/ss/08-rom-detail.png
+          tap 53; sleep 0.4
 
-          # Games Store
+          # 09 Games Store
           tap 53; sleep 0.3
-          for i in $(seq 1 7); do tap 48; sleep 0.15; done; tap 36; sleep 8
-          ss /tmp/ss/08-games-store.png
+          for i in $(seq 1 3); do tap 48; sleep 0.2; done; tap 36; sleep 10
+          ss /tmp/ss/09-games-store.png
+          tap 48; sleep 0.4; tap 36; sleep 5
+          ss /tmp/ss/10-app-store.png
 
-          # App Store tab
-          tap 48; sleep 0.3; tap 36; sleep 5
-          ss /tmp/ss/09-app-store.png
-
-          # Friends
+          # 11 Friends
           tap 53; sleep 0.3
-          for i in $(seq 1 3); do tap 48; sleep 0.15; done; tap 36; sleep 6
-          ss /tmp/ss/10-friends.png
-          tap 48; sleep 0.3; tap 36; sleep 4
-          ss /tmp/ss/11-friends-conversation.png
+          for i in $(seq 1 4); do tap 48; sleep 0.2; done; tap 36; sleep 8
+          ss /tmp/ss/11-friends.png
+          tap 48; sleep 0.4; tap 36; sleep 5
+          ss /tmp/ss/12-friends-conversation.png
 
-          # Profile
+          # 13 Profile
           tap 53; sleep 0.3
-          for i in $(seq 1 4); do tap 48; sleep 0.15; done; tap 36; sleep 4
-          ss /tmp/ss/12-profile.png
+          for i in $(seq 1 5); do tap 48; sleep 0.2; done; tap 36; sleep 5
+          ss /tmp/ss/13-profile.png
 
           echo "=== macOS screenshots ===" && ls -lh /tmp/ss/
 
@@ -526,79 +542,83 @@ jobs:
               -RedirectStandardOutput 'C:\tmp\stdout.log' `
               -RedirectStandardError  'C:\tmp\stderr.log'
           Write-Host "PID: $($proc.Id)"
-          Start-Sleep -Seconds 18
+          Start-Sleep -Seconds 20
           if ($proc.HasExited) { Write-Host "::error::Launcher crashed"; Get-Content 'C:\tmp\stderr.log' -EA SilentlyContinue; exit 1 }
 
           try { $sh = New-Object -ComObject WScript.Shell; $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
-          Start-Sleep -Milliseconds 500
+          Start-Sleep -Milliseconds 600
 
+          # 01 Login screen
           ss "$ssDir\01-login-screen.png"
-          # Click near centre of screen to ensure focus, then type credentials
-          $f = New-Object System.Windows.Forms.Form -Property @{ Width=1; Height=1; WindowState='Minimized'; ShowInTaskbar=$false }
-          $f.Show(); $f.Activate(); $f.Close()
-          try { $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
-          Start-Sleep -Milliseconds 400
-          keys "Koriebonx98"
-          Start-Sleep -Milliseconds 400
-          keys "{TAB}"
-          Start-Sleep -Milliseconds 300
+          # Username field gets focus automatically — just type
           $pw = $env:GAMEOS_TEST_PASSWORD
+          keys "Koriebonx98"
+          Start-Sleep -Milliseconds 500
+          # Tab → password field
+          keys "{TAB}"
+          Start-Sleep -Milliseconds 400
           if ($pw) { keys $pw }
-          Start-Sleep -Milliseconds 300
+          Start-Sleep -Milliseconds 400
+
+          # 02 Credentials entered
           ss "$ssDir\02-login-credentials.png"
 
+          # Tab → Remember Me, Tab → Sign In button, Return → submit
           keys "{TAB}{TAB}{RETURN}"
-          Write-Host "Waiting for auth + data load (22s)…"
-          Start-Sleep -Seconds 22
-          if ($proc.HasExited) { Write-Host "::warning::Launcher may have exited" }
-          try { $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
-          Start-Sleep -Milliseconds 400
+          Write-Host "Waiting for auth + data load (35s)…"
+          Start-Sleep -Seconds 35
+          if ($proc.HasExited) { Write-Host "::warning::Launcher exited after login" }
+          else {
+              try { $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
+              Start-Sleep -Milliseconds 500
+          }
 
+          # 03 Dashboard
           ss "$ssDir\03-dashboard.png"
           Start-Sleep -Seconds 2
-          keys "{ESC}"; Start-Sleep -Milliseconds 300
 
-          # My Games
-          1..6 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
-          keys "{RETURN}"; Start-Sleep -Seconds 8
+          # 04 My Library — sidebar nav item 2
+          1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
+          keys "{RETURN}"; Start-Sleep -Seconds 10
           ss "$ssDir\04-my-games.png"
 
-          # Repacks (Ready to Install) — Page Down to show section
+          # 05 Repacks (Ready to Install) — Page Down to show section
           keys "{NEXT}"; Start-Sleep -Seconds 1
           ss "$ssDir\05-repacks-ready-to-install.png"
           # Tab to first repack card and open its detail
-          keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 5
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 6
           ss "$ssDir\06-repack-detail.png"
-          keys "{ESC}"; Start-Sleep -Milliseconds 300
+          keys "{ESC}"; Start-Sleep -Milliseconds 400
 
-          # ROMs — go back to library, scroll to end
-          1..6 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
-          keys "{RETURN}"; Start-Sleep -Seconds 3
+          # 07 ROMs — go back to library, scroll to end
+          1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
+          keys "{RETURN}"; Start-Sleep -Seconds 4
           keys "{END}"; Start-Sleep -Seconds 1
           ss "$ssDir\07-roms-detected.png"
+          # 08 ROM detail — Tab to first ROM card and open
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          ss "$ssDir\08-rom-detail.png"
+          keys "{ESC}"; Start-Sleep -Milliseconds 400
 
-          # Games Store
-          keys "{ESC}"; Start-Sleep -Milliseconds 300
-          1..7 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
+          # 09 Games Store — sidebar nav item 3
+          1..3 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
+          keys "{RETURN}"; Start-Sleep -Seconds 10
+          ss "$ssDir\09-games-store.png"
+          # 10 App Store tab
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          ss "$ssDir\10-app-store.png"
+
+          # 11 Friends — sidebar nav item 4
+          1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{RETURN}"; Start-Sleep -Seconds 8
-          ss "$ssDir\08-games-store.png"
-          # App Store tab
-          keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 5
-          ss "$ssDir\09-app-store.png"
+          ss "$ssDir\11-friends.png"
+          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{RETURN}"; Start-Sleep -Seconds 5
+          ss "$ssDir\12-friends-conversation.png"
 
-          # Friends
-          keys "{ESC}"; Start-Sleep -Milliseconds 300
-          1..3 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
-          keys "{RETURN}"; Start-Sleep -Seconds 6
-          ss "$ssDir\10-friends.png"
-          keys "{TAB}"; Start-Sleep -Milliseconds 300; keys "{RETURN}"; Start-Sleep -Seconds 4
-          ss "$ssDir\11-friends-conversation.png"
-
-          # Profile
-          keys "{ESC}"; Start-Sleep -Milliseconds 300
-          1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 150 }
-          keys "{RETURN}"; Start-Sleep -Seconds 4
-          ss "$ssDir\12-profile.png"
+          # 13 Profile — sidebar nav item 5
+          1..5 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
+          keys "{RETURN}"; Start-Sleep -Seconds 5
+          ss "$ssDir\13-profile.png"
 
           Write-Host "=== Windows screenshots ===" && Get-ChildItem $ssDir | Select-Object Name, Length
 
@@ -636,6 +656,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.ref }}
 
       - name: Download Linux screenshots
         uses: actions/download-artifact@v4
