@@ -120,125 +120,159 @@ jobs:
           sleep 2
           DISPLAY=:99 xdpyinfo | grep "name of display"
 
+      - name: Pre-seed auto-login session (GitHub-direct mode)
+        run: |
+          # In GitHub-direct mode the "token" is just the username — no password
+          # required.  TryAutoLoginAsync() will call GetProfileAsync(username) which
+          # reads accounts/koriebonx98/profile.json from the data repo using the
+          # DATA_REPO_TOKEN already injected into gameos-token.dat.
+          # This bypasses the login UI entirely so screenshots show the logged-in state.
+          SESSION_DIR="${HOME}/.config/GameOS"
+          mkdir -p "${SESSION_DIR}"
+          cat > "${SESSION_DIR}/sessions.json" << 'SESSIONEOF'
+          [
+            {
+              "username": "Koriebonx98",
+              "email": "",
+              "token": "Koriebonx98",
+              "avatarColor": "#1e90ff",
+              "savedAt": "2026-01-01T00:00:00.0000000Z",
+              "rememberMe": true
+            }
+          ]
+          SESSIONEOF
+          echo "sessions.json written to ${SESSION_DIR}"
+          cat "${SESSION_DIR}/sessions.json"
+
       - name: Launch and screenshot all pages
         env:
           DISPLAY: ':99'
           GAMEOS_DISABLE_GPU: '1'
           LIBGL_ALWAYS_SOFTWARE: '1'
           GALLIUM_DRIVER: softpipe
-          GAMEOS_TEST_PASSWORD: ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           mkdir -p /tmp/ss
 
-          cd /tmp/gameos-linux
-          ./GameLauncher > /tmp/launcher.log 2>&1 &
-          APP=$!
-          echo "PID: $APP"
-          sleep 20
-
-          kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
-
-          ss() { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
-
-          # ── Layout constants (verified against live 1280×800 Xvfb render) ──────
-          # Login form (no sidebar — full window):
-          #   Username input centre:  x=640  y=420
-          #   Password  input centre: x=640  y=492
-          #   Sign In button centre:  x=640  y=595
-          # Sidebar nav (220 px wide, logo height 80 px):
+          # ── Layout constants (1280×800 Xvfb, measured from live screenshots) ──
+          # Sidebar nav (220 px wide):
           #   Home:        x=110  y=147
           #   My Library:  x=110  y=200
           #   Games Store: x=110  y=253
           #   Friends:     x=110  y=306
           #   Profile:     x=110  y=359
+          #
+          # Library content (x starts at 252 = sidebar 220 + StackPanel margin 32):
+          #   Game-card col-1 centre: x=337 (card width 170, margin 12)
+          #   Repack-card col-1 centre: x=352 (card width 200, margin 10)
+          #   ROM-card col-1 centre:   x=337 (card width 170, margin 10)
+          #
+          # Scroll note: xdotool key Next/End do NOT scroll in Avalonia because the
+          # outer ScrollViewer has no keyboard focus after clicking a sidebar button.
+          # Fix: hover mouse over content area then use button-5 (wheel-down) events
+          # which work regardless of focus.
+          #   • 3 wheel clicks ≈ 144 px scroll → "Ready to Install" row visible
+          #   • 30 wheel clicks caps at max-scroll (~799 px) → ROMs section visible
+          #
+          # Repack card (Height=90 image + ~71 info = 161 px total):
+          #   After 3×48 px = 144 px scroll: card-top ≈ y=586, card-centre ≈ y=666
+          # ROM card (Height=100 image + ~88 info = 188 px total):
+          #   After max scroll (799 px): ROM row-1 top ≈ y=178, image-centre ≈ y=228
+          #
+          # Friends Message button: far-right column of each friend-row, x≈1200
+          #   First friend-row centre: y≈190
 
-          # 01 Login screen
-          ss /tmp/ss/01-login-screen.png
+          cd /tmp/gameos-linux
+          ./GameLauncher > /tmp/launcher.log 2>&1 &
+          APP=$!
+          echo "PID: $APP"
 
-          # Click the username field (centre of input box — verified)
-          DISPLAY=:99 xdotool mousemove 640 420 click 1
-          sleep 0.5
-          DISPLAY=:99 xdotool type --clearmodifiers --delay 80 "Koriebonx98"
-          sleep 0.5
-          # Click password field directly instead of using Tab
-          DISPLAY=:99 xdotool mousemove 640 492 click 1
-          sleep 0.4
-          DISPLAY=:99 xdotool type --clearmodifiers --delay 80 "${GAMEOS_TEST_PASSWORD}"
-          sleep 0.4
+          # Auto-login resolves profile from GitHub; allow 30s for auth + data load
+          echo "Waiting for auto-login + data load (30s)…"
+          sleep 30
 
-          # 02 Credentials entered (Koriebonx98 / real password)
-          ss /tmp/ss/02-login-credentials.png
+          kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          # Click Sign In button (centre verified via pixel scan)
-          DISPLAY=:99 xdotool mousemove 640 595 click 1
-          echo "Waiting for auth + data load (35s)…"
-          sleep 35
+          ss()     { DISPLAY=:99 scrot "$1" && echo "  📸 $1"; sleep 1; }
+          # Scroll the main ScrollViewer using mouse-wheel events (button 5 = wheel-down).
+          # The mouse must be over the content area; no keyboard focus required.
+          wheel_down() {
+            local n=${1:-3}
+            DISPLAY=:99 xdotool mousemove 750 400
+            for i in $(seq 1 "$n"); do DISPLAY=:99 xdotool click 5; sleep 0.08; done
+          }
 
-          kill -0 $APP 2>/dev/null || { echo "::warning::Launcher exited after login"; cat /tmp/launcher.log | tail -20; }
-
-          # 03 Dashboard
-          ss /tmp/ss/03-dashboard.png
+          # 01 Dashboard — auto-login lands here (no login screen shown)
+          ss /tmp/ss/01-dashboard.png
           sleep 2
 
-          # 04 My Games (Library) — nav button verified at x=110, y=200
+          # 02 My Games (Library) — nav button at x=110, y=200
           DISPLAY=:99 xdotool mousemove 110 200 click 1
           sleep 10
-          ss /tmp/ss/04-my-games.png
+          ss /tmp/ss/02-my-games.png
 
-          # 05 Ready to Install (Repacks section) — scroll down to show it
-          DISPLAY=:99 xdotool key Next   # Page Down
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-down events ≈ 144 px → brings "Ready to Install" row into view
+          wheel_down 3
           sleep 1
-          ss /tmp/ss/05-repacks-ready-to-install.png
+          ss /tmp/ss/03-repacks-ready-to-install.png
 
-          # 06 Repack Detail — click the first repack card
-          DISPLAY=:99 xdotool mousemove 300 480 click 1
+          # 04 Repack Detail — click the first repack card
+          # col-1 x=352; after 144 px scroll, repack card-centre ≈ y=666
+          DISPLAY=:99 xdotool mousemove 352 666 click 1
           sleep 6
-          ss /tmp/ss/06-repack-detail.png
+          ss /tmp/ss/04-repack-detail.png
 
-          # Close detail
+          # Close detail (Back button shown; Escape also works in Avalonia overlay)
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 07 ROM Detection — go back to library and scroll to bottom
+          # 05 ROM Detection — back to library, then scroll to very bottom
+          # 30 wheel-down events caps at max-scroll (~799 px); ROMs section visible
           DISPLAY=:99 xdotool mousemove 110 200 click 1
           sleep 3
-          DISPLAY=:99 xdotool key End
+          wheel_down 30
           sleep 1
-          ss /tmp/ss/07-roms-detected.png
+          ss /tmp/ss/05-roms-detected.png
 
-          # 08 ROM Detail — click a ROM card
-          DISPLAY=:99 xdotool mousemove 300 560 click 1
+          # 06 ROM Detail — click the first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          DISPLAY=:99 xdotool mousemove 337 228 click 1
           sleep 5
-          ss /tmp/ss/08-rom-detail.png
+          ss /tmp/ss/06-rom-detail.png
 
           # Close detail
           DISPLAY=:99 xdotool key Escape
           sleep 1
 
-          # 09 Games Store — nav verified at x=110, y=253
+          # 07 Games Store — nav at x=110, y=253
           DISPLAY=:99 xdotool mousemove 110 253 click 1
           sleep 10
-          ss /tmp/ss/09-games-store.png
+          ss /tmp/ss/07-games-store.png
 
-          # 10 App Store tab (inside store page) ≈x=420, y=155
+          # 08 App Store tab (inside store page) ≈x=420, y=155
           DISPLAY=:99 xdotool mousemove 420 155 click 1
           sleep 5
-          ss /tmp/ss/10-app-store.png
+          ss /tmp/ss/08-app-store.png
 
-          # 11 Friends — nav verified at x=110, y=306
+          # 09 Friends — nav at x=110, y=306
+          # Increased wait: FriendsViewModel.LoadAsync() fetches friends list via
+          # GitHub API (multiple calls); 15 s gives the data time to arrive on Linux
           DISPLAY=:99 xdotool mousemove 110 306 click 1
-          sleep 8
-          ss /tmp/ss/11-friends.png
+          sleep 15
+          ss /tmp/ss/09-friends.png
 
-          # 12 Friends — click first friend's Message button (≈x=640, y=290)
-          DISPLAY=:99 xdotool mousemove 640 290 click 1
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # The button is in Grid.Column="3" (far-right) of the friend-row.
+          # Content-area starts at x=252; row is full-width; Message button ≈ x=1200.
+          # First friend-row centre ≈ y=190 (after Friends header + section header).
+          DISPLAY=:99 xdotool mousemove 1200 190 click 1
           sleep 5
-          ss /tmp/ss/12-friends-conversation.png
+          ss /tmp/ss/10-friends-conversation.png
 
-          # 13 Profile — nav verified at x=110, y=359
+          # 11 Profile — nav at x=110, y=359
           DISPLAY=:99 xdotool mousemove 110 359 click 1
           sleep 5
-          ss /tmp/ss/13-profile.png
+          ss /tmp/ss/11-profile.png
 
           echo "=== Linux screenshots ==="
           ls -lh /tmp/ss/
@@ -304,7 +338,8 @@ jobs:
         run: |
           # macOS root filesystem (/) is read-only (SIP).
           # Create a 100 MB HFS+ RAM disk so the scanner picks it up via /Volumes/*.
-          DISK=$(hdiutil attach -nomount ram://204800)
+          # Strip trailing whitespace from hdiutil output (it pads the device path).
+          DISK=$(hdiutil attach -nomount ram://204800 | xargs)
           diskutil eraseDisk HFS+ GameOS "${DISK}"
           DRIVE=/Volumes/GameOS
 
@@ -343,88 +378,135 @@ jobs:
           cp GameLauncher/gameos-backend.url /tmp/gameos-mac/ 2>/dev/null || true
           ls -lh /tmp/gameos-mac/GameLauncher
 
+      - name: Pre-seed auto-login session (GitHub-direct mode)
+        run: |
+          # macOS ApplicationData = ~/Library/Application Support
+          SESSION_DIR="${HOME}/Library/Application Support/GameOS"
+          mkdir -p "${SESSION_DIR}"
+          cat > "${SESSION_DIR}/sessions.json" << 'SESSIONEOF'
+          [
+            {
+              "username": "Koriebonx98",
+              "email": "",
+              "token": "Koriebonx98",
+              "avatarColor": "#1e90ff",
+              "savedAt": "2026-01-01T00:00:00.0000000Z",
+              "rememberMe": true
+            }
+          ]
+          SESSIONEOF
+          echo "sessions.json written to ${SESSION_DIR}"
+          cat "${SESSION_DIR}/sessions.json"
+
       - name: Launch and screenshot all pages
         env:
           GAMEOS_DISABLE_GPU:           '1'
           AVALONIA_USE_RASTER_RENDERER: '1'
-          GAMEOS_TEST_PASSWORD:         ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           mkdir -p /tmp/ss
           chmod +x /tmp/gameos-mac/GameLauncher
           /tmp/gameos-mac/GameLauncher > /tmp/launcher.log 2>&1 &
           APP=$!
           echo "PID: $APP"
-          sleep 18
+
+          # Auto-login resolves profile from GitHub; allow 30s for auth + data load
+          echo "Waiting for auto-login + data load (30s)…"
+          sleep 30
           kill -0 $APP 2>/dev/null || { echo "::error::Launcher crashed"; cat /tmp/launcher.log; exit 1; }
 
-          tap()       { osascript -e "tell application \"System Events\" to key code $1"      2>/dev/null || true; }
-          send_text() { osascript -e "tell application \"System Events\" to keystroke \"$1\"" 2>/dev/null || true; }
-          ss()        { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
-          PASS="${GAMEOS_TEST_PASSWORD}"
-          # Key codes: 48=Tab 36=Return 53=Escape 121=PageDown 119=End
+          tap()  { osascript -e "tell application \"System Events\" to key code $1" 2>/dev/null || true; }
+          ss()   { screencapture -x "$1" && echo "  📸 $1"; sleep 1; }
+          # Key codes: 48=Tab 36=Return 53=Escape
 
-          # 01 Login screen
-          ss /tmp/ss/01-login-screen.png
-          # Username field gets focus automatically as first focusable element
-          send_text "Koriebonx98"; sleep 0.5
-          tap 48; sleep 0.4   # Tab → password field
-          osascript -e "tell application \"System Events\" to keystroke \"${PASS}\"" 2>/dev/null || true
-          sleep 0.4
+          # Scroll the main ScrollViewer AND click at screen coordinates via Quartz.
+          # tap key-code 121 (PageDown) / 119 (End) do NOT scroll because the outer
+          # ScrollViewer has no keyboard focus after Tab-navigating the sidebar.
+          # "osascript click at {x,y}" is not a valid System Events command.
+          # CGEvent APIs work regardless of focus and use the same coordinate space
+          # as screencapture (screen coords, top-left origin, y increases downward).
+          mac_wheel_down() {
+            local n=${1:-3} px=${2:-48}
+            python3 - "$n" "$px" << 'PYEOF'
+          import sys, time, Quartz
+          n, px = int(sys.argv[1]), int(sys.argv[2])
+          for _ in range(n):
+              ev = Quartz.CGEventCreateScrollWheelEvent(
+                      None, Quartz.kCGScrollEventUnitPixel, 1, -px)
+              Quartz.CGEventPost(Quartz.kCGHIDEventTap, ev)
+              time.sleep(0.08)
+          PYEOF
+          }
+          mac_click() {
+            local x=$1 y=$2
+            python3 - "$x" "$y" << 'PYEOF'
+          import sys, time, Quartz
+          x, y = int(sys.argv[1]), int(sys.argv[2])
+          dn = Quartz.CGEventCreateMouseEvent(
+                  None, Quartz.kCGEventLeftMouseDown, (x, y), Quartz.kCGMouseButtonLeft)
+          up = Quartz.CGEventCreateMouseEvent(
+                  None, Quartz.kCGEventLeftMouseUp,   (x, y), Quartz.kCGMouseButtonLeft)
+          Quartz.CGEventPost(Quartz.kCGHIDEventTap, dn)
+          time.sleep(0.05)
+          Quartz.CGEventPost(Quartz.kCGHIDEventTap, up)
+          PYEOF
+          }
 
-          # 02 Credentials entered
-          ss /tmp/ss/02-login-credentials.png
-
-          # Tab → Remember Me checkbox, Tab → Sign In button, Return → click
-          tap 48; sleep 0.2; tap 48; sleep 0.2; tap 36
-          echo "Waiting for auth + data load (35s)…"; sleep 35
-          kill -0 $APP 2>/dev/null || { echo "::warning::Launcher exited after login"; cat /tmp/launcher.log | tail -20; }
-
-          # 03 Dashboard
-          ss /tmp/ss/03-dashboard.png
+          # 01 Dashboard — auto-login lands here (no login screen shown)
+          ss /tmp/ss/01-dashboard.png
           sleep 2
 
-          # 04 My Library — navigate via keyboard (Tab through sidebar items)
-          # Sidebar: Home(1) Library(2) Store(3) Friends(4) Profile(5)
-          # From dashboard content, shift-tab back to sidebar then tab forward
+          # 02 My Library — sidebar nav item 2
           tap 53; sleep 0.3  # Escape to clear any focus
           for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 10
-          ss /tmp/ss/04-my-games.png
+          ss /tmp/ss/02-my-games.png
 
-          # 05 Repacks (Ready to Install) — Page Down
-          tap 121; sleep 1
-          ss /tmp/ss/05-repacks-ready-to-install.png
-          # Tab to first repack card and open
-          tap 48; sleep 0.4; tap 36; sleep 6
-          ss /tmp/ss/06-repack-detail.png
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-down events × 48 px = 144 px → brings repack row into view
+          mac_wheel_down 3 48
+          sleep 1
+          ss /tmp/ss/03-repacks-ready-to-install.png
+
+          # 04 Repack Detail — click first repack card
+          # col-1 x=352; after 144 px scroll, repack card-centre ≈ y=666
+          mac_click 352 666; sleep 6
+          ss /tmp/ss/04-repack-detail.png
           tap 53; sleep 0.4  # close detail
 
-          # 07 ROMs — back to library, scroll to end
+          # 05 ROMs — back to library, scroll to very bottom (ROMs section)
+          # 30 wheel-down events caps at max-scroll (~799 px); ROMs visible from y≈130
           tap 53; sleep 0.3
           for i in $(seq 1 2); do tap 48; sleep 0.2; done; tap 36; sleep 4
-          tap 119; sleep 1  # End key
-          ss /tmp/ss/07-roms-detected.png
-          tap 48; sleep 0.4; tap 36; sleep 5
-          ss /tmp/ss/08-rom-detail.png
+          mac_wheel_down 30 48
+          sleep 1
+          ss /tmp/ss/05-roms-detected.png
+
+          # 06 ROM Detail — click first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          mac_click 337 228; sleep 5
+          ss /tmp/ss/06-rom-detail.png
           tap 53; sleep 0.4
 
-          # 09 Games Store
+          # 07 Games Store
           tap 53; sleep 0.3
           for i in $(seq 1 3); do tap 48; sleep 0.2; done; tap 36; sleep 10
-          ss /tmp/ss/09-games-store.png
+          ss /tmp/ss/07-games-store.png
           tap 48; sleep 0.4; tap 36; sleep 5
-          ss /tmp/ss/10-app-store.png
+          ss /tmp/ss/08-app-store.png
 
-          # 11 Friends
+          # 09 Friends — increased wait for GitHub API data load
           tap 53; sleep 0.3
-          for i in $(seq 1 4); do tap 48; sleep 0.2; done; tap 36; sleep 8
-          ss /tmp/ss/11-friends.png
-          tap 48; sleep 0.4; tap 36; sleep 5
-          ss /tmp/ss/12-friends-conversation.png
+          for i in $(seq 1 4); do tap 48; sleep 0.2; done; tap 36; sleep 15
+          ss /tmp/ss/09-friends.png
 
-          # 13 Profile
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # Button is in far-right column of each friend row (x≈1200, y≈190)
+          mac_click 1200 190; sleep 5
+          ss /tmp/ss/10-friends-conversation.png
+
+          # 11 Profile
           tap 53; sleep 0.3
           for i in $(seq 1 5); do tap 48; sleep 0.2; done; tap 36; sleep 5
-          ss /tmp/ss/13-profile.png
+          ss /tmp/ss/11-profile.png
 
           echo "=== macOS screenshots ===" && ls -lh /tmp/ss/
 
@@ -519,18 +601,45 @@ jobs:
           Copy-Item 'GameLauncher\gameos-backend.url' 'C:\gameos-win\' -ErrorAction SilentlyContinue
           Get-ChildItem 'C:\gameos-win\GameLauncher.exe'
 
+      - name: Pre-seed auto-login session (GitHub-direct mode)
+        shell: pwsh
+        run: |
+          # Windows ApplicationData = %APPDATA%
+          $sessionDir = Join-Path $env:APPDATA 'GameOS'
+          New-Item -ItemType Directory -Force $sessionDir | Out-Null
+          $session = @(
+            [ordered]@{
+              username    = 'Koriebonx98'
+              email       = ''
+              token       = 'Koriebonx98'
+              avatarColor = '#1e90ff'
+              savedAt     = '2026-01-01T00:00:00.0000000Z'
+              rememberMe  = $true
+            }
+          )
+          $json = ConvertTo-Json -InputObject $session -Depth 5
+          Set-Content (Join-Path $sessionDir 'sessions.json') $json
+          Write-Host "sessions.json written to $sessionDir"
+          Get-Content (Join-Path $sessionDir 'sessions.json')
+
       - name: Launch and screenshot all pages
         shell: pwsh
         env:
           GAMEOS_DISABLE_GPU:           '1'
           AVALONIA_USE_RASTER_RENDERER: '1'
-          GAMEOS_TEST_PASSWORD:         ${{ secrets.GAMEOS_TEST_PASSWORD }}
         run: |
           $ssDir = 'C:\tmp\ss'
           New-Item -ItemType Directory -Force $ssDir, 'C:\tmp' | Out-Null
 
           Add-Type -AssemblyName System.Windows.Forms
           Add-Type -AssemblyName System.Drawing
+
+          # P/Invoke helpers — placed in a single-line string to avoid YAML
+          # block-scalar indentation issues with PowerShell @'...'@ here-strings.
+          # SendKeys {PGDN}/{END} do NOT scroll Avalonia's ScrollViewer because focus
+          # stays on the last-clicked sidebar button, not the viewer itself.
+          Add-Type -TypeDefinition 'using System.Runtime.InteropServices; public class GameOSMouse { [DllImport("user32.dll")] public static extern bool SetCursorPos(int x, int y); [DllImport("user32.dll")] public static extern void mouse_event(uint f, int dx, int dy, int d, int e); public const uint WHEEL=0x800,LDOWN=0x0002,LUP=0x0004; public static void ScrollDown(int n){SetCursorPos(750,400);for(int i=0;i<n;i++){mouse_event(WHEEL,0,0,-120,0);System.Threading.Thread.Sleep(80);}} public static void ClickAt(int x,int y){SetCursorPos(x,y);System.Threading.Thread.Sleep(100);mouse_event(LDOWN,0,0,0,0);mouse_event(LUP,0,0,0,0);}}'
+
           function ss([string]$path) {
               $s = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
               $b = New-Object System.Drawing.Bitmap($s.Width, $s.Height)
@@ -548,83 +657,71 @@ jobs:
               -RedirectStandardOutput 'C:\tmp\stdout.log' `
               -RedirectStandardError  'C:\tmp\stderr.log'
           Write-Host "PID: $($proc.Id)"
-          Start-Sleep -Seconds 20
+
+          # Auto-login resolves profile from GitHub; allow 30s for auth + data load
+          Write-Host "Waiting for auto-login + data load (30s)…"
+          Start-Sleep -Seconds 30
           if ($proc.HasExited) { Write-Host "::error::Launcher crashed"; Get-Content 'C:\tmp\stderr.log' -EA SilentlyContinue; exit 1 }
 
           try { $sh = New-Object -ComObject WScript.Shell; $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
           Start-Sleep -Milliseconds 600
 
-          # 01 Login screen
-          ss "$ssDir\01-login-screen.png"
-          # Username field gets focus automatically — just type
-          $pw = $env:GAMEOS_TEST_PASSWORD
-          keys "Koriebonx98"
-          Start-Sleep -Milliseconds 500
-          # Tab → password field
-          keys "{TAB}"
-          Start-Sleep -Milliseconds 400
-          if ($pw) { keys $pw }
-          Start-Sleep -Milliseconds 400
-
-          # 02 Credentials entered
-          ss "$ssDir\02-login-credentials.png"
-
-          # Tab → Remember Me, Tab → Sign In button, Return → submit
-          keys "{TAB}{TAB}{ENTER}"
-          Write-Host "Waiting for auth + data load (35s)…"
-          Start-Sleep -Seconds 35
-          if ($proc.HasExited) { Write-Host "::warning::Launcher exited after login" }
-          else {
-              try { $sh.AppActivate($proc.MainWindowTitle) | Out-Null } catch {}
-              Start-Sleep -Milliseconds 500
-          }
-
-          # 03 Dashboard
-          ss "$ssDir\03-dashboard.png"
+          # 01 Dashboard — auto-login lands here (no login screen shown)
+          ss "$ssDir\01-dashboard.png"
           Start-Sleep -Seconds 2
 
-          # 04 My Library — sidebar nav item 2
+          # 02 My Library — sidebar nav item 2
           1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{ENTER}"; Start-Sleep -Seconds 10
-          ss "$ssDir\04-my-games.png"
+          ss "$ssDir\02-my-games.png"
 
-          # 05 Repacks (Ready to Install) — Page Down to show section
-          keys "{NEXT}"; Start-Sleep -Seconds 1
-          ss "$ssDir\05-repacks-ready-to-install.png"
-          # Tab to first repack card and open its detail
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 6
-          ss "$ssDir\06-repack-detail.png"
+          # 03 Ready to Install (Repacks section)
+          # 3 wheel-detents × ~48 px = ~144 px → brings repack row into view
+          [GameOSMouse]::ScrollDown(3); Start-Sleep -Seconds 1
+          ss "$ssDir\03-repacks-ready-to-install.png"
+
+          # 04 Repack Detail — click first repack card
+          # col-1 x=352; after ~144 px scroll, repack card-centre ≈ y=666
+          [GameOSMouse]::ClickAt(352, 666); Start-Sleep -Seconds 6
+          ss "$ssDir\04-repack-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
-          # 07 ROMs — go back to library, scroll to end
+          # 05 ROMs — back to library, scroll to very bottom (ROMs section)
+          # 30 wheel-detents caps at max-scroll (~799 px); ROMs visible from y≈130
           1..2 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{ENTER}"; Start-Sleep -Seconds 4
-          keys "{END}"; Start-Sleep -Seconds 1
-          ss "$ssDir\07-roms-detected.png"
-          # 08 ROM detail — Tab to first ROM card and open
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
-          ss "$ssDir\08-rom-detail.png"
+          [GameOSMouse]::ScrollDown(30); Start-Sleep -Seconds 1
+          ss "$ssDir\05-roms-detected.png"
+
+          # 06 ROM detail — click first ROM card
+          # col-1 x=337; after max scroll, ROM row-1 image-centre ≈ y=228
+          [GameOSMouse]::ClickAt(337, 228); Start-Sleep -Seconds 5
+          ss "$ssDir\06-rom-detail.png"
           keys "{ESC}"; Start-Sleep -Milliseconds 400
 
-          # 09 Games Store — sidebar nav item 3
+          # 07 Games Store — sidebar nav item 3
           1..3 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{ENTER}"; Start-Sleep -Seconds 10
-          ss "$ssDir\09-games-store.png"
-          # 10 App Store tab
+          ss "$ssDir\07-games-store.png"
+          # 08 App Store tab
           keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
-          ss "$ssDir\10-app-store.png"
+          ss "$ssDir\08-app-store.png"
 
-          # 11 Friends — sidebar nav item 4
+          # 09 Friends — sidebar nav item 4
+          # Increased wait: LoadAsync() fetches friends via GitHub API (multiple calls)
           1..4 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
-          keys "{ENTER}"; Start-Sleep -Seconds 8
-          ss "$ssDir\11-friends.png"
-          keys "{TAB}"; Start-Sleep -Milliseconds 400; keys "{ENTER}"; Start-Sleep -Seconds 5
-          ss "$ssDir\12-friends-conversation.png"
+          keys "{ENTER}"; Start-Sleep -Seconds 15
+          ss "$ssDir\09-friends.png"
 
-          # 13 Profile — sidebar nav item 5
+          # 10 Friends conversation — click first friend's 💬 Message button
+          # Button is in far-right column of each friend row (x≈1200, y≈190)
+          [GameOSMouse]::ClickAt(1200, 190); Start-Sleep -Seconds 5
+          ss "$ssDir\10-friends-conversation.png"
+
+          # 11 Profile — sidebar nav item 5
           1..5 | ForEach-Object { keys "{TAB}"; Start-Sleep -Milliseconds 200 }
           keys "{ENTER}"; Start-Sleep -Seconds 5
-          ss "$ssDir\13-profile.png"
+          ss "$ssDir\11-profile.png"
 
           Write-Host "=== Windows screenshots ===" && Get-ChildItem $ssDir | Select-Object Name, Length
 
