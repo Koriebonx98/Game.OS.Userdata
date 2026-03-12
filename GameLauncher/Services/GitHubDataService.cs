@@ -923,6 +923,7 @@ namespace GameLauncher.Services
                     item.TryGetProperty("image",    out var img) && img.ValueKind == JsonValueKind.String ? img.GetString() :
                     item.TryGetProperty("cover_url",out var cov) && cov.ValueKind == JsonValueKind.String ? cov.GetString() :
                     null;
+                if (string.IsNullOrWhiteSpace(coverUrl)) coverUrl = null;
 
                 // Description — check both casings (mirrors game.Description || game.description in script.js)
                 string? description =
@@ -943,10 +944,14 @@ namespace GameLauncher.Services
                     }
                 }
 
-                // Achievements URL
+                // Achievements URL — check multiple field name variants used by different platform JSONs
+                // (Switch/PS3 may use "achievements_url" while PC/PS4 use "achievementsUrl")
                 string? achievementsUrl =
-                    item.TryGetProperty("achievementsUrl", out var au) && au.ValueKind == JsonValueKind.String
-                    ? au.GetString() : null;
+                    item.TryGetProperty("achievementsUrl",  out var au)  && au.ValueKind  == JsonValueKind.String ? au.GetString()  :
+                    item.TryGetProperty("achievements_url", out var au2) && au2.ValueKind == JsonValueKind.String ? au2.GetString() :
+                    item.TryGetProperty("AchievementsUrl",  out var au3) && au3.ValueKind == JsonValueKind.String ? au3.GetString() :
+                    null;
+                if (string.IsNullOrWhiteSpace(achievementsUrl)) achievementsUrl = null;
 
                 // Store page URL — explicit field or construct from appid
                 string? storePageUrl =
@@ -961,6 +966,11 @@ namespace GameLauncher.Services
                     ? aid.GetInt64() : null;
                 if (string.IsNullOrEmpty(storePageUrl) && appId.HasValue && appId.Value > 0)
                     storePageUrl = $"https://store.steampowered.com/app/{appId.Value}/";
+
+                // For PC Steam games that have an appId but no explicit cover URL, derive
+                // the portrait cover from the Steam CDN (library_600x900 format).
+                if (string.IsNullOrEmpty(coverUrl) && appId.HasValue && appId.Value > 0)
+                    coverUrl = $"https://cdn.cloudflare.steamstatic.com/steam/apps/{appId.Value}/library_600x900.jpg";
 
                 // Screenshots / background images
                 List<string>? screenshots = null;

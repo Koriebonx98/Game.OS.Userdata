@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +21,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly GameScannerService  _scanner;
     private readonly SessionCacheService _sessionCache;
     private readonly PlaytimeService     _playtimeSvc = new();
+
+    // ── Message polling ────────────────────────────────────────────────────
+    /// <summary>Fires every 60 seconds after login to check for new direct messages.</summary>
+    private Timer? _messagePoller;
+    /// <summary>Latest known message timestamp per friend (sender username → ISO timestamp).</summary>
+    private readonly Dictionary<string, string> _lastKnownMessageAt =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // ── Session data ───────────────────────────────────────────────────────
     private UserProfile     _profile      = new();
@@ -81,9 +89,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DetailVm.OnClose = () => ShowDetail = false;
 
         // Wire playtime tracking: when a game is launched from the detail view,
-        // pass the process to the PlaytimeService to record the session.
+        // pass the process to the PlaytimeService to record the session, then
+        // immediately refresh the dashboard so "Continue Playing" shows the game.
         DetailVm.OnRequestPlaytimeTracking = (proc, title, platform) =>
+        {
             _playtimeSvc.TrackProcess(proc, title, platform, _library);
+            // Refresh dashboard immediately so the game appears in "Continue Playing"
+            RefreshDashboardLocalGames();
+        };
+
+        // When a tracked game session ends, refresh the dashboard one more time
+        // so the stored playtime and status reflect the completed session.
+        PlaytimeService.SessionCompleted += (platform, title) =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshDashboardLocalGames());
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
 
@@ -264,6 +282,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Pre-fetch cover art for the unified My Games cards (scanner may already
         // have found games before login, so enrich what's there right away).
         _ = EnrichMyGamesListAsync();
+
+        // Start background message polling (checks for new DMs every 60 seconds)
+        StartMessagePolling();
 
         ShowLogin = false;
         ShowMain  = true;
@@ -626,7 +647,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 bool anyUpdated = false;
                 foreach (var game in platformGames)
                 {
-                    var dbGame = FindDatabaseGame(dbGames, game.Title);
+                    var dbGame = FindDatabaseGame(dbGames, game.Title, game.TitleId);
                     if (dbGame == null) continue;
 
                     // Only fill in fields that are still empty
@@ -786,6 +807,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SignOut()
     {
+        // Stop message polling before clearing credentials
+        _messagePoller?.Dispose();
+        _messagePoller = null;
+        _lastKnownMessageAt.Clear();
+
         // Clear the saved token so the next launch shows the login form
         // (equivalent to the web calling localStorage.removeItem('gameOSUser'))
         if (_client.LoggedInUser != null)
@@ -808,9 +834,104 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     public void Dispose()
     {
+        _messagePoller?.Dispose();
+        _messagePoller = null;
         _scanner.Dispose();
         (_client as IDisposable)?.Dispose();
         StoreVm.Dispose();
         _playtimeSvc.Dispose();
+    }
+
+    // ── Message polling & OS notifications ────────────────────────────────────
+
+    /// <summary>Maximum number of friends to poll per cycle to avoid excessive API calls.</summary>
+    private const int MaxFriendsToPoll = 20;
+
+    /// <summary>
+    /// Starts a background timer that polls for new direct messages every 60 seconds.
+    /// Fires an OS notification whenever a new message arrives from a friend.
+    /// </summary>
+    private void StartMessagePolling()
+    {
+        _messagePoller?.Dispose();
+        _lastKnownMessageAt.Clear();
+        _messagePoller = new Timer(_ =>
+        {
+            // Fire-and-forget with structured exception handling
+            Task.Run(async () =>
+            {
+                try   { await PollMessagesAsync().ConfigureAwait(false); }
+                catch { /* polling failure is non-fatal */ }
+            });
+        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+    }
+
+    /// <summary>
+    /// Fetches recent messages from online friends and fires a notification for any
+    /// messages that arrived since the last poll.  Suppresses notifications for the
+    /// conversation that is currently open in the Friends view.
+    /// </summary>
+    private async Task PollMessagesAsync()
+    {
+        if (!_client.IsAuthenticated) return;
+
+        try
+        {
+            // Collect online friend usernames to poll (limit to avoid excessive API calls)
+            var friends = FriendsVm.OnlineFriends
+                .Concat(FriendsVm.OfflineFriends)
+                .Select(f => f.Username)
+                .Take(MaxFriendsToPoll)
+                .ToList();
+
+            foreach (var friendUsername in friends)
+            {
+                try
+                {
+                    var messages = await _client.GetMessagesAsync(friendUsername);
+                    if (messages.Count == 0) continue;
+
+                    // The most recent message in the conversation
+                    var latest = messages
+                        .OrderByDescending(m => m.SentAt)
+                        .FirstOrDefault();
+
+                    if (latest == null) continue;
+
+                    // Only surface messages sent by the friend (not the logged-in user)
+                    if (!string.Equals(latest.From, friendUsername, StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    _lastKnownMessageAt.TryGetValue(friendUsername, out var lastSeen);
+
+                    bool isNew = string.IsNullOrEmpty(lastSeen) ||
+                                 string.Compare(latest.SentAt, lastSeen, StringComparison.Ordinal) > 0;
+
+                    if (isNew)
+                    {
+                        _lastKnownMessageAt[friendUsername] = latest.SentAt;
+
+                        // Skip notification if this conversation is currently open
+                        bool conversationOpen =
+                            string.Equals(FriendsVm.ConversationFriend, friendUsername,
+                                          StringComparison.OrdinalIgnoreCase) &&
+                            FriendsVm.ShowConversation;
+
+                        // Skip notification if this is the very first poll (seed phase)
+                        bool seedPhase = string.IsNullOrEmpty(lastSeen);
+
+                        if (!conversationOpen && !seedPhase)
+                        {
+                            string preview = latest.Text.Length > 80
+                                ? latest.Text[..80] + "…"
+                                : latest.Text;
+                            NotificationService.ShowMessageNotification(friendUsername, preview);
+                        }
+                    }
+                }
+                catch { /* best-effort per friend */ }
+            }
+        }
+        catch { /* best-effort — polling failure is non-fatal */ }
     }
 }

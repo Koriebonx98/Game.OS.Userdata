@@ -438,10 +438,16 @@ namespace GameLauncher.Models
     /// </summary>
     public class PlaySession
     {
-        [JsonPropertyName("platform")]       public string Platform     { get; set; } = "";
-        [JsonPropertyName("title")]          public string Title        { get; set; } = "";
-        [JsonPropertyName("startedAt")]      public string StartedAt    { get; set; } = "";
-        [JsonPropertyName("endedAt")]        public string EndedAt      { get; set; } = "";
-        [JsonPropertyName("minutes")]        public int    Minutes      { get; set; }
+        [JsonPropertyName("platform")]       public string Platform      { get; set; } = "";
+        [JsonPropertyName("title")]          public string Title         { get; set; } = "";
+        [JsonPropertyName("startedAt")]      public string StartedAt     { get; set; } = "";
+        [JsonPropertyName("endedAt")]        public string EndedAt       { get; set; } = "";
+        [JsonPropertyName("minutes")]        public int    Minutes       { get; set; }
+        /// <summary>
+        /// When <c>true</c>, this is a periodic checkpoint entry that may be superseded
+        /// by the final session record once the game closes cleanly.  Checkpoints are
+        /// excluded from playtime totals and not shown in history to avoid double-counting.
+        /// </summary>
+        [JsonPropertyName("isCheckpoint")]   public bool   IsCheckpoint  { get; set; }
     }
 }
