@@ -28,6 +28,10 @@ public partial class DashboardViewModel : ViewModelBase
     private Game?            _heroCloudGame;
     private LocalGameCardVm? _heroLocalCard;
 
+    // ── Constants ────────────────────────────────────────────────────────────
+    /// <summary>Maximum number of games shown in "Continue Playing" and hero last-played lookup.</summary>
+    private const int MaxRecentGames = 8;
+
     // Recently added / played (cloud + local combined)
     public ObservableCollection<Game> RecentGames { get; } = new();
     /// <summary>True when there are recently detected local ROMs or installed games to show.</summary>
@@ -87,7 +91,7 @@ public partial class DashboardViewModel : ViewModelBase
         var recentlyPlayed = library
             .Where(g => !string.IsNullOrEmpty(g.LastPlayedAt))
             .OrderByDescending(g => ParseDate(g.LastPlayedAt))
-            .Take(8)
+            .Take(MaxRecentGames)
             .ToList();
         foreach (var g in recentlyPlayed)
             RecentGames.Add(g);
@@ -111,7 +115,7 @@ public partial class DashboardViewModel : ViewModelBase
                 .OrderByDescending(c => PlaytimeService.IsBeingTracked(c.Platform, c.EffectiveTitle)
                                         ? DateTime.MaxValue
                                         : PlaytimeService.GetLastPlayedAt(c.Platform, c.EffectiveTitle))
-                .Take(8))
+                .Take(MaxRecentGames))
             {
                 if (PlaytimeService.IsBeingTracked(c.Platform, c.EffectiveTitle))
                     c.PlaytimeLabel = "▶ Playing now";
@@ -131,7 +135,7 @@ public partial class DashboardViewModel : ViewModelBase
             .Where(g => g.PlaytimeMinutes > 0 && !string.IsNullOrEmpty(g.LastPlayedAt))
             .Where(g => !addedKeys.Contains($"{g.Platform}||{g.Title}"))
             .OrderByDescending(g => ParseDate(g.LastPlayedAt))
-            .Take(Math.Max(0, 8 - RecentLocalGames.Count)))
+            .Take(Math.Max(0, MaxRecentGames - RecentLocalGames.Count)))
         {
             var card = new LocalGameCardVm
             {

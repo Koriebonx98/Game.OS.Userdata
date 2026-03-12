@@ -104,6 +104,8 @@ public partial class EmulatorPlatformGroupVm : ViewModelBase
     {
         if (row != null && Emulators.Count > 1)
             Emulators.Remove(row);
+        // Note: removing the last emulator entry is intentionally blocked to ensure
+        // the platform always has at least one (possibly empty) configuration row.
     }
 }
 

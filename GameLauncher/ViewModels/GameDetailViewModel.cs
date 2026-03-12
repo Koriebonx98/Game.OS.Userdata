@@ -185,6 +185,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         // ── Populate exe dropdown with detected executables in the game folder ──
         AvailableExePaths.Clear();
+        const int MaxExeFileSearchResults = 20;
         if (!string.IsNullOrEmpty(SettingsExePath))
             AvailableExePaths.Add(SettingsExePath);
         if (_driveInstances.Count > 0)
@@ -194,7 +195,7 @@ public partial class GameDetailViewModel : ViewModelBase
             {
                 foreach (var exe in System.IO.Directory.EnumerateFiles(folderPath, "*.exe")
                              .Concat(System.IO.Directory.EnumerateFiles(folderPath, "*.bat"))
-                             .Take(20))
+                             .Take(MaxExeFileSearchResults))
                 {
                     if (!AvailableExePaths.Contains(exe))
                         AvailableExePaths.Add(exe);

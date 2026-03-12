@@ -45,12 +45,12 @@
                                                            FontSize="11" FontWeight="Bold"
                                                            Foreground="White"/>
                                             </Border>
-                                            <!-- Column labels (shown only for first group, but
-                                                 shown here for each platform for clarity) -->
+                                            <!-- Column labels placeholder -->
                                             <StackPanel Grid.Column="1"
                                                         Orientation="Horizontal" Spacing="0"
-                                                        Margin="12,0,0,0"
-                                                        IsVisible="False"/>
+                                                        Margin="12,0,0,0">
+                                                <!-- Platform badge above; emulator rows below -->
+                                            </StackPanel>
                                             <Button Grid.Column="2"
                                                     Classes="btn-secondary"
                                                     Content="+ Add Emulator"

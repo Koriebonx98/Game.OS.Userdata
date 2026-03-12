@@ -112,13 +112,27 @@ namespace GameLauncher.Services
             catch { /* best-effort */ }
         }
 
-        /// <summary>Persists emulator settings for the given platform to disk (single-emulator helper).</summary>
+        /// <summary>
+        /// Persists emulator settings for the given platform to disk.
+        /// If an entry with the same <see cref="EmulatorSettings.EmulatorName"/> (or same path when
+        /// name is empty) already exists it is updated in-place; otherwise the settings are added
+        /// as a new entry.  Use <see cref="SaveAll"/> when managing the full list explicitly.
+        /// </summary>
         public static void Save(EmulatorSettings settings)
         {
             var all = LoadAll(settings.Platform);
-            // Replace the first entry or add a new one
-            if (all.Count == 0) all.Add(settings);
-            else all[0] = settings;
+            // Find an existing entry with matching name or matching path to update in-place
+            int idx = -1;
+            if (!string.IsNullOrWhiteSpace(settings.EmulatorName))
+                idx = all.FindIndex(e => string.Equals(e.EmulatorName, settings.EmulatorName, StringComparison.OrdinalIgnoreCase));
+            if (idx < 0 && !string.IsNullOrWhiteSpace(settings.EmulatorPath))
+                idx = all.FindIndex(e => string.Equals(e.EmulatorPath, settings.EmulatorPath, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+                all[idx] = settings;
+            else if (all.Count == 1 && string.IsNullOrEmpty(all[0].EmulatorPath))
+                all[0] = settings; // Replace the default empty placeholder
+            else
+                all.Add(settings);
             SaveAll(settings.Platform, all);
         }
 
