@@ -45,6 +45,12 @@ public partial class DashboardViewModel : ViewModelBase
     public Action<Game>?            OnOpenDetail        { get; set; }
     public Action<StoreGame>?       OnOpenStoreDetail   { get; set; }
     public Action<LocalGameCardVm>? OnOpenLocalDetail   { get; set; }
+    /// <summary>
+    /// Invoked when the user clicks "Continue Playing" on the hero banner.
+    /// The card is the most-recently played local game; the handler should launch
+    /// the game directly without opening the detail overlay.
+    /// </summary>
+    public Action<LocalGameCardVm>? OnContinuePlaying   { get; set; }
 
     public void Load(UserProfile profile, List<Game> library, List<Achievement> achievements,
                      IReadOnlyList<LocalGameCardVm>? localCards = null)
@@ -252,6 +258,21 @@ public partial class DashboardViewModel : ViewModelBase
             OnOpenDetail?.Invoke(_heroCloudGame);
         else if (FeaturedGame != null)
             OnOpenStoreDetail?.Invoke(FeaturedGame);
+    }
+
+    /// <summary>
+    /// Called when the user clicks the "Continue Playing" button on the hero banner.
+    /// Invokes <see cref="OnContinuePlaying"/> with the most-recently played local card
+    /// so the caller can launch the game immediately without opening the detail view.
+    /// Falls back to <see cref="OpenFeaturedDetail"/> for cloud / store featured games.
+    /// </summary>
+    [RelayCommand]
+    private void ContinuePlaying()
+    {
+        if (_heroLocalCard != null && OnContinuePlaying != null)
+            OnContinuePlaying(_heroLocalCard);
+        else
+            OpenFeaturedDetail();
     }
 
     private static string FormatMinutes(int minutes)

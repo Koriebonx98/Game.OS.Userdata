@@ -51,6 +51,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _showDetail        = false;
     [ObservableProperty] private bool _showFriendProfile = false;
     [ObservableProperty] private string _activePage      = "dashboard";
+    /// <summary>True when the left nav sidebar overlay is visible.</summary>
+    [ObservableProperty] private bool _isNavExpanded     = false;
     /// <summary>Username of the friend currently being viewed (shown in the friend-profile overlay).</summary>
     [ObservableProperty] private string _viewingFriendName = "";
 
@@ -109,6 +111,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnOpenDetail      = OpenDetailFromGame;
         DashboardVm.OnOpenStoreDetail = OpenDetailFromStoreGame;
         DashboardVm.OnOpenLocalDetail = OpenDetailFromMyGameCard;
+        DashboardVm.OnContinuePlaying = LaunchFromCard;
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
@@ -323,6 +326,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void Navigate(string page)
     {
+        // Auto-collapse the nav sidebar after a page is selected (console-like)
+        IsNavExpanded = false;
         ShowDetail = false;
         ActivePage = page;
         if (page == "library")
@@ -482,6 +487,59 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             // Cloud library game shown in "Continue Playing" — open via standard cloud detail flow
             OpenDetailFromGame(card.SourceCloudGame);
+        }
+    }
+
+    /// <summary>
+    /// Launches the game for the given card directly (no detail overlay shown).
+    /// Used by the "Continue Playing" hero button on the dashboard to skip the
+    /// detail screen and start the last-played game immediately.
+    /// </summary>
+    private void LaunchFromCard(LocalGameCardVm card)
+    {
+        // Load the detail VM in background (no ShowDetail = true) then trigger launch.
+        if (card.SourceGame != null)
+        {
+            DetailVm.LoadFromLocalGame(card.SourceGame);
+        }
+        else if (card.SourceRom != null)
+        {
+            DetailVm.LoadFromLocalRom(card.SourceRom);
+        }
+        else if (card.SourceRepack != null)
+        {
+            // Repacks are not yet installed — fall back to opening the detail overlay so
+            // the user can select an install location.
+            OpenDetailFromLocalRepack(card.SourceRepack);
+            return;
+        }
+        else if (card.SourceCloudGame != null)
+        {
+            // Find the matching local copy (if any) so the detail VM has IsInstalled = true.
+            var cg = card.SourceCloudGame;
+            var localGame = LibraryVm.LocalGames
+                .FirstOrDefault(lg => lg.Title.Equals(cg.Title, StringComparison.OrdinalIgnoreCase));
+            var repack = localGame == null
+                ? LibraryVm.ReadyToInstall
+                    .FirstOrDefault(r => r.Title.Equals(cg.Title, StringComparison.OrdinalIgnoreCase))
+                : null;
+            var localRom = localGame == null && repack == null
+                ? FindMatchingRom(cg.Title, cg.Platform, cg.TitleId)
+                : null;
+            DetailVm.LoadFromGame(cg, localGame, repack, localRom);
+        }
+        else
+        {
+            return;
+        }
+
+        // Launch immediately without showing the overlay
+        if (DetailVm.IsInstalled)
+            DetailVm.LaunchGameCommand.Execute(null);
+        else
+        {
+            // Game is not installed — open detail so user can install it
+            ShowDetail = true;
         }
     }
 

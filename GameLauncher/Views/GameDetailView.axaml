@@ -93,11 +93,11 @@
                                        FontSize="20" Foreground="#f1c40f"/>
                         </StackPanel>
 
-                        <!-- Price -->
+                        <!-- Price — only shown when explicitly set (not for store games) -->
                         <TextBlock Text="{Binding Price}"
                                    FontSize="24" FontWeight="Bold"
                                    Foreground="#3fb950"
-                                   IsVisible="{Binding Price, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                   IsVisible="False"/>
 
                         <!-- Description -->
                         <TextBlock Text="{Binding Description}"
@@ -145,18 +145,36 @@
                                     Command="{Binding InstallRepackCommand}">
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
-                                    <!-- Label: "Run Setup" for setup repacks, "Install" otherwise -->
-                                    <TextBlock Text="Run Setup" FontSize="15" FontWeight="Bold"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding IsSetupRepack}"/>
+                                    <!-- Label: always "Install" -->
                                     <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
-                                               VerticalAlignment="Center"
-                                               IsVisible="{Binding !IsSetupRepack}"/>
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                             <TextBlock Text="{Binding RepackSizeLabel}"
                                        FontSize="11" Foreground="#8b949e"
                                        IsVisible="{Binding RepackSizeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            <!-- Extraction progress bar -->
+                            <Border IsVisible="{Binding IsExtracting}"
+                                    Background="#161b22" CornerRadius="8"
+                                    Padding="12,10" Margin="0,4,0,0">
+                                <StackPanel Spacing="6">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="⏳" FontSize="13" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Extracting…"
+                                                   FontSize="12" Foreground="#8b949e"
+                                                   VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding ExtractionProgress, StringFormat='{}{0:F0}%'}"
+                                                   FontSize="12" Foreground="#0ea5e9"
+                                                   FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <ProgressBar Value="{Binding ExtractionProgress}"
+                                                 Minimum="0" Maximum="100"
+                                                 Height="6" CornerRadius="3"
+                                                 Foreground="#0ea5e9"
+                                                 Background="#21262d"/>
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
 
                         <!-- ── Store page button ── -->

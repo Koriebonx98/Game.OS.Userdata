@@ -16,12 +16,13 @@ public partial class MainWindow : Window
     /// Handles global keyboard and gamepad navigation.
     /// Xbox / PlayStation controllers connected via XInput/DirectInput are reported
     /// as standard keyboard keys by Windows:
-    ///   Escape / B-button  → close overlays / go back
-    ///   Enter / A-button   → activate / confirm (passthrough to focused control)
-    ///   PageUp  / LB       → navigate to previous sidebar page
-    ///   PageDown / RB      → navigate to next sidebar page
-    ///   Left / Right       → navigate between sidebar pages (when not in detail)
-    ///   Up / Down          → scroll the active content (passthrough)
+    ///   Escape / B-button  → close overlays / go back / close nav menu
+    ///   Enter / A-button   → confirm; when nav open, selects current page and closes nav
+    ///   Left               → open nav sidebar (when not in detail / text input)
+    ///   Right              → close nav sidebar (when open)
+    ///   Up / Down          → when nav sidebar is open: navigate up/down through menu items
+    ///   PageUp  / LB       → navigate to previous page (always available)
+    ///   PageDown / RB      → navigate to next page (always available)
     ///   F5                 → refresh / reload library
     /// </summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -31,6 +32,7 @@ public partial class MainWindow : Window
         switch (e.Key)
         {
             // Navigate back from a detail or friend-profile overlay
+            // Also close nav sidebar when open
             case Key.Escape:
             case Key.BrowserBack:
                 if (vm.ShowDetail)
@@ -43,9 +45,14 @@ public partial class MainWindow : Window
                     vm.CloseFriendProfileCommand.Execute(null);
                     e.Handled = true;
                 }
+                else if (vm.IsNavExpanded)
+                {
+                    vm.IsNavExpanded = false;
+                    e.Handled = true;
+                }
                 break;
 
-            // LB / PageUp → previous sidebar section
+            // LB / PageUp → previous page (always works regardless of nav state)
             case Key.PageUp:
                 if (!vm.ShowDetail && !vm.ShowFriendProfile)
                 {
@@ -54,7 +61,7 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // RB / PageDown → next sidebar section
+            // RB / PageDown → next page (always works regardless of nav state)
             case Key.PageDown:
                 if (!vm.ShowDetail && !vm.ShowFriendProfile)
                 {
@@ -63,20 +70,53 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // Left arrow → previous sidebar section (when not in a text input)
+            // Left arrow → open the nav sidebar (when not in a text input)
             case Key.Left:
                 if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+                {
+                    if (!vm.IsNavExpanded)
+                    {
+                        vm.IsNavExpanded = true;
+                        e.Handled = true;
+                    }
+                }
+                break;
+
+            // Right arrow → close the nav sidebar (when open)
+            case Key.Right:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+                {
+                    if (vm.IsNavExpanded)
+                    {
+                        vm.IsNavExpanded = false;
+                        e.Handled = true;
+                    }
+                }
+                break;
+
+            // Up arrow → when nav is open, move to previous menu item
+            case Key.Up:
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
                 {
                     NavigatePrev(vm);
                     e.Handled = true;
                 }
                 break;
 
-            // Right arrow → next sidebar section (when not in a text input)
-            case Key.Right:
-                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+            // Down arrow → when nav is open, move to next menu item
+            case Key.Down:
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
                 {
                     NavigateNext(vm);
+                    e.Handled = true;
+                }
+                break;
+
+            // Enter → when nav is open, select current page and close the sidebar
+            case Key.Enter:
+                if (vm.IsNavExpanded && !IsTextInputFocused())
+                {
+                    vm.IsNavExpanded = false;
                     e.Handled = true;
                 }
                 break;
