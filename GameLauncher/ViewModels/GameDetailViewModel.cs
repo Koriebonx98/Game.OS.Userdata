@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -104,6 +105,11 @@ public partial class GameDetailViewModel : ViewModelBase
 
     /// <summary>Available drives for archive-repack installation.</summary>
     public ObservableCollection<InstallDriveOption> InstallDrives { get; } = new();
+
+    // ── Static compiled regex ─────────────────────────────────────────────────
+    /// <summary>Matches 7-Zip progress output like "  42% - filename".</summary>
+    private static readonly Regex _sevenZipProgressRegex =
+        new(@"(\d+)%", RegexOptions.Compiled);
 
     public ObservableCollection<string> DriveLabels { get; } = new();
 
@@ -1071,7 +1077,7 @@ public partial class GameDetailViewModel : ViewModelBase
                             var line = await proc.StandardOutput.ReadLineAsync();
                             if (line == null) break;
                             // 7z progress format: "  XX% - filename"
-                            var match = System.Text.RegularExpressions.Regex.Match(line, @"(\d+)%");
+                            var match = _sevenZipProgressRegex.Match(line);
                             if (match.Success && int.TryParse(match.Groups[1].Value, out int pct))
                                 Avalonia.Threading.Dispatcher.UIThread.Post(() => ExtractionProgress = pct);
                         }

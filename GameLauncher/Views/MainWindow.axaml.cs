@@ -114,7 +114,7 @@ public partial class MainWindow : Window
 
             // Enter → when nav is open, select current page and close the sidebar
             case Key.Enter:
-                if (vm.IsNavExpanded && !IsTextInputFocused())
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
                 {
                     vm.IsNavExpanded = false;
                     e.Handled = true;
