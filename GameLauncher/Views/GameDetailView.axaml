@@ -333,13 +333,24 @@
                             <StackPanel Spacing="10">
                                 <TextBlock Text="🎯  Executable / Launch File  (Exe Select)"
                                            FontSize="13" FontWeight="Bold" Foreground="White"/>
-                    <TextBlock Text="Path to the .exe, .bat, or PS1 script used to launch this game."
+                                <TextBlock Text="Path to the .exe, .bat, or PS1 script used to launch this game."
                                            FontSize="11" Foreground="#8b949e"/>
+                                <!-- ComboBox: shows detected executables; also allows typing a custom path -->
+                                <ComboBox ItemsSource="{Binding AvailableExePaths}"
+                                          SelectedItem="{Binding SettingsExePath}"
+                                          PlaceholderText="C:\Games\GameTitle\game.exe"
+                                          Background="#0d1117" Foreground="White"
+                                          BorderBrush="#30363d" CornerRadius="6"
+                                          Padding="10,8" FontSize="12"
+                                          HorizontalAlignment="Stretch"
+                                          IsVisible="{Binding AvailableExePaths.Count}"/>
+                                <!-- Fallback TextBox when no executables are detected -->
                                 <TextBox Text="{Binding SettingsExePath}"
                                          Watermark="C:\Games\GameTitle\game.exe"
                                          Background="#0d1117" Foreground="White"
                                          BorderBrush="#30363d" CornerRadius="6"
-                                         Padding="10,8" FontSize="12"/>
+                                         Padding="10,8" FontSize="12"
+                                         IsVisible="{Binding !AvailableExePaths.Count}"/>
                                 <TextBlock Text="Launch arguments (optional):"
                                            FontSize="11" Foreground="#8b949e"/>
                                 <TextBox Text="{Binding SettingsExeArgs}"
@@ -354,11 +365,37 @@
                                                FontSize="13" FontWeight="Bold" Foreground="#58a6ff"/>
                                     <TextBlock Text="Path to the ROM file passed to the emulator above."
                                                FontSize="11" Foreground="#8b949e"/>
+                                    <!-- ComboBox: shows known ROM paths for multi-disk / multi-region games -->
+                                    <ComboBox ItemsSource="{Binding AvailableRomPaths}"
+                                              SelectedItem="{Binding SettingsRomPath}"
+                                              PlaceholderText="/Roms/PS3/Games/GameTitle.iso"
+                                              Background="#0d1117" Foreground="White"
+                                              BorderBrush="#30363d" CornerRadius="6"
+                                              Padding="10,8" FontSize="12"
+                                              HorizontalAlignment="Stretch"
+                                              IsVisible="{Binding AvailableRomPaths.Count}"/>
+                                    <!-- Fallback TextBox when no ROM paths are auto-detected -->
                                     <TextBox Text="{Binding SettingsRomPath}"
                                              Watermark="/Roms/PS3/Games/GameTitle.iso"
                                              Background="#0d1117" Foreground="White"
                                              BorderBrush="#30363d" CornerRadius="6"
-                                             Padding="10,8" FontSize="12"/>
+                                             Padding="10,8" FontSize="12"
+                                             IsVisible="{Binding !AvailableRomPaths.Count}"/>
+                                </StackPanel>
+
+                                <!-- Emulator picker — only shown when multiple emulators configured -->
+                                <StackPanel Spacing="6"
+                                            IsVisible="{Binding HasMultipleEmulators}">
+                                    <TextBlock Text="🎮  Emulator"
+                                               FontSize="13" FontWeight="Bold" Foreground="#f0c040"/>
+                                    <TextBlock Text="Choose which emulator to use for this game."
+                                               FontSize="11" Foreground="#8b949e"/>
+                                    <ComboBox ItemsSource="{Binding AvailableEmulators}"
+                                              SelectedItem="{Binding SelectedEmulatorName}"
+                                              Background="#0d1117" Foreground="White"
+                                              BorderBrush="#30363d" CornerRadius="6"
+                                              Padding="10,8" FontSize="12"
+                                              HorizontalAlignment="Stretch"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>

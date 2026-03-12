@@ -23,86 +23,124 @@
                         <TextBlock Text="Emulator Setup" FontSize="17" FontWeight="Bold"
                                    Foreground="#e6edf3" VerticalAlignment="Center"/>
                     </StackPanel>
-                    <TextBlock Text="Set the emulator executable for each platform. Use {rom} in Arguments as the ROM path placeholder."
+                    <TextBlock Text="Set the emulator executable for each platform. Use {rom} in Arguments as the ROM path placeholder. You can add multiple emulators per platform."
                                FontSize="12" Foreground="#8b949e" Margin="0,0,0,8"/>
 
-                    <!-- Column headers -->
-                    <Grid ColumnDefinitions="130,*,160,80,50" Margin="0,0,0,4">
-                        <TextBlock Grid.Column="0" Text="Platform"
-                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
-                        <TextBlock Grid.Column="1" Text="Emulator Executable"
-                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
-                        <TextBlock Grid.Column="2" Text="Arguments"
-                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
-                        <TextBlock Grid.Column="3" Text="Name (optional)"
-                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
-                        <TextBlock Grid.Column="4" Text="On"
-                                   FontSize="11" FontWeight="Bold" Foreground="#8b949e"
-                                   HorizontalAlignment="Center"/>
-                    </Grid>
-
-                    <Rectangle Height="1" Fill="#21262d"/>
-
-                    <!-- Emulator rows -->
-                    <ItemsControl ItemsSource="{Binding EmulatorRows}">
+                    <!-- Platform groups -->
+                    <ItemsControl ItemsSource="{Binding EmulatorGroups}">
                         <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="vm:EmulatorRowVm">
-                                <Grid ColumnDefinitions="130,*,160,80,50"
-                                      Margin="0,4,0,4">
-                                    <!-- Platform name -->
-                                    <Border Grid.Column="0"
-                                            Background="#1f6feb"
-                                            CornerRadius="4" Padding="8,4"
-                                            HorizontalAlignment="Left"
-                                            VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Platform}"
-                                                   FontSize="11" FontWeight="Bold"
-                                                   Foreground="White"/>
-                                    </Border>
+                            <DataTemplate x:DataType="vm:EmulatorPlatformGroupVm">
+                                <Border Background="#1c2128" CornerRadius="8"
+                                        Padding="12,10" Margin="0,0,0,8">
+                                    <StackPanel Spacing="6">
 
-                                    <!-- Emulator path -->
-                                    <Grid Grid.Column="1" ColumnDefinitions="*,Auto" Margin="8,0">
-                                        <TextBox Grid.Column="0"
-                                                 Classes="form-input"
-                                                 Text="{Binding EmulatorPath}"
-                                                 Watermark="Path to emulator .exe…"
-                                                 FontSize="12"
-                                                 VerticalAlignment="Center"/>
-                                        <Button Grid.Column="1"
-                                                Classes="btn-secondary"
-                                                Content="Browse…"
-                                                FontSize="11"
-                                                Padding="8,6"
-                                                Margin="4,0,0,0"
-                                                Command="{Binding $parent[UserControl].DataContext.BrowseEmulatorCommand}"
-                                                CommandParameter="{Binding}"
-                                                VerticalAlignment="Center"/>
-                                    </Grid>
+                                        <!-- Platform header row -->
+                                        <Grid ColumnDefinitions="Auto,*,Auto">
+                                            <Border Grid.Column="0"
+                                                    Background="#1f6feb"
+                                                    CornerRadius="4" Padding="8,4"
+                                                    HorizontalAlignment="Left"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Platform}"
+                                                           FontSize="11" FontWeight="Bold"
+                                                           Foreground="White"/>
+                                            </Border>
+                                            <!-- Column labels (shown only for first group, but
+                                                 shown here for each platform for clarity) -->
+                                            <StackPanel Grid.Column="1"
+                                                        Orientation="Horizontal" Spacing="0"
+                                                        Margin="12,0,0,0"
+                                                        IsVisible="False"/>
+                                            <Button Grid.Column="2"
+                                                    Classes="btn-secondary"
+                                                    Content="+ Add Emulator"
+                                                    FontSize="11"
+                                                    Padding="8,4"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding AddEmulatorCommand}"/>
+                                        </Grid>
 
-                                    <!-- Arguments -->
-                                    <TextBox Grid.Column="2"
-                                             Classes="form-input"
-                                             Text="{Binding Arguments}"
-                                             Watermark="{}{rom}"
-                                             FontSize="12"
-                                             Margin="0,0,8,0"
-                                             VerticalAlignment="Center"/>
+                                        <!-- Column headers (shown once per platform group) -->
+                                        <Grid ColumnDefinitions="*,160,80,44,38" Margin="0,4,0,0">
+                                            <TextBlock Grid.Column="0" Text="Emulator Executable"
+                                                       FontSize="10" Foreground="#484f58"/>
+                                            <TextBlock Grid.Column="1" Text="Arguments"
+                                                       FontSize="10" Foreground="#484f58" Margin="8,0,0,0"/>
+                                            <TextBlock Grid.Column="2" Text="Name"
+                                                       FontSize="10" Foreground="#484f58" Margin="4,0,0,0"/>
+                                            <TextBlock Grid.Column="3" Text="On"
+                                                       FontSize="10" Foreground="#484f58"
+                                                       HorizontalAlignment="Center"/>
+                                        </Grid>
 
-                                    <!-- Emulator name -->
-                                    <TextBox Grid.Column="3"
-                                             Classes="form-input"
-                                             Text="{Binding EmulatorName}"
-                                             Watermark="Optional"
-                                             FontSize="12"
-                                             Margin="0,0,8,0"
-                                             VerticalAlignment="Center"/>
+                                        <!-- Emulator rows for this platform -->
+                                        <ItemsControl ItemsSource="{Binding Emulators}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="vm:EmulatorRowVm">
+                                                    <Grid ColumnDefinitions="*,160,80,44,38"
+                                                          Margin="0,2,0,2">
 
-                                    <!-- Enabled toggle -->
-                                    <CheckBox Grid.Column="4"
-                                              IsChecked="{Binding Enabled}"
-                                              HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                                </Grid>
+                                                        <!-- Emulator path + Browse -->
+                                                        <Grid Grid.Column="0" ColumnDefinitions="*,Auto">
+                                                            <TextBox Grid.Column="0"
+                                                                     Classes="form-input"
+                                                                     Text="{Binding EmulatorPath}"
+                                                                     Watermark="Path to emulator .exe…"
+                                                                     FontSize="12"
+                                                                     VerticalAlignment="Center"/>
+                                                            <Button Grid.Column="1"
+                                                                    Classes="btn-secondary"
+                                                                    Content="Browse…"
+                                                                    FontSize="11"
+                                                                    Padding="8,6"
+                                                                    Margin="4,0,0,0"
+                                                                    Command="{Binding $parent[UserControl].DataContext.BrowseEmulatorCommand}"
+                                                                    CommandParameter="{Binding}"
+                                                                    VerticalAlignment="Center"/>
+                                                        </Grid>
+
+                                                        <!-- Arguments -->
+                                                        <TextBox Grid.Column="1"
+                                                                 Classes="form-input"
+                                                                 Text="{Binding Arguments}"
+                                                                 Watermark="{}{rom}"
+                                                                 FontSize="12"
+                                                                 Margin="8,0,4,0"
+                                                                 VerticalAlignment="Center"/>
+
+                                                        <!-- Emulator name -->
+                                                        <TextBox Grid.Column="2"
+                                                                 Classes="form-input"
+                                                                 Text="{Binding EmulatorName}"
+                                                                 Watermark="e.g. Ryujinx"
+                                                                 FontSize="12"
+                                                                 Margin="0,0,4,0"
+                                                                 VerticalAlignment="Center"/>
+
+                                                        <!-- Enabled toggle -->
+                                                        <CheckBox Grid.Column="3"
+                                                                  IsChecked="{Binding Enabled}"
+                                                                  HorizontalAlignment="Center"
+                                                                  VerticalAlignment="Center"/>
+
+                                                        <!-- Remove button -->
+                                                        <Button Grid.Column="4"
+                                                                Classes="btn-secondary"
+                                                                Content="✕"
+                                                                FontSize="11"
+                                                                Padding="6,4"
+                                                                Foreground="#f85149"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center"
+                                                                Command="{Binding $parent[ItemsControl].DataContext.RemoveEmulatorCommand}"
+                                                                CommandParameter="{Binding}"/>
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                    </StackPanel>
+                                </Border>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>

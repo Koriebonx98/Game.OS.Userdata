@@ -40,28 +40,34 @@ public partial class LocalGameCardVm : ViewModelBase
     // ── Source objects (exactly one is non-null) ──────────────────────────────
 
     /// <summary>Non-null when this entry represents a locally installed game folder.</summary>
-    public LocalGame?   SourceGame   { get; init; }
+    public LocalGame?   SourceGame      { get; init; }
 
     /// <summary>Non-null when this entry represents a ready-to-install repack archive.</summary>
-    public LocalRepack? SourceRepack { get; init; }
+    public LocalRepack? SourceRepack    { get; init; }
 
     /// <summary>Non-null when this entry represents a ROM file.</summary>
-    public LocalRom?    SourceRom    { get; init; }
+    public LocalRom?    SourceRom       { get; init; }
+
+    /// <summary>Non-null when this entry represents a cloud library game with recorded playtime.</summary>
+    public Game?        SourceCloudGame { get; init; }
 
     // ── Derived badge text / colours ──────────────────────────────────────────
 
     public string KindLabel =>
-        SourceRom    != null ? "ROM"    :
+        SourceRom         != null ? "ROM"    :
+        SourceCloudGame   != null ? "Cloud"  :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "Installed" :
         SourceRepack != null ? "Repack" : "Installed";
 
     public string KindBackground =>
-        SourceRom    != null ? "#1f3a6e" :
+        SourceRom         != null ? "#1f3a6e" :
+        SourceCloudGame   != null ? "#1a3a6e" :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "#1a5e34" :
         SourceRepack != null ? "#5c3800" : "#1a5e34";
 
     public string KindForeground =>
-        SourceRom    != null ? "#58a6ff" :
+        SourceRom         != null ? "#58a6ff" :
+        SourceCloudGame   != null ? "#0ea5e9" :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "#3fb950" :
         SourceRepack != null ? "#e3b341" : "#3fb950";
 

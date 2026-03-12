@@ -105,6 +105,9 @@ public partial class GameDetailViewModel : ViewModelBase
 
     private List<LocalGameDriveEntry> _driveInstances = new();
 
+    /// <summary>Cached reference to the current LocalRom (if any), used to expose AdditionalPaths in settings.</summary>
+    private LocalRom? _currentLocalRom;
+
     // ── Navigation back-action ────────────────────────────────────────────────
     public System.Action? OnClose { get; set; }
 
@@ -126,6 +129,20 @@ public partial class GameDetailViewModel : ViewModelBase
 
     /// <summary>True when this game is a ROM (non-PC) and shows the Rom Select field.</summary>
     [ObservableProperty] private bool _isRom;
+
+    // ── Exe / ROM file pickers (populated when the settings panel opens) ─────
+    /// <summary>Detected .exe/.bat files in the game folder — shown as a ComboBox dropdown.</summary>
+    public ObservableCollection<string> AvailableExePaths { get; } = new();
+    /// <summary>Known ROM files for this game (main path + additional paths) — shown as a ComboBox.</summary>
+    public ObservableCollection<string> AvailableRomPaths { get; } = new();
+
+    // ── Emulator picker (for ROM games with multiple emulators configured) ───
+    /// <summary>Named emulators configured for this game's platform.</summary>
+    public ObservableCollection<string> AvailableEmulators { get; } = new();
+    /// <summary>True when more than one emulator is configured for this platform.</summary>
+    [ObservableProperty] private bool _hasMultipleEmulators;
+    /// <summary>Name of the emulator the user has selected for this game.</summary>
+    [ObservableProperty] private string _selectedEmulatorName = "";
 
     /// <summary>Path typed by the user when adding a new pre-launch entry.</summary>
     [ObservableProperty] private string _newPreLaunchPath  = "";
@@ -166,6 +183,65 @@ public partial class GameDetailViewModel : ViewModelBase
             SettingsExePath = _driveInstances[idx].ExecutablePath ?? "";
         }
 
+        // ── Populate exe dropdown with detected executables in the game folder ──
+        AvailableExePaths.Clear();
+        if (!string.IsNullOrEmpty(SettingsExePath))
+            AvailableExePaths.Add(SettingsExePath);
+        if (_driveInstances.Count > 0)
+        {
+            var folderPath = _driveInstances[0].FolderPath;
+            if (!string.IsNullOrEmpty(folderPath) && System.IO.Directory.Exists(folderPath))
+            {
+                foreach (var exe in System.IO.Directory.EnumerateFiles(folderPath, "*.exe")
+                             .Concat(System.IO.Directory.EnumerateFiles(folderPath, "*.bat"))
+                             .Take(20))
+                {
+                    if (!AvailableExePaths.Contains(exe))
+                        AvailableExePaths.Add(exe);
+                }
+            }
+        }
+
+        // ── Populate ROM dropdown with known ROM paths ──────────────────────
+        AvailableRomPaths.Clear();
+        if (!string.IsNullOrEmpty(SettingsRomPath))
+            AvailableRomPaths.Add(SettingsRomPath);
+        if (_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath))
+        {
+            string mainRomPath = _driveInstances[0].ExecutablePath;
+            if (!AvailableRomPaths.Contains(mainRomPath))
+                AvailableRomPaths.Add(mainRomPath);
+        }
+        // Add multi-disk / multi-region paths from the ROM scanner
+        if (_currentLocalRom?.AdditionalPaths != null)
+        {
+            foreach (var p in _currentLocalRom.AdditionalPaths)
+                if (!string.IsNullOrEmpty(p) && !AvailableRomPaths.Contains(p))
+                    AvailableRomPaths.Add(p);
+        }
+
+        // ── Populate emulator dropdown ──────────────────────────────────────
+        AvailableEmulators.Clear();
+        if (IsRom)
+        {
+            var emulators = Services.EmulatorSettingsService.LoadAll(Platform);
+            foreach (var e in emulators.Where(e => !string.IsNullOrEmpty(e.EmulatorPath)))
+            {
+                string label = string.IsNullOrWhiteSpace(e.EmulatorName)
+                    ? System.IO.Path.GetFileNameWithoutExtension(e.EmulatorPath)
+                    : e.EmulatorName;
+                if (!AvailableEmulators.Contains(label))
+                    AvailableEmulators.Add(label);
+            }
+            HasMultipleEmulators = AvailableEmulators.Count > 1;
+            SelectedEmulatorName = saved.PreferredEmulatorName ?? (AvailableEmulators.Count > 0 ? AvailableEmulators[0] : "");
+        }
+        else
+        {
+            HasMultipleEmulators = false;
+            SelectedEmulatorName = "";
+        }
+
         PreLaunchEntries.Clear();
         foreach (var e in saved.PreLaunch)
             PreLaunchEntries.Add(e);
@@ -196,13 +272,14 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         var settings = new GameSettings
         {
-            GameTitle    = Title,
-            ExePath      = string.IsNullOrWhiteSpace(SettingsExePath) ? null : SettingsExePath.Trim(),
-            ExeArgs      = string.IsNullOrWhiteSpace(SettingsExeArgs)  ? null : SettingsExeArgs.Trim(),
-            RomPath      = string.IsNullOrWhiteSpace(SettingsRomPath)  ? null : SettingsRomPath.Trim(),
-            PreLaunch    = PreLaunchEntries.ToList(),
-            DuringLaunch = DuringLaunchEntries.ToList(),
-            PostLaunch   = PostLaunchEntries.ToList(),
+            GameTitle              = Title,
+            ExePath                = string.IsNullOrWhiteSpace(SettingsExePath) ? null : SettingsExePath.Trim(),
+            ExeArgs                = string.IsNullOrWhiteSpace(SettingsExeArgs)  ? null : SettingsExeArgs.Trim(),
+            RomPath                = string.IsNullOrWhiteSpace(SettingsRomPath)  ? null : SettingsRomPath.Trim(),
+            PreferredEmulatorName  = string.IsNullOrWhiteSpace(SelectedEmulatorName) ? null : SelectedEmulatorName.Trim(),
+            PreLaunch              = PreLaunchEntries.ToList(),
+            DuringLaunch           = DuringLaunchEntries.ToList(),
+            PostLaunch             = PostLaunchEntries.ToList(),
         };
         GameSettingsService.Save(settings);
         SettingsStatus = "✓  Settings saved.";
@@ -642,7 +719,11 @@ public partial class GameDetailViewModel : ViewModelBase
 
             if (!string.IsNullOrEmpty(romPath))
             {
-                var emuSettings = EmulatorSettingsService.Load(Platform);
+                // Use the game's preferred emulator when set; otherwise the first enabled one
+                var emuSettings = string.IsNullOrWhiteSpace(saved.PreferredEmulatorName)
+                    ? EmulatorSettingsService.Load(Platform)
+                    : EmulatorSettingsService.LoadByName(Platform, saved.PreferredEmulatorName);
+
                 if (!string.IsNullOrEmpty(emuSettings.EmulatorPath)
                     && System.IO.File.Exists(emuSettings.EmulatorPath)
                     && emuSettings.Enabled)
@@ -1013,6 +1094,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         ShowSettings    = false;
         ShowDrivePicker = false;
+        _currentLocalRom = localRom;
         Title         = game.Title;
         Platform      = game.Platform;
         Genre         = game.Genre    ?? "";
@@ -1055,6 +1137,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         ShowSettings    = false;
         ShowDrivePicker = false;
+        _currentLocalRom = localRom;
         Title         = game.Title;
         Platform      = game.Platform;
         Genre         = game.Genre;
@@ -1095,6 +1178,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         ShowSettings    = false;
         ShowDrivePicker = false;
+        _currentLocalRom = null;
         Title             = game.Title;
         Platform          = "PC";
         Genre             = "";
@@ -1222,6 +1306,7 @@ public partial class GameDetailViewModel : ViewModelBase
         RepackSizeLabel  = "";
 
         // Store the ROM's directory as the "folder path" so the Open Folder button works
+        _currentLocalRom = rom;
         _driveInstances = new List<LocalGameDriveEntry>
         {
             new LocalGameDriveEntry

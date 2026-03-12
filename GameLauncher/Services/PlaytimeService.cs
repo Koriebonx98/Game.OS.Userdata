@@ -229,6 +229,28 @@ namespace GameLauncher.Services
             catch { return 0; }
         }
 
+        /// <summary>
+        /// Returns the UTC <see cref="DateTime"/> when the given game was last played
+        /// according to persisted sessions, or <see cref="DateTime.MinValue"/> if never.
+        /// </summary>
+        public static DateTime GetLastPlayedAt(string platform, string title)
+        {
+            try
+            {
+                var latest = LoadSessions()
+                    .Where(s => !s.IsCheckpoint &&
+                                string.Equals(s.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(s.Title,    title,    StringComparison.OrdinalIgnoreCase) &&
+                                !string.IsNullOrEmpty(s.EndedAt))
+                    .Select(s => DateTime.TryParse(s.EndedAt, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var dt) ? dt : DateTime.MinValue)
+                    .DefaultIfEmpty(DateTime.MinValue)
+                    .Max();
+                return latest;
+            }
+            catch { return DateTime.MinValue; }
+        }
+
         public void Dispose()
         {
             foreach (var e in _watching)

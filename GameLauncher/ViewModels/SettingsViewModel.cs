@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -9,11 +11,12 @@ namespace GameLauncher.ViewModels;
 /// <summary>
 /// View-model for the Settings page.
 /// Allows the user to configure per-platform emulators and basic app settings.
+/// Each platform can have multiple emulators; the user can add, remove, and reorder them.
 /// </summary>
 public partial class SettingsViewModel : ViewModelBase
 {
-    // ── Platform emulator list ─────────────────────────────────────────────
-    public ObservableCollection<EmulatorRowVm> EmulatorRows { get; } = new();
+    // ── Platform emulator groups ───────────────────────────────────────────
+    public ObservableCollection<EmulatorPlatformGroupVm> EmulatorGroups { get; } = new();
 
     // ── Status message ─────────────────────────────────────────────────────
     [ObservableProperty] private string _statusMessage = "";
@@ -26,11 +29,14 @@ public partial class SettingsViewModel : ViewModelBase
 
     public void Load()
     {
-        EmulatorRows.Clear();
+        EmulatorGroups.Clear();
         foreach (var platform in EmulatorSettingsService.SupportedPlatforms)
         {
-            var settings = EmulatorSettingsService.Load(platform);
-            EmulatorRows.Add(new EmulatorRowVm(platform, settings));
+            var allSettings = EmulatorSettingsService.LoadAll(platform);
+            var group       = new EmulatorPlatformGroupVm(platform, this);
+            foreach (var s in allSettings)
+                group.Emulators.Add(new EmulatorRowVm(platform, s));
+            EmulatorGroups.Add(group);
         }
         StatusMessage = "";
     }
@@ -38,32 +44,67 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void Save()
     {
-        foreach (var row in EmulatorRows)
+        foreach (var group in EmulatorGroups)
         {
-            var settings = new EmulatorSettings
+            var list = group.Emulators.Select(row => new EmulatorSettings
             {
                 Platform     = row.Platform,
                 EmulatorPath = row.EmulatorPath,
                 Arguments    = string.IsNullOrWhiteSpace(row.Arguments) ? "{rom}" : row.Arguments,
                 EmulatorName = row.EmulatorName,
                 Enabled      = row.Enabled,
-            };
-            EmulatorSettingsService.Save(settings);
+            }).ToList();
+            EmulatorSettingsService.SaveAll(group.Platform, list);
         }
-        StatusMessage  = "✅ Settings saved!";
-        IsSaveSuccess  = true;
+        StatusMessage = "✅ Settings saved!";
+        IsSaveSuccess = true;
     }
 
     [RelayCommand]
     private void BrowseEmulator(EmulatorRowVm? row)
     {
         if (row == null) return;
-        // Opens a file picker asynchronously – handled in code-behind
         BrowseRequested?.Invoke(row);
     }
 
     /// <summary>Raised when the user clicks Browse… on an emulator row.</summary>
     public System.Action<EmulatorRowVm>? BrowseRequested { get; set; }
+}
+
+/// <summary>
+/// View-model for a platform group in the emulator settings grid.
+/// Contains 1-N <see cref="EmulatorRowVm"/> entries that can be added or removed.
+/// </summary>
+public partial class EmulatorPlatformGroupVm : ViewModelBase
+{
+    private readonly SettingsViewModel _parent;
+
+    public string Platform { get; }
+    public ObservableCollection<EmulatorRowVm> Emulators { get; } = new();
+
+    public EmulatorPlatformGroupVm(string platform, SettingsViewModel parent)
+    {
+        Platform = platform;
+        _parent  = parent;
+    }
+
+    [RelayCommand]
+    private void AddEmulator()
+    {
+        Emulators.Add(new EmulatorRowVm(Platform, new EmulatorSettings
+        {
+            Platform  = Platform,
+            Arguments = "{rom}",
+            Enabled   = true,
+        }));
+    }
+
+    [RelayCommand]
+    private void RemoveEmulator(EmulatorRowVm? row)
+    {
+        if (row != null && Emulators.Count > 1)
+            Emulators.Remove(row);
+    }
 }
 
 /// <summary>Editable row in the emulator settings grid.</summary>
