@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using GameLauncher;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 /// <summary>
 /// Demonstrates the GameScannerService detecting fake games, repacks and ROMs
@@ -248,6 +249,90 @@ class Program
         {
             Console.WriteLine("  ⚠  FakeGame1 repack not found — ensure TestData/Repacks/FakeGame1.zip exists");
         }
+        Console.WriteLine();
+
+        // ── PS2 Platform Normalisation ────────────────────────────────────────
+        Console.WriteLine("🎮 PS2 Platform Normalisation (Sony - PlayStation 2 → PS2):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var ps2Flat = detectedRoms.FirstOrDefault(r =>
+            string.Equals(r.Title, "FakePS2Flat", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Platform, "PS2", StringComparison.OrdinalIgnoreCase));
+        var ps2Sub  = detectedRoms.FirstOrDefault(r =>
+            string.Equals(r.Title, "FakePS2Sub", StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(r.Platform, "PS2", StringComparison.OrdinalIgnoreCase));
+
+        if (ps2Flat != null)
+            Console.WriteLine($"  ✅  FakePS2Flat (flat in Games/)  → Platform=\"{ps2Flat.Platform}\"");
+        else
+        {
+            Console.WriteLine("  ❌  FakePS2Flat not found with Platform=PS2 — ensure TestData/Roms/Sony - PlayStation 2/Games/FakePS2Flat.iso exists");
+            passed = false;
+        }
+
+        if (ps2Sub != null)
+            Console.WriteLine($"  ✅  FakePS2Sub (in Games/FakePS2Sub/) → Platform=\"{ps2Sub.Platform}\"");
+        else
+        {
+            Console.WriteLine("  ❌  FakePS2Sub not found with Platform=PS2 — ensure TestData/Roms/Sony - PlayStation 2/Games/FakePS2Sub/FakePS2Sub.iso exists");
+            passed = false;
+        }
+        Console.WriteLine();
+
+        // ── ROM Copy/Move Destination Pattern ─────────────────────────────────
+        // Verify that RomPathHelper produces destinations that match the scanner's
+        // expected Roms/{PlatformFolder}/Games/... layout for every detected ROM.
+        Console.WriteLine("📋 ROM Copy/Move Destination Pattern (Roms/{Platform}/Games/...):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        string tempDestRoot = Path.Combine(Path.GetTempPath(), "GameOS_TestDest_" + Path.GetRandomFileName());
+        bool   copyMoveOk = true;
+        try
+        {
+            foreach (var rom in detectedRoms.Where(r => r.FileType != "folder"))
+            {
+                string romFile   = rom.FilePath;
+                string romFolder = Path.GetDirectoryName(romFile) ?? "";
+                string destFile  = RomPathHelper.ComputeFileRomDestPath(romFile, romFolder, tempDestRoot, rom.Platform);
+
+                // The destination must be inside {tempDestRoot}/Roms/{SomePlatformFolder}/Games/
+                string? gamesDir = RomPathHelper.FindRomsGamesDir(destFile);
+                if (gamesDir == null)
+                {
+                    Console.WriteLine($"  ❌  [{rom.Platform}] {rom.Title}: dest not in Roms/*/Games/ layout → {destFile}");
+                    passed    = false;
+                    copyMoveOk = false;
+                    continue;
+                }
+
+                // The platform folder used in the destination must normalise to the ROM's platform
+                string destPlatformFolder = Path.GetFileName(Path.GetDirectoryName(gamesDir) ?? "");
+                string normalisedDest     = PlatformHelper.NormalizePlatform(destPlatformFolder);
+                if (!string.Equals(normalisedDest, rom.Platform, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"  ❌  [{rom.Platform}] {rom.Title}: dest platform folder \"{destPlatformFolder}\" normalises to \"{normalisedDest}\" not \"{rom.Platform}\"");
+                    passed    = false;
+                    copyMoveOk = false;
+                    continue;
+                }
+
+                // The destination file name must equal the source file name
+                if (!string.Equals(Path.GetFileName(destFile), Path.GetFileName(romFile), StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"  ❌  [{rom.Platform}] {rom.Title}: dest filename mismatch — got \"{Path.GetFileName(destFile)}\"");
+                    passed    = false;
+                    copyMoveOk = false;
+                    continue;
+                }
+
+                Console.WriteLine($"  ✅  [{rom.Platform,-10}] {rom.Title,-25} → .../{destPlatformFolder}/Games/{Path.GetRelativePath(gamesDir, destFile)}");
+            }
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempDestRoot)) Directory.Delete(tempDestRoot, recursive: true); } catch { }
+        }
+
+        if (copyMoveOk)
+            Console.WriteLine("  ✅  All ROM copy/move destinations are in the correct scanner layout.");
         Console.WriteLine();
 
         // ── SUMMARY ───────────────────────────────────────────────────────────

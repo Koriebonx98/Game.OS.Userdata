@@ -401,7 +401,7 @@ public partial class GameDetailViewModel : ViewModelBase
         string romSource = entry0.ExecutablePath ?? "";
 
         bool srcIsDir  = Directory.Exists(romSource);
-        bool srcIsFile = !srcIsDir && System.IO.File.Exists(romSource);
+        bool srcIsFile = System.IO.File.Exists(romSource);
 
         if (string.IsNullOrEmpty(romSource) || (!srcIsFile && !srcIsDir))
         {
@@ -409,19 +409,12 @@ public partial class GameDetailViewModel : ViewModelBase
             return;
         }
 
-        // Use the actual platform folder name from the source path (e.g. "Sony - PlayStation 2")
-        // so the destination mirrors the same Roms/{folder}/Games/ layout the scanner expects.
-        string platformFolder = GetRomPlatformFolderName(romSource);
-        string destGamesDir   = System.IO.Path.Combine(option.DriveRoot, "Roms", platformFolder, "Games");
-
-        char[] dirSeps = { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
-
         if (srcIsDir)
         {
             // Folder-based ROM (e.g. PS3/PS4 TitleID directory): copy/move the whole folder.
             // Destination: Roms/{platformFolder}/Games/{FolderName}/
-            string folderName = System.IO.Path.GetFileName(romSource.TrimEnd(dirSeps));
-            string destFolder = System.IO.Path.Combine(destGamesDir, folderName);
+            string destFolder   = Services.RomPathHelper.ComputeFolderRomDestPath(romSource, option.DriveRoot, Platform);
+            string destGamesDir = System.IO.Path.GetDirectoryName(destFolder) ?? System.IO.Path.Combine(option.DriveRoot, "Roms", Platform, "Games");
             try { Directory.CreateDirectory(destGamesDir); } catch { }
             _ = ExecuteCopyMoveFolderAsync(romSource, destFolder, CopyMoveMode == "Move");
         }
@@ -431,77 +424,15 @@ public partial class GameDetailViewModel : ViewModelBase
             // scanner can reconstruct the same title from the folder name.
             // e.g.  …/Roms/Sony - PlayStation 2/Games/Grand Theft Auto/gta_sa.iso
             //       → {dest}/Roms/Sony - PlayStation 2/Games/Grand Theft Auto/gta_sa.iso
-            string srcDir = string.IsNullOrEmpty(entry0.FolderPath)
-                ? (System.IO.Path.GetDirectoryName(romSource) ?? "")
-                : entry0.FolderPath.TrimEnd(dirSeps);
-            string? srcGamesDir = FindRomsGamesDir(romSource);
-
-            string destDir;
-            if (!string.IsNullOrEmpty(srcGamesDir))
-            {
-                string relSub = System.IO.Path.GetRelativePath(srcGamesDir, srcDir);
-                destDir = (relSub == "." || string.IsNullOrEmpty(relSub))
-                    ? destGamesDir
-                    : System.IO.Path.Combine(destGamesDir, relSub);
-            }
-            else
-            {
-                destDir = destGamesDir;
-            }
-
-            try { Directory.CreateDirectory(destDir); } catch { }
-            string destFile = System.IO.Path.Combine(destDir, System.IO.Path.GetFileName(romSource));
+            string destFile = Services.RomPathHelper.ComputeFileRomDestPath(
+                romSource, entry0.FolderPath, option.DriveRoot, Platform);
+            try { Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destFile) ?? ""); } catch { }
             _ = ExecuteCopyMoveAsync(romSource, destFile, CopyMoveMode == "Move");
         }
     }
 
     [RelayCommand]
     private void CancelCopyMove() => ShowCopyMovePicker = false;
-
-    /// <summary>
-    /// Returns the actual platform folder name used on disk for the given ROM path,
-    /// e.g. <c>"Sony - PlayStation 2"</c> from <c>…/Roms/Sony - PlayStation 2/Games/…</c>.
-    /// Falls back to the normalised <see cref="Platform"/> value when the path does not
-    /// follow the expected <c>Roms/{folder}/Games/</c> layout.
-    /// </summary>
-    private string GetRomPlatformFolderName(string romPath)
-    {
-        string? gamesDir    = FindRomsGamesDir(romPath);
-        string? platformDir = gamesDir == null ? null : System.IO.Path.GetDirectoryName(gamesDir);
-        string  folderName  = platformDir == null ? "" : System.IO.Path.GetFileName(platformDir);
-        return string.IsNullOrEmpty(folderName) ? Platform : folderName;
-    }
-
-    /// <summary>
-    /// Walks up the path of <paramref name="romPath"/> to find the first ancestor
-    /// directory named "Games" whose parent is inside a "Roms" directory,
-    /// matching the expected scanner layout: Roms/{Platform}/Games/.
-    /// Returns <c>null</c> when the path does not follow the expected layout.
-    /// </summary>
-    private static string? FindRomsGamesDir(string romPath)
-    {
-        char[] dirSeps = { System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar };
-        string? dir = System.IO.Path.GetDirectoryName(romPath.TrimEnd(dirSeps));
-
-        while (dir != null)
-        {
-            string name         = System.IO.Path.GetFileName(dir);
-            string? parent      = System.IO.Path.GetDirectoryName(dir);
-            string? grandParent = parent == null ? null : System.IO.Path.GetDirectoryName(parent);
-
-            if (string.Equals(name, "Games", StringComparison.OrdinalIgnoreCase) &&
-                grandParent != null &&
-                string.Equals(System.IO.Path.GetFileName(grandParent), "Roms",
-                    StringComparison.OrdinalIgnoreCase))
-            {
-                return dir;
-            }
-
-            dir = parent;
-        }
-
-        return null;
-    }
 
     private async System.Threading.Tasks.Task ExecuteCopyMoveAsync(string source, string dest, bool move)
     {
@@ -626,7 +557,7 @@ public partial class GameDetailViewModel : ViewModelBase
             // Use the actual platform folder name from the source ROM path so the displayed
             // destination matches the layout the scanner expects (e.g. "Sony - PlayStation 2").
             string romPath        = _driveInstances.Count > 0 ? (_driveInstances[0].ExecutablePath ?? "") : "";
-            string platformFolder = GetRomPlatformFolderName(romPath);
+            string platformFolder = Services.RomPathHelper.GetRomPlatformFolderName(romPath, Platform);
 
             foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady))
             {
