@@ -397,19 +397,38 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowCopyMovePicker = false;
 
         if (_driveInstances.Count == 0) return;
-        string romSource = _driveInstances[0].ExecutablePath ?? "";
-        if (string.IsNullOrEmpty(romSource) || !System.IO.File.Exists(romSource))
+        var entry0 = _driveInstances[0];
+        string romSource = entry0.ExecutablePath ?? "";
+
+        bool srcIsDir  = Directory.Exists(romSource);
+        bool srcIsFile = System.IO.File.Exists(romSource);
+
+        if (string.IsNullOrEmpty(romSource) || (!srcIsFile && !srcIsDir))
         {
-            SettingsStatus = "ROM file not found.";
+            SettingsStatus = "ROM not found.";
             return;
         }
 
-        // Destination: Roms/{Platform}/Games/{filename}
-        string romsDest = System.IO.Path.Combine(option.DriveRoot, "Roms", Platform, "Games");
-        try { Directory.CreateDirectory(romsDest); } catch { }
-
-        string destFile = System.IO.Path.Combine(romsDest, System.IO.Path.GetFileName(romSource));
-        _ = ExecuteCopyMoveAsync(romSource, destFile, CopyMoveMode == "Move");
+        if (srcIsDir)
+        {
+            // Folder-based ROM (e.g. PS3/PS4 TitleID directory): copy/move the whole folder.
+            // Destination: Roms/{platformFolder}/Games/{FolderName}/
+            string destFolder   = Services.RomPathHelper.ComputeFolderRomDestPath(romSource, option.DriveRoot, Platform);
+            string destGamesDir = System.IO.Path.GetDirectoryName(destFolder) ?? System.IO.Path.Combine(option.DriveRoot, "Roms", Platform, "Games");
+            try { Directory.CreateDirectory(destGamesDir); } catch { }
+            _ = ExecuteCopyMoveFolderAsync(romSource, destFolder, CopyMoveMode == "Move");
+        }
+        else
+        {
+            // File-based ROM: preserve any subfolder between Games/ and the file so the
+            // scanner can reconstruct the same title from the folder name.
+            // e.g.  …/Roms/Sony - PlayStation 2/Games/Grand Theft Auto/gta_sa.iso
+            //       → {dest}/Roms/Sony - PlayStation 2/Games/Grand Theft Auto/gta_sa.iso
+            string destFile = Services.RomPathHelper.ComputeFileRomDestPath(
+                romSource, entry0.FolderPath, option.DriveRoot, Platform);
+            try { Directory.CreateDirectory(System.IO.Path.GetDirectoryName(destFile) ?? ""); } catch { }
+            _ = ExecuteCopyMoveAsync(romSource, destFile, CopyMoveMode == "Move");
+        }
     }
 
     [RelayCommand]
@@ -456,6 +475,76 @@ public partial class GameDetailViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Recursively copies or moves a ROM folder (e.g. a PS3/PS4 TitleID directory)
+    /// to <paramref name="destFolder"/>, then updates the displayed drive path.
+    /// </summary>
+    private async System.Threading.Tasks.Task ExecuteCopyMoveFolderAsync(
+        string sourceFolder, string destFolder, bool move)
+    {
+        SettingsStatus = move ? "Moving ROM…" : "Copying ROM…";
+        try
+        {
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                if (move)
+                {
+                    // Directory.Move only works on the same volume; use copy+delete for cross-drive.
+                    string? srcRoot  = System.IO.Path.GetPathRoot(sourceFolder);
+                    string? destRoot = System.IO.Path.GetPathRoot(destFolder);
+                    if (string.Equals(srcRoot, destRoot, StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (Directory.Exists(destFolder))
+                            Directory.Delete(destFolder, recursive: true);
+                        Directory.Move(sourceFolder, destFolder);
+                    }
+                    else
+                    {
+                        CopyDirectoryRecursive(sourceFolder, destFolder);
+                        Directory.Delete(sourceFolder, recursive: true);
+                    }
+                }
+                else
+                {
+                    CopyDirectoryRecursive(sourceFolder, destFolder);
+                }
+            });
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                SettingsStatus = move
+                    ? $"✓  ROM moved to {destFolder}"
+                    : $"✓  ROM copied to {destFolder}";
+                if (move && _driveInstances.Count > 0)
+                {
+                    var entry = _driveInstances[0];
+                    _driveInstances[0] = new LocalGameDriveEntry
+                    {
+                        DriveRoot      = System.IO.Path.GetPathRoot(destFolder) ?? entry.DriveRoot,
+                        FolderPath     = System.IO.Path.GetDirectoryName(destFolder) ?? entry.FolderPath,
+                        ExecutablePath = destFolder,
+                        ExecutableType = entry.ExecutableType,
+                    };
+                    ActiveDrivePath = _driveInstances[0].FolderPath;
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                SettingsStatus = $"Failed: {ex.Message}");
+        }
+    }
+
+    private static void CopyDirectoryRecursive(string source, string dest)
+    {
+        Directory.CreateDirectory(dest);
+        foreach (var file in Directory.EnumerateFiles(source))
+            System.IO.File.Copy(file, System.IO.Path.Combine(dest, System.IO.Path.GetFileName(file)), overwrite: true);
+        foreach (var dir in Directory.EnumerateDirectories(source))
+            CopyDirectoryRecursive(dir, System.IO.Path.Combine(dest, System.IO.Path.GetFileName(dir)));
+    }
+
     private void PopulateCopyMoveDrives()
     {
         CopyMoveDrives.Clear();
@@ -465,11 +554,16 @@ public partial class GameDetailViewModel : ViewModelBase
             string? currentRoot = _driveInstances.Count > 0
                 ? System.IO.Path.GetPathRoot(_driveInstances[0].ExecutablePath ?? "") : null;
 
+            // Use the actual platform folder name from the source ROM path so the displayed
+            // destination matches the layout the scanner expects (e.g. "Sony - PlayStation 2").
+            string romPath        = _driveInstances.Count > 0 ? (_driveInstances[0].ExecutablePath ?? "") : "";
+            string platformFolder = Services.RomPathHelper.GetRomPlatformFolderName(romPath, Platform);
+
             foreach (var drive in DriveInfo.GetDrives().Where(d => d.IsReady))
             {
                 try
                 {
-                    string romsPath  = System.IO.Path.Combine(drive.RootDirectory.FullName, "Roms", Platform, "Games");
+                    string romsPath  = System.IO.Path.Combine(drive.RootDirectory.FullName, "Roms", platformFolder, "Games");
                     string gamesPath = romsPath; // reuse InstallDriveOption.GamesFolderPath for display
                     bool   exists    = Directory.Exists(romsPath);
                     long   free      = drive.AvailableFreeSpace;
@@ -561,9 +655,10 @@ public partial class GameDetailViewModel : ViewModelBase
                     {
                         var psi = new System.Diagnostics.ProcessStartInfo
                         {
-                            FileName        = emuSettings.EmulatorPath,
-                            Arguments       = args,
-                            UseShellExecute = false,
+                            FileName         = emuSettings.EmulatorPath,
+                            Arguments        = args,
+                            UseShellExecute  = false,
+                            WorkingDirectory = System.IO.Path.GetDirectoryName(emuSettings.EmulatorPath) ?? "",
                         };
                         romProc = System.Diagnostics.Process.Start(psi);
 
@@ -609,8 +704,9 @@ public partial class GameDetailViewModel : ViewModelBase
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName        = exePath,
-                    UseShellExecute = true,
+                    FileName         = exePath,
+                    UseShellExecute  = true,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(exePath) ?? "",
                 };
                 if (!string.IsNullOrEmpty(exeArgs))
                     psi.Arguments = exeArgs;
@@ -647,8 +743,9 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             var psi = new System.Diagnostics.ProcessStartInfo
             {
-                FileName        = path,
-                UseShellExecute = true,
+                FileName         = path,
+                UseShellExecute  = true,
+                WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? "",
             };
             if (!string.IsNullOrEmpty(args))
                 psi.Arguments = args;
