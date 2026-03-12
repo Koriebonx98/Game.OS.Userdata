@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading;
 using GameLauncher.Models;
 
 namespace GameLauncher.Services
@@ -26,6 +27,29 @@ namespace GameLauncher.Services
         private static readonly JsonSerializerOptions _jsonOpts =
             new JsonSerializerOptions { WriteIndented = true };
 
+        // ── Constants ─────────────────────────────────────────────────────────
+
+        /// <summary>How often (in minutes) a running-game checkpoint is written to disk.</summary>
+        private const int CheckpointIntervalMinutes = 2;
+
+        // ── In-memory active session tracking (static so callers can query from any context) ──
+
+        /// <summary>
+        /// Games that are currently running (platform||title → session start time).
+        /// Updated immediately when <see cref="TrackProcess"/> is called so the
+        /// dashboard can show the game in "Continue Playing" without waiting for exit.
+        /// </summary>
+        private static readonly Dictionary<string, DateTime> _activeSessions =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        private static readonly object _activeSessionsLock = new();
+
+        /// <summary>
+        /// Fired on the thread-pool when a tracked game process exits and the session
+        /// has been saved to disk.  Parameters are (platform, title).
+        /// </summary>
+        public static event Action<string, string>? SessionCompleted;
+
         // Active watch record: process + metadata
         private sealed class WatchEntry
         {
@@ -33,6 +57,7 @@ namespace GameLauncher.Services
             public string   Title     { get; init; } = "";
             public string   Platform  { get; init; } = "";
             public DateTime StartedAt { get; init; }
+            public Timer?   Checkpoint { get; set; }
         }
 
         private readonly List<WatchEntry> _watching = new();
@@ -40,44 +65,119 @@ namespace GameLauncher.Services
         // ── Public API ────────────────────────────────────────────────────────
 
         /// <summary>
+        /// Returns <c>true</c> if a game process with the given platform and title is
+        /// currently being tracked (i.e. the game is running right now).
+        /// </summary>
+        public static bool IsBeingTracked(string platform, string title)
+        {
+            string key = MakeKey(platform, title);
+            lock (_activeSessionsLock)
+                return _activeSessions.ContainsKey(key);
+        }
+
+        /// <summary>
+        /// Returns the number of minutes the game has been running in the current session.
+        /// Returns 0 when the game is not currently being tracked.
+        /// </summary>
+        public static int GetActiveMinutes(string platform, string title)
+        {
+            string key = MakeKey(platform, title);
+            lock (_activeSessionsLock)
+            {
+                if (_activeSessions.TryGetValue(key, out var startedAt))
+                    return Math.Max(1, (int)(DateTime.UtcNow - startedAt).TotalMinutes);
+            }
+            return 0;
+        }
+
+        /// <summary>
         /// Called after a game process has been started.
         /// The service monitors the process and records the session on exit.
+        /// Immediately marks the game as "active" so callers can detect it without
+        /// waiting for the process to exit.
         /// </summary>
         public void TrackProcess(Process proc, string title, string platform,
                                  List<Game>? libraryToUpdate = null)
         {
-            if (proc == null || proc.HasExited) return;
+            if (proc == null) return;
+
+            var startedAt = DateTime.UtcNow;
+            string key = MakeKey(platform, title);
+
+            lock (_activeSessionsLock)
+                _activeSessions[key] = startedAt;
+
+            // Immediately stamp LastPlayedAt on the cloud-library game (if present)
+            // so the dashboard "Recently Played" section updates right away.
+            if (libraryToUpdate != null)
+                StampLastPlayedAt(libraryToUpdate, platform, title);
+
+            // If the process has already exited (e.g. launcher-style games that spawn
+            // a child and exit quickly), record the session synchronously and return.
+            if (proc.HasExited)
+            {
+                FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
+                return;
+            }
 
             var entry = new WatchEntry
             {
                 Proc      = proc,
                 Title     = title,
                 Platform  = platform,
-                StartedAt = DateTime.UtcNow,
+                StartedAt = startedAt,
             };
             _watching.Add(entry);
+
+            // Periodic checkpoint: save an interim session every 2 minutes so playtime
+            // is not lost if the launcher crashes before the game exits cleanly.
+            entry.Checkpoint = new Timer(_ =>
+            {
+                lock (_activeSessionsLock)
+                {
+                    if (!_activeSessions.ContainsKey(key)) return; // session already ended
+                }
+                var checkpoint = new PlaySession
+                {
+                    Platform  = platform,
+                    Title     = title,
+                    StartedAt = startedAt.ToString("o"),
+                    EndedAt   = DateTime.UtcNow.ToString("o"),
+                    Minutes   = Math.Max(1, (int)(DateTime.UtcNow - startedAt).TotalMinutes),
+                    IsCheckpoint = true,
+                };
+                SaveCheckpoint(checkpoint);
+            }, null, TimeSpan.FromMinutes(CheckpointIntervalMinutes), TimeSpan.FromMinutes(CheckpointIntervalMinutes));
 
             proc.EnableRaisingEvents = true;
             proc.Exited += (_, _) =>
             {
+                entry.Checkpoint?.Change(Timeout.Infinite, Timeout.Infinite);
+                entry.Checkpoint?.Dispose();
+                entry.Checkpoint = null;
                 _watching.Remove(entry);
-                var minutes = (int)(DateTime.UtcNow - entry.StartedAt).TotalMinutes;
-                if (minutes < 1) minutes = 1; // round up to at least 1 minute
-
-                var session = new PlaySession
-                {
-                    Platform  = platform,
-                    Title     = title,
-                    StartedAt = entry.StartedAt.ToString("o"),
-                    EndedAt   = DateTime.UtcNow.ToString("o"),
-                    Minutes   = minutes,
-                };
-
-                AppendSession(session);
-
-                if (libraryToUpdate != null)
-                    UpdateLibraryEntry(libraryToUpdate, platform, title, minutes);
+                FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
             };
+
+            // Guard against a race: if the process exited between the HasExited check
+            // and the Exited handler registration, the event may never fire.
+            // Check and remove atomically under the lock to avoid double-finalisation.
+            bool raceDetected = false;
+            if (proc.HasExited)
+            {
+                lock (_activeSessionsLock)
+                {
+                    raceDetected = _activeSessions.ContainsKey(key);
+                }
+            }
+            if (raceDetected)
+            {
+                entry.Checkpoint?.Change(Timeout.Infinite, Timeout.Infinite);
+                entry.Checkpoint?.Dispose();
+                entry.Checkpoint = null;
+                _watching.Remove(entry);
+                FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
+            }
         }
 
         /// <summary>
@@ -90,7 +190,7 @@ namespace GameLauncher.Services
         {
             try
             {
-                var sessions = LoadSessions();
+                var sessions = LoadSessions().Where(s => !s.IsCheckpoint).ToList();
                 if (sessions.Count == 0) return;
 
                 // Group sessions by (platform, title) and sum minutes / find latest session
@@ -115,14 +215,15 @@ namespace GameLauncher.Services
             catch { /* best-effort */ }
         }
 
-        /// <summary>Returns total minutes played for a given game.</summary>
+        /// <summary>Returns total minutes played for a given game (persisted sessions only).</summary>
         public static int GetTotalMinutes(string platform, string title)
         {
             try
             {
                 return LoadSessions()
-                    .Where(s => string.Equals(s.Platform, platform, StringComparison.OrdinalIgnoreCase)
-                             && string.Equals(s.Title, title, StringComparison.OrdinalIgnoreCase))
+                    .Where(s => !s.IsCheckpoint &&
+                                string.Equals(s.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                                string.Equals(s.Title,    title,    StringComparison.OrdinalIgnoreCase))
                     .Sum(s => s.Minutes);
             }
             catch { return 0; }
@@ -130,10 +231,53 @@ namespace GameLauncher.Services
 
         public void Dispose()
         {
-            // Nothing to dispose — process exit events are unmanaged
+            foreach (var e in _watching)
+            {
+                e.Checkpoint?.Dispose();
+            }
+            _watching.Clear();
         }
 
         // ── Private helpers ────────────────────────────────────────────────────
+
+        private static string MakeKey(string platform, string title)
+            => $"{platform.ToLowerInvariant()}||{title.ToLowerInvariant()}";
+
+        private static void FinaliseSession(string key, string platform, string title,
+                                             DateTime startedAt, List<Game>? libraryToUpdate)
+        {
+            lock (_activeSessionsLock)
+                _activeSessions.Remove(key);
+
+            var minutes = Math.Max(1, (int)(DateTime.UtcNow - startedAt).TotalMinutes);
+
+            var session = new PlaySession
+            {
+                Platform  = platform,
+                Title     = title,
+                StartedAt = startedAt.ToString("o"),
+                EndedAt   = DateTime.UtcNow.ToString("o"),
+                Minutes   = minutes,
+            };
+
+            // Remove any checkpoint entries for this game before saving the final session
+            RemoveCheckpoints(platform, title);
+            AppendSession(session);
+
+            if (libraryToUpdate != null)
+                UpdateLibraryEntry(libraryToUpdate, platform, title, minutes);
+
+            SessionCompleted?.Invoke(platform, title);
+        }
+
+        private static void StampLastPlayedAt(List<Game> library, string platform, string title)
+        {
+            var game = library.FirstOrDefault(g =>
+                string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(g.Title,    title,    StringComparison.OrdinalIgnoreCase));
+            if (game != null)
+                game.LastPlayedAt = DateTime.UtcNow.ToString("o");
+        }
 
         private static void AppendSession(PlaySession session)
         {
@@ -144,6 +288,38 @@ namespace GameLauncher.Services
                 sessions.Add(session);
                 File.WriteAllText(SessionsFile,
                     JsonSerializer.Serialize(sessions, _jsonOpts));
+            }
+            catch { /* best-effort */ }
+        }
+
+        private static void SaveCheckpoint(PlaySession checkpoint)
+        {
+            try
+            {
+                Directory.CreateDirectory(DataDir);
+                var sessions = LoadSessions();
+                // Replace any existing checkpoint for the same game with the latest one
+                sessions.RemoveAll(s => s.IsCheckpoint &&
+                    string.Equals(s.Platform, checkpoint.Platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Title,    checkpoint.Title,    StringComparison.OrdinalIgnoreCase));
+                sessions.Add(checkpoint);
+                File.WriteAllText(SessionsFile,
+                    JsonSerializer.Serialize(sessions, _jsonOpts));
+            }
+            catch { /* best-effort */ }
+        }
+
+        private static void RemoveCheckpoints(string platform, string title)
+        {
+            try
+            {
+                var sessions = LoadSessions();
+                bool changed = sessions.RemoveAll(s => s.IsCheckpoint &&
+                    string.Equals(s.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(s.Title,    title,    StringComparison.OrdinalIgnoreCase)) > 0;
+                if (changed)
+                    File.WriteAllText(SessionsFile,
+                        JsonSerializer.Serialize(sessions, _jsonOpts));
             }
             catch { /* best-effort */ }
         }

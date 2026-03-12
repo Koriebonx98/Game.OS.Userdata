@@ -90,18 +90,25 @@ public partial class DashboardViewModel : ViewModelBase
         foreach (var a in achievements.OrderByDescending(a => ParseDate(a.UnlockedAt)).Take(4))
             RecentAchievements.Add(a);
 
-        // Continue Playing — only local games/ROMs that have been played (have recorded playtime)
+        // Continue Playing — local games/ROMs that have recorded playtime OR are actively running now
         RecentLocalGames.Clear();
         if (localCards != null)
         {
             foreach (var c in localCards
-                .Where(c => PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle) > 0)
-                .OrderByDescending(c => PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle))
+                .Where(c => PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle) > 0
+                         || PlaytimeService.IsBeingTracked(c.Platform, c.EffectiveTitle))
+                .OrderByDescending(c => PlaytimeService.IsBeingTracked(c.Platform, c.EffectiveTitle) ? int.MaxValue
+                                       : PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle))
                 .Take(8))
             {
-                // Populate playtime label on the card
-                int mins = PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
-                c.PlaytimeLabel = FormatMinutes(mins);
+                // Show "▶ Playing now" for active sessions, otherwise show accumulated time
+                if (PlaytimeService.IsBeingTracked(c.Platform, c.EffectiveTitle))
+                    c.PlaytimeLabel = "▶ Playing now";
+                else
+                {
+                    int mins = PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
+                    c.PlaytimeLabel = FormatMinutes(mins);
+                }
                 RecentLocalGames.Add(c);
             }
         }
