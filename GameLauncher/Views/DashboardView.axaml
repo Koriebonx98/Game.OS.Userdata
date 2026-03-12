@@ -47,7 +47,7 @@
             </Border>
         </StackPanel>
 
-        <!-- Hero Featured Game -->
+        <!-- Hero Featured Game / Last Played -->
         <Border Classes="hero-banner" Margin="0,0,0,24" Cursor="Hand"
                 IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
             <Border.Background>
@@ -60,12 +60,22 @@
                 <StackPanel Grid.Column="0" Spacing="10" VerticalAlignment="Center">
                     <Border Background="#1f6feb" CornerRadius="4"
                             Padding="8,3" HorizontalAlignment="Left">
-                        <TextBlock Text="⭐  FEATURED" FontSize="11"
+                        <TextBlock Text="{Binding FeaturedBadgeText}" FontSize="11"
                                    FontWeight="Bold" Foreground="White"/>
                     </Border>
                     <TextBlock Text="{Binding FeaturedGame.Title}" Classes="hero-title"/>
-                    <TextBlock Text="{Binding FeaturedGame.Description}" Classes="hero-desc"/>
-                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0">
+                    <TextBlock Text="{Binding FeaturedGame.Description}" Classes="hero-desc"
+                               IsVisible="{Binding FeaturedGame.Description,
+                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <!-- Show platform badge for last-played game (no description/price) -->
+                    <Border CornerRadius="4" Padding="8,3" Background="#0d2137"
+                            HorizontalAlignment="Left"
+                            IsVisible="{Binding IsFeaturedLastPlayed}">
+                        <TextBlock Text="{Binding FeaturedGame.Platform}"
+                                   FontSize="11" Foreground="#58a6ff"/>
+                    </Border>
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0"
+                                IsVisible="{Binding !IsFeaturedLastPlayed}">
                         <TextBlock Text="{Binding FeaturedGame.Price}" Classes="hero-price"/>
                         <TextBlock Text="{Binding FeaturedGame.RatingStars}"
                                    FontSize="16" Foreground="#f1c40f"
@@ -74,9 +84,17 @@
                                    FontSize="13" Foreground="#8b949e"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
+                    <!-- "Continue Playing" for last-played, "View Details" for featured store game -->
+                    <Button Classes="btn-primary" Width="160"
+                            HorizontalContentAlignment="Center" Margin="0,8,0,0"
+                            Command="{Binding OpenFeaturedDetailCommand}"
+                            IsVisible="{Binding IsFeaturedLastPlayed}">
+                        ▶  Continue Playing
+                    </Button>
                     <Button Classes="btn-primary" Width="140"
                             HorizontalContentAlignment="Center" Margin="0,8,0,0"
-                            Command="{Binding OpenFeaturedDetailCommand}">
+                            Command="{Binding OpenFeaturedDetailCommand}"
+                            IsVisible="{Binding !IsFeaturedLastPlayed}">
                         View Details
                     </Button>
                 </StackPanel>

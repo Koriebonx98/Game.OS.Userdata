@@ -9,7 +9,10 @@ namespace GameLauncher.Services
 {
     /// <summary>
     /// Loads and saves per-platform emulator settings to AppData.
-    /// Settings are stored at %APPDATA%/GameOS/EmulatorSettings/{Platform}.json
+    /// Settings are stored at %APPDATA%/GameOS/EmulatorSettings/{Platform}.emu.json
+    /// Each file is a JSON array of <see cref="EmulatorSettings"/>, allowing multiple
+    /// emulators to be configured per platform.  Single-object legacy files are
+    /// automatically upgraded to an array on first read.
     /// </summary>
     public static class EmulatorSettingsService
     {
@@ -31,10 +34,11 @@ namespace GameLauncher.Services
         };
 
         /// <summary>
-        /// Loads saved emulator settings for the given platform.
-        /// Returns a default instance (empty paths) when no file exists.
+        /// Loads ALL saved emulator configurations for the given platform.
+        /// Returns a list with one default (empty) entry when no file exists.
+        /// Handles both the legacy single-object format and the new array format.
         /// </summary>
-        public static EmulatorSettings Load(string platform)
+        public static List<EmulatorSettings> LoadAll(string platform)
         {
             try
             {
@@ -42,26 +46,94 @@ namespace GameLauncher.Services
                 if (File.Exists(path))
                 {
                     var json = File.ReadAllText(path);
-                    return JsonSerializer.Deserialize<EmulatorSettings>(json)
-                           ?? new EmulatorSettings { Platform = platform };
+                    using var doc = JsonDocument.Parse(json);
+                    var root = doc.RootElement;
+
+                    if (root.ValueKind == JsonValueKind.Array)
+                    {
+                        // New format: array of emulator settings
+                        var list = JsonSerializer.Deserialize<List<EmulatorSettings>>(json) ?? new();
+                        if (list.Count > 0) return list;
+                    }
+                    else if (root.ValueKind == JsonValueKind.Object)
+                    {
+                        // Legacy format: single object → wrap in list
+                        var single = JsonSerializer.Deserialize<EmulatorSettings>(json);
+                        if (single != null) return new List<EmulatorSettings> { single };
+                    }
                 }
             }
             catch { /* best-effort */ }
 
-            return new EmulatorSettings { Platform = platform, Arguments = "{rom}" };
+            return new List<EmulatorSettings>
+            {
+                new EmulatorSettings { Platform = platform, Arguments = "{rom}" }
+            };
         }
 
-        /// <summary>Persists emulator settings for the given platform to disk.</summary>
-        public static void Save(EmulatorSettings settings)
+        /// <summary>
+        /// Loads the first enabled emulator for the given platform.
+        /// Returns a default instance (empty paths) when no file exists.
+        /// </summary>
+        public static EmulatorSettings Load(string platform)
+        {
+            var all = LoadAll(platform);
+            return all.FirstOrDefault(e => e.Enabled)
+                   ?? all.FirstOrDefault()
+                   ?? new EmulatorSettings { Platform = platform, Arguments = "{rom}" };
+        }
+
+        /// <summary>
+        /// Returns the emulator with the given name for <paramref name="platform"/>,
+        /// or the first enabled one if the name is not found / empty.
+        /// </summary>
+        public static EmulatorSettings LoadByName(string platform, string? name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return Load(platform);
+            var all = LoadAll(platform);
+            return all.FirstOrDefault(e => string.Equals(e.EmulatorName, name, StringComparison.OrdinalIgnoreCase))
+                   ?? Load(platform);
+        }
+
+        /// <summary>Persists the full list of emulator settings for the given platform to disk.</summary>
+        public static void SaveAll(string platform, List<EmulatorSettings> settings)
         {
             try
             {
+                // Ensure every entry carries the platform name
+                foreach (var s in settings)
+                    s.Platform = platform;
+
                 Directory.CreateDirectory(SettingsDir);
                 File.WriteAllText(
-                    GetPath(settings.Platform),
+                    GetPath(platform),
                     JsonSerializer.Serialize(settings, _jsonOpts));
             }
             catch { /* best-effort */ }
+        }
+
+        /// <summary>
+        /// Persists emulator settings for the given platform to disk.
+        /// If an entry with the same <see cref="EmulatorSettings.EmulatorName"/> (or same path when
+        /// name is empty) already exists it is updated in-place; otherwise the settings are added
+        /// as a new entry.  Use <see cref="SaveAll"/> when managing the full list explicitly.
+        /// </summary>
+        public static void Save(EmulatorSettings settings)
+        {
+            var all = LoadAll(settings.Platform);
+            // Find an existing entry with matching name or matching path to update in-place
+            int idx = -1;
+            if (!string.IsNullOrWhiteSpace(settings.EmulatorName))
+                idx = all.FindIndex(e => string.Equals(e.EmulatorName, settings.EmulatorName, StringComparison.OrdinalIgnoreCase));
+            if (idx < 0 && !string.IsNullOrWhiteSpace(settings.EmulatorPath))
+                idx = all.FindIndex(e => string.Equals(e.EmulatorPath, settings.EmulatorPath, StringComparison.OrdinalIgnoreCase));
+            if (idx >= 0)
+                all[idx] = settings;
+            else if (all.Count == 1 && string.IsNullOrEmpty(all[0].EmulatorPath))
+                all[0] = settings; // Replace the default empty placeholder
+            else
+                all.Add(settings);
+            SaveAll(settings.Platform, all);
         }
 
         private static string GetPath(string platform)

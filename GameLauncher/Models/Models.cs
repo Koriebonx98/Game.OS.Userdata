@@ -267,6 +267,11 @@ namespace GameLauncher.Models
         [JsonPropertyName("exeArgs")]     public string? ExeArgs     { get; set; }
         /// <summary>Full path to the ROM file used when launching via an emulator.</summary>
         [JsonPropertyName("romPath")]     public string? RomPath     { get; set; }
+        /// <summary>
+        /// Name (EmulatorName label) of the preferred emulator to use for this game.
+        /// When set, this overrides the default first-enabled emulator for the platform.
+        /// </summary>
+        [JsonPropertyName("preferredEmulatorName")] public string? PreferredEmulatorName { get; set; }
         /// <summary>Apps/scripts to run <b>before</b> the game launches.</summary>
         [JsonPropertyName("preLaunch")]   public List<LaunchEntry> PreLaunch    { get; set; } = new();
         /// <summary>Apps/scripts to run <b>during</b> the game (e.g. overlay or server).</summary>

@@ -261,6 +261,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Apply stored playtime data to the library so the dashboard shows accurate totals
         PlaytimeService.ApplyStoredPlaytime(library);
 
+        // Cross-reference the user's unlocked achievements with their cloud library so that
+        // opening any game detail view immediately shows the achievements they have earned
+        // (covers Switch, PS3, Xbox 360, and all other platforms, not just PC/Steam).
+        foreach (var game in library)
+        {
+            var matching = achievements
+                .Where(a => string.Equals(a.Platform, game.Platform, StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(a.GameTitle, game.Title,    StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            if (matching.Count > 0)
+                game.GameAchievements = matching;
+        }
+
         // Update presence so the user appears "Online" to friends (mirrors the web app)
         _ = _client.UpdatePresenceAsync();
 
@@ -464,6 +477,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         else if (card.SourceRom != null)
         {
             OpenDetailFromLocalRom(card.SourceRom);
+        }
+        else if (card.SourceCloudGame != null)
+        {
+            // Cloud library game shown in "Continue Playing" — open via standard cloud detail flow
+            OpenDetailFromGame(card.SourceCloudGame);
         }
     }
 
