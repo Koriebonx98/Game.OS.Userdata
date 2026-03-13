@@ -2882,13 +2882,14 @@ async function _parseSteamRunStats(runId, conclusion, ghHeaders) {
  * Polls the scrape-exophase workflow run after a manual dispatch,
  * shows live step progress, and updates the progress panel element in place.
  */
-async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl) {
+async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl, btn) {
     const ghHeaders = {
         'Authorization': `Bearer ${GAMES_DB_TOKEN}`,
         'Accept': 'application/vnd.github+json',
         'X-GitHub-Api-Version': '2022-11-28'
     };
     const runsApiUrl = `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/workflows/scrape-exophase.yml/runs?per_page=10`;
+    const restoreBtn = () => { if (btn) { btn.disabled = false; btn.textContent = '🔄 Scrape JSON'; } };
 
     let _statusPhrase = 'waiting for workflow to start…';
     const ticker = setInterval(() => {
@@ -2941,9 +2942,37 @@ async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl) {
                 const conclusion = run.conclusion;
                 if (progressEl) {
                     if (conclusion === 'success') {
+                        // Parse job logs for real achievement count
+                        let achCount = null;
+                        try {
+                            const jobsResp = await fetch(
+                                `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/runs/${runId}/jobs`,
+                                { headers: ghHeaders }
+                            );
+                            if (jobsResp.ok) {
+                                const jobsData = await jobsResp.json();
+                                const firstJob = (jobsData.jobs || [])[0];
+                                if (firstJob) {
+                                    const logResp = await fetch(
+                                        `https://api.github.com/repos/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/actions/jobs/${firstJob.id}/logs`,
+                                        { headers: ghHeaders }
+                                    );
+                                    if (logResp.ok) {
+                                        const logText = await logResp.text();
+                                        const m = logText.match(/Scraped (\d+) achievements/);
+                                        if (m) achCount = parseInt(m[1], 10);
+                                    }
+                                }
+                            }
+                        } catch (logErr) {
+                            console.warn('Scrape log parse error:', logErr);
+                        }
+                        const link = `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;font-weight:normal;">View run →</a>`;
+                        const body = achCount != null
+                            ? `<strong>${achCount}</strong> achievements scraped and saved to Games.Database.`
+                            : `Achievements scraped and saved to Games.Database.`;
                         progressEl.innerHTML =
-                            `<div style="color:#22c55e;font-weight:600;">✅ Achievements scraped and saved to Games.Database successfully! ` +
-                            `<a href="${escapeHtml(runsUrl)}" target="_blank" rel="noopener noreferrer" style="color:#3b82f6;font-weight:normal;">View run →</a></div>`;
+                            `<div style="color:#22c55e;font-weight:600;">✅ ${body} ${link}</div>`;
                     } else {
                         progressEl.innerHTML =
                             `<div style="color:#ef4444;">❌ Workflow finished with status: <strong>${escapeHtml(conclusion || 'unknown')}</strong>. ` +
@@ -2958,6 +2987,7 @@ async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl) {
         }
     } finally {
         clearInterval(ticker);
+        restoreBtn();
     }
 
     // Timed out
@@ -2968,8 +2998,6 @@ async function _pollAndDisplayScrapeProgress(triggerTime, progressEl, runsUrl) {
     }
 }
 
-// ============================================================
-// TOTAL USER COUNT
 // ============================================================
 
 /**
@@ -5589,6 +5617,7 @@ async function _adminScrapeExophaseNow() {
     if (msgEl) { msgEl.style.display = 'none'; }
     if (progressPanel) { progressPanel.style.display = 'none'; }
 
+    let pollingActive = false;
     try {
         if (getBackendBase()) {
             // Backend path: delegate to the server-side scrape endpoint
@@ -5662,8 +5691,9 @@ async function _adminScrapeExophaseNow() {
                 );
                 if (progressPanel && progressContent) {
                     progressPanel.style.display = '';
-                    // Poll for live progress in the background
-                    _pollAndDisplayScrapeProgress(triggerTime, progressContent, runsUrl);
+                    // Poll for live progress in the background; btn is restored when polling finishes
+                    _pollAndDisplayScrapeProgress(triggerTime, progressContent, runsUrl, btn);
+                    pollingActive = true;
                 }
             } catch (dispatchErr) {
                 // If the token lacks Actions write permission, fall back to a direct
@@ -5703,7 +5733,9 @@ async function _adminScrapeExophaseNow() {
     } catch (err) {
         showScrapeMsg(`❌ Scrape failed: ${escapeHtml(err.message)}`, false);
     } finally {
-        if (btn) { btn.disabled = false; btn.textContent = '🔄 Scrape JSON'; }
+        if (!pollingActive) {
+            if (btn) { btn.disabled = false; btn.textContent = '🔄 Scrape JSON'; }
+        }
     }
 }
 
