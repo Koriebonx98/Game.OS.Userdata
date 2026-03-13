@@ -4,6 +4,7 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -97,9 +98,18 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool _isSetupRepack;
     /// <summary>True when the repack is an archive and we should show a drive-selection picker.</summary>
     [ObservableProperty] private bool _showDrivePicker;
+    /// <summary>Extraction progress percentage (0–100) shown in the progress bar during archive extraction.</summary>
+    [ObservableProperty] private double _extractionProgress;
+    /// <summary>True while an archive is being extracted — drives the progress bar visibility.</summary>
+    [ObservableProperty] private bool _isExtracting;
 
     /// <summary>Available drives for archive-repack installation.</summary>
     public ObservableCollection<InstallDriveOption> InstallDrives { get; } = new();
+
+    // ── Static compiled regex ─────────────────────────────────────────────────
+    /// <summary>Matches 7-Zip progress output like "  42% - filename".</summary>
+    private static readonly Regex _sevenZipProgressRegex =
+        new(@"(\d+)%", RegexOptions.Compiled);
 
     public ObservableCollection<string> DriveLabels { get; } = new();
 
@@ -781,6 +791,14 @@ public partial class GameDetailViewModel : ViewModelBase
 
         if (!string.IsNullOrEmpty(exePath))
         {
+            // Save the resolved exe path so "Continue Playing" reuses it next session
+            if (string.IsNullOrEmpty(saved.ExePath) || saved.ExePath != exePath)
+            {
+                saved.ExePath    = exePath;
+                saved.GameTitle  = Title;
+                GameSettingsService.Save(saved);
+            }
+
             System.Diagnostics.Process? gameProc = null;
             try
             {
@@ -943,32 +961,66 @@ public partial class GameDetailViewModel : ViewModelBase
     private void CancelInstall() => ShowDrivePicker = false;
 
     /// <summary>
-    /// Extracts a ZIP archive to <paramref name="destFolder"/> in a background thread.
-    /// Shows extraction status in <see cref="SettingsStatus"/> when the settings panel is open.
+    /// Extracts a ZIP archive to <paramref name="destFolder"/> in a background thread,
+    /// reporting per-entry progress via <see cref="ExtractionProgress"/>.
     /// </summary>
     private async System.Threading.Tasks.Task ExtractZipAsync(string archivePath, string destFolder)
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            SettingsStatus = "Extracting ZIP…");
+        {
+            SettingsStatus      = "Extracting ZIP…";
+            ExtractionProgress  = 0;
+            IsExtracting        = true;
+        });
         try
         {
             await System.Threading.Tasks.Task.Run(() =>
-                System.IO.Compression.ZipFile.ExtractToDirectory(archivePath, destFolder, overwriteFiles: true));
+            {
+                using var archive = System.IO.Compression.ZipFile.OpenRead(archivePath);
+                int total = archive.Entries.Count;
+                int done  = 0;
+                foreach (var entry in archive.Entries)
+                {
+                    string destPath = System.IO.Path.Combine(destFolder, entry.FullName);
+                    // Directory entries end with a separator
+                    if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
+                    {
+                        System.IO.Directory.CreateDirectory(destPath);
+                    }
+                    else
+                    {
+                        string? dir = System.IO.Path.GetDirectoryName(destPath);
+                        if (!string.IsNullOrEmpty(dir))
+                            System.IO.Directory.CreateDirectory(dir);
+                        entry.ExtractToFile(destPath, overwrite: true);
+                    }
+                    done++;
+                    double pct = total > 0 ? (double)done / total * 100.0 : 0;
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() => ExtractionProgress = pct);
+                }
+            });
 
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                SettingsStatus = $"✓  Extracted to {destFolder}");
+            {
+                SettingsStatus     = $"✓  Extracted to {destFolder}";
+                ExtractionProgress = 100;
+                IsExtracting       = false;
+            });
         }
         catch (Exception ex)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                SettingsStatus = $"Extraction failed: {ex.Message}");
+            {
+                SettingsStatus = $"Extraction failed: {ex.Message}";
+                IsExtracting   = false;
+            });
         }
     }
 
     /// <summary>
     /// Tries to extract <paramref name="archivePath"/> to <paramref name="destFolder"/>
-    /// using the 7-Zip command-line tool.  Returns false if 7-Zip is not found so
-    /// the caller can fall back to opening with the system handler.
+    /// using the 7-Zip command-line tool.  Reports progress via <see cref="ExtractionProgress"/>.
+    /// Returns false if 7-Zip is not found so the caller can fall back to the system handler.
     /// </summary>
     private bool TryExtractWith7Zip(string archivePath, string destFolder)
     {
@@ -990,7 +1042,11 @@ public partial class GameDetailViewModel : ViewModelBase
         sevenZip ??= "7z";
 
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            SettingsStatus = "Extracting archive with 7-Zip…");
+        {
+            SettingsStatus     = "Extracting archive with 7-Zip…";
+            ExtractionProgress = 0;
+            IsExtracting       = true;
+        });
 
         // Safely escape paths to avoid issues with special characters
         string safeArchive = archivePath.Replace("\"", "\\\"");
@@ -1002,22 +1058,48 @@ public partial class GameDetailViewModel : ViewModelBase
             {
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName        = sevenZip,
-                    Arguments       = $"x \"{safeArchive}\" -o\"{safeDest}\" -y",
-                    UseShellExecute = false,
-                    CreateNoWindow  = true,
+                    FileName               = sevenZip,
+                    // -bsp1 makes 7z write progress percentages to stdout
+                    Arguments              = $"x \"{safeArchive}\" -o\"{safeDest}\" -y -bsp1",
+                    UseShellExecute        = false,
+                    CreateNoWindow         = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError  = true,
                 };
                 using var proc = System.Diagnostics.Process.Start(psi);
                 if (proc != null)
+                {
+                    // Parse 7z progress output asynchronously
+                    var outputTask = System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        while (!proc.StandardOutput.EndOfStream)
+                        {
+                            var line = await proc.StandardOutput.ReadLineAsync();
+                            if (line == null) break;
+                            // 7z progress format: "  XX% - filename"
+                            var match = _sevenZipProgressRegex.Match(line);
+                            if (match.Success && int.TryParse(match.Groups[1].Value, out int pct))
+                                Avalonia.Threading.Dispatcher.UIThread.Post(() => ExtractionProgress = pct);
+                        }
+                    });
                     await proc.WaitForExitAsync();
+                    await outputTask;
+                }
 
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    SettingsStatus = $"✓  Extracted to {destFolder}");
+                {
+                    SettingsStatus     = $"✓  Extracted to {destFolder}";
+                    ExtractionProgress = 100;
+                    IsExtracting       = false;
+                });
             }
             catch (Exception ex)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    SettingsStatus = $"Extraction failed: {ex.Message}");
+                {
+                    SettingsStatus = $"Extraction failed: {ex.Message}";
+                    IsExtracting   = false;
+                });
             }
         });
 

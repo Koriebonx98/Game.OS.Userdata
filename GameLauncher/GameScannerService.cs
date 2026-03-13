@@ -537,9 +537,13 @@ public sealed class GameScannerService : IDisposable
     {
         try
         {
-            // .exe (Windows)
+            // .exe (Windows) — preferred over batch scripts
             var exe = Directory.EnumerateFiles(folder, "*.exe", SearchOption.TopDirectoryOnly).FirstOrDefault();
             if (exe != null) return new ExeInfo(exe, "exe");
+
+            // .bat (Windows batch launcher — common in repacks and mod clients)
+            var bat = Directory.EnumerateFiles(folder, "*.bat", SearchOption.TopDirectoryOnly).FirstOrDefault();
+            if (bat != null) return new ExeInfo(bat, "bat");
 
             // .app bundle (macOS)
             var app = Directory.EnumerateDirectories(folder, "*.app", SearchOption.TopDirectoryOnly).FirstOrDefault();

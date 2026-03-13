@@ -87,7 +87,7 @@
                     <!-- "Continue Playing" for last-played, "View Details" for featured store game -->
                     <Button Classes="btn-primary" Width="160"
                             HorizontalContentAlignment="Center" Margin="0,8,0,0"
-                            Command="{Binding OpenFeaturedDetailCommand}"
+                            Command="{Binding ContinuePlayingCommand}"
                             IsVisible="{Binding IsFeaturedLastPlayed}">
                         ▶  Continue Playing
                     </Button>

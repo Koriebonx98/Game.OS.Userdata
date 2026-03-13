@@ -54,22 +54,22 @@ public partial class LocalGameCardVm : ViewModelBase
     // ── Derived badge text / colours ──────────────────────────────────────────
 
     public string KindLabel =>
-        SourceRom         != null ? "ROM"    :
-        SourceCloudGame   != null ? "Cloud"  :
+        SourceRom         != null ? "ROM"       :
+        SourceCloudGame   != null ? "Cloud"     :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "Installed" :
-        SourceRepack != null ? "Repack" : "Installed";
+        SourceRepack != null ? "Not Installed"  : "Installed";
 
     public string KindBackground =>
         SourceRom         != null ? "#1f3a6e" :
         SourceCloudGame   != null ? "#1a3a6e" :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "#1a5e34" :
-        SourceRepack != null ? "#5c3800" : "#1a5e34";
+        SourceRepack != null ? "#3d1a1a" : "#1a5e34";
 
     public string KindForeground =>
         SourceRom         != null ? "#58a6ff" :
         SourceCloudGame   != null ? "#0ea5e9" :
         SourceRepack != null && SourceRepack.IsInstalledGame ? "#3fb950" :
-        SourceRepack != null ? "#e3b341" : "#3fb950";
+        SourceRepack != null ? "#f85149" : "#3fb950";
 
     /// <summary>Comma-separated region tags for ROM entries (e.g. "Europe, USA"). Empty for non-ROM cards.</summary>
     public string RegionsLabel =>
