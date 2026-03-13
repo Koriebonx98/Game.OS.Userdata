@@ -247,42 +247,72 @@ try {
     );
 
     if (!toUpdate.length) {
-        console.warn(`   ⚠️  No matching game found in ${platformFile} for title_id="${TITLE_ID}" / title="${GAME_TITLE}" — skipping.`);
+        // Game not yet in the platform JSON — add a minimal entry so the UI can show
+        // it immediately (important for platforms where the JSON was just bootstrapped,
+        // e.g. Xbox 360.Games.json created for the first time).
+        console.log(`   No matching game found — adding new entry for "${GAME_TITLE}"`);
+        gamesArr.push({ TitleID: TITLE_ID, game_name: GAME_TITLE, exophaseUrl: EXOPHASE_URL, achievementsUrl });
     } else {
-        toUpdate.forEach(g => { g.achievementsUrl = achievementsUrl; });
+        toUpdate.forEach(g => {
+            g.achievementsUrl = achievementsUrl;
+            // Also update exophaseUrl to the URL that was just successfully used;
+            // this auto-corrects any stale or incorrect URL stored previously
+            // (e.g. Skate 2 PS3 entry that previously had Skate 3's URL).
+            g.exophaseUrl = EXOPHASE_URL;
+        });
         console.log(`   Updating ${toUpdate.length} game entry/entries…`);
-
-        // Use Git Data API (blob → tree → commit → ref) to handle large files
-        const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
-        const { data: blob } = await octokit.git.createBlob({
-            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
-            content: Buffer.from(JSON.stringify(updated)).toString('base64'),
-            encoding: 'base64'
-        });
-        const { data: commit } = await octokit.git.getCommit({
-            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, commit_sha: headSha
-        });
-        const { data: tree } = await octokit.git.createTree({
-            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
-            base_tree: commit.tree.sha,
-            tree: [{ path: platformFile, mode: '100644', type: 'blob', sha: blob.sha }]
-        });
-        const { data: newCommit } = await octokit.git.createCommit({
-            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
-            message: `Set achievementsUrl for ${safeTitle} (${safePlatform})`,
-            tree: tree.sha,
-            parents: [headSha],
-            author: { name: 'Game OS Bot', email: 'bot@gameos.com', date: new Date().toISOString() }
-        });
-        await octokit.git.updateRef({
-            owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
-            ref: 'heads/main', sha: newCommit.sha
-        });
-        console.log(`✅ achievementsUrl set in ${platformFile}`);
     }
+
+    // Use Git Data API (blob → tree → commit → ref) to handle large files
+    const updated = topKey ? { ...platformData, [topKey]: gamesArr } : gamesArr;
+    const { data: blob } = await octokit.git.createBlob({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+        content: Buffer.from(JSON.stringify(updated)).toString('base64'),
+        encoding: 'base64'
+    });
+    const { data: commit } = await octokit.git.getCommit({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME, commit_sha: headSha
+    });
+    const { data: tree } = await octokit.git.createTree({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+        base_tree: commit.tree.sha,
+        tree: [{ path: platformFile, mode: '100644', type: 'blob', sha: blob.sha }]
+    });
+    const { data: newCommit } = await octokit.git.createCommit({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+        message: `Set achievementsUrl for ${safeTitle} (${safePlatform})`,
+        tree: tree.sha,
+        parents: [headSha],
+        author: { name: 'Game OS Bot', email: 'bot@gameos.com', date: new Date().toISOString() }
+    });
+    await octokit.git.updateRef({
+        owner: GAMES_DB_REPO_OWNER, repo: GAMES_DB_REPO_NAME,
+        ref: 'heads/main', sha: newCommit.sha
+    });
+    console.log(`✅ achievementsUrl set in ${platformFile}`);
 } catch (err) {
-    // Non-fatal: achievements.json was already written.
-    console.warn(`⚠️  Could not update achievementsUrl in ${platformFile}: ${err.message}`);
+    // If the platform JSON doesn't exist yet (e.g. Xbox 360.Games.json), create it
+    // with a minimal entry so the game immediately appears in the UI.
+    if (err.status === 404) {
+        try {
+            console.log(`   ${platformFile} not found — creating with initial entry…`);
+            const newEntry = { TitleID: TITLE_ID, game_name: GAME_TITLE, achievementsUrl };
+            await octokit.repos.createOrUpdateFileContents({
+                owner:   GAMES_DB_REPO_OWNER,
+                repo:    GAMES_DB_REPO_NAME,
+                path:    platformFile,
+                message: `Create ${platformFile} — ${safeTitle} (${safePlatform})`,
+                content: Buffer.from(JSON.stringify([newEntry], null, 2)).toString('base64'),
+                committer: { name: 'Game OS Bot', email: 'bot@gameos.com' }
+            });
+            console.log(`✅ Created ${platformFile} with 1 initial entry`);
+        } catch (createErr) {
+            console.warn(`⚠️  Could not create ${platformFile}: ${createErr.message}`);
+        }
+    } else {
+        // Non-fatal: achievements.json was already written.
+        console.warn(`⚠️  Could not update achievementsUrl in ${platformFile}: ${err.message}`);
+    }
 }
 
 })();
