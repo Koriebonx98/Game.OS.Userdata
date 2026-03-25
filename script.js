@@ -216,42 +216,73 @@ async function initializeMode() {
     const statusEl = document.getElementById('connectionStatus');
 
     if (MODE === 'github') {
-        try {
-            // Verify the token and data repo are reachable (10-second timeout)
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000);
-            let resp;
+        // Try up to 2 attempts: first attempt with a 10-second timeout; if that
+        // times out (network blip), retry once before falling back to demo mode.
+        let resp = null;
+        let lastErr = null;
+        let tokenRejected = false; // true when a token was present but rejected by the API
+
+        for (let attempt = 1; attempt <= 2; attempt++) {
             try {
-                resp = await fetch(
-                    `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
-                    { headers: githubHeaders(), signal: controller.signal }
-                );
-            } finally {
-                clearTimeout(timeoutId);
-            }
-            if (resp.ok) {
-                console.log('✅ GitHub mode active – real accounts enabled');
-                if (statusEl) {
-                    statusEl.textContent = '✅ Real accounts active';
-                    statusEl.className = 'status connected';
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000);
+                try {
+                    resp = await fetch(
+                        `https://api.github.com/repos/${DATA_REPO_OWNER}/${DATA_REPO_NAME}`,
+                        { headers: githubHeaders(), signal: controller.signal }
+                    );
+                } finally {
+                    clearTimeout(timeoutId);
                 }
-                // Initialize the admin account in the background (runs once per session)
-                initAdminAccountGitHub();
-                return;
+
+                if (resp.ok) {
+                    console.log('✅ GitHub mode active – real accounts enabled');
+                    if (statusEl) {
+                        statusEl.textContent = '✅ Real accounts active';
+                        statusEl.className = 'status connected';
+                    }
+                    // Initialize the admin account in the background (runs once per session)
+                    initAdminAccountGitHub();
+                    return;
+                }
+
+                // Provide specific guidance based on the HTTP status code
+                if (resp.status === 401) {
+                    tokenRejected = true;
+                    console.warn('⚠️ DATA_REPO_TOKEN is invalid or expired. Generate a new fine-grained PAT and update the DATA_REPO_TOKEN repository secret, then re-run the deploy workflow.');
+                } else if (resp.status === 403) {
+                    tokenRejected = true;
+                    console.warn(`⚠️ DATA_REPO_TOKEN does not have access to ${DATA_REPO_OWNER}/${DATA_REPO_NAME}. Ensure the PAT was created with Contents: Read and write permission scoped to that repository. If the token was previously exposed in a public branch, GitHub may have auto-revoked it - generate a new token.`);
+                } else if (resp.status === 404) {
+                    tokenRejected = true;
+                    console.warn(`⚠️ Private data repository "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found. Create it at https://github.com/new (set to Private) and ensure your PAT is scoped to it.`);
+                }
+                lastErr = new Error(`GitHub API ${resp.status}`);
+                break; // a non-OK HTTP response is definitive – don't retry
+            } catch (err) {
+                lastErr = err;
+                if (attempt < 2) {
+                    // Likely a timeout or network error – wait briefly then retry
+                    console.warn(`⚠️ GitHub API check attempt ${attempt} failed (${err.message}), retrying…`);
+                    await new Promise(r => setTimeout(r, 2000));
+                }
             }
-            // Provide specific guidance based on the HTTP status code
-            if (resp.status === 401) {
-                console.warn('⚠️ DATA_REPO_TOKEN is invalid or expired. Generate a new fine-grained PAT and update the DATA_REPO_TOKEN repository secret, then re-run the deploy workflow.');
-            } else if (resp.status === 403) {
-                console.warn(`⚠️ DATA_REPO_TOKEN does not have access to ${DATA_REPO_OWNER}/${DATA_REPO_NAME}. Ensure the PAT was created with Contents: Read and write permission scoped to that repository. If the token was previously exposed in a public branch, GitHub may have auto-revoked it - generate a new token.`);
-            } else if (resp.status === 404) {
-                console.warn(`⚠️ Private data repository "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found. Create it at https://github.com/new (set to Private) and ensure your PAT is scoped to it.`);
-            }
-            throw new Error(`GitHub API ${resp.status}`);
-        } catch (err) {
-            console.warn('⚠️ GitHub mode unavailable – falling back to demo mode');
-            console.warn(err.message);
-            MODE = 'demo';
+        }
+
+        console.warn('⚠️ GitHub mode unavailable – falling back to demo mode');
+        if (lastErr) console.warn(lastErr.message);
+        MODE = 'demo';
+
+        // Show a more specific status message when the token was present but rejected,
+        // so the user knows the cause is a token issue (not just "no token set").
+        if (tokenRejected && statusEl) {
+            const statusCode = resp?.status ?? 0;
+            let hint = 'token may be expired or revoked';
+            if (statusCode === 404) hint = `data repo "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found`;
+            else if (statusCode === 403) hint = 'token lacks Contents permission';
+            statusEl.textContent = `⚠️ GitHub mode unavailable (${hint}) – using local demo mode`;
+            statusEl.className = 'status disconnected';
+            return;
         }
     }
 
