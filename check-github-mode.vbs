@@ -267,6 +267,30 @@ If nAns = 6 Then  ' vbYes
 
         sDispatchToken = Trim(sDispatchToken)
 
+        ' ── Record the latest run ID before dispatch ──────────────────────────
+        ' We compare against this later in the poll loop so we never declare
+        ' the pre-existing completed run as the "newly triggered" one.
+        Dim sRunsUrl : sRunsUrl = _
+            "https://api.github.com/repos/" & REPO_OWNER & "/" & REPO_NAME & _
+            "/actions/runs?workflow_id=deploy.yml&branch=main&per_page=1"
+
+        Dim sPreDispatchRunId : sPreDispatchRunId = "0"
+        Dim oHTTPpre  : Set oHTTPpre  = CreateObject("MSXML2.XMLHTTP.6.0")
+        Dim oREpre    : Set oREpre    = CreateObject("VBScript.RegExp")
+        oREpre.Global  = False
+        oREpre.Pattern = """id""\s*:\s*(\d+)"
+        On Error Resume Next
+        oHTTPpre.Open "GET", sRunsUrl, False
+        oHTTPpre.SetRequestHeader "Authorization",        "Bearer " & sDispatchToken
+        oHTTPpre.SetRequestHeader "Accept",               "application/vnd.github+json"
+        oHTTPpre.SetRequestHeader "X-GitHub-Api-Version", "2022-11-28"
+        oHTTPpre.Send
+        If Err.Number = 0 And oHTTPpre.Status = 200 Then
+            Dim oMpre : Set oMpre = oREpre.Execute(oHTTPpre.ResponseText)
+            If oMpre.Count > 0 Then sPreDispatchRunId = oMpre(0).SubMatches(0)
+        End If
+        On Error GoTo 0
+
         ' POST workflow dispatch
         Dim sDispatchUrl : sDispatchUrl = _
             "https://api.github.com/repos/" & REPO_OWNER & "/" & REPO_NAME & _
@@ -328,10 +352,6 @@ If nAns = 6 Then  ' vbYes
         ' Wait for GitHub to register the new run before first poll
         WScript.Sleep WORKFLOW_REGISTRATION_DELAY_MS
 
-        Dim sRunsUrl : sRunsUrl = _
-            "https://api.github.com/repos/" & REPO_OWNER & "/" & REPO_NAME & _
-            "/actions/runs?workflow_id=deploy.yml&branch=main&per_page=1"
-
         ' One regex object reused for all JSON field extractions during polling
         Dim oREpoll : Set oREpoll = CreateObject("VBScript.RegExp")
         oREpoll.Global = False
@@ -375,7 +395,13 @@ If nAns = 6 Then  ' vbYes
                     Dim oMconc : Set oMconc = oREpoll.Execute(sRunsBody)
                     If oMconc.Count > 0 Then sConclusion = oMconc(0).SubMatches(0)
 
-                    If sRunStatus = "completed" Then Exit Do
+                    ' Only exit when we see a run that is *newer* than the one that
+                    ' existed before we dispatched.  Without this check, the already-
+                    ' completed prior run would be matched immediately, falsely
+                    ' reporting "back online" before the new run has even started.
+                    If sRunStatus = "completed" _
+                       And Len(sLatestRunId) > 0 _
+                       And CLng(sLatestRunId) > CLng(sPreDispatchRunId) Then Exit Do
                 End If
             End If
 
