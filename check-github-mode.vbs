@@ -29,6 +29,13 @@ Const DATA_REPO   = "Game.OS.Private.Data"
 Const XOR_KEY     = "GameOS_KEY"
 Const PAGES_URL   = "https://Koriebonx98.github.io/Game.OS.Userdata"
 
+' Workflow polling configuration
+Const WORKFLOW_REGISTRATION_DELAY_MS = 5000   ' ms to wait after dispatch before first poll
+Const CDN_PROPAGATION_DELAY_MS       = 8000   ' ms to wait after deploy before re-fetching page
+Const POLL_INTERVAL_MS               = 10000  ' ms between each status poll
+Const MAX_POLL_ATTEMPTS              = 60     ' 60 × 10 s = 10 minutes maximum wait
+Const FEEDBACK_AFTER_ATTEMPTS        = 6      ' show "still waiting" message after this many attempts
+
 Dim oShell : Set oShell = CreateObject("WScript.Shell")
 
 ' ── 1. Fetch the deployed script.js ──────────────────────────
@@ -77,8 +84,8 @@ End If
 
 ' ── 3. XOR-decode the token (mirrors script.js runtime logic) ─
 
-Dim sToken : sToken = ""
-Dim nBytes : nBytes = 0
+Dim sToken  : sToken  = ""
+Dim nBytes  : nBytes  = 0   ' used in "all good" confirmation message below
 If bTokenSet Then
     nBytes = Len(sEncoded) \ 2
     Dim i
@@ -309,46 +316,33 @@ If nAns = 6 Then  ' vbYes
 
         ' ── Poll for completion ────────────────────────────────────
 
+        Dim nMaxMinutes : nMaxMinutes = (MAX_POLL_ATTEMPTS * POLL_INTERVAL_MS) \ 60000
         MsgBox "✅ Deploy workflow triggered successfully!" & vbCrLf & vbCrLf & _
                "The workflow is now running. Click OK and this script will" & vbCrLf & _
-               "wait up to 10 minutes for it to complete, then verify the" & vbCrLf & _
+               "wait up to " & nMaxMinutes & " minutes for it to complete, then verify the" & vbCrLf & _
                "site is back online." & vbCrLf & vbCrLf & _
                "You can also watch progress at:" & vbCrLf & _
                "  https://github.com/" & REPO_OWNER & "/" & REPO_NAME & "/actions/workflows/deploy.yml", _
                64, "Game.OS – Workflow Triggered"
 
-        ' Wait a few seconds for GitHub to register the run
-        WScript.Sleep 5000
+        ' Wait for GitHub to register the new run before first poll
+        WScript.Sleep WORKFLOW_REGISTRATION_DELAY_MS
 
         Dim sRunsUrl : sRunsUrl = _
             "https://api.github.com/repos/" & REPO_OWNER & "/" & REPO_NAME & _
             "/actions/runs?workflow_id=deploy.yml&branch=main&per_page=1"
 
-        Dim oRErun    : Set oRErun    = CreateObject("VBScript.RegExp")
-        oRErun.Global = False
+        ' One regex object reused for all JSON field extractions during polling
+        Dim oREpoll : Set oREpoll = CreateObject("VBScript.RegExp")
+        oREpoll.Global = False
 
-        Dim oREstatus : Set oREstatus = CreateObject("VBScript.RegExp")
-        oREstatus.Global = False
-
-        Dim oREconc   : Set oREconc   = CreateObject("VBScript.RegExp")
-        oREconc.Global = False
-
-        Dim oRErunId  : Set oRErunId  = CreateObject("VBScript.RegExp")
-        oRErunId.Global = False
-
-        oRErun.Pattern    = """total_count""\s*:\s*(\d+)"
-        oREstatus.Pattern = """status""\s*:\s*""([^""]+)"""
-        oREconc.Pattern   = """conclusion""\s*:\s*""([^""]+)"""
-        oRErunId.Pattern  = """id""\s*:\s*(\d+)"
-
-        Dim nMaxTries : nMaxTries = 60   ' 60 x 10 s = 10 minutes
-        Dim nTry      : nTry      = 0
-        Dim sRunStatus  : sRunStatus  = ""
-        Dim sConclusion : sConclusion = ""
+        Dim nTry         : nTry         = 0
+        Dim sRunStatus   : sRunStatus   = ""
+        Dim sConclusion  : sConclusion  = ""
         Dim sLatestRunId : sLatestRunId = ""
 
-        Do While nTry < nMaxTries
-            WScript.Sleep 10000  ' wait 10 seconds between polls
+        Do While nTry < MAX_POLL_ATTEMPTS
+            WScript.Sleep POLL_INTERVAL_MS
 
             Dim oHTTP4 : Set oHTTP4 = CreateObject("MSXML2.XMLHTTP.6.0")
             On Error Resume Next
@@ -365,17 +359,20 @@ If nAns = 6 Then  ' vbYes
             On Error GoTo 0
 
             If Len(sRunsBody) > 0 Then
-                Dim oMcount : Set oMcount = oRErun.Execute(sRunsBody)
+                oREpoll.Pattern = """total_count""\s*:\s*(\d+)"
+                Dim oMcount : Set oMcount = oREpoll.Execute(sRunsBody)
                 If oMcount.Count > 0 And CLng(oMcount(0).SubMatches(0)) > 0 Then
-                    Dim oMrunId : Set oMrunId = oRErunId.Execute(sRunsBody)
-                    If oMrunId.Count > 0 Then
-                        sLatestRunId = oMrunId(0).SubMatches(0)
-                    End If
 
-                    Dim oMstatus : Set oMstatus = oREstatus.Execute(sRunsBody)
+                    oREpoll.Pattern = """id""\s*:\s*(\d+)"
+                    Dim oMrunId : Set oMrunId = oREpoll.Execute(sRunsBody)
+                    If oMrunId.Count > 0 Then sLatestRunId = oMrunId(0).SubMatches(0)
+
+                    oREpoll.Pattern = """status""\s*:\s*""([^""]+)"""
+                    Dim oMstatus : Set oMstatus = oREpoll.Execute(sRunsBody)
                     If oMstatus.Count > 0 Then sRunStatus = oMstatus(0).SubMatches(0)
 
-                    Dim oMconc : Set oMconc = oREconc.Execute(sRunsBody)
+                    oREpoll.Pattern = """conclusion""\s*:\s*""([^""]+)"""
+                    Dim oMconc : Set oMconc = oREpoll.Execute(sRunsBody)
                     If oMconc.Count > 0 Then sConclusion = oMconc(0).SubMatches(0)
 
                     If sRunStatus = "completed" Then Exit Do
@@ -383,6 +380,19 @@ If nAns = 6 Then  ' vbYes
             End If
 
             nTry = nTry + 1
+
+            ' Periodic progress notification so the user knows we haven't stalled
+            If nTry = FEEDBACK_AFTER_ATTEMPTS Then
+                Dim nElapsedSec : nElapsedSec = (nTry * POLL_INTERVAL_MS) \ 1000
+                Dim sStatusDisplay : sStatusDisplay = sRunStatus
+                If Len(sStatusDisplay) = 0 Then sStatusDisplay = "queued/pending"
+                MsgBox "Still waiting for the Deploy workflow to complete…" & vbCrLf & _
+                       "  Elapsed: ~" & nElapsedSec & " seconds  |  Status: " & _
+                       sStatusDisplay & vbCrLf & vbCrLf & _
+                       "Click OK to keep waiting, or check progress at:" & vbCrLf & _
+                       "  https://github.com/" & REPO_OWNER & "/" & REPO_NAME & "/actions/workflows/deploy.yml", _
+                       64, "Game.OS – Still Waiting"
+            End If
         Loop
 
         ' ── Report workflow outcome ────────────────────────────────
@@ -393,7 +403,7 @@ If nAns = 6 Then  ' vbYes
         End If
 
         If sRunStatus <> "completed" Then
-            MsgBox "The workflow is still running after 10 minutes." & vbCrLf & vbCrLf & _
+            MsgBox "The workflow is still running after " & nMaxMinutes & " minutes." & vbCrLf & vbCrLf & _
                    "Please check its progress at:" & vbCrLf & "  " & sRunUrl & vbCrLf & vbCrLf & _
                    "Once it completes, hard-refresh the site (Ctrl+Shift+R).", _
                    48, "Game.OS – Workflow Still Running"
@@ -416,8 +426,8 @@ If nAns = 6 Then  ' vbYes
 
         ' ── Verify the deployed page is now in GitHub mode ────────
 
-        ' Wait a moment for Pages CDN to propagate
-        WScript.Sleep 8000
+        ' Wait for Pages CDN to propagate
+        WScript.Sleep CDN_PROPAGATION_DELAY_MS
 
         Dim oHTTP5 : Set oHTTP5 = CreateObject("MSXML2.XMLHTTP.6.0")
         Dim sScript2 : sScript2 = ""
@@ -429,12 +439,11 @@ If nAns = 6 Then  ' vbYes
         End If
         On Error GoTo 0
 
+        ' Reuse existing oRE for post-deploy verification
         Dim bNowLive : bNowLive = False
         If Len(sScript2) > 0 Then
-            Dim oRE2 : Set oRE2 = CreateObject("VBScript.RegExp")
-            oRE2.Global  = False
-            oRE2.Pattern = "const GITHUB_TOKEN_ENCODED\s*=\s*""([0-9a-fA-F]+)"""
-            Dim oM2 : Set oM2 = oRE2.Execute(sScript2)
+            oRE.Pattern = "const GITHUB_TOKEN_ENCODED\s*=\s*""([0-9a-fA-F]+)"""
+            Dim oM2 : Set oM2 = oRE.Execute(sScript2)
             If oM2.Count > 0 And Len(oM2(0).SubMatches(0)) > 0 Then
                 bNowLive = True
             End If
