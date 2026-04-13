@@ -278,10 +278,20 @@ async function initializeMode() {
         if (tokenRejected && statusEl) {
             const statusCode = resp?.status ?? 0;
             let hint = 'token may be expired or revoked';
-            if (statusCode === 404) hint = `data repo "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found`;
-            else if (statusCode === 403) hint = 'token lacks Contents permission';
-            statusEl.textContent = `⚠️ GitHub mode unavailable (${hint}) – using local demo mode`;
+            let fixUrl = `https://github.com/${DATA_REPO_OWNER}/${USERDATA_REPO_NAME}/settings/secrets/actions`;
+            if (statusCode === 404) {
+                hint = `data repo "${DATA_REPO_OWNER}/${DATA_REPO_NAME}" not found`;
+                fixUrl = 'https://github.com/new';
+            } else if (statusCode === 403) {
+                hint = 'token lacks Contents permission';
+            }
+            statusEl.innerHTML =
+                `⚠️ GitHub mode unavailable (${hint}) – using local demo mode` +
+                ` &nbsp;<a href="${fixUrl}" target="_blank" rel="noopener" ` +
+                `style="color:#f9a825;font-size:0.85em;">🔧 Fix token</a>`;
             statusEl.className = 'status disconnected';
+            // Also initialize the demo admin account so the admin can still log in
+            initAdminAccountDemo();
             return;
         }
     }
@@ -292,6 +302,39 @@ async function initializeMode() {
     if (statusEl) {
         statusEl.textContent = '🎮 Demo Mode – accounts stored locally only';
         statusEl.className = 'status disconnected';
+    }
+    // Ensure the admin account exists in localStorage for demo mode
+    initAdminAccountDemo();
+}
+
+/**
+ * Creates the Admin.GameOS account in localStorage (demo mode) on first launch.
+ * Runs silently in the background once per session.
+ * Initial password: "GameOS2026" – change via Account Settings after first login.
+ */
+async function initAdminAccountDemo() {
+    if (sessionStorage.getItem('adminDemoInitChecked')) return;
+    sessionStorage.setItem('adminDemoInitChecked', '1');
+    try {
+        const accounts = getDemoAccounts();
+        const exists = accounts.some(
+            a => a.username.toLowerCase() === ADMIN_USERNAME_LOWER ||
+                 a.email.toLowerCase()    === ADMIN_EMAIL.toLowerCase()
+        );
+        if (exists) return;
+
+        const passwordHash = await hashPasswordDemo('GameOS2026');
+        accounts.push({
+            username:      ADMIN_USERNAME,
+            email:         ADMIN_EMAIL,
+            password_hash: passwordHash,
+            createdAt:     new Date().toISOString(),
+            is_admin:      true
+        });
+        saveDemoAccounts(accounts);
+        console.log(`✅ Admin account "${ADMIN_USERNAME}" initialized in demo mode.`);
+    } catch (err) {
+        console.warn('Admin demo account init skipped:', err.message);
     }
 }
 

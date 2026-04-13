@@ -183,6 +183,7 @@ jobs:
           STEAMGRID_API_KEY: ${{ secrets.STEAMGRID_API_KEY }}
 
       - name: Validate GitHub data repository access (if token set)
+        id: validate_token
         run: |
           OWNER="${{ github.repository_owner }}"
           REPO="${{ vars.DATA_REPO_NAME }}"
@@ -191,6 +192,7 @@ jobs:
           if [ -z "$TOKEN" ]; then
             echo "ℹ️  DATA_REPO_TOKEN is not set — site will use demo mode."
             echo "   To enable real accounts, add DATA_REPO_TOKEN as a repository secret."
+            echo "token_status=missing" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           echo "Checking access to ${OWNER}/${REPO} …"
@@ -200,16 +202,36 @@ jobs:
             "https://api.github.com/repos/${OWNER}/${REPO}" || echo "000")
           if [ "$HTTP_STATUS" = "200" ]; then
             echo "✅ Data repository is accessible (HTTP 200) — GitHub mode will be active"
+            echo "token_status=ok" >> "$GITHUB_OUTPUT"
           elif [ "$HTTP_STATUS" = "401" ]; then
+            echo "token_status=expired" >> "$GITHUB_OUTPUT"
             echo "⚠️  DATA_REPO_TOKEN is invalid or expired (HTTP 401)."
-            echo "   Generate a new fine-grained PAT and update the DATA_REPO_TOKEN secret."
+            echo "   ──────────────────────────────────────────────────────────────"
+            echo "   ACTION REQUIRED — the site will be stuck in demo mode until"
+            echo "   you update DATA_REPO_TOKEN with a new fine-grained PAT:"
+            echo ""
+            echo "   Step 1 – Create a new PAT:"
+            echo "     https://github.com/settings/tokens?type=beta"
+            echo "     • Repository access : Only ${OWNER}/${REPO}"
+            echo "     • Permission        : Contents → Read and write"
+            echo ""
+            echo "   Step 2 – Update the secret:"
+            echo "     https://github.com/${OWNER}/${{ github.event.repository.name }}/settings/secrets/actions"
+            echo "     (Secret name: DATA_REPO_TOKEN)"
+            echo ""
+            echo "   Step 3 – Re-run this workflow:"
+            echo "     https://github.com/${OWNER}/${{ github.event.repository.name }}/actions/workflows/deploy.yml"
+            echo "   ──────────────────────────────────────────────────────────────"
           elif [ "$HTTP_STATUS" = "403" ]; then
+            echo "token_status=forbidden" >> "$GITHUB_OUTPUT"
             echo "⚠️  DATA_REPO_TOKEN lacks permission (HTTP 403)."
             echo "   Ensure the PAT has Contents: Read and write on ${OWNER}/${REPO}."
           elif [ "$HTTP_STATUS" = "404" ]; then
+            echo "token_status=not_found" >> "$GITHUB_OUTPUT"
             echo "⚠️  Repository ${OWNER}/${REPO} not found (HTTP 404)."
             echo "   Create it at https://github.com/new (set to Private)."
           else
+            echo "token_status=unknown" >> "$GITHUB_OUTPUT"
             echo "⚠️  GitHub API returned HTTP ${HTTP_STATUS}. Deployment will continue."
           fi
 
@@ -320,3 +342,39 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+
+      - name: Deployment summary
+        if: always()
+        run: |
+          TOKEN_STATUS="${{ steps.validate_token.outputs.token_status }}"
+          echo "============================================================"
+          echo "  Game.OS Deployment Summary"
+          echo "============================================================"
+          if [ "$TOKEN_STATUS" = "ok" ]; then
+            echo "  ✅ GitHub mode ACTIVE – real accounts enabled"
+            echo "  Site: ${{ steps.deployment.outputs.page_url }}"
+          elif [ "$TOKEN_STATUS" = "expired" ] || [ "$TOKEN_STATUS" = "forbidden" ]; then
+            echo "  ⚠️  GitHub mode INACTIVE – DATA_REPO_TOKEN needs renewal"
+            echo ""
+            echo "  The site deployed successfully but users will see:"
+            echo "  '⚠️ GitHub mode unavailable (token may be expired or revoked)'"
+            echo ""
+            echo "  TO FIX — three steps:"
+            echo "    1. Create a new fine-grained PAT:"
+            echo "       https://github.com/settings/tokens?type=beta"
+            echo "       • Resource owner : ${{ github.repository_owner }}"
+            echo "       • Repository     : ${{ vars.DATA_REPO_NAME || 'Game.OS.Private.Data' }}"
+            echo "       • Permission     : Contents → Read and write"
+            echo ""
+            echo "    2. Update the DATA_REPO_TOKEN secret:"
+            echo "       https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/settings/secrets/actions"
+            echo ""
+            echo "    3. Re-run this workflow:"
+            echo "       https://github.com/${{ github.repository_owner }}/${{ github.event.repository.name }}/actions/workflows/deploy.yml"
+          elif [ "$TOKEN_STATUS" = "missing" ]; then
+            echo "  ℹ️  Demo mode – DATA_REPO_TOKEN secret not configured"
+            echo "  See README.md to enable real GitHub-backed accounts."
+          else
+            echo "  ❓ Token status unknown – check the validation step above for details"
+          fi
+          echo "============================================================"
