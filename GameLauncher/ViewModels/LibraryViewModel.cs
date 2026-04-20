@@ -57,6 +57,8 @@ public partial class LibraryViewModel : ViewModelBase
     public Action<LocalGameCardVm>? OnOpenMyGameDetail { get; set; }
 
     // ── Debounce flag to avoid triple-rebuild when all three scanner events fire ──
+    // Only ever read or written inside Dispatcher.UIThread.Post callbacks, so all
+    // accesses are sequentially serialised on the UI thread — no locking needed.
     private bool _rebuildScheduled = false;
 
     public void Load(List<Game> games)

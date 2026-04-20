@@ -727,8 +727,8 @@ public partial class GameDetailViewModel : ViewModelBase
                 romPath = saved.RomPath;
             else if (_driveInstances.Count > 0)
             {
-                int idx = System.Math.Clamp(SelectedDriveIndex, 0, _driveInstances.Count - 1);
-                romPath = _driveInstances[idx].ExecutablePath ?? "";
+                int driveIdx = System.Math.Clamp(SelectedDriveIndex, 0, _driveInstances.Count - 1);
+                romPath = _driveInstances[driveIdx].ExecutablePath ?? "";
             }
 
             if (!string.IsNullOrEmpty(romPath))
