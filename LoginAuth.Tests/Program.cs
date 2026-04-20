@@ -608,7 +608,7 @@ class Program
             {
                 Title    = "Offline Added Game",
                 Platform = "PC",
-                AddedAt  = DateTime.UtcNow.ToString("o"),
+                AddedAt  = "2025-01-03T12:00:00Z",
             };
             svc.EnqueueAddGame(testUser, game);
 

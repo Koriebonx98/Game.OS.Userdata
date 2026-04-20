@@ -302,10 +302,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             // Flush any pending offline changes now that we are back online
             _ = FlushPendingChangesAsync(profile.Username);
-        }
 
-        if (!isOffline)
-        {
             // Update presence immediately on login so the user appears "Online" to friends,
             // then start a background heartbeat that refreshes it every 2 minutes — mirroring
             // the web app's updatePresence() call at startup + setInterval every 2 minutes.

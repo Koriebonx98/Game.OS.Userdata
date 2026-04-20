@@ -27,6 +27,8 @@ namespace GameLauncher.Services
         /// Cache files older than this are considered stale.  The caller still
         /// uses the stale cache for the offline UI but will attempt a background
         /// sync when online.
+        /// 24 hours matches the typical daily session pattern: a user who logged in
+        /// yesterday will get cached data on reconnect today and sync immediately.
         /// </summary>
         private static readonly TimeSpan StalenessThreshold = TimeSpan.FromHours(24);
 
@@ -45,7 +47,7 @@ namespace GameLauncher.Services
 
         private static string CacheFileFor(string username)
         {
-            string safe = SanitiseName(username);
+            string safe = StorageHelpers.SanitiseName(username);
             return Path.Combine(BaseDir, safe, "userdata.json");
         }
 
@@ -171,15 +173,6 @@ namespace GameLauncher.Services
         }
 
         // ── Private helpers ───────────────────────────────────────────────────
-
-        private static string SanitiseName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return "_";
-            name = name.Replace(':', '-');
-            foreach (char c in Path.GetInvalidFileNameChars())
-                name = name.Replace(c.ToString(), "");
-            return name.Trim();
-        }
     }
 
     /// <summary>

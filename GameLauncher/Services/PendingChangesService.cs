@@ -113,7 +113,7 @@ namespace GameLauncher.Services
 
         private static string QueueFileFor(string username)
         {
-            string safe = SanitiseName(username);
+            string safe = StorageHelpers.SanitiseName(username);
             return Path.Combine(BaseDir, safe, "pending-changes.json");
         }
 
@@ -152,15 +152,6 @@ namespace GameLauncher.Services
                 System.Diagnostics.Debug.WriteLine(
                     $"[PendingChanges] Could not write queue for '{username}': {ex.Message}");
             }
-        }
-
-        private static string SanitiseName(string name)
-        {
-            if (string.IsNullOrEmpty(name)) return "_";
-            name = name.Replace(':', '-');
-            foreach (char c in Path.GetInvalidFileNameChars())
-                name = name.Replace(c.ToString(), "");
-            return name.Trim();
         }
     }
 
