@@ -291,6 +291,16 @@
         <Setter Property="Background" Value="#21262d"/>
     </Style>
 
+    <!-- ─── Mods Flyout (dark popup) ─── -->
+    <Style Selector="FlyoutPresenter.mods-flyout">
+        <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="BorderBrush" Value="#30363d"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Padding" Value="16"/>
+        <Setter Property="MaxWidth" Value="380"/>
+    </Style>
+
     <!-- ─── Platform Filter Chip ─── -->
     <Style Selector="Button.platform-chip">
         <Setter Property="Background" Value="#21262d"/>

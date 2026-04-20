@@ -1906,7 +1906,21 @@ public partial class GameDetailViewModel : ViewModelBase
 
         mod.Enabled = !mod.Enabled;
 
-        // Persist all mods back to mods.json
+        PersistSwitchMods();
+    }
+
+    /// <summary>
+    /// Persists the current enabled/disabled state of all mods to <c>mods.json</c>.
+    /// Called by the mod flyout checkboxes after their two-way <c>IsChecked</c> binding
+    /// has already updated <see cref="RyujinxModVm.Enabled"/>.
+    /// </summary>
+    [RelayCommand]
+    private void SaveSwitchMods() => PersistSwitchMods();
+
+    private void PersistSwitchMods()
+    {
+        if (string.IsNullOrEmpty(_ryujinxModsJsonPath)) return;
+
         var modList = SwitchMods.Select(m => new GameLauncher.Models.RyujinxMod
         {
             Name    = m.Name,
