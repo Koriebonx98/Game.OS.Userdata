@@ -1924,4 +1924,33 @@ public partial class GameDetailViewModel : ViewModelBase
             SwitchModsStatus = $"Failed to save: {ex.Message}";
         }
     }
+
+    /// <summary>
+    /// Opens the Ryujinx mods folder for the current Switch game in the system file manager.
+    /// Creates the folder if it does not yet exist so users can drop mod archives in straight away.
+    /// </summary>
+    [RelayCommand]
+    private void OpenSwitchModsFolder()
+    {
+        string? titleId = _currentLocalRom?.TitleId;
+        if (string.IsNullOrEmpty(titleId)) return;
+
+        var emuSettings = Services.EmulatorSettingsService.Load("Switch");
+        if (string.IsNullOrEmpty(emuSettings.EmulatorPath)) return;
+
+        string modsJsonPath = Services.RyujinxModService.GetDefaultModsJsonPath(emuSettings.EmulatorPath, titleId);
+        string modsDir = System.IO.Path.GetDirectoryName(modsJsonPath) ?? "";
+        if (string.IsNullOrEmpty(modsDir)) return;
+
+        try
+        {
+            Directory.CreateDirectory(modsDir);
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = modsDir,
+                UseShellExecute = true,
+            });
+        }
+        catch { /* best-effort */ }
+    }
 }

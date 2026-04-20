@@ -135,6 +135,17 @@
                                 <TextBlock Text="···" FontSize="18" FontWeight="Bold"
                                            VerticalAlignment="Center"/>
                             </Button>
+                            <!-- Mods button — visible for Nintendo Switch games -->
+                            <Button Classes="btn-secondary"
+                                    Padding="16,12" ToolTip.Tip="Open Mods Folder"
+                                    Command="{Binding OpenSwitchModsFolderCommand}"
+                                    IsVisible="{Binding IsSwitch}">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="🧩" FontSize="14" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Mods" FontSize="14" FontWeight="SemiBold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
                         </StackPanel>
 
                         <!-- ── Install button when repack available ── -->
