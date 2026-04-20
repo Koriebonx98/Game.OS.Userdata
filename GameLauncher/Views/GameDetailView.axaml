@@ -135,11 +135,73 @@
                                 <TextBlock Text="···" FontSize="18" FontWeight="Bold"
                                            VerticalAlignment="Center"/>
                             </Button>
-                            <!-- Mods button — visible for Nintendo Switch games -->
+                            <!-- Mods button — visible for Nintendo Switch games; opens mod-management flyout -->
                             <Button Classes="btn-secondary"
-                                    Padding="16,12" ToolTip.Tip="Open Mods Folder"
-                                    Command="{Binding OpenSwitchModsFolderCommand}"
+                                    Padding="16,12" ToolTip.Tip="Manage Mods"
                                     IsVisible="{Binding IsSwitch}">
+                                <Button.Flyout>
+                                    <Flyout FlyoutPresenterClasses="mods-flyout">
+                                        <StackPanel Width="320" Spacing="12">
+
+                                            <!-- Header -->
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <TextBlock Text="🧩" FontSize="18" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Mods" FontSize="16" FontWeight="Bold"
+                                                           Foreground="White" VerticalAlignment="Center"/>
+                                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                                        VerticalAlignment="Center"
+                                                        IsVisible="{Binding HasSwitchMods}">
+                                                    <TextBlock Text="{Binding SwitchMods.Count}"
+                                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                                </Border>
+                                            </StackPanel>
+
+                                            <!-- Empty-state hint -->
+                                            <TextBlock Text="No mods found. Drop mod folders into the mods directory, then re-open this menu."
+                                                       FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
+                                                       IsVisible="{Binding !HasSwitchMods}"/>
+
+                                            <!-- Mod list with checkboxes -->
+                                            <ScrollViewer MaxHeight="280"
+                                                          IsVisible="{Binding HasSwitchMods}">
+                                                <ItemsControl ItemsSource="{Binding SwitchMods}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:RyujinxModVm">
+                                                            <CheckBox IsChecked="{Binding Enabled}"
+                                                                      Foreground="White"
+                                                                      FontSize="13"
+                                                                      Margin="0,3,0,3"
+                                                                      Command="{Binding $parent[ItemsControl].DataContext.SaveSwitchModsCommand}">
+                                                                <TextBlock Text="{Binding Name}"
+                                                                           FontSize="13" Foreground="White"/>
+                                                            </CheckBox>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+
+                                            <!-- Save status -->
+                                            <TextBlock Text="{Binding SwitchModsStatus}"
+                                                       FontSize="11" Foreground="#3fb950"
+                                                       IsVisible="{Binding SwitchModsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                                            <!-- Divider -->
+                                            <Border Height="1" Background="#30363d"/>
+
+                                            <!-- Open mods folder -->
+                                            <Button Classes="btn-secondary" Padding="10,8"
+                                                    HorizontalAlignment="Left"
+                                                    Command="{Binding OpenSwitchModsFolderCommand}">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="📁" FontSize="13" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="Open Mods Folder" FontSize="12"
+                                                               VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
+
+                                        </StackPanel>
+                                    </Flyout>
+                                </Button.Flyout>
                                 <StackPanel Orientation="Horizontal" Spacing="6">
                                     <TextBlock Text="🧩" FontSize="14" VerticalAlignment="Center"/>
                                     <TextBlock Text="Mods" FontSize="14" FontWeight="SemiBold"
