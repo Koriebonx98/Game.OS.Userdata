@@ -585,17 +585,24 @@ public sealed class GameScannerService : IDisposable
     /// <summary>
     /// Extracts a single string value from a VDF/ACF file given its key.
     /// Handles the <c>"key"  "value"</c> format used by Steam.
+    /// Uses a general field-capture regex and filters by key at match time to avoid
+    /// allocating a new <see cref="Regex"/> per field on every call.
     /// </summary>
+    /// <remarks>
+    /// <c>_acfValueRegex</c> captures all key/value pairs in one scan; <c>ExtractAcfValue</c>
+    /// then iterates the matches to find the requested key (case-insensitive).
+    /// </remarks>
     private static readonly Regex _acfValueRegex =
         new(@"""(\w+)""\s+""([^""]*)""", RegexOptions.Compiled);
 
     private static string? ExtractAcfValue(string content, string key)
     {
-        // Use a per-call regex so the key is embedded — this is only called a few times
-        // per manifest so the small allocation cost is acceptable.
-        var m = Regex.Match(content, $@"""{Regex.Escape(key)}""\s+""([^""]*)""",
-                            RegexOptions.IgnoreCase);
-        return m.Success ? m.Groups[1].Value : null;
+        foreach (Match m in _acfValueRegex.Matches(content))
+        {
+            if (string.Equals(m.Groups[1].Value, key, StringComparison.OrdinalIgnoreCase))
+                return m.Groups[2].Value;
+        }
+        return null;
     }
 
     /// <summary>
