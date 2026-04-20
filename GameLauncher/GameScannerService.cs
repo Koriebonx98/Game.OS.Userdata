@@ -938,6 +938,8 @@ public sealed class GameScannerService : IDisposable
     /// Strips common ROM region/language tags from a raw ROM title and returns
     /// the clean title plus the list of extracted region strings.
     /// Handles both single tags "(USA)" and comma-separated lists "(En,Ja,Fr,De,Es,It)".
+    /// Also strips trademark/copyright/registered symbols (™, ®, ©) so that a filename
+    /// such as "Super Mario Odyssey™.nca" yields the display title "Super Mario Odyssey".
     /// </summary>
     internal static (string CleanTitle, List<string> Regions) ParseRomTitle(string rawTitle)
     {
@@ -955,6 +957,9 @@ public sealed class GameScannerService : IDisposable
             }
         }
         string clean = _romRegionRegex.Replace(rawTitle, "").Trim();
+        // Strip trademark, registered, and copyright symbols so that display titles
+        // match the site catalog (e.g. "Super Mario Odyssey™" → "Super Mario Odyssey").
+        clean = PlatformHelper.StripSpecialSymbols(clean);
         return (clean, regions);
     }
 

@@ -210,6 +210,32 @@ class Program
         }
         Console.WriteLine();
 
+        // Trademark symbol stripping: "Super Mario Odyssey™.nca" → title="Super Mario Odyssey"
+        Console.WriteLine("™  Trademark Symbol Stripping (ParseRomTitle):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        var (tmStripped, _) = GameScannerService.ParseRomTitle("Super Mario Odyssey™");
+        if (string.Equals(tmStripped, "Super Mario Odyssey", StringComparison.Ordinal))
+        {
+            Console.WriteLine("  ✅  \"Super Mario Odyssey™\" → \"Super Mario Odyssey\" (™ stripped)");
+        }
+        else
+        {
+            Console.WriteLine($"  ❌  ParseRomTitle did not strip ™ — got \"{tmStripped}\"");
+            passed = false;
+        }
+        // Verify via the scanner that the fixture file title is clean (no ™ in stored title)
+        static bool HasTrademarkSymbol(string title) =>
+            title.Contains('™') || title.Contains('®') || title.Contains('©');
+        var badRom = detectedRoms.FirstOrDefault(r => HasTrademarkSymbol(r.Title));
+        if (badRom == null)
+            Console.WriteLine("  ✅  No detected ROM title contains a trademark/copyright symbol");
+        else
+        {
+            Console.WriteLine($"  ❌  ROM title still contains symbol: \"{badRom.Title}\"");
+            passed = false;
+        }
+        Console.WriteLine();
+
         // Archive title normalisation: "A-Way-Out-SteamRIP.zip" → "A Way Out"
         Console.WriteLine("🔧 Archive Title Normalisation:");
         Console.WriteLine("───────────────────────────────────────────────────────────────");
