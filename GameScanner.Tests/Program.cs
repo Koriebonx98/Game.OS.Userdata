@@ -224,14 +224,13 @@ class Program
             passed = false;
         }
         // Verify via the scanner that the fixture file title is clean (no ™ in stored title)
-        bool tmInTitle = detectedRoms.Any(r =>
-            r.Title.Contains('™') || r.Title.Contains('®') || r.Title.Contains('©'));
-        if (!tmInTitle)
+        static bool HasTrademarkSymbol(string title) =>
+            title.Contains('™') || title.Contains('®') || title.Contains('©');
+        var badRom = detectedRoms.FirstOrDefault(r => HasTrademarkSymbol(r.Title));
+        if (badRom == null)
             Console.WriteLine("  ✅  No detected ROM title contains a trademark/copyright symbol");
         else
         {
-            var badRom = detectedRoms.First(r =>
-                r.Title.Contains('™') || r.Title.Contains('®') || r.Title.Contains('©'));
             Console.WriteLine($"  ❌  ROM title still contains symbol: \"{badRom.Title}\"");
             passed = false;
         }
