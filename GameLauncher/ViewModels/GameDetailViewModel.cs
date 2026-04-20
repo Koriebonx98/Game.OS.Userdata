@@ -131,6 +131,8 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool _isSwitch;
     /// <summary>True when at least one Ryujinx mod is found for this game's TitleID.</summary>
     [ObservableProperty] private bool _hasSwitchMods;
+    /// <summary>True when the mods panel is expanded (toggled by the Mods button).</summary>
+    [ObservableProperty] private bool _showModsPanel;
     /// <summary>Status message shown at the bottom of the mods section (save confirmation / error).</summary>
     [ObservableProperty] private string _switchModsStatus = "";
     /// <summary>Full path to the mods.json currently loaded (null when mods are not available).</summary>
@@ -143,6 +145,10 @@ public partial class GameDetailViewModel : ViewModelBase
 
     [RelayCommand]
     private void Close() => OnClose?.Invoke();
+
+    /// <summary>Toggles the visibility of the Ryujinx mods panel.</summary>
+    [RelayCommand]
+    private void ToggleModsPanel() => ShowModsPanel = !ShowModsPanel;
 
     // ── Settings panel ────────────────────────────────────────────────────────
     /// <summary>True when the settings overlay is visible.</summary>
@@ -1384,8 +1390,10 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveDrivePath      = "";
         ActiveExeType        = "";
         IsSwitch             = false;
+        foreach (var m in SwitchMods) m.PropertyChanged -= OnModEnabledChanged;
         SwitchMods.Clear();
         HasSwitchMods        = false;
+        ShowModsPanel        = false;
         SwitchModsStatus     = "";
     }
 
@@ -1866,6 +1874,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     private void LoadSwitchMods()
     {
+        foreach (var m in SwitchMods) m.PropertyChanged -= OnModEnabledChanged;
         SwitchMods.Clear();
         HasSwitchMods        = false;
         SwitchModsStatus     = "";
@@ -1893,20 +1902,31 @@ public partial class GameDetailViewModel : ViewModelBase
         _ryujinxModsJsonPath = modsJsonPath;
         var mods = Services.RyujinxModService.LoadMods(modsJsonPath);
         foreach (var mod in mods)
-            SwitchMods.Add(new RyujinxModVm { Name = mod.Name, Path = mod.Path, Enabled = mod.Enabled });
+        {
+            var vm = new RyujinxModVm { Name = mod.Name, Path = mod.Path, Enabled = mod.Enabled };
+            vm.PropertyChanged += OnModEnabledChanged;
+            SwitchMods.Add(vm);
+        }
 
         HasSwitchMods = SwitchMods.Count > 0;
     }
 
-    /// <summary>Toggles the enabled state of a Ryujinx mod and persists the change to <c>mods.json</c>.</summary>
-    [RelayCommand]
-    private void ToggleSwitchMod(RyujinxModVm? mod)
+    /// <summary>
+    /// Called whenever a mod's <see cref="RyujinxModVm.Enabled"/> property changes
+    /// (triggered by the CheckBox in the mods panel).  Persists all mod states to
+    /// <c>mods.json</c> immediately.
+    /// </summary>
+    private void OnModEnabledChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (mod == null || string.IsNullOrEmpty(_ryujinxModsJsonPath)) return;
+        if (e.PropertyName == nameof(RyujinxModVm.Enabled))
+            SaveCurrentMods();
+    }
 
-        mod.Enabled = !mod.Enabled;
+    /// <summary>Persists the current <see cref="SwitchMods"/> collection to <c>mods.json</c>.</summary>
+    private void SaveCurrentMods()
+    {
+        if (string.IsNullOrEmpty(_ryujinxModsJsonPath)) return;
 
-        // Persist all mods back to mods.json
         var modList = SwitchMods.Select(m => new GameLauncher.Models.RyujinxMod
         {
             Name    = m.Name,
