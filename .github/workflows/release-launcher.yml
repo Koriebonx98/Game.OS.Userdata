@@ -336,7 +336,7 @@ jobs:
           | Platform | File | Notes |
           |----------|------|-------|
           | Windows 10/11 x64 | \`GameOS-Launcher-win-x64.zip\` | Extract and run \`GameLauncher.exe\` |
-          | Linux x64 (Bazzite / Fedora / Ubuntu / Arch) | \`GameOS-Launcher-linux-x64.tar.gz\` | Run \`install-linux.sh\` to add to app menu, or \`chmod +x GameLauncher && ./GameLauncher\` |
+          | Linux x64 (Bazzite / Fedora / Ubuntu / Arch) | \`GameOS-Launcher-linux-x64.tar.gz\` | See Linux quick-start below |
           | macOS Intel | \`GameOS-Launcher-osx-x64.tar.gz\` | \`chmod +x GameLauncher && ./GameLauncher\` |
           | macOS Apple Silicon | \`GameOS-Launcher-osx-arm64.tar.gz\` | \`chmod +x GameLauncher && ./GameLauncher\` |
 
