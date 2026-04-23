@@ -20,3 +20,8 @@ GameScanner.Tests/bin/
 GameScanner.Tests/obj/
 LoginAuth.Tests/bin/
 LoginAuth.Tests/obj/
+
+# BAZITE build context — binary and icon are injected by bazzite-build.yml at CI time
+# and must never be committed to the repository.
+BAZITE/build_files/GameLauncher
+BAZITE/files/usr/share/icons/hicolor/256x256/apps/gameos-launcher.png

@@ -1,0 +1,3 @@
+# gameos-launcher.png is injected here by bazzite-build.yml at CI build time.
+# It is extracted from the GameOS-Launcher-linux-x64 release tarball and is
+# never committed to the repository.

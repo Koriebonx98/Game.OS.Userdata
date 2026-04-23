@@ -1,0 +1,259 @@
+# Build Bazzite Image (and optionally ISO)
+#
+# Produces a custom Bazzite OCI image with the Game.OS Launcher pre-installed.
+# The launcher binary, XOR-encoded DATA_REPO_TOKEN, and backend URL are all
+# baked into the image at build time — end-users just boot and sign in.
+#
+# ┌──────────────────────────────────────────────────────────────────────────┐
+# │  HOW TO RUN                                                              │
+# │  ─────────────────────────────────────────────────────────────────────   │
+# │  1. Actions → Build Bazzite Image → Run workflow                         │
+# │  2. Set "build_iso" to true if you want a bootable .iso artifact         │
+# │  3. The OCI image is pushed to ghcr.io/<owner>/game-os-bazzite           │
+# │  4. If build_iso=true the .iso is uploaded as a workflow artifact        │
+# └──────────────────────────────────────────────────────────────────────────┘
+#
+# Required secrets (Settings → Secrets and variables → Actions):
+#   DATA_REPO_TOKEN    — Fine-grained PAT, Contents read+write on the private
+#                        data repository.  Same secret used by deploy.yml and
+#                        release-launcher.yml.
+#   GAMEOS_BACKEND_URL — (optional) Deployed backend URL.  When set the
+#                        launcher connects via REST API; otherwise it uses
+#                        GitHub-direct mode via the encoded token.
+#
+# Required permissions: packages: write  (to push to ghcr.io)
+
+name: Build Bazzite Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_iso:
+        description: 'Also build a bootable .iso? (adds ~25 min)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+      image_tag:
+        description: 'Image tag to push to ghcr.io'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: read
+  packages: write   # push OCI image to ghcr.io
+
+jobs:
+  build-image:
+    name: Build & Push OCI Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_ref: ${{ steps.image-meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ── Download latest Game.OS Launcher Linux binary ─────────────────────
+      - name: Download latest GameOS-Launcher-linux-x64 release asset
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Fetching latest release info …"
+          LATEST=$(gh api repos/${{ github.repository }}/releases/latest \
+                     --jq '.assets[] | select(.name | test("linux-x64\\.tar\\.gz$")) | .browser_download_url' \
+                   2>/dev/null || echo "")
+
+          if [ -z "$LATEST" ]; then
+            echo "⚠️  No linux-x64 release asset found."
+            echo "    Build the launcher first via Actions → Release C# Launcher."
+            echo "    Falling back to building from source …"
+
+            # ── Fallback: build from source ──────────────────────────────────
+            dotnet publish GameLauncher/GameLauncher.csproj \
+              -c Release \
+              -r linux-x64 \
+              --self-contained true \
+              -p:PublishSingleFile=true \
+              -o /tmp/launcher-build
+            cp /tmp/launcher-build/GameLauncher BAZITE/build_files/GameLauncher
+            echo "✅ Built GameLauncher from source"
+          else
+            echo "Downloading: $LATEST"
+            curl -L -o /tmp/launcher.tar.gz "$LATEST"
+            mkdir -p /tmp/launcher-extract
+            tar -xzf /tmp/launcher.tar.gz -C /tmp/launcher-extract/
+            # Find the binary (may be at root or in a subdirectory)
+            BINARY=$(find /tmp/launcher-extract -name 'GameLauncher' -type f | head -1)
+            if [ -z "$BINARY" ]; then
+              echo "❌ GameLauncher binary not found in release tarball"
+              exit 1
+            fi
+            cp "$BINARY" BAZITE/build_files/GameLauncher
+            echo "✅ GameLauncher binary extracted from release tarball"
+          fi
+
+          chmod +x BAZITE/build_files/GameLauncher
+
+          # ── Extract icon from tarball if available ────────────────────────
+          ICON_DEST="BAZITE/files/usr/share/icons/hicolor/256x256/apps/gameos-launcher.png"
+          if [ -f /tmp/launcher.tar.gz ]; then
+            tar -xzf /tmp/launcher.tar.gz -C /tmp/launcher-extract/ --wildcards '*.png' 2>/dev/null || true
+            PNG=$(find /tmp/launcher-extract -name '*.png' | head -1)
+            if [ -n "$PNG" ]; then
+              cp "$PNG" "$ICON_DEST"
+              echo "✅ Icon extracted: $ICON_DEST"
+            fi
+          fi
+          # If no PNG found, try converting the .ico from the repo
+          if [ ! -f "$ICON_DEST" ]; then
+            if command -v convert &>/dev/null && [ -f "GameLauncher/Assets/avalonia-logo.ico" ]; then
+              convert "GameLauncher/Assets/avalonia-logo.ico[0]" "$ICON_DEST" 2>/dev/null || true
+              [ -f "$ICON_DEST" ] && echo "✅ Icon converted from avalonia-logo.ico"
+            fi
+          fi
+
+      # ── Inject DATA_REPO_TOKEN into gameos-token.dat ──────────────────────
+      - name: Inject DATA_REPO_TOKEN into gameos-token.dat
+        # Same XOR-hex encoding used by deploy.yml (GITHUB_TOKEN_ENCODED in
+        # script.js) and release-launcher.yml (gameos-token.dat in exe).
+        # Key: "GameOS_KEY" — not secret, just changes byte representation so
+        # the raw PAT pattern never appears in any file.
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          token   = os.environ.get('DATA_REPO_TOKEN', '')
+          XOR_KEY = b'GameOS_KEY'
+
+          if token:
+              tok_bytes = token.encode('utf-8')
+              encoded = ''.join(
+                  f'{b ^ XOR_KEY[i % len(XOR_KEY)]:02x}'
+                  for i, b in enumerate(tok_bytes)
+              )
+              with open('BAZITE/build_files/gameos-token.dat', 'w') as f:
+                  f.write(encoded)
+              print(f'✅ DATA_REPO_TOKEN injected ({len(encoded)} hex chars)')
+          else:
+              print('⚠️  DATA_REPO_TOKEN is not set.')
+              print('   The launcher inside the image will not be able to sign in.')
+              print('   Add DATA_REPO_TOKEN as a repository secret and re-run.')
+          PYEOF
+
+      # ── Inject GAMEOS_BACKEND_URL into gameos-backend.url ─────────────────
+      - name: Inject GAMEOS_BACKEND_URL into gameos-backend.url
+        env:
+          GAMEOS_BACKEND_URL: ${{ secrets.GAMEOS_BACKEND_URL }}
+        run: |
+          python3 << 'PYEOF'
+          import os
+
+          url = os.environ.get('GAMEOS_BACKEND_URL', '').strip().rstrip('/')
+          if url:
+              with open('BAZITE/build_files/gameos-backend.url', 'w') as f:
+                  f.write(url)
+              print(f'✅ Backend URL injected: {url}')
+          else:
+              print('ℹ️  GAMEOS_BACKEND_URL not set — launcher will use GitHub-direct mode.')
+          PYEOF
+
+      # ── Set up Docker Buildx ──────────────────────────────────────────────
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # ── Login to ghcr.io ──────────────────────────────────────────────────
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Generate image metadata (tags + labels) ────────────────────────────
+      - name: Generate image metadata
+        id: image-meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/game-os-bazzite
+          tags: |
+            type=raw,value=${{ github.event.inputs.image_tag || 'latest' }}
+            type=sha,prefix=sha-
+
+      # ── Build and push ────────────────────────────────────────────────────
+      - name: Build and push OCI image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./BAZITE
+          file: ./BAZITE/Containerfile
+          push: true
+          tags: ${{ steps.image-meta.outputs.tags }}
+          labels: ${{ steps.image-meta.outputs.labels }}
+          platforms: linux/amd64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Image pushed
+        run: |
+          echo "✅ OCI image pushed:"
+          echo "${{ steps.image-meta.outputs.tags }}" | tr ',' '\n' | sed 's/^/   • /'
+          echo ""
+          echo "To rebase an existing Bazzite install onto this image:"
+          echo "  rpm-ostree rebase ostree-unverified-registry:ghcr.io/${{ github.repository_owner }}/game-os-bazzite:${{ github.event.inputs.image_tag || 'latest' }}"
+
+  # ── Optional ISO generation ────────────────────────────────────────────────
+  build-iso:
+    name: Build Bootable ISO
+    runs-on: ubuntu-latest
+    needs: build-image
+    if: ${{ github.event.inputs.build_iso == 'true' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build ISO
+        uses: jasonn3/build-container-installer@v1.2.3
+        id: build
+        with:
+          arch: x86_64
+          image_name: game-os-bazzite
+          image_repo: ghcr.io/${{ github.repository_owner }}
+          image_tag: ${{ github.event.inputs.image_tag || 'latest' }}
+          image_signed: false
+          variant: Kinoite
+          version: 41
+          iso_name: Game-OS-Bazzite-x86_64.iso
+          secure_boot_key_url: 'https://github.com/ublue-os/akmods/raw/main/certs/public_key.der'
+          enrollment_password: 'universalblue'
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Game-OS-Bazzite-ISO
+          path: |
+            ${{ steps.build.outputs.iso_path }}
+            ${{ steps.build.outputs.iso_path }}.sha256
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: ISO ready
+        run: |
+          echo "✅ ISO artifact uploaded: Game-OS-Bazzite-ISO"
+          echo ""
+          echo "To download:"
+          echo "  Actions → Build Bazzite Image → (this run) → Artifacts → Game-OS-Bazzite-ISO"
+          echo ""
+          echo "Flash to USB with:"
+          echo "  # Linux"
+          echo "  sudo dd if=Game-OS-Bazzite-x86_64.iso of=/dev/sdX bs=4M status=progress"
+          echo ""
+          echo "  # Windows — use Rufus or balenaEtcher"

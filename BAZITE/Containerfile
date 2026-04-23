@@ -1,0 +1,46 @@
+# =============================================================
+# Game.OS Custom Bazzite Image
+# =============================================================
+# Builds a custom Bazzite OCI image with the Game.OS Launcher
+# pre-installed, ready to launch from the application menu on
+# first boot. No post-install setup required.
+#
+# Built by .github/workflows/bazzite-build.yml, which:
+#   1. Downloads the latest GameOS-Launcher-linux-x64 binary
+#      from GitHub Releases
+#   2. XOR-encodes DATA_REPO_TOKEN → build_files/gameos-token.dat
+#   3. Writes GAMEOS_BACKEND_URL → build_files/gameos-backend.url
+#   4. Runs: docker buildx build -f BAZITE/Containerfile BAZITE/
+#   5. Pushes to ghcr.io
+#   6. Optionally generates a bootable .iso via
+#      jasonn3/build-container-installer
+# =============================================================
+
+FROM ghcr.io/ublue-os/bazzite:latest
+
+# ── Layer 1: System dependencies ─────────────────────────────
+# Install .NET 8 Runtime — required by the Avalonia-based
+# Game.OS Launcher.  All other Avalonia dependencies (libX11,
+# mesa-libGL, fontconfig) are already present in Bazzite.
+RUN rpm-ostree install --idempotent dotnet-runtime-8.0 \
+    && ostree container commit
+
+# ── Layer 2: Game.OS Launcher binary ─────────────────────────
+# The binary and config files are placed into build_files/ by
+# the bazzite-build.yml workflow before docker build runs.
+# They are never committed to the repository.
+COPY build_files/GameLauncher       /usr/local/bin/GameLauncher
+COPY build_files/gameos-token.dat   /usr/local/bin/gameos-token.dat
+COPY build_files/gameos-backend.url /usr/local/bin/gameos-backend.url
+
+RUN chmod +x /usr/local/bin/GameLauncher \
+    && ostree container commit
+
+# ── Layer 3: Desktop integration ─────────────────────────────
+# Installs the .desktop entry and icon so the launcher appears
+# in the GNOME / KDE application menu on first login.
+COPY files/ /
+
+RUN update-desktop-database /usr/share/applications/ 2>/dev/null || true \
+    && gtk-update-icon-cache /usr/share/icons/hicolor/ -f 2>/dev/null || true \
+    && ostree container commit
