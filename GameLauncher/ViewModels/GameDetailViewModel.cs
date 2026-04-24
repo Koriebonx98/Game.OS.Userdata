@@ -85,6 +85,13 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     private string? _databaseDescription;
 
+    /// <summary>
+    /// TitleID from the Games Database, stored when <see cref="EnrichFromDatabaseGame"/>
+    /// is called.  Used as a fallback by <see cref="LoadSwitchMods"/> and
+    /// <see cref="OpenSwitchModsFolder"/> when the scanned ROM does not carry a TitleID.
+    /// </summary>
+    private string? _databaseTitleId;
+
     // ── Install / launch state ────────────────────────────────────────────────
     /// <summary>True when the game is found installed on a local drive.</summary>
     [ObservableProperty] private bool _isInstalled;
@@ -1348,6 +1355,7 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl          = null;
         IsRom             = false;
         _databaseDescription = null;
+        _databaseTitleId     = null;
         PopulateRegions(null);
         PopulateStoreUrl(null, "PC", null);
 
@@ -1406,6 +1414,7 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl          = null;
         IsRom             = false;
         _databaseDescription = null;
+        _databaseTitleId     = null;
         PopulateRegions(null);
         PopulateStoreUrl(null, "PC", null);
 
@@ -1454,6 +1463,7 @@ public partial class GameDetailViewModel : ViewModelBase
         CoverUrl          = null;
         IsRom             = true;
         _databaseDescription = null;
+        _databaseTitleId     = null;
 
         // Populate region/language metadata from the ROM file
         PopulateRegions(rom.Regions.Count > 0 ? rom.Regions : null);
@@ -1613,6 +1623,11 @@ public partial class GameDetailViewModel : ViewModelBase
         // Populate release year if not already set
         if (!string.IsNullOrEmpty(dbGame.ReleaseYear) && string.IsNullOrEmpty(ReleaseYear))
             ReleaseYear = dbGame.ReleaseYear;
+
+        // Cache the TitleID from the database so LoadSwitchMods can use it even
+        // when the scanned ROM does not carry a TitleID of its own.
+        if (!string.IsNullOrEmpty(dbGame.TitleId))
+            _databaseTitleId = dbGame.TitleId;
 
         // Populate store URL from database (overrides any previously derived one)
         if (!string.IsNullOrEmpty(dbGame.StorePageUrl) || dbGame.AppId.HasValue || !string.IsNullOrEmpty(dbGame.TitleId))
