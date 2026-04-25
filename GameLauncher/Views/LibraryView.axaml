@@ -117,7 +117,7 @@
                                     <Border Height="130" CornerRadius="10,10,0,0" ClipToBounds="True">
                                         <views:CoverImage
                                             ImageUrl="{Binding CoverUrl}"
-                                            FallbackText="{Binding Title}"
+                                            FallbackText="{Binding EffectiveTitle}"
                                             FallbackGradient="{Binding CoverGradient}"
                                             SubText="{Binding Platform}"
                                             LetterFontSize="48"

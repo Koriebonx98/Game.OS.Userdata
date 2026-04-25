@@ -60,8 +60,27 @@ public partial class DashboardViewModel : ViewModelBase
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
-        // Total playtime across all games — show days/hours/minutes breakdown
+        // Total playtime across all games — show days/hours/minutes breakdown.
+        // Include cloud library games AND local-only games (not in the cloud library) so that
+        // PC games tracked only by the scanner are counted towards the total playtime.
         int totalMinutes = library.Sum(g => g.PlaytimeMinutes);
+
+        if (localCards != null)
+        {
+            // Build a set of (platform, title) keys already counted from the cloud library
+            // to avoid double-counting games that appear in both the library and local cards.
+            var cloudKeys = new HashSet<string>(
+                library.Select(g => $"{g.Platform.ToLowerInvariant()}||{g.Title.ToLowerInvariant()}"),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var c in localCards)
+            {
+                string key = $"{c.Platform.ToLowerInvariant()}||{c.EffectiveTitle.ToLowerInvariant()}";
+                if (cloudKeys.Contains(key)) continue; // already counted via the library entry
+                totalMinutes += PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
+            }
+        }
+
         if (totalMinutes <= 0)
         {
             TotalPlaytimeLabel = "0m";
