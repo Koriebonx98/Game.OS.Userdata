@@ -1262,6 +1262,7 @@ public partial class GameDetailViewModel : ViewModelBase
                              LocalRom? localRom = null)
     {
         ShowSettings    = false;
+        ShowModsPanel   = false;
         ShowDrivePicker = false;
         _currentLocalRom = localRom;
         Title         = game.Title;
@@ -1303,6 +1304,7 @@ public partial class GameDetailViewModel : ViewModelBase
                                   LocalRom? localRom = null)
     {
         ShowSettings    = false;
+        ShowModsPanel   = false;
         ShowDrivePicker = false;
         _currentLocalRom = localRom;
         Title         = game.Title;
@@ -1344,6 +1346,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public void LoadFromLocalGame(LocalGame game)
     {
         ShowSettings    = false;
+        ShowModsPanel   = false;
         ShowDrivePicker = false;
         _currentLocalRom = null;
         Title             = game.Title;
@@ -1453,6 +1456,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public void LoadFromLocalRom(LocalRom rom)
     {
         ShowSettings    = false;
+        ShowModsPanel   = false;
         ShowDrivePicker = false;
         Title             = rom.Title;
         Platform          = rom.Platform;
