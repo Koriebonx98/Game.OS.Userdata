@@ -424,6 +424,30 @@ namespace GameLauncher
             catch { return false; }
         }
 
+        // ── Playtime sync ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Fetch the authenticated user's stored play sessions from the server.
+        /// Only available in backend mode; returns an empty list otherwise.
+        /// </summary>
+        public async Task<List<Models.PlaySession>> GetPlaytimeAsync(CancellationToken ct = default)
+        {
+            if (_backend == null) return new List<Models.PlaySession>();
+            try { return await _backend.GetPlaytimeAsync(ct); }
+            catch { return new List<Models.PlaySession>(); }
+        }
+
+        /// <summary>
+        /// Upload the merged play-session list to the server.
+        /// No-op when not in backend mode (GitHub-direct mode has no playtime endpoint).
+        /// </summary>
+        public async Task SavePlaytimeAsync(List<Models.PlaySession> sessions, CancellationToken ct = default)
+        {
+            if (_backend == null) return;
+            try { await _backend.SavePlaytimeAsync(sessions, ct); }
+            catch { /* best-effort — local data is the source of truth */ }
+        }
+
         public void Dispose()
         {
             _backend?.Dispose();

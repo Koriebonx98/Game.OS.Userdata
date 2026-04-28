@@ -161,6 +161,17 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>All Ryujinx mods for the current game, populated by <see cref="LoadSwitchMods"/>.</summary>
     public ObservableCollection<RyujinxModVm> SwitchMods { get; } = new();
 
+    // ── Nintendo Switch / Ryujinx DLC & update management ─────────────────────
+    /// <summary>True when at least one DLC pack is found for this game.</summary>
+    [ObservableProperty] private bool _hasDlc;
+    /// <summary>DLC packs for the current game, populated by <see cref="LoadSwitchDlcAndUpdates"/>.</summary>
+    public ObservableCollection<RyujinxDlcVm> SwitchDlcItems { get; } = new();
+
+    /// <summary>True when at least one game-update file is found for this game.</summary>
+    [ObservableProperty] private bool _hasUpdates;
+    /// <summary>Game updates for the current game, populated by <see cref="LoadSwitchDlcAndUpdates"/>.</summary>
+    public ObservableCollection<RyujinxUpdateVm> SwitchUpdateItems { get; } = new();
+
     // ── Navigation back-action ────────────────────────────────────────────────
     public System.Action? OnClose { get; set; }
 
@@ -1948,9 +1959,10 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void OpenModsPanel()
     {
-        // Reload mods each time the panel is opened so that newly added mods are shown
-        // without requiring the user to navigate away and back.
+        // Reload mods and DLC/update data each time the panel is opened so that newly
+        // added content is shown without requiring the user to navigate away and back.
         LoadSwitchMods();
+        LoadSwitchDlcAndUpdates();
         ShowModsPanel = true;
     }
 
@@ -2025,6 +2037,79 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSwitchMods          = SwitchMods.Count > 0;
         // ModsJsonExistsButEmpty = file was found but contained no mod entries.
         ModsJsonExistsButEmpty = !HasSwitchMods;
+    }
+
+    /// <summary>
+    /// Loads DLC packs and game updates for the current Switch game from its
+    /// <c>dlc.json</c> and <c>updates.json</c> files in the Ryujinx games folder.
+    /// Silently clears both collections for non-Switch games or when no TitleID is
+    /// available.
+    /// </summary>
+    private void LoadSwitchDlcAndUpdates()
+    {
+        SwitchDlcItems.Clear();
+        SwitchUpdateItems.Clear();
+        HasDlc     = false;
+        HasUpdates = false;
+
+        if (!IsSwitch) return;
+
+        // Resolve TitleID (same three-tier logic as LoadSwitchMods)
+        string? titleId = _currentLocalRom?.TitleId;
+        if (string.IsNullOrEmpty(titleId)) titleId = _databaseTitleId;
+        if (string.IsNullOrEmpty(titleId) && !string.IsNullOrEmpty(Title))
+            titleId = Services.GitHubDataService.TryGetTitleIdFromLocalCache("Switch", Title);
+        if (string.IsNullOrEmpty(titleId)) return;
+
+        var emuSettings = Services.EmulatorSettingsService.Load("Switch");
+        if (string.IsNullOrEmpty(emuSettings.EmulatorPath)) return;
+
+        string exeName = System.IO.Path.GetFileNameWithoutExtension(emuSettings.EmulatorPath)
+                         .ToLowerInvariant();
+        if (!exeName.Contains("ryujinx")) return;
+
+        // ── DLC ───────────────────────────────────────────────────────────────
+        string? dlcJsonPath = Services.RyujinxModService.FindDlcJson(emuSettings.EmulatorPath, titleId);
+        if (dlcJsonPath != null)
+        {
+            var dlcEntries = Services.RyujinxModService.LoadDlcEntries(dlcJsonPath);
+            foreach (var entry in dlcEntries)
+            {
+                string fileName = string.IsNullOrEmpty(entry.Path)
+                    ? "(unknown)"
+                    : System.IO.Path.GetFileName(entry.Path);
+                int enabled = entry.DlcNcaList.Count(n => n.IsEnabled);
+                SwitchDlcItems.Add(new RyujinxDlcVm
+                {
+                    FileName     = fileName,
+                    NcaCount     = entry.DlcNcaList.Count,
+                    EnabledCount = enabled,
+                });
+            }
+            HasDlc = SwitchDlcItems.Count > 0;
+        }
+
+        // ── Updates ───────────────────────────────────────────────────────────
+        string? updatesJsonPath = Services.RyujinxModService.FindUpdatesJson(emuSettings.EmulatorPath, titleId);
+        if (updatesJsonPath != null)
+        {
+            var cfg = Services.RyujinxModService.LoadUpdatesConfig(updatesJsonPath);
+            var paths = cfg.Paths ?? new System.Collections.Generic.List<string>();
+            // Also include Selected if it's not already in Paths
+            if (!string.IsNullOrEmpty(cfg.Selected) && !paths.Contains(cfg.Selected))
+                paths.Insert(0, cfg.Selected);
+
+            foreach (var path in paths.Where(p => !string.IsNullOrEmpty(p)))
+            {
+                bool isSelected = string.Equals(path, cfg.Selected, StringComparison.OrdinalIgnoreCase);
+                SwitchUpdateItems.Add(new RyujinxUpdateVm
+                {
+                    FileName   = System.IO.Path.GetFileName(path),
+                    IsSelected = isSelected,
+                });
+            }
+            HasUpdates = SwitchUpdateItems.Count > 0;
+        }
     }
 
     /// <summary>Toggles the enabled state of a Ryujinx mod and persists the change to <c>mods.json</c>.</summary>

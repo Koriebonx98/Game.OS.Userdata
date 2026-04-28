@@ -948,8 +948,128 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ── Media row: Trailer (left) + Screenshots (right) on the same row.
-                     WrapPanel collapses gracefully when only one child is visible. ── -->
+                <!-- ── Nintendo Switch DLC section (shown when mods panel is open) ── -->
+                <Border IsVisible="{Binding ShowModsPanel}"
+                        Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,12">
+                    <StackPanel Spacing="12">
+
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="DLC Packs"
+                                       FontSize="15" FontWeight="Bold"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                            <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding HasDlc}">
+                                <TextBlock Text="{Binding SwitchDlcItems.Count}"
+                                           FontSize="12" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- DLC list -->
+                        <ItemsControl ItemsSource="{Binding SwitchDlcItems}"
+                                      IsVisible="{Binding HasDlc}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RyujinxDlcVm">
+                                    <Border Background="#21262d" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" Spacing="3"
+                                                        VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding FileName}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="White"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           MaxWidth="480"/>
+                                                <TextBlock FontSize="10" Foreground="#6e7681">
+                                                    <Run Text="{Binding NcaCount}"/>
+                                                    <Run Text=" NCA entries · "/>
+                                                    <Run Text="{Binding EnabledCount}"/>
+                                                    <Run Text=" enabled"/>
+                                                </TextBlock>
+                                            </StackPanel>
+                                            <Border Grid.Column="1" CornerRadius="4" Padding="8,3"
+                                                    Background="{Binding StatusBackground}"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="{Binding StatusForeground}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Empty state -->
+                        <Border IsVisible="{Binding !HasDlc}"
+                                Background="#21262d" CornerRadius="8" Padding="14,10">
+                            <TextBlock Text="No dlc.json found for this game."
+                                       FontSize="12" Foreground="#6e7681"/>
+                        </Border>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Nintendo Switch Updates section (shown when mods panel is open) ── -->
+                <Border IsVisible="{Binding ShowModsPanel}"
+                        Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="12">
+
+                        <!-- Header -->
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="⬆️" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="Game Updates"
+                                       FontSize="15" FontWeight="Bold"
+                                       Foreground="White" VerticalAlignment="Center"/>
+                            <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                    VerticalAlignment="Center"
+                                    IsVisible="{Binding HasUpdates}">
+                                <TextBlock Text="{Binding SwitchUpdateItems.Count}"
+                                           FontSize="12" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                        </StackPanel>
+
+                        <!-- Update list -->
+                        <ItemsControl ItemsSource="{Binding SwitchUpdateItems}"
+                                      IsVisible="{Binding HasUpdates}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RyujinxUpdateVm">
+                                    <Border Background="#21262d" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,6">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Grid.Column="0"
+                                                       Text="{Binding FileName}"
+                                                       FontSize="12" FontWeight="SemiBold"
+                                                       Foreground="White"
+                                                       TextTrimming="CharacterEllipsis"
+                                                       MaxWidth="480"
+                                                       VerticalAlignment="Center"/>
+                                            <Border Grid.Column="1" CornerRadius="4" Padding="8,3"
+                                                    Background="{Binding StatusBackground}"
+                                                    VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="{Binding StatusForeground}"/>
+                                            </Border>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Empty state -->
+                        <Border IsVisible="{Binding !HasUpdates}"
+                                Background="#21262d" CornerRadius="8" Padding="14,10">
+                            <TextBlock Text="No updates.json found for this game."
+                                       FontSize="12" Foreground="#6e7681"/>
+                        </Border>
+
+                    </StackPanel>
+                </Border>
                 <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
 
                     <!-- Trailer (first in media) -->

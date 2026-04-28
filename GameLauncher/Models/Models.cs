@@ -72,6 +72,39 @@ namespace GameLauncher.Models
         [JsonPropertyName("mods")] public List<RyujinxMod> Mods { get; set; } = new();
     }
 
+    // ── Ryujinx DLC management (Nintendo Switch) ──────────────────────────────
+
+    /// <summary>A single DLC NCA entry inside a <c>dlc.json</c> pack.</summary>
+    public class RyujinxDlcNca
+    {
+        [JsonPropertyName("path")]       public string Path      { get; set; } = "";
+        [JsonPropertyName("title_id")]   public long   TitleId   { get; set; }
+        [JsonPropertyName("is_enabled")] public bool   IsEnabled { get; set; }
+    }
+
+    /// <summary>
+    /// A single DLC pack entry from a Ryujinx <c>dlc.json</c> file.
+    /// Located at <c>{RyujinxPortableDir}\games\{titleId}\dlc.json</c>.
+    /// </summary>
+    public class RyujinxDlcEntry
+    {
+        [JsonPropertyName("path")]         public string             Path       { get; set; } = "";
+        [JsonPropertyName("dlc_nca_list")] public List<RyujinxDlcNca> DlcNcaList { get; set; } = new();
+    }
+
+    // ── Ryujinx game-update management (Nintendo Switch) ──────────────────────
+
+    /// <summary>
+    /// The content of a Ryujinx <c>updates.json</c> file, which lists available
+    /// game-update packages and which one is currently selected.
+    /// Located at <c>{RyujinxPortableDir}\games\{titleId}\updates.json</c>.
+    /// </summary>
+    public class RyujinxUpdatesConfig
+    {
+        [JsonPropertyName("Selected")] public string?       Selected { get; set; }
+        [JsonPropertyName("Paths")]    public List<string>? Paths    { get; set; }
+    }
+
     public class SystemSpec
     {
         [JsonPropertyName("cpu")]    public string? Cpu    { get; set; }

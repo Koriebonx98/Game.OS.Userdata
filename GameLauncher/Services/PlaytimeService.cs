@@ -346,6 +346,49 @@ namespace GameLauncher.Services
             catch { /* best-effort */ }
         }
 
+        /// <summary>
+        /// Returns all locally persisted play sessions (checkpoint entries included).
+        /// Used for server sync.
+        /// </summary>
+        public static List<PlaySession> GetAllSessions() => LoadSessions();
+
+        /// <summary>
+        /// Merges <paramref name="serverSessions"/> with the local sessions file, keeping the
+        /// union of both sets (deduplicated by platform+title+startedAt).  Saves the merged
+        /// result locally so the device is always up-to-date with the server.
+        /// </summary>
+        public static void MergeFromServer(List<PlaySession> serverSessions)
+        {
+            if (serverSessions.Count == 0) return;
+            try
+            {
+                var local = LoadSessions();
+                // Use a composite key to deduplicate: platform||title||startedAt
+                var seen = new HashSet<string>(
+                    local.Select(s =>
+                        $"{s.Platform.ToLowerInvariant()}||{s.Title.ToLowerInvariant()}||{s.StartedAt}"),
+                    StringComparer.OrdinalIgnoreCase);
+
+                bool added = false;
+                foreach (var s in serverSessions.Where(s => !s.IsCheckpoint))
+                {
+                    var key = $"{s.Platform.ToLowerInvariant()}||{s.Title.ToLowerInvariant()}||{s.StartedAt}";
+                    if (seen.Add(key))
+                    {
+                        local.Add(s);
+                        added = true;
+                    }
+                }
+
+                if (added)
+                {
+                    Directory.CreateDirectory(DataDir);
+                    File.WriteAllText(SessionsFile, JsonSerializer.Serialize(local, _jsonOpts));
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
         private static List<PlaySession> LoadSessions()
         {
             try

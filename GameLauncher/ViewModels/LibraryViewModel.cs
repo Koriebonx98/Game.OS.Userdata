@@ -56,6 +56,12 @@ public partial class LibraryViewModel : ViewModelBase
     /// <summary>Invoked when the user clicks any card in the unified My Games section.</summary>
     public Action<LocalGameCardVm>? OnOpenMyGameDetail { get; set; }
 
+    /// <summary>
+    /// Invoked on the UI thread immediately after <c>_allMyGames</c> is rebuilt
+    /// so MainViewModel can trigger cover-art enrichment with fresh data.
+    /// </summary>
+    public Action? OnMyGamesRebuilt { get; set; }
+
     // ── Debounce flag to avoid triple-rebuild when all three scanner events fire ──
     // Only ever read or written inside Dispatcher.UIThread.Post callbacks, so all
     // accesses are sequentially serialised on the UI thread — no locking needed.
@@ -127,6 +133,7 @@ public partial class LibraryViewModel : ViewModelBase
             RebuildMyGames();
             RebuildPlatforms();
             ApplyFilter();
+            OnMyGamesRebuilt?.Invoke();
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 

@@ -2062,6 +2062,49 @@ app.get('/api/me/activity', authenticateToken, async (req, res) => {
     }
 });
 
+// ── GET /api/me/playtime ──────────────────────────────────────────────────────
+// Retrieve the authenticated user's play session list (synced from the launcher).
+app.get('/api/me/playtime', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/playtime.json`);
+        res.json({ success: true, sessions: file ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/me/playtime error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── PUT /api/me/playtime ──────────────────────────────────────────────────────
+// Replace the authenticated user's play session list with the provided array.
+// The launcher merges local and server sessions before uploading so no data is lost.
+// Body: { sessions: [ { platform, title, startedAt, endedAt, minutes, isCheckpoint? } ] }
+app.put('/api/me/playtime', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        let { sessions } = req.body;
+        if (!Array.isArray(sessions)) {
+            return res.status(400).json({ success: false, message: 'sessions must be an array.' });
+        }
+        // Validate and sanitise each session entry
+        sessions = sessions.filter(s =>
+            s && typeof s.platform === 'string' && typeof s.title === 'string' &&
+            typeof s.startedAt === 'string' && typeof s.minutes === 'number' &&
+            s.minutes >= 0 && s.minutes <= 2880
+        );
+        // Cap at 2000 sessions to prevent unbounded growth
+        if (sessions.length > 2000) sessions = sessions.slice(-2000);
+
+        const path = `accounts/${usernameLower}/playtime.json`;
+        const file = await getFile(path);
+        await putFile(path, sessions, `Sync playtime: ${sessions.length} sessions`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Playtime synced.', count: sessions.length });
+    } catch (err) {
+        console.error('PUT /api/me/playtime error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── GET /api/users/:username ──────────────────────────────────────────────────
 // Read a user's public profile using either the shared PUBLIC_API_KEY or their
 // own per-user token.  Sensitive fields (password hash, token hash) are stripped.
