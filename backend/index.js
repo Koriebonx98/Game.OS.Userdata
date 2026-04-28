@@ -2086,7 +2086,9 @@ app.put('/api/me/playtime', authenticateToken, async (req, res) => {
         if (!Array.isArray(sessions)) {
             return res.status(400).json({ success: false, message: 'sessions must be an array.' });
         }
-        // Validate and sanitise each session entry
+        // Validate and sanitise each session entry.
+        // Max 2880 minutes (48 hours) per session to support marathon sessions while
+        // preventing bad data — mirrors the same cap used in POST /api/me/activity.
         sessions = sessions.filter(s =>
             s && typeof s.platform === 'string' && typeof s.title === 'string' &&
             typeof s.startedAt === 'string' && typeof s.minutes === 'number' &&

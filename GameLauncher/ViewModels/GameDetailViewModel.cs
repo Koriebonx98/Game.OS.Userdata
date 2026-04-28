@@ -2095,8 +2095,9 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             var cfg = Services.RyujinxModService.LoadUpdatesConfig(updatesJsonPath);
             var paths = cfg.Paths ?? new System.Collections.Generic.List<string>();
-            // Also include Selected if it's not already in Paths
-            if (!string.IsNullOrEmpty(cfg.Selected) && !paths.Contains(cfg.Selected))
+            // Use a HashSet for O(1) contains check when inserting Selected at the front
+            var pathSet = new System.Collections.Generic.HashSet<string>(paths, StringComparer.OrdinalIgnoreCase);
+            if (!string.IsNullOrEmpty(cfg.Selected) && !pathSet.Contains(cfg.Selected))
                 paths.Insert(0, cfg.Selected);
 
             foreach (var path in paths.Where(p => !string.IsNullOrEmpty(p)))
