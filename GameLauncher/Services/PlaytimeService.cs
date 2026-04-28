@@ -32,10 +32,17 @@ namespace GameLauncher.Services
         /// <summary>How often (in minutes) a running-game checkpoint is written to disk.</summary>
         private const int CheckpointIntervalMinutes = 2;
 
+        /// <summary>
+        /// Delimiter used when forming composite session keys such as
+        /// <c>platform||title</c> and <c>platform||title||startedAt</c>.
+        /// Defined as a constant to avoid inconsistencies across all call sites.
+        /// </summary>
+        private const string SessionKeyDelimiter = "||";
+
         // ── In-memory active session tracking (static so callers can query from any context) ──
 
         /// <summary>
-        /// Games that are currently running (platform||title → session start time).
+        /// Games that are currently running (platform{SessionKeyDelimiter}title → session start time).
         /// Updated immediately when <see cref="TrackProcess"/> is called so the
         /// dashboard can show the game in "Continue Playing" without waiting for exit.
         /// </summary>
@@ -195,7 +202,7 @@ namespace GameLauncher.Services
 
                 // Group sessions by (platform, title) and sum minutes / find latest session
                 var grouped = sessions
-                    .GroupBy(s => $"{s.Platform.ToLowerInvariant()}||{s.Title.ToLowerInvariant()}")
+                    .GroupBy(s => $"{s.Platform.ToLowerInvariant()}{SessionKeyDelimiter}{s.Title.ToLowerInvariant()}")
                     .ToDictionary(
                         g => g.Key,
                         g => (TotalMinutes: g.Sum(s => s.Minutes),
@@ -203,7 +210,7 @@ namespace GameLauncher.Services
 
                 foreach (var game in library)
                 {
-                    var key = $"{game.Platform.ToLowerInvariant()}||{game.Title.ToLowerInvariant()}";
+                    var key = $"{game.Platform.ToLowerInvariant()}{SessionKeyDelimiter}{game.Title.ToLowerInvariant()}";
                     if (grouped.TryGetValue(key, out var agg))
                     {
                         game.PlaytimeMinutes = agg.TotalMinutes;
@@ -263,7 +270,7 @@ namespace GameLauncher.Services
         // ── Private helpers ────────────────────────────────────────────────────
 
         private static string MakeKey(string platform, string title)
-            => $"{platform.ToLowerInvariant()}||{title.ToLowerInvariant()}";
+            => $"{platform.ToLowerInvariant()}{SessionKeyDelimiter}{title.ToLowerInvariant()}";
 
         private static void FinaliseSession(string key, string platform, string title,
                                              DateTime startedAt, List<Game>? libraryToUpdate)
@@ -342,6 +349,49 @@ namespace GameLauncher.Services
                 if (changed)
                     File.WriteAllText(SessionsFile,
                         JsonSerializer.Serialize(sessions, _jsonOpts));
+            }
+            catch { /* best-effort */ }
+        }
+
+        /// <summary>
+        /// Returns all locally persisted play sessions (checkpoint entries included).
+        /// Used for server sync.
+        /// </summary>
+        public static List<PlaySession> GetAllSessions() => LoadSessions();
+
+        /// <summary>
+        /// Merges <paramref name="serverSessions"/> with the local sessions file, keeping the
+        /// union of both sets (deduplicated by platform+title+startedAt).  Saves the merged
+        /// result locally so the device is always up-to-date with the server.
+        /// </summary>
+        public static void MergeFromServer(List<PlaySession> serverSessions)
+        {
+            if (serverSessions.Count == 0) return;
+            try
+            {
+                var local = LoadSessions();
+                // Use a composite key to deduplicate: platform||title||startedAt
+                var seen = new HashSet<string>(
+                    local.Select(s =>
+                        $"{s.Platform.ToLowerInvariant()}{SessionKeyDelimiter}{s.Title.ToLowerInvariant()}{SessionKeyDelimiter}{s.StartedAt}"),
+                    StringComparer.OrdinalIgnoreCase);
+
+                bool added = false;
+                foreach (var s in serverSessions.Where(s => !s.IsCheckpoint))
+                {
+                    var key = $"{s.Platform.ToLowerInvariant()}{SessionKeyDelimiter}{s.Title.ToLowerInvariant()}{SessionKeyDelimiter}{s.StartedAt}";
+                    if (seen.Add(key))
+                    {
+                        local.Add(s);
+                        added = true;
+                    }
+                }
+
+                if (added)
+                {
+                    Directory.CreateDirectory(DataDir);
+                    File.WriteAllText(SessionsFile, JsonSerializer.Serialize(local, _jsonOpts));
+                }
             }
             catch { /* best-effort */ }
         }

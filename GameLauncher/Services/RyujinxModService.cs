@@ -95,4 +95,86 @@ public static class RyujinxModService
         string json = JsonSerializer.Serialize(cfg, _jsonOpts);
         File.WriteAllText(modsJsonPath, json);
     }
+
+    // ── DLC ───────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Searches for the <c>dlc.json</c> file for the given <paramref name="titleId"/>
+    /// relative to the Ryujinx executable.
+    /// Returns <see langword="null"/> when neither portable nor AppData file exists.
+    /// </summary>
+    public static string? FindDlcJson(string ryujinxExePath, string titleId)
+    {
+        if (string.IsNullOrEmpty(ryujinxExePath) || string.IsNullOrEmpty(titleId))
+            return null;
+
+        string ryujinxDir = Path.GetDirectoryName(ryujinxExePath) ?? "";
+        string tid        = titleId.ToLowerInvariant();
+
+        string portablePath = Path.Combine(ryujinxDir, "portable", "games", tid, "dlc.json");
+        if (File.Exists(portablePath)) return portablePath;
+
+        string appData      = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string standardPath = Path.Combine(appData, "Ryujinx", "games", tid, "dlc.json");
+        if (File.Exists(standardPath)) return standardPath;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Deserialises the <c>dlc.json</c> at <paramref name="dlcJsonPath"/> and returns
+    /// the list of DLC pack entries.  Returns an empty list on error.
+    /// </summary>
+    public static List<RyujinxDlcEntry> LoadDlcEntries(string dlcJsonPath)
+    {
+        try
+        {
+            string json = File.ReadAllText(dlcJsonPath);
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<List<RyujinxDlcEntry>>(json, opts)
+                   ?? new List<RyujinxDlcEntry>();
+        }
+        catch { return new List<RyujinxDlcEntry>(); }
+    }
+
+    // ── Updates ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Searches for the <c>updates.json</c> file for the given <paramref name="titleId"/>
+    /// relative to the Ryujinx executable.
+    /// Returns <see langword="null"/> when neither portable nor AppData file exists.
+    /// </summary>
+    public static string? FindUpdatesJson(string ryujinxExePath, string titleId)
+    {
+        if (string.IsNullOrEmpty(ryujinxExePath) || string.IsNullOrEmpty(titleId))
+            return null;
+
+        string ryujinxDir = Path.GetDirectoryName(ryujinxExePath) ?? "";
+        string tid        = titleId.ToLowerInvariant();
+
+        string portablePath = Path.Combine(ryujinxDir, "portable", "games", tid, "updates.json");
+        if (File.Exists(portablePath)) return portablePath;
+
+        string appData      = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string standardPath = Path.Combine(appData, "Ryujinx", "games", tid, "updates.json");
+        if (File.Exists(standardPath)) return standardPath;
+
+        return null;
+    }
+
+    /// <summary>
+    /// Deserialises the <c>updates.json</c> at <paramref name="updatesJsonPath"/> and
+    /// returns the updates configuration.  Returns an empty config on error.
+    /// </summary>
+    public static RyujinxUpdatesConfig LoadUpdatesConfig(string updatesJsonPath)
+    {
+        try
+        {
+            string json = File.ReadAllText(updatesJsonPath);
+            var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+            return JsonSerializer.Deserialize<RyujinxUpdatesConfig>(json, opts)
+                   ?? new RyujinxUpdatesConfig();
+        }
+        catch { return new RyujinxUpdatesConfig(); }
+    }
 }

@@ -134,8 +134,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // When a tracked game session ends, refresh the dashboard one more time
         // so the stored playtime and status reflect the completed session.
+        // Also push the updated sessions to the server so playtime is synced across devices.
         PlaytimeService.SessionCompleted += (platform, title) =>
+        {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => RefreshDashboardLocalGames());
+            _ = SyncPlaytimeAsync();
+        };
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
 
@@ -154,9 +158,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
-        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
-        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
-        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
+        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); RefreshDashboardLocalGames(); };
+        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  RefreshDashboardLocalGames(); };
+        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        RefreshDashboardLocalGames(); };
+        // Trigger cover-art enrichment after _allMyGames is freshly rebuilt on the UI thread
+        // (the previous direct calls fired before RebuildMyGames ran, so GetMyGameSources
+        //  returned an empty list and enrichment exited immediately).
+        LibraryVm.OnMyGamesRebuilt = () => _ = EnrichMyGamesListAsync();
         _ = _scanner.StartAsync();
 
         // On startup, check if any cached platform JSON files are outdated and
@@ -297,6 +305,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Apply stored playtime data to the library so the dashboard shows accurate totals
         PlaytimeService.ApplyStoredPlaytime(library);
+
+        if (!isOffline)
+        {
+            // Asynchronously sync playtime with the server: download server sessions,
+            // merge into the local store (so data from other devices is preserved),
+            // then push the merged result back to the server.
+            _ = SyncPlaytimeAsync();
+        }
 
         // Cross-reference the user's unlocked achievements with their cloud library so that
         // opening any game detail view immediately shows the achievements they have earned
@@ -706,6 +722,31 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch { /* best-effort */ }
     }
 
+
+    /// <summary>
+    /// Syncs playtime sessions with the server in the background:
+    ///   1. Download server sessions and merge them into the local store.
+    ///   2. Upload the merged set back to the server.
+    /// This ensures playtime is preserved across devices and logins.
+    /// </summary>
+    private async Task SyncPlaytimeAsync()
+    {
+        try
+        {
+            // Step 1 – download and merge server sessions into local store
+            var serverSessions = await _client.GetPlaytimeAsync();
+            if (serverSessions.Count > 0)
+                Services.PlaytimeService.MergeFromServer(serverSessions);
+
+            // Step 2 – upload the (now merged) local sessions to the server
+            var allLocal = Services.PlaytimeService.GetAllSessions()
+                           .Where(s => !s.IsCheckpoint)
+                           .ToList();
+            if (allLocal.Count > 0)
+                await _client.SavePlaytimeAsync(allLocal);
+        }
+        catch { /* best-effort — local data is the authoritative source */ }
+    }
 
     /// "My Games" list from the Games.Database.  Groups cards by platform to
     /// minimise API calls; results are cached on disk (24 h TTL) so subsequent

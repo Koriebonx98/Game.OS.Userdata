@@ -407,6 +407,35 @@ namespace GameLauncher.Services
             catch { return false; }
         }
 
+        // ── Playtime sync ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Fetch the authenticated user's stored play sessions via GET /api/me/playtime.
+        /// Returns an empty list when the server has no data yet.
+        /// </summary>
+        public async Task<List<PlaySession>> GetPlaytimeAsync(CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.GetAsync("/api/me/playtime", ct);
+            if (!resp.IsSuccessStatusCode) return new List<PlaySession>();
+
+            var data = await resp.Content
+                .ReadFromJsonAsync<PlaytimeResponse>(_jsonOpts, ct);
+            return data?.Sessions ?? new List<PlaySession>();
+        }
+
+        /// <summary>
+        /// Upload the full merged play-session list to the server via PUT /api/me/playtime.
+        /// Overwrites the server copy; callers should merge local and server data first.
+        /// </summary>
+        public async Task SavePlaytimeAsync(List<PlaySession> sessions, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            var body = new { sessions };
+            using var resp = await _http.PutAsJsonAsync("/api/me/playtime", body, ct);
+            // Non-critical — ignore failures silently
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private void EnsureAuthenticated()
@@ -480,6 +509,12 @@ namespace GameLauncher.Services
         private sealed class ErrorResponse
         {
             [JsonPropertyName("message")] public string? Message { get; set; }
+        }
+
+        private sealed class PlaytimeResponse
+        {
+            [JsonPropertyName("success")]  public bool              Success  { get; set; }
+            [JsonPropertyName("sessions")] public List<PlaySession>? Sessions { get; set; }
         }
     }
 }
