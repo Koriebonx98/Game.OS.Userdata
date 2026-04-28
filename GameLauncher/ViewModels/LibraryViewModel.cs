@@ -113,9 +113,17 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Invoked on the UI thread after each scheduled rebuild completes so that
+    /// MainViewModel can trigger cover-art enrichment on the freshly built cards.
+    /// </summary>
+    public Action? OnMyGamesRebuilt { get; set; }
+
+    /// <summary>
     /// Schedules a single deferred rebuild (RebuildMyGames + RebuildPlatforms + ApplyFilter).
     /// Multiple rapid calls collapse into one background pass so the three scanner events
     /// that fire together never trigger more than one expensive rebuild.
+    /// Fires <see cref="OnMyGamesRebuilt"/> after the rebuild so callers can enrich cover
+    /// art once <c>_allMyGames</c> is fully populated.
     /// </summary>
     private void ScheduleRebuild()
     {
@@ -127,6 +135,7 @@ public partial class LibraryViewModel : ViewModelBase
             RebuildMyGames();
             RebuildPlatforms();
             ApplyFilter();
+            OnMyGamesRebuilt?.Invoke();
         }, Avalonia.Threading.DispatcherPriority.Background);
     }
 
@@ -217,7 +226,18 @@ public partial class LibraryViewModel : ViewModelBase
                 StringComparer.OrdinalIgnoreCase);
 
         // LocalGames → platform = "PC"
+        // Skip installed games whose title is already represented in the cloud library
+        // so the same PC game doesn't appear twice (once in the cloud section and once here).
         foreach (var g in _allLocalGames)
+        {
+            if (cloudByPlatform.TryGetValue("PC", out var cloudPcTitles) &&
+                (cloudPcTitles.Contains(g.Title) ||
+                 cloudPcTitles.Any(ct => string.Equals(
+                     PlatformHelper.StripSpecialSymbols(ct),
+                     PlatformHelper.StripSpecialSymbols(g.Title),
+                     StringComparison.OrdinalIgnoreCase))))
+                continue;
+
             _allMyGames.Add(new LocalGameCardVm
             {
                 Title          = g.Title,
@@ -225,6 +245,7 @@ public partial class LibraryViewModel : ViewModelBase
                 CoverGradient  = "#0d2137,#163d5e",
                 SourceGame     = g,
             });
+        }
 
         // Repacks → platform = "PC"
         // Skip repacks that are already represented as installed LocalGames so the user
