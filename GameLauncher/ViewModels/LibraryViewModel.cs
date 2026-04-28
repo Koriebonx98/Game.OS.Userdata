@@ -228,14 +228,18 @@ public partial class LibraryViewModel : ViewModelBase
         // LocalGames → platform = "PC"
         // Skip installed games whose title is already represented in the cloud library
         // so the same PC game doesn't appear twice (once in the cloud section and once here).
+        // Pre-build a stripped-symbols set for O(1) fuzzy lookups instead of O(n) per game.
+        cloudByPlatform.TryGetValue("PC", out var cloudPcTitles);
+        var cloudPcStripped = cloudPcTitles != null
+            ? new HashSet<string>(
+                cloudPcTitles.Select(PlatformHelper.StripSpecialSymbols),
+                StringComparer.OrdinalIgnoreCase)
+            : null;
         foreach (var g in _allLocalGames)
         {
-            if (cloudByPlatform.TryGetValue("PC", out var cloudPcTitles) &&
+            if (cloudPcTitles != null &&
                 (cloudPcTitles.Contains(g.Title) ||
-                 cloudPcTitles.Any(ct => string.Equals(
-                     PlatformHelper.StripSpecialSymbols(ct),
-                     PlatformHelper.StripSpecialSymbols(g.Title),
-                     StringComparison.OrdinalIgnoreCase))))
+                 cloudPcStripped!.Contains(PlatformHelper.StripSpecialSymbols(g.Title))))
                 continue;
 
             _allMyGames.Add(new LocalGameCardVm

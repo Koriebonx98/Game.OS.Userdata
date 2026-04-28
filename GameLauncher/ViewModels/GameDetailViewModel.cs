@@ -1293,13 +1293,12 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        // LoadSwitchMods is intentionally called for all platforms: it sets IsSwitch = false
+        // for non-Switch games (clearing stale state from a previously viewed Switch game)
+        // and returns immediately without file system operations.
         LoadSwitchMods();
     }
     // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Load a store game into the detail view.
-    /// </summary>
     /// <param name="game">The store entry.</param>
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
@@ -1336,6 +1335,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
+        // so stale Switch state from a previously viewed game is always cleared.
         LoadSwitchMods();
     }
 
