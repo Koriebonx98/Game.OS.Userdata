@@ -797,11 +797,23 @@ class Program
                              installDir: "SteamAcfGame1", stateFlags: "4");
             WriteAcfManifest(steamAppsDir, appId: "100002", name: "Steam ACF Game Two",
                              installDir: "SteamAcfGame2Folder", stateFlags: "4");
-            // A partially-downloaded game (StateFlags != 4) — should be skipped
+            // A partially-downloaded game (bit 2 / value 4 NOT set) — should be skipped
             string game3Dir = Path.Combine(commonDir, "SteamAcfGame3Partial");
             Directory.CreateDirectory(game3Dir);
             WriteAcfManifest(steamAppsDir, appId: "100003", name: "Steam ACF Game Three Partial",
                              installDir: "SteamAcfGame3Partial", stateFlags: "2");
+            // Installed + update required (StateFlags 6 = 4|2): bit 2 IS set → should be included
+            string game4Dir = Path.Combine(commonDir, "SteamAcfGame4UpdateRequired");
+            Directory.CreateDirectory(game4Dir);
+            File.WriteAllText(Path.Combine(game4Dir, "game4.exe"), "fake exe");
+            WriteAcfManifest(steamAppsDir, appId: "100004", name: "Steam ACF Game Four UpdateRequired",
+                             installDir: "SteamAcfGame4UpdateRequired", stateFlags: "6");
+            // Installed + update paused (StateFlags 516 = 4|512): bit 2 IS set → should be included
+            string game5Dir = Path.Combine(commonDir, "SteamAcfGame5UpdatePaused");
+            Directory.CreateDirectory(game5Dir);
+            File.WriteAllText(Path.Combine(game5Dir, "game5.exe"), "fake exe");
+            WriteAcfManifest(steamAppsDir, appId: "100005", name: "Steam ACF Game Five UpdatePaused",
+                             installDir: "SteamAcfGame5UpdatePaused", stateFlags: "516");
 
             var results = new List<LocalGame>();
             GameScannerService.ScanSteamAcfManifests(steamAppsDir, results);
@@ -836,6 +848,28 @@ class Program
             else
             {
                 Console.WriteLine("  ❌  Partial download was NOT skipped (StateFlags=2 should be filtered)");
+                passed = false;
+            }
+
+            // ── StateFlags=6 (installed + update required): must be included ──
+            var g4 = results.FirstOrDefault(g =>
+                string.Equals(g.Title, "Steam ACF Game Four UpdateRequired", StringComparison.OrdinalIgnoreCase));
+            if (g4 != null)
+                Console.WriteLine($"  ✅  Game 4 (StateFlags=6, installed+update required): included");
+            else
+            {
+                Console.WriteLine("  ❌  Game 4 (StateFlags=6) was NOT detected — installed games pending update must be shown");
+                passed = false;
+            }
+
+            // ── StateFlags=516 (installed + update paused): must be included ──
+            var g5 = results.FirstOrDefault(g =>
+                string.Equals(g.Title, "Steam ACF Game Five UpdatePaused", StringComparison.OrdinalIgnoreCase));
+            if (g5 != null)
+                Console.WriteLine($"  ✅  Game 5 (StateFlags=516, installed+update paused): included");
+            else
+            {
+                Console.WriteLine("  ❌  Game 5 (StateFlags=516) was NOT detected — installed games with paused update must be shown");
                 passed = false;
             }
 
@@ -1052,10 +1086,13 @@ class Program
             Directory.CreateDirectory(gameDir);
             File.WriteAllText(Path.Combine(gameDir, "game.exe"), "fake");
 
-            // Write an ACF manifest that gives the proper display name
+            // Write an ACF manifest that gives the proper display name.
+            // Use StateFlags="516" (installed + update paused) to reproduce the real-world
+            // case where the naive stateFlags != "4" check would drop the game and the
+            // directory scan would fall back to the cryptic folder name "LHPCR".
             WriteAcfManifest(steamAppsDir, appId: "400750",
                              name: "LEGO Harry Potter Collection",
-                             installDir: "LHPCR", stateFlags: "4");
+                             installDir: "LHPCR", stateFlags: "516");
 
             // Run the ACF scan first (as the production code now does), then ScanDir
             var results = new List<LocalGame>();

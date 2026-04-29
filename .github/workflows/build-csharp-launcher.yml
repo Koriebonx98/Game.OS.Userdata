@@ -51,6 +51,9 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-and-test:
     name: Build + Auth Tests (including live login)
@@ -124,10 +127,10 @@ jobs:
           PYEOF
 
       # ── Set up Node.js for local backend server ──────────────────────────
-      - name: Set up Node.js 20 (for local backend)
+      - name: Set up Node.js 22 (for local backend)
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install backend dependencies
         working-directory: backend
