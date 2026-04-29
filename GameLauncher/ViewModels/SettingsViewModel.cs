@@ -231,8 +231,9 @@ public partial class SettingsViewModel : ViewModelBase
         {
             var progress = new Progress<double>(p =>
             {
-                UpdateProgress = p * 100;
-                UpdateStatus   = $"⬇ Downloading update… {p * 100:F0}%";
+                double pct     = p * 100;
+                UpdateProgress = pct;
+                UpdateStatus   = $"⬇ Downloading update… {pct:F0}%";
             });
 
             // This call does not return — the app exits and the updater re-launches it.

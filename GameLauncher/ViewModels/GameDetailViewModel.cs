@@ -974,8 +974,8 @@ public partial class GameDetailViewModel : ViewModelBase
                     SanitiseFolderName(gameTitle));
                 System.IO.Directory.CreateDirectory(logDir);
 
-                string stamp    = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
-                string logPath  = System.IO.Path.Combine(logDir, $"room_entries_{stamp}.json");
+                string timestamp = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                string logPath   = System.IO.Path.Combine(logDir, $"room_entries_{timestamp}.json");
                 string json     = System.Text.Json.JsonSerializer.Serialize(
                     roomEntries,
                     new System.Text.Json.JsonSerializerOptions { WriteIndented = true });

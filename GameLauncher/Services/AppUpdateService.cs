@@ -40,6 +40,7 @@ namespace GameLauncher.Services
 
         private static readonly HttpClient _http = new()
         {
+            Timeout = System.TimeSpan.FromSeconds(30),
             DefaultRequestHeaders =
             {
                 { "User-Agent", "GameOS-Launcher/2.0" },
@@ -63,7 +64,9 @@ namespace GameLauncher.Services
             /// </summary>
             bool IsNewer);
 
-        // ── Check ──────────────────────────────────────────────────────────────
+        // Named constants for clarity
+        private const int    DownloadBufferBytes          = 81920; // 80 KB — good balance of throughput vs. memory
+        private const int    UpdaterWaitForExitSeconds    = 60;    // How long the updater script waits for the launcher to exit
 
         /// <summary>
         /// Queries the GitHub releases API for the latest release tag and compares
@@ -147,7 +150,7 @@ namespace GameLauncher.Services
                 await using var stream    = await resp.Content.ReadAsStreamAsync(ct);
                 await using var fileStream = File.Create(zipPath);
 
-                byte[] buffer = new byte[81920];
+                byte[] buffer = new byte[DownloadBufferBytes];
                 int read;
                 while ((read = await stream.ReadAsync(buffer, 0, buffer.Length, ct)) > 0)
                 {
@@ -214,7 +217,7 @@ namespace GameLauncher.Services
             int pid = Environment.ProcessId;
             string script = $@"
 $pid = {pid}
-try {{ (Get-Process -Id $pid -ErrorAction Stop).WaitForExit(30000) }} catch {{}}
+try {{ (Get-Process -Id $pid -ErrorAction Stop).WaitForExit({UpdaterWaitForExitSeconds * 1000}) }} catch {{}}
 Add-Type -Assembly System.IO.Compression.FileSystem
 [System.IO.Compression.ZipFile]::ExtractToDirectory('{zipPath.Replace("'", "''")}', '{appDir.Replace("'", "''")}', $true)
 if (Test-Path '{appExe.Replace("'", "''")}') {{ Start-Process '{appExe.Replace("'", "''")}' }}
