@@ -20,7 +20,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     // ── Application-wide settings ──────────────────────────────────────────
     /// <summary>Check for Games.Database updates on startup.</summary>
-    [ObservableProperty] private bool _autoUpdate    = true;
+    [ObservableProperty] private bool _autoUpdate = true;
     /// <summary>Play the Game.OS intro animation when the launcher starts.</summary>
     [ObservableProperty] private bool _showIntroVideo = true;
 
@@ -70,7 +70,7 @@ public partial class SettingsViewModel : ViewModelBase
 
         AppSettingsService.Save(new Models.AppSettings
         {
-            AutoUpdate     = AutoUpdate,
+            AutoUpdate = AutoUpdate,
             ShowIntroVideo = ShowIntroVideo,
         });
 

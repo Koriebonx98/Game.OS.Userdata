@@ -41,7 +41,9 @@ namespace GameLauncher.Services
         {
             try
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+                string? dir = Path.GetDirectoryName(SettingsPath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
                 File.WriteAllText(SettingsPath, JsonSerializer.Serialize(settings, _jsonOpts));
             }
             catch { /* best-effort */ }
