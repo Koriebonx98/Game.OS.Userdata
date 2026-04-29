@@ -50,6 +50,9 @@ on:
 permissions:
   contents: write   # create releases + upload assets
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-and-release:
     name: Build & Publish GitHub Release
@@ -248,10 +251,10 @@ jobs:
       # ── Run auth tests before publishing ─────────────────────────────────────
       # Sets up Node.js + local backend for end-to-end login verification (Admin.GameOS).
       # The release is published only when the tests pass.
-      - name: Set up Node.js 20
+      - name: Set up Node.js 22
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Install backend dependencies
         working-directory: backend

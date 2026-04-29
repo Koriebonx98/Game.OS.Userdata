@@ -566,9 +566,14 @@ public sealed class GameScannerService : IDisposable
                     string? installDir = ExtractAcfValue(content, "installdir");
                     string? stateFlags = ExtractAcfValue(content, "StateFlags");
 
-                    // Only fully-installed games (StateFlags 4)
+                    // Only games where the "Fully Installed" bit (4) is set in the StateFlags bitmask.
+                    // StateFlags is a bitmask: bit 2 (value 4) = fully installed.
+                    // Accept any value with that bit set (e.g. "4", "6" = installed+update required,
+                    // "516" = installed+update paused) so games are not hidden when Steam flags them
+                    // for an update.
                     if (string.IsNullOrEmpty(name) || string.IsNullOrEmpty(installDir)) continue;
-                    if (!string.IsNullOrEmpty(stateFlags) && stateFlags != "4") continue;
+                    if (!string.IsNullOrEmpty(stateFlags) &&
+                        (!int.TryParse(stateFlags, out int stateInt) || (stateInt & 4) == 0)) continue;
 
                     string fullPath = Path.Combine(commonDir, installDir);
                     if (!Directory.Exists(fullPath)) continue;
