@@ -333,7 +333,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERSION:  ${{ github.event.inputs.version }}
         run: |
-          VERSION=$(echo "$VERSION" | xargs)
+          # Trim leading/trailing whitespace (handles accidental spaces in the input)
+          VERSION=$(echo "$VERSION" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           # Push the tag if it does not yet exist remotely
           if git ls-remote --tags origin "refs/tags/$VERSION" | grep -q "refs/tags/$VERSION"; then
             echo "ℹ  Tag $VERSION already exists remotely"
@@ -343,11 +344,12 @@ jobs:
             echo "✅ Created and pushed tag $VERSION"
           fi
 
-          # Remove any stale draft release left by a previous failed run
-          DRAFT=$(gh release view "$VERSION" --json isDraft -q '.isDraft' 2>/dev/null || echo "")
-          if [ "$DRAFT" = "true" ]; then
+          # Remove any existing release (draft or published) for this tag so that
+          # re-running the workflow with the same version tag always produces a
+          # fresh release rather than failing with "release already exists".
+          if gh release view "$VERSION" >/dev/null 2>&1; then
             gh release delete "$VERSION" --yes || true
-            echo "🗑️  Removed stale draft release for $VERSION"
+            echo "🗑️  Removed existing release for $VERSION"
           fi
 
       # ── Create GitHub Release ─────────────────────────────────────────────────
@@ -358,7 +360,8 @@ jobs:
           EXTRA_NOTES: ${{ github.event.inputs.release_notes }}
           IS_PRERELEASE: ${{ github.event.inputs.prerelease }}
         run: |
-          VERSION=$(echo "$VERSION" | xargs)
+          # Trim leading/trailing whitespace (handles accidental spaces in the input)
+          VERSION=$(echo "$VERSION" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
           NOTES="## Game.OS Launcher ${VERSION}
 
           Cross-platform game launcher for Windows, Linux and macOS.
@@ -418,14 +421,32 @@ jobs:
             PRERELEASE_FLAG="--prerelease"
           fi
 
+          # Create the release first (metadata only, no files).
+          # Uploading all assets in one gh release create call can cause a
+          # HTTP 404 on later assets if GitHub's upload endpoint is briefly
+          # unavailable after the release is created.  Separating creation
+          # from upload lets each file be retried independently.
           gh release create "$VERSION" \
             --title "Game.OS Launcher $VERSION" \
             --notes "$NOTES" \
-            $PRERELEASE_FLAG \
-            /tmp/GameOS-Launcher-win-x64.zip#GameOS-Launcher-win-x64.zip \
-            /tmp/GameOS-Launcher-linux-x64.tar.gz#GameOS-Launcher-linux-x64.tar.gz \
-            /tmp/GameOS-Launcher-osx-x64.tar.gz#GameOS-Launcher-osx-x64.tar.gz \
-            /tmp/GameOS-Launcher-osx-arm64.tar.gz#GameOS-Launcher-osx-arm64.tar.gz
+            $PRERELEASE_FLAG
+
+          # Upload each platform binary one at a time with a single retry on failure.
+          for ASSET_SPEC in \
+            "/tmp/GameOS-Launcher-win-x64.zip#GameOS-Launcher-win-x64.zip" \
+            "/tmp/GameOS-Launcher-linux-x64.tar.gz#GameOS-Launcher-linux-x64.tar.gz" \
+            "/tmp/GameOS-Launcher-osx-x64.tar.gz#GameOS-Launcher-osx-x64.tar.gz" \
+            "/tmp/GameOS-Launcher-osx-arm64.tar.gz#GameOS-Launcher-osx-arm64.tar.gz"; do
+            FILE="${ASSET_SPEC%%#*}"
+            LABEL="${ASSET_SPEC##*#}"
+            echo "⬆  Uploading $LABEL ..."
+            if ! gh release upload "$VERSION" "$FILE#$LABEL" --clobber; then
+              echo "⚠  Upload failed for $LABEL — waiting 10s before retry ..."
+              sleep 10
+              gh release upload "$VERSION" "$FILE#$LABEL" --clobber
+            fi
+            echo "✅ $LABEL uploaded"
+          done
 
           echo "✅ Release $VERSION published!"
           echo "   Download: https://github.com/${{ github.repository }}/releases/tag/$VERSION"
