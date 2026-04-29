@@ -154,9 +154,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Start background scanner regardless of login state
         _scanner = new GameScannerService();
-        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
-        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
-        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        _ = EnrichMyGamesListAsync(); RefreshDashboardLocalGames(); };
+        // Wire the rebuild-complete callback so cover enrichment always runs after
+        // _allMyGames is fully populated — eliminates the race condition where
+        // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
+        LibraryVm.OnMyGamesRebuilt = () => _ = EnrichMyGamesListAsync();
+        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); RefreshDashboardLocalGames(); };
+        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  RefreshDashboardLocalGames(); };
+        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        RefreshDashboardLocalGames(); };
         _ = _scanner.StartAsync();
 
         // On startup, check if any cached platform JSON files are outdated and

@@ -853,6 +853,18 @@
                         <TextBlock Text="Enable or disable mods for this game in Ryujinx."
                                    FontSize="12" Foreground="#8b949e"/>
 
+                        <!-- mods.json file path hint -->
+                        <Border IsVisible="{Binding SwitchModsJsonPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                Background="#21262d" CornerRadius="6" Padding="10,6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📄" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SwitchModsJsonPath}"
+                                           FontSize="10" Foreground="#6e7681"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Mod list -->
                         <ItemsControl ItemsSource="{Binding SwitchMods}"
                                       IsVisible="{Binding HasSwitchMods}">

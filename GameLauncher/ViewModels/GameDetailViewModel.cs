@@ -161,6 +161,9 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>All Ryujinx mods for the current game, populated by <see cref="LoadSwitchMods"/>.</summary>
     public ObservableCollection<RyujinxModVm> SwitchMods { get; } = new();
 
+    /// <summary>Full path to the mods.json for the current Switch game, shown in the mods panel.</summary>
+    [ObservableProperty] private string _switchModsJsonPath = "";
+
     // ── Navigation back-action ────────────────────────────────────────────────
     public System.Action? OnClose { get; set; }
 
@@ -1290,13 +1293,12 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        // LoadSwitchMods is intentionally called for all platforms: it sets IsSwitch = false
+        // for non-Switch games (clearing stale state from a previously viewed Switch game)
+        // and returns immediately without file system operations.
         LoadSwitchMods();
     }
     // ─────────────────────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Load a store game into the detail view.
-    /// </summary>
     /// <param name="game">The store entry.</param>
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
@@ -1333,6 +1335,9 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
+        // so stale Switch state from a previously viewed game is always cleared.
+        LoadSwitchMods();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1348,6 +1353,15 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowSettings    = false;
         ShowModsPanel   = false;
         ShowDrivePicker = false;
+        // Reset Switch/Ryujinx state so the Mods button is not incorrectly visible
+        // when navigating from a Switch game to a PC game.
+        IsSwitch             = false;
+        SwitchMods.Clear();
+        HasSwitchMods        = false;
+        ModsJsonExistsButEmpty = false;
+        SwitchModsStatus     = "";
+        SwitchModsJsonPath   = "";
+        _ryujinxModsJsonPath = null;
         _currentLocalRom = null;
         Title             = game.Title;
         Platform          = "PC";
@@ -1974,6 +1988,7 @@ public partial class GameDetailViewModel : ViewModelBase
         ModsJsonExistsButEmpty  = false;
         ShowModsPanel           = false;
         SwitchModsStatus        = "";
+        SwitchModsJsonPath      = "";
         _ryujinxModsJsonPath    = null;
 
         IsSwitch = string.Equals(Platform, "Switch", StringComparison.OrdinalIgnoreCase);
@@ -2009,6 +2024,7 @@ public partial class GameDetailViewModel : ViewModelBase
                                ?? Services.RyujinxModService.GetDefaultModsJsonPath(emuSettings.EmulatorPath, titleId);
 
         _ryujinxModsJsonPath = modsJsonPath;
+        SwitchModsJsonPath   = modsJsonPath ?? "";
 
         if (!System.IO.File.Exists(modsJsonPath))
         {
