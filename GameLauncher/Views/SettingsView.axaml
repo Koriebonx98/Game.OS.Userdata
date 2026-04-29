@@ -41,20 +41,81 @@
 
                     <Rectangle Height="1" Fill="#21262d"/>
 
-                    <!-- Intro video toggle -->
-                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                    <!-- Intro video toggle + Download button -->
+                    <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center">
                         <StackPanel Grid.Column="0" Spacing="2">
                             <TextBlock Text="Show intro video on startup"
                                        FontSize="13" Foreground="#e6edf3"/>
                             <TextBlock Text="Plays the Game.OS intro animation each time the launcher opens. Disable for a faster startup."
                                        FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            <!-- Download status inline -->
+                            <TextBlock Text="{Binding IntroVideoStatus}"
+                                       FontSize="11" Foreground="#3fb950"
+                                       IsVisible="{Binding IntroVideoStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                       TextWrapping="Wrap" Margin="0,2,0,0"/>
                         </StackPanel>
-                        <ToggleSwitch Grid.Column="1"
+                        <!-- Download Intro Video button -->
+                        <Button Grid.Column="1"
+                                Classes="btn-secondary"
+                                Content="⬇  Download Intro Video"
+                                FontSize="11"
+                                Padding="10,6"
+                                Margin="12,0,8,0"
+                                VerticalAlignment="Center"
+                                IsEnabled="{Binding !IsDownloadingIntro}"
+                                Command="{Binding DownloadIntroVideoAsyncCommand}"/>
+                        <ToggleSwitch Grid.Column="2"
                                       IsChecked="{Binding ShowIntroVideo}"
                                       OffContent="" OnContent=""
-                                      VerticalAlignment="Center"
-                                      Margin="16,0,0,0"/>
+                                      VerticalAlignment="Center"/>
                     </Grid>
+
+                    <Rectangle Height="1" Fill="#21262d"/>
+
+                    <!-- Check for update -->
+                    <StackPanel Spacing="8">
+                        <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                            <StackPanel Grid.Column="0" Spacing="2">
+                                <TextBlock Text="Check for Update"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <TextBlock Text="Check GitHub for a newer version of Game.OS Launcher and install it automatically."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <Button Grid.Column="1"
+                                    Classes="btn-secondary"
+                                    Content="🔍  Check for Update"
+                                    FontSize="11"
+                                    Padding="10,6"
+                                    Margin="16,0,0,0"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding !IsCheckingUpdate}"
+                                    Command="{Binding CheckForUpdateAsyncCommand}"/>
+                        </Grid>
+
+                        <!-- Update status + Install Now -->
+                        <StackPanel IsVisible="{Binding UpdateStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                    Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="{Binding UpdateStatus}"
+                                       FontSize="12" Foreground="#e6edf3"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"/>
+                            <!-- Install now button — only shown when an update is available -->
+                            <Button IsVisible="{Binding UpdateAvailable}"
+                                    Classes="btn-primary"
+                                    Content="⬇  Install Now"
+                                    FontSize="11"
+                                    Padding="10,6"
+                                    VerticalAlignment="Center"
+                                    IsEnabled="{Binding !IsInstallingUpdate}"
+                                    Command="{Binding InstallUpdateAsyncCommand}"/>
+                        </StackPanel>
+
+                        <!-- Download progress bar -->
+                        <ProgressBar IsVisible="{Binding IsInstallingUpdate}"
+                                     Minimum="0" Maximum="100"
+                                     Value="{Binding UpdateProgress}"
+                                     Height="6"
+                                     CornerRadius="3"/>
+                    </StackPanel>
 
                 </StackPanel>
             </Border>
@@ -205,6 +266,44 @@
                            VerticalAlignment="Center"
                            IsVisible="{Binding IsSaveSuccess}"/>
             </StackPanel>
+
+            <!-- ── Nintendo Switch / Log Data ── -->
+            <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                <StackPanel Spacing="16">
+
+                    <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,4">
+                        <TextBlock Text="🕹" FontSize="18" VerticalAlignment="Center"/>
+                        <TextBlock Text="Nintendo Switch – Log Data" FontSize="17" FontWeight="Bold"
+                                   Foreground="#e6edf3" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                        When a Switch game is launched via Ryujinx, Game.OS automatically clears
+                        old log files before the emulator starts so only the current session's
+                        data is captured.  After the session ends the launcher scans the new log
+                        for "Room:" entries that contain match statistics useful for building
+                        game achievements.
+                    </TextBlock>
+
+                    <Rectangle Height="1" Fill="#21262d"/>
+
+                    <!-- Allow log upload toggle -->
+                    <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" Spacing="2">
+                            <TextBlock Text="Allow log upload to Games.Database"
+                                       FontSize="13" Foreground="#e6edf3"/>
+                            <TextBlock Text="If enabled, &quot;Room:&quot; snippets found in Ryujinx logs may be submitted to the shared database so achievements can be researched. Disabled by default — you must opt in."
+                                       FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                        </StackPanel>
+                        <ToggleSwitch Grid.Column="1"
+                                      IsChecked="{Binding AllowLogUpload}"
+                                      OffContent="" OnContent=""
+                                      VerticalAlignment="Center"
+                                      Margin="16,0,0,0"/>
+                    </Grid>
+
+                </StackPanel>
+            </Border>
 
             <!-- ── Playtime Info ── -->
             <Border Background="#161b22" CornerRadius="10" Padding="24,20">

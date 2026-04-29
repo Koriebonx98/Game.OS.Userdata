@@ -780,6 +780,12 @@ public partial class GameDetailViewModel : ViewModelBase
                     && System.IO.File.Exists(emuSettings.EmulatorPath)
                     && emuSettings.Enabled)
                 {
+                    // ── Switch / Ryujinx: clear stale log files before launching ──
+                    bool isSwitchGame = string.Equals(Platform, "Switch",
+                        System.StringComparison.OrdinalIgnoreCase);
+                    if (isSwitchGame)
+                        Services.RyujinxLogService.DeleteLogs(emuSettings.EmulatorPath);
+
                     // Replace {rom} placeholder with the ROM path, safely quoting any embedded quotes
                     string safeRomPath = romPath.Replace("\"", "\\\"");
                     string args = emuSettings.Arguments.Replace("{rom}", $"\"{safeRomPath}\"");
@@ -801,7 +807,11 @@ public partial class GameDetailViewModel : ViewModelBase
                     }
                     catch { /* best-effort */ }
 
-                    if (saved.PostLaunch.Count > 0)
+                    // For Switch games: scan logs for Room: entries after the session ends
+                    if (isSwitchGame)
+                        _ = WatchSwitchSessionAsync(romProc, emuSettings.EmulatorPath,
+                                Title, saved.PostLaunch);
+                    else if (saved.PostLaunch.Count > 0)
                         _ = WatchAndRunPostLaunchAsync(romProc, saved.PostLaunch);
                     return;
                 }
@@ -917,6 +927,113 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var post in postEntries)
             TryStartProcess(post.Path, post.Arguments);
     }
+
+    /// <summary>
+    /// Waits for the Ryujinx process to exit, then:
+    /// <list type="number">
+    ///   <item>Scans the new log files for "Room: " achievement-data blocks.</item>
+    ///   <item>Optionally uploads them (when AllowLogUpload is enabled in settings).</item>
+    ///   <item>Runs any configured post-launch entries.</item>
+    /// </list>
+    /// Runs fire-and-forget so it never blocks the UI.
+    /// </summary>
+    private static async System.Threading.Tasks.Task WatchSwitchSessionAsync(
+        System.Diagnostics.Process? ryujinxProc,
+        string ryujinxExePath,
+        string gameTitle,
+        List<LaunchEntry> postEntries)
+    {
+        // ── 1. Wait for the emulator to exit ──────────────────────────────────
+        if (ryujinxProc != null)
+        {
+            try
+            {
+                using var cts = new System.Threading.CancellationTokenSource(
+                    System.TimeSpan.FromHours(24));
+                await ryujinxProc.WaitForExitAsync(cts.Token);
+            }
+            catch { /* best-effort */ }
+            finally
+            {
+                ryujinxProc.Dispose();
+            }
+        }
+
+        // ── 2. Scan logs for Room: entries ────────────────────────────────────
+        var roomEntries = Services.RyujinxLogService.ScanForRoomEntries(ryujinxExePath);
+
+        if (roomEntries.Count > 0)
+        {
+            // Persist Room: snippets locally alongside other game data so they are
+            // available for future achievement research even without upload.
+            try
+            {
+                string logDir = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "GameOS", "SwitchLogData",
+                    SanitiseFolderName(gameTitle));
+                System.IO.Directory.CreateDirectory(logDir);
+
+                string stamp    = DateTime.UtcNow.ToString("yyyyMMddHHmmss");
+                string logPath  = System.IO.Path.Combine(logDir, $"room_entries_{stamp}.json");
+                string json     = System.Text.Json.JsonSerializer.Serialize(
+                    roomEntries,
+                    new System.Text.Json.JsonSerializerOptions { WriteIndented = true });
+                await System.IO.File.WriteAllTextAsync(logPath, json);
+            }
+            catch { /* best-effort — do not disrupt post-launch */ }
+
+            // ── 3. Optional upload (user must opt in via settings) ────────────
+            var appSettings = Services.AppSettingsService.Load();
+            if (appSettings.AllowLogUpload)
+                _ = UploadRoomEntriesAsync(gameTitle, roomEntries);
+        }
+
+        // ── 4. Post-launch entries ────────────────────────────────────────────
+        foreach (var post in postEntries)
+            TryStartProcess(post.Path, post.Arguments);
+    }
+
+    /// <summary>
+    /// Submits the Room: snippets to the Games.Database backend for achievement research.
+    /// This is a fire-and-forget best-effort call — failure is silently swallowed.
+    /// </summary>
+    private static async System.Threading.Tasks.Task UploadRoomEntriesAsync(
+        string gameTitle, List<string> roomEntries)
+    {
+        try
+        {
+            var payload = new
+            {
+                gameTitle,
+                platform  = "Switch",
+                entries   = roomEntries,
+                uploadedAt = DateTime.UtcNow.ToString("o"),
+            };
+
+            string json = System.Text.Json.JsonSerializer.Serialize(payload);
+            using var http    = new System.Net.Http.HttpClient();
+            using var content = new System.Net.Http.StringContent(
+                json, System.Text.Encoding.UTF8, "application/json");
+            http.DefaultRequestHeaders.Add("User-Agent", "GameOS-Launcher/2.0");
+
+            // The backend endpoint is read from BackendApiService (same as the rest of the app).
+            string backendBase = Services.BackendApiService.BackendUrl?.TrimEnd('/') ?? "";
+            if (string.IsNullOrEmpty(backendBase)) return;
+
+            await http.PostAsync($"{backendBase}/api/switch-log-upload", content);
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Strips characters that are invalid in folder names from a game title.</summary>
+    private static string SanitiseFolderName(string name)
+    {
+        if (string.IsNullOrEmpty(name)) return "Unknown";
+        var invalid = System.IO.Path.GetInvalidFileNameChars();
+        return new string(name.Select(c => invalid.Contains(c) ? '_' : c).ToArray()).Trim();
+    }
+
 
     /// <summary>
     /// Installs the repack.

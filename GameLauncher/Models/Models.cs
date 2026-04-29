@@ -293,6 +293,13 @@ namespace GameLauncher.Models
         /// intro animation on startup.  Set to <see langword="false"/> to skip it.
         /// </summary>
         [JsonPropertyName("showIntroVideo")] public bool ShowIntroVideo { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, the launcher may upload "Room: " log snippets from
+        /// Ryujinx sessions to the Games.Database so achievements can be researched.
+        /// Defaults to <see langword="false"/> — the user must explicitly opt in.
+        /// </summary>
+        [JsonPropertyName("allowLogUpload")] public bool AllowLogUpload { get; set; } = false;
     }
 
     // ── Game launch settings (saved locally per game title) ───────────────────
