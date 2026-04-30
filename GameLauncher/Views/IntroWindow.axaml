@@ -1,6 +1,5 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
         x:Class="GameLauncher.Views.IntroWindow"
         Title="GameOS"
         Background="Black"
@@ -10,10 +9,7 @@
         Topmost="True"
         ShowInTaskbar="False">
 
-    <Grid Background="Black">
-        <vlc:VideoView x:Name="IntroVideoView"
-                       HorizontalAlignment="Stretch"
-                       VerticalAlignment="Stretch" />
-    </Grid>
+    <!-- Plain black container; platform-specific video host is added in code-behind -->
+    <Grid x:Name="VideoContainer" Background="Black" />
 
 </Window>
