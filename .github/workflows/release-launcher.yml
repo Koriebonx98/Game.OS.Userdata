@@ -343,11 +343,13 @@ jobs:
             echo "✅ Created and pushed tag $VERSION"
           fi
 
-          # Remove any stale draft release left by a previous failed run
-          DRAFT=$(gh release view "$VERSION" --json isDraft -q '.isDraft' 2>/dev/null || echo "")
-          if [ "$DRAFT" = "true" ]; then
+          # Remove any existing release (draft or published) left by a previous run.
+          # This prevents gh release create from conflicting with a stale published
+          # release, which causes HTTP 404 errors during asset uploads.
+          EXISTING=$(gh release view "$VERSION" --json tagName -q '.tagName' 2>/dev/null || echo "")
+          if [ -n "$EXISTING" ]; then
             gh release delete "$VERSION" --yes || true
-            echo "🗑️  Removed stale draft release for $VERSION"
+            echo "🗑️  Removed existing release for $VERSION"
           fi
 
       # ── Create GitHub Release ─────────────────────────────────────────────────
