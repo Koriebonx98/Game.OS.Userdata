@@ -42,7 +42,9 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.1" />
     <PackageReference Include="LibVLCSharp" Version="3.9.7.1" />
     <PackageReference Include="LibVLCSharp.Avalonia" Version="3.9.7.1" />
-    <!-- Native LibVLC binaries, included only for the matching OS -->
-    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" Condition="$([MSBuild]::IsOSPlatform('Windows'))" />
+    <!-- Native LibVLC binaries for Windows (no OS condition — must be included
+         even when cross-compiling from Linux/macOS in CI so the DLLs land in
+         the win-x64 publish output) -->
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.23.1" />
   </ItemGroup>
 </Project>
