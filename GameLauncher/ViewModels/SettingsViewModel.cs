@@ -27,6 +27,8 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _introVideoPath = "";
     /// <summary>Read the Ryujinx log after each Switch game session.</summary>
     [ObservableProperty] private bool _readSwitchLog = false;
+    /// <summary>Write all debug output and exceptions to Dev.log next to the exe.</summary>
+    [ObservableProperty] private bool _devLogs = false;
 
     // ── Active settings section (Steam-style left-nav) ────────────────────
     [ObservableProperty]
@@ -68,6 +70,7 @@ public partial class SettingsViewModel : ViewModelBase
         ShowIntroVideo = appSettings.ShowIntroVideo;
         IntroVideoPath = appSettings.IntroVideoPath;
         ReadSwitchLog  = appSettings.ReadSwitchLog;
+        DevLogs        = appSettings.DevLogs;
 
         StatusMessage = "";
     }
@@ -94,6 +97,7 @@ public partial class SettingsViewModel : ViewModelBase
             ShowIntroVideo = ShowIntroVideo,
             IntroVideoPath = IntroVideoPath,
             ReadSwitchLog  = ReadSwitchLog,
+            DevLogs        = DevLogs,
         });
 
         StatusMessage = "✅ Settings saved!";

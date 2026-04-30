@@ -306,6 +306,13 @@ namespace GameLauncher.Models
         /// Switch game session and displays any relevant output in the launcher.
         /// </summary>
         [JsonPropertyName("readSwitchLog")] public bool ReadSwitchLog { get; set; } = false;
+
+        /// <summary>
+        /// When <see langword="true"/>, all debug output, trace messages, and unhandled
+        /// exceptions are written to <c>Dev.log</c> next to the launcher exe.
+        /// Useful for diagnosing playback, network, and startup issues.
+        /// </summary>
+        [JsonPropertyName("devLogs")] public bool DevLogs { get; set; } = false;
     }
 
     // ── Game launch settings (saved locally per game title) ───────────────────

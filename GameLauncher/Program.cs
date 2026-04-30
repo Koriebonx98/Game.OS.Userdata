@@ -11,7 +11,15 @@ internal sealed class Program
     public static void Main(string[] args)
     {
         DemoMode.DetectAndEnable(args);
+
+        // Start dev logging as early as possible so that any startup crash is captured.
+        var settings = Services.AppSettingsService.Load();
+        if (settings.DevLogs)
+            Services.DevLogService.Enable();
+
         BuildAvaloniaApp().StartWithClassicDesktopLifetime(args);
+
+        Services.DevLogService.Disable();
     }
 
     public static AppBuilder BuildAvaloniaApp()
