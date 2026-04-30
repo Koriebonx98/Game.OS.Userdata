@@ -7,6 +7,7 @@ using System;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace GameLauncher.Views;
 
@@ -60,21 +61,43 @@ public partial class IntroWindow : Window
             _mediaPlayer.EncounteredError += OnEncounteredError;
 
             // Keep a reference to the Media so it isn't disposed before VLC
-            // finishes reading it (disposing immediately after Play() can cut
-            // off playback on some builds).
+            // finishes reading it.
             _media = new Media(_libVlc, new Uri(path));
 
-            // Attach the media player after the first layout pass so the
-            // VideoView has a valid native window handle.
+            // After the window is fully rendered, bind VLC to the native window
+            // handle so it renders directly into the IntroWindow (no VideoView
+            // needed – matching how PS5_OS drives playback via the OS media layer).
             Dispatcher.UIThread.Post(() =>
             {
-                IntroVideoView.MediaPlayer = _mediaPlayer;
-                _mediaPlayer.Play(_media);
-            }, Avalonia.Threading.DispatcherPriority.Loaded);
+                try
+                {
+                    var platformHandle = TryGetPlatformHandle();
+                    if (platformHandle != null)
+                    {
+                        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                            _mediaPlayer.Hwnd = platformHandle.Handle;
+                        else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                            _mediaPlayer.XWindow = (uint)platformHandle.Handle;
+                        else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                            _mediaPlayer.NsObject = platformHandle.Handle;
+
+                        _mediaPlayer.Play(_media);
+                    }
+                    else
+                    {
+                        FinishIntro();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[IntroWindow] Failed to start playback: {ex.Message}");
+                    FinishIntro();
+                }
+            }, DispatcherPriority.Loaded);
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[IntroWindow] Failed to start playback: {ex.Message}");
+            Debug.WriteLine($"[IntroWindow] Failed to initialize VLC: {ex.Message}");
             FinishIntro();
         }
     }
