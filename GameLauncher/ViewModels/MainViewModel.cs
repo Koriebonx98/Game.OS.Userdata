@@ -158,9 +158,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // _allMyGames is fully populated — eliminates the race condition where
         // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
         LibraryVm.OnMyGamesRebuilt = () => _ = EnrichMyGamesListAsync();
-        _scanner.GamesUpdated   += games   => { LibraryVm.UpdateLocalGames(games); RefreshDashboardLocalGames(); };
-        _scanner.RepacksUpdated += repacks => { LibraryVm.UpdateRepacks(repacks);  RefreshDashboardLocalGames(); };
-        _scanner.RomsUpdated    += roms    => { LibraryVm.UpdateRoms(roms);        RefreshDashboardLocalGames(); };
+        _scanner.GamesUpdated   += games   => { DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found."); LibraryVm.UpdateLocalGames(games); RefreshDashboardLocalGames(); };
+        _scanner.RepacksUpdated += repacks => { DevLogService.Log($"[Scanner] RepacksUpdated: {repacks.Count} repacks found."); LibraryVm.UpdateRepacks(repacks);  RefreshDashboardLocalGames(); };
+        _scanner.RomsUpdated    += roms    => { DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found."); LibraryVm.UpdateRoms(roms);        RefreshDashboardLocalGames(); };
+        DevLogService.Log("[Scanner] Starting background game scanner…");
         _ = _scanner.StartAsync();
 
         // On startup, check if any cached platform JSON files are outdated and
@@ -298,6 +299,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         bool isAdmin = _client.IsAdmin;
 
+        DevLogService.Log($"[MainViewModel] OnLoginSuccess: user='{profile.Username}'  games={library.Count}  achievements={achievements.Count}  offline={isOffline}  isAdmin={isAdmin}");
+
         // Create the per-user data folder hierarchy beneath the executable
         UserDataService.CreateUserFolders(profile.Username);
 
@@ -325,6 +328,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Only save when we actually fetched from the server (isOffline = false).
         if (!isOffline)
         {
+            DevLogService.Log("[MainViewModel] Online mode — saving offline cache and starting background services.");
             _offlineCache.Save(profile.Username, profile, library, achievements);
 
             // Flush any pending offline changes now that we are back online
@@ -353,6 +357,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             System.Diagnostics.Debug.WriteLine(
                 $"[MainViewModel] Offline mode — loaded cached data for '{profile.Username}'.");
+            DevLogService.Log($"[MainViewModel] Offline mode — loaded cached data for '{profile.Username}'.");
 
             // Start the reconnect timer so the app automatically transitions back online
             // as soon as a live server connection becomes available.
@@ -365,6 +370,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             .Cast<LocalGameCardVm>()
             .ToList();
 
+        DevLogService.Log($"[MainViewModel] Local game cards found: {localCards.Count}. Loading child view models…");
         DashboardVm.Load(profile, library, achievements, localCards);
         LibraryVm.Load(library);
         StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
@@ -387,6 +393,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowLogin = false;
         ShowMain  = true;
         ActivePage = "dashboard";
+        DevLogService.Log("[MainViewModel] Login flow complete — showing dashboard.");
     }
 
     /// <summary>
@@ -430,10 +437,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task ApplyCloudPlaytimeAsync(List<Game> library)
     {
+        DevLogService.Log("[Playtime] Fetching cloud activity log…");
         try
         {
             var activity = await _client.GetActivityAsync().ConfigureAwait(false);
-            if (activity.Count == 0) return;
+            if (activity.Count == 0)
+            {
+                DevLogService.Log("[Playtime] Cloud activity log is empty — no playtime to apply.");
+                return;
+            }
+            DevLogService.Log($"[Playtime] Cloud activity log has {activity.Count} entries.");
 
             // Aggregate cloud minutes per (platform, title)
             var totals = activity
@@ -460,6 +473,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 System.Diagnostics.Debug.WriteLine(
                     "[Playtime] Applied cloud playtime totals to library.");
+                DevLogService.Log("[Playtime] Applied cloud playtime totals to library.");
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var cards = LibraryVm.GetMyGameSources()
@@ -476,6 +490,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             System.Diagnostics.Debug.WriteLine(
                 $"[Playtime] Failed to load cloud activity: {ex.Message}");
+            DevLogService.Log($"[Playtime] Failed to load cloud activity: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -547,6 +562,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void Navigate(string page)
     {
+        DevLogService.Log($"[Navigation] Navigate → '{page}'");
         // Auto-collapse the nav sidebar after a page is selected (console-like)
         IsNavExpanded = false;
         ShowDetail = false;
