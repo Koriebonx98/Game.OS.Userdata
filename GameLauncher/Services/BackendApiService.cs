@@ -418,6 +418,9 @@ namespace GameLauncher.Services
                     minutesPlayed,
                 };
                 using var resp = await _http.PostAsJsonAsync("/api/me/activity", body, ct);
+                if (!resp.IsSuccessStatusCode)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[BackendApiService] LogActivity HTTP {(int)resp.StatusCode}: {gameTitle} ({platform})");
                 // Non-critical — do not throw on failure
             }
             catch { /* best-effort */ }

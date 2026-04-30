@@ -83,7 +83,7 @@ public partial class App : Application
 
             using var proc = Process.Start(psi);
             if (proc != null)
-                await Task.Run(() => proc.WaitForExit());
+                await proc.WaitForExitAsync();
         }
         catch (Exception ex)
         {
@@ -167,7 +167,9 @@ public partial class App : Application
                 UseShellExecute        = false,
                 CreateNoWindow         = true,
             });
-            var line = p?.StandardOutput.ReadLine()?.Trim();
+            if (p == null) return null;
+            var line = p.StandardOutput.ReadLine()?.Trim();
+            p.WaitForExit();
             if (!string.IsNullOrEmpty(line) && File.Exists(line))
                 return line;
         }

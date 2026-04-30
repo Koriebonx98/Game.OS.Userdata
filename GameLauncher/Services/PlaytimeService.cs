@@ -98,9 +98,11 @@ namespace GameLauncher.Services
         public static event Action<string, string>? SessionCompleted;
 
         /// <summary>
-        /// Fired on the thread-pool after a session is finalised and written to disk.
+        /// Fired on the <b>thread-pool</b> (not the UI thread) after a session is
+        /// finalised and written to disk.
         /// Passes the complete <see cref="PlaySession"/> record so callers can push
         /// it to the cloud without needing to re-read the local file.
+        /// Subscribers that update the UI must marshal back to the UI thread.
         /// </summary>
         public static event Action<PlaySession>? SessionSaved;
 
