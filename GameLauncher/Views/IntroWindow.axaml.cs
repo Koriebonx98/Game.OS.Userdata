@@ -21,6 +21,7 @@ public partial class IntroWindow : Window
     private readonly MainViewModel _mainVm;
     private LibVLC? _libVlc;
     private MediaPlayer? _mediaPlayer;
+    private Media? _media;
     private bool _finished;
 
     // Parameterless constructor required by the Avalonia XAML loader / designer.
@@ -55,10 +56,10 @@ public partial class IntroWindow : Window
 
             VideoView.MediaPlayer = _mediaPlayer;
 
-            using var media = new Media(_libVlc, _videoPath, FromType.FromPath);
-            _mediaPlayer.EndReached  += OnMediaEnded;
+            _media = new Media(_libVlc, _videoPath, FromType.FromPath);
+            _mediaPlayer.EndReached       += OnMediaEnded;
             _mediaPlayer.EncounteredError += OnMediaError;
-            _mediaPlayer.Play(media);
+            _mediaPlayer.Play(_media);
         }
         catch
         {
@@ -97,9 +98,16 @@ public partial class IntroWindow : Window
 
     private void DisposeVlc()
     {
+        if (_mediaPlayer != null)
+        {
+            _mediaPlayer.EndReached       -= OnMediaEnded;
+            _mediaPlayer.EncounteredError -= OnMediaError;
+        }
         try { _mediaPlayer?.Dispose(); } catch { /* ignore */ }
+        try { _media?.Dispose();       } catch { /* ignore */ }
         try { _libVlc?.Dispose();      } catch { /* ignore */ }
         _mediaPlayer = null;
+        _media       = null;
         _libVlc      = null;
     }
 
