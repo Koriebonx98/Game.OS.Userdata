@@ -85,9 +85,7 @@ public partial class IntroWindow : Window
                     // Calling Core.Initialize() without a path lets LibVLCSharp use
                     // that resolver (and the OS DLL search path) to locate libvlc.dll.
                     // It also handles the case where VLC is installed system-wide.
-                    DevLogService.Log(string.IsNullOrEmpty(appDir) || !Directory.Exists(appDir)
-                        ? "[IntroWindow] appDir is empty or missing — calling Core.Initialize() with default search."
-                        : "[IntroWindow] libvlc.dll absent from appDir (single-file bundle) — calling Core.Initialize() with default search.");
+                    DevLogService.Log("[IntroWindow] libvlc.dll not found in appDir — calling Core.Initialize() with default search (single-file bundle or system VLC).");
                     Core.Initialize();
                     DevLogService.Log("[IntroWindow] Core.Initialize() succeeded.");
                 }
