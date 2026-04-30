@@ -52,8 +52,7 @@ namespace GameLauncher.Services
         public static async Task<List<IntroVideoGalleryItem>> FetchGalleryAsync(
             CancellationToken ct = default)
         {
-            using var http = CreateHttpClient();
-            var items = await http.GetFromJsonAsync<GitHubContentItem[]>(GalleryApiUrl, ct)
+            var items = await _http.GetFromJsonAsync<GitHubContentItem[]>(GalleryApiUrl, ct)
                         ?? Array.Empty<GitHubContentItem>();
 
             return items
@@ -81,8 +80,7 @@ namespace GameLauncher.Services
             Directory.CreateDirectory(LocalCacheDir);
             var localPath = Path.Combine(LocalCacheDir, item.Name);
 
-            using var http = CreateHttpClient();
-            using var response = await http.GetAsync(
+            using var response = await _http.GetAsync(
                 item.DownloadUrl, HttpCompletionOption.ResponseHeadersRead, ct);
             response.EnsureSuccessStatusCode();
 
@@ -109,6 +107,9 @@ namespace GameLauncher.Services
         public static bool IsVideoFile(string name) =>
             VideoExtensions.Contains(
                 Path.GetExtension(name ?? "").ToLowerInvariant());
+
+        // Shared HttpClient — reused across all gallery requests to avoid socket exhaustion.
+        private static readonly HttpClient _http = CreateHttpClient();
 
         private static HttpClient CreateHttpClient()
         {

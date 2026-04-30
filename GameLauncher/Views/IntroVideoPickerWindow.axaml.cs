@@ -163,11 +163,16 @@ public partial class IntroVideoItemVm : ObservableObject
 
     public bool IsButtonEnabled    => !IsDownloading;
     public bool HasStatus          => !string.IsNullOrEmpty(StatusLabel);
-    public bool IsAlreadyDownloaded =>
-        File.Exists(Path.Combine(IntroVideoGalleryService.LocalCacheDir, Item.Name));
+    // Checked once at construction — the file either exists in the cache or it doesn't.
+    public bool IsAlreadyDownloaded { get; }
 
     public string ButtonLabel =>
         IsDownloading ? "Downloading…" : IsAlreadyDownloaded ? "Use This" : "Download & Use";
 
-    public IntroVideoItemVm(IntroVideoGalleryItem item) => Item = item;
+    public IntroVideoItemVm(IntroVideoGalleryItem item)
+    {
+        Item = item;
+        IsAlreadyDownloaded =
+            File.Exists(Path.Combine(IntroVideoGalleryService.LocalCacheDir, item.Name));
+    }
 }
