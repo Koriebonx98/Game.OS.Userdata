@@ -24,11 +24,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private readonly PendingChangesService   _pendingChanges = new();
     private readonly PlaytimeService         _playtimeSvc    = new();
 
-    /// <summary>Per-game image and metadata cache; created after login when the username is known.</summary>
-    private GameMetadataCacheService? _metadataCache;
+    /// <summary>
+    /// Per-system metadata cache — shared across all logged-in accounts on this machine.
+    /// Initialised at startup (no username required) since covers and achievements are
+    /// the same data regardless of which user is signed in.
+    /// </summary>
+    private readonly GameMetadataCacheService _metadataCache = new GameMetadataCacheService();
 
     /// <summary>Timestamp of the last successful periodic sync (used by the Settings label).</summary>
     private DateTime _lastSyncedAt = DateTime.MinValue;
+
+    // ── Sync status (shown in the bottom-right overlay) ────────────────────
+    /// <summary>True while the background metadata cache task is running.</summary>
+    [ObservableProperty] private bool   _isCachingGames;
+    /// <summary>Human-readable description of the game currently being cached, e.g. "Caching The Witcher 3…".</summary>
+    [ObservableProperty] private string _cacheSyncLabel = "";
 
     // ── Message polling ────────────────────────────────────────────────────
     /// <summary>Fires every 60 seconds after login to check for new direct messages.</summary>
@@ -126,6 +136,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         SettingsVm     = new SettingsViewModel();
         DetailVm       = new GameDetailViewModel();
 
+        // Give the detail VM access to the per-system metadata cache so it can
+        // load achievement JSON from disk instead of re-downloading every time.
+        DetailVm.CacheService = _metadataCache;
+
         DetailVm.OnClose = () => ShowDetail = false;
 
         // Wire Settings → SyncNow so the Resync button triggers TryRefreshUserDataAsync
@@ -173,9 +187,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // _allMyGames is fully populated — eliminates the race condition where
         // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
         LibraryVm.OnMyGamesRebuilt = () => _ = EnrichMyGamesListAsync();
-        _scanner.GamesUpdated   += games   => { DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found."); LibraryVm.UpdateLocalGames(games); RefreshDashboardLocalGames(); };
-        _scanner.RepacksUpdated += repacks => { DevLogService.Log($"[Scanner] RepacksUpdated: {repacks.Count} repacks found."); LibraryVm.UpdateRepacks(repacks);  RefreshDashboardLocalGames(); };
-        _scanner.RomsUpdated    += roms    => { DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found."); LibraryVm.UpdateRoms(roms);        RefreshDashboardLocalGames(); };
+        _scanner.GamesUpdated += games =>
+        {
+            DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found.");
+            LibraryVm.UpdateLocalGames(games);
+            RefreshDashboardLocalGames();
+            // Trigger background metadata caching for the newly found PC games
+            _ = BackgroundCacheLocalGamesAsync();
+        };
+        _scanner.RepacksUpdated += repacks =>
+        {
+            DevLogService.Log($"[Scanner] RepacksUpdated: {repacks.Count} repacks found.");
+            LibraryVm.UpdateRepacks(repacks);
+            RefreshDashboardLocalGames();
+        };
+        _scanner.RomsUpdated += roms =>
+        {
+            DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found.");
+            LibraryVm.UpdateRoms(roms);
+            RefreshDashboardLocalGames();
+            // Trigger background metadata caching for the newly found ROMs
+            _ = BackgroundCacheLocalGamesAsync();
+        };
         DevLogService.Log("[Scanner] Starting background game scanner…");
         _ = _scanner.StartAsync();
 
@@ -368,9 +401,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // immediately pushed to the cloud activity log.
             PlaytimeService.SessionSaved += OnSessionSaved;
 
-            // Initialise per-user metadata cache and start background caching for owned games
-            _metadataCache = new GameMetadataCacheService(profile.Username);
+            // Start background metadata caching for cloud library games and local games
             _ = BackgroundCacheLibraryAsync(library);
+            _ = BackgroundCacheLocalGamesAsync();
         }
         else
         {
@@ -1596,7 +1629,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     ach.Name ?? "", ach.IconUrl).ConfigureAwait(false);
 
                 // Cache the achievement icon locally
-                if (_metadataCache != null && !string.IsNullOrEmpty(titleId) && !string.IsNullOrEmpty(ach.IconUrl))
+                if (!string.IsNullOrEmpty(titleId) && !string.IsNullOrEmpty(ach.IconUrl))
                 {
                     _ = _metadataCache.CacheAchievementIconAsync(
                         ach.Platform ?? "", titleId, ach.AchievementId, ach.IconUrl);
@@ -1611,20 +1644,126 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Background task: iterates all library games and caches metadata + images
-    /// for any game not yet cached.
+    /// Background task: iterates all cloud library games and caches metadata + images
+    /// for any game not yet cached.  Reports progress via IsCachingGames / CacheSyncLabel.
     /// </summary>
     private async Task BackgroundCacheLibraryAsync(List<Game> library)
     {
-        if (_metadataCache == null) return;
-        foreach (var game in library)
+        if (library.Count == 0) return;
+        try
         {
-            try { await _metadataCache.CacheGameAsync(game).ConfigureAwait(false); }
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => IsCachingGames = true);
+            foreach (var game in library)
+            {
+                try
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        CacheSyncLabel = $"Caching {game.Title}…");
+                    await _metadataCache.CacheGameAsync(game).ConfigureAwait(false);
+                }
+                catch { /* best-effort */ }
+            }
+            // Prune games that are no longer in the library
+            try { _metadataCache.PruneMissingGames(library); }
             catch { /* best-effort */ }
         }
-        // Prune games that are no longer in the library
-        try { _metadataCache.PruneMissingGames(library); }
-        catch { /* best-effort */ }
+        finally
+        {
+            // Only clear the indicator if local-game caching isn't also running
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                IsCachingGames = false;
+                CacheSyncLabel = "";
+            });
+        }
+    }
+
+    /// <summary>
+    /// Background task: iterates all locally-detected games (PC games and ROMs found by the
+    /// scanner) and downloads metadata + achievements.json for each one from the Games.Database
+    /// — mirroring what the website shows.  Safe to call multiple times; already-cached assets
+    /// are skipped.
+    /// </summary>
+    private async Task BackgroundCacheLocalGamesAsync()
+    {
+        try
+        {
+            // Snapshot local games from the UI thread to avoid collection-modified exceptions
+            List<(string Title, string Platform, string? TitleId)> sources = new();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var g in LibraryVm.LocalGames)
+                    sources.Add((g.Title, "PC", null));
+                foreach (var r in LibraryVm.LocalRoms)
+                    sources.Add((r.Title, r.Platform, r.TitleId));
+            });
+
+            // Give the UI thread a moment to process the Post above
+            await Task.Delay(200).ConfigureAwait(false);
+
+            if (sources.Count == 0) return;
+
+            DevLogService.Log($"[Cache] BackgroundCacheLocalGamesAsync: {sources.Count} local games to process.");
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                IsCachingGames = true;
+                CacheSyncLabel = "Scanning local games…";
+            });
+
+            // Group by platform to fetch each database at most once
+            var byPlatform = sources
+                .GroupBy(s => s.Platform, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (platform, entries) in byPlatform)
+            {
+                try
+                {
+                    var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform).ConfigureAwait(false);
+                    if (dbGames.Count == 0) continue;
+
+                    foreach (var (title, _, titleId) in entries)
+                    {
+                        try
+                        {
+                            var dbGame = FindDatabaseGame(dbGames, title, titleId);
+                            if (dbGame == null) continue;
+
+                            // Resolve the effective titleId: scanner titleId → database titleId → null
+                            string? effectiveTitleId = titleId ?? dbGame.TitleId;
+
+                            if (string.IsNullOrEmpty(dbGame.CoverUrl) && string.IsNullOrEmpty(dbGame.AchievementsUrl))
+                                continue;
+
+                            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                                CacheSyncLabel = $"Caching {dbGame.Title ?? title}…");
+
+                            await _metadataCache.CacheLocalGameAsync(
+                                platform,
+                                effectiveTitleId,
+                                title,
+                                dbGame.CoverUrl,
+                                dbGame.AchievementsUrl).ConfigureAwait(false);
+                        }
+                        catch { /* best-effort per game */ }
+                    }
+                }
+                catch { /* best-effort per platform */ }
+            }
+        }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[Cache] BackgroundCacheLocalGamesAsync failed: {ex.Message}");
+        }
+        finally
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                IsCachingGames = false;
+                CacheSyncLabel = "";
+            });
+        }
     }
 
     /// <summary>Formats the last-synced label for the Settings Sync section.</summary>
