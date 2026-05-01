@@ -3,7 +3,7 @@
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
-             xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+             xmlns:wv="clr-namespace:AvaloniaWebView;assembly=Avalonia.WebView"
              x:Class="GameLauncher.Views.GameDetailView"
              x:DataType="vm:GameDetailViewModel"
              Background="#0d1117">
@@ -1007,7 +1007,7 @@
                                                            VerticalAlignment="Center"
                                                            Margin="6,0,0,0"/>
                                             </Border>
-                                            <TextBlock Text="▶  Watch Trailer on YouTube"
+                                            <TextBlock Text="▶  Watch Trailer"
                                                        FontSize="13" FontWeight="SemiBold"
                                                        Foreground="#c9d1d9"
                                                        HorizontalAlignment="Center"/>
@@ -1088,12 +1088,12 @@
                 </Grid>
             </Border>
 
-            <!-- VideoView fills the remaining area -->
-            <vlc:VideoView Grid.Row="1"
-                           x:Name="TrailerVideoView"
-                           HorizontalAlignment="Stretch"
-                           VerticalAlignment="Stretch"
-                           Background="Black"/>
+            <!-- WebView fills the remaining area and plays the YouTube embed URL -->
+            <wv:WebView Grid.Row="1"
+                        x:Name="TrailerWebView"
+                        HorizontalAlignment="Stretch"
+                        VerticalAlignment="Stretch"
+                        Url="{Binding TrailerEmbedUrl}"/>
 
             <!-- Status bar -->
             <Border Grid.Row="2" Background="#0d1117" Padding="16,8">

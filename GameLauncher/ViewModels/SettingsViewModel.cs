@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -57,10 +58,10 @@ public partial class SettingsViewModel : ViewModelBase
     /// Wired by MainViewModel.  Executes an immediate full sync and updates
     /// <see cref="IsSyncing"/> / <see cref="LastSyncedLabel"/>.
     /// </summary>
-    public System.Func<System.Threading.Tasks.Task>? SyncNowAction { get; set; }
+    public Func<Task>? SyncNowAction { get; set; }
 
     [RelayCommand]
-    private async System.Threading.Tasks.Task SyncNow()
+    private async Task SyncNow()
     {
         if (IsSyncing) return;
         IsSyncing = true;

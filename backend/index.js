@@ -3106,6 +3106,14 @@ const ALLOWED_IMAGE_HOSTS = new Set([
     'assets.nintendo.com',
 ]);
 
+/** Extracts a safe lowercase file extension (jpg/png/gif/webp) from a URL. */
+function imageExtFromUrl(url) {
+    try {
+        const raw = new URL(url).pathname.split('.').pop() || 'jpg';
+        return raw.replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+    } catch { return 'jpg'; }
+}
+
 async function downloadAndStoreImage(imageUrl, gamesDbPath) {
     if (!octokitGamesDb || !imageUrl || typeof imageUrl !== 'string') return imageUrl;
 
@@ -3113,17 +3121,20 @@ async function downloadAndStoreImage(imageUrl, gamesDbPath) {
     try { parsedUrl = new URL(imageUrl); } catch { return imageUrl; }
 
     if (parsedUrl.protocol !== 'https:') return imageUrl;
-    if (!ALLOWED_IMAGE_HOSTS.has(parsedUrl.hostname) &&
-        !Array.from(ALLOWED_IMAGE_HOSTS).some(h => parsedUrl.hostname.endsWith('.' + h))) {
-        return imageUrl;
-    }
+    // Check direct host match first, then subdomain match (avoids Set→Array conversion on every call)
+    const host = parsedUrl.hostname;
+    const isAllowed = ALLOWED_IMAGE_HOSTS.has(host) ||
+        [...ALLOWED_IMAGE_HOSTS].some(h => host.length > h.length && host.endsWith('.' + h));
+    if (!isAllowed) return imageUrl;
 
     try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 15000);
         let imageData;
         try {
-            const resp = await fetch(imageUrl, {
+            // Use parsedUrl.href (the URL reconstructed from validated parts) rather than
+            // the raw imageUrl string so there is no ambiguity about what is being fetched.
+            const resp = await fetch(parsedUrl.href, {
                 signal:  controller.signal,
                 headers: { 'User-Agent': 'GameOS-Bot/1.0' }
             });
@@ -3273,13 +3284,13 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
                     const imgDir = `Data/${platformFolder}/Games/${titleIdForPath}/images`;
                     if (game.CoverUrl || game.cover_url || game.coverUrl) {
                         const rawUrl = game.CoverUrl || game.cover_url || game.coverUrl;
-                        const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                        const ext = imageExtFromUrl(rawUrl);
                         const cached = await downloadAndStoreImage(rawUrl, `${imgDir}/cover.${ext}`);
                         if (cached !== rawUrl) { game.CoverUrl = cached; }
                     }
                     if (game.BackgroundUrl || game.background_url || game.backgroundUrl) {
                         const rawUrl = game.BackgroundUrl || game.background_url || game.backgroundUrl;
-                        const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                        const ext = imageExtFromUrl(rawUrl);
                         const cached = await downloadAndStoreImage(rawUrl, `${imgDir}/background.${ext}`);
                         if (cached !== rawUrl) { game.BackgroundUrl = cached; }
                     }
@@ -3289,7 +3300,7 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
                         for (let i = 0; i < screenshots.length; i++) {
                             const rawUrl = screenshots[i];
                             if (!rawUrl || typeof rawUrl !== 'string') { cachedScreenshots.push(rawUrl); continue; }
-                            const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                            const ext = imageExtFromUrl(rawUrl);
                             cachedScreenshots.push(await downloadAndStoreImage(rawUrl, `${imgDir}/screenshot_${i + 1}.${ext}`));
                         }
                         if (game.Screenshots)     game.Screenshots     = cachedScreenshots;
@@ -3436,13 +3447,13 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
                     const merged = gamesArr[idx];
                     if (merged.CoverUrl || merged.cover_url || merged.coverUrl) {
                         const rawUrl = merged.CoverUrl || merged.cover_url || merged.coverUrl;
-                        const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                        const ext = imageExtFromUrl(rawUrl);
                         const cached = await downloadAndStoreImage(rawUrl, `${imgDir}/cover.${ext}`);
                         if (cached !== rawUrl) { merged.CoverUrl = cached; gamesArr[idx].CoverUrl = cached; }
                     }
                     if (merged.BackgroundUrl || merged.background_url || merged.backgroundUrl) {
                         const rawUrl = merged.BackgroundUrl || merged.background_url || merged.backgroundUrl;
-                        const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                        const ext = imageExtFromUrl(rawUrl);
                         const cached = await downloadAndStoreImage(rawUrl, `${imgDir}/background.${ext}`);
                         if (cached !== rawUrl) { merged.BackgroundUrl = cached; gamesArr[idx].BackgroundUrl = cached; }
                     }
@@ -3452,7 +3463,7 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
                         for (let i = 0; i < screenshots.length; i++) {
                             const rawUrl = screenshots[i];
                             if (!rawUrl || typeof rawUrl !== 'string') { cachedScreenshots.push(rawUrl); continue; }
-                            const ext = (rawUrl.split('?')[0].split('.').pop() || 'jpg').replace(/[^a-z]/gi, '').toLowerCase() || 'jpg';
+                            const ext = imageExtFromUrl(rawUrl);
                             cachedScreenshots.push(await downloadAndStoreImage(rawUrl, `${imgDir}/screenshot_${i + 1}.${ext}`));
                         }
                         if (merged.Screenshots)     { merged.Screenshots     = cachedScreenshots; gamesArr[idx].Screenshots     = cachedScreenshots; }

@@ -135,10 +135,6 @@ namespace GameLauncher.Services
             if (!string.IsNullOrEmpty(game.CoverUrl) && GetCachedCoverPath(game.Platform, game.TitleId) == null)
                 await TryCacheImageAsync(game.CoverUrl, folder, "cover", ct);
 
-            // Background image
-            if (!string.IsNullOrEmpty(game.BackgroundUrl) && GetCachedBackgroundPath(game.Platform, game.TitleId) == null)
-                await TryCacheImageAsync(game.BackgroundUrl, folder, "background", ct);
-
             // Cache achievements.json if we have an AchievementsUrl
             if (!string.IsNullOrEmpty(game.AchievementsUrl) && GetCachedAchievementsPath(game.Platform, game.TitleId) == null)
                 await TryCacheJsonAsync(game.AchievementsUrl, Path.Combine(folder, "achievements.json"), ct);
@@ -159,13 +155,8 @@ namespace GameLauncher.Services
             if (!string.IsNullOrEmpty(game.AchievementsUrl))
                 await TryCacheJsonAsync(game.AchievementsUrl, Path.Combine(folder, "achievements.json"), ct, force: true);
 
-            if (forceImages)
-            {
-                if (!string.IsNullOrEmpty(game.CoverUrl))
-                    await TryCacheImageAsync(game.CoverUrl, folder, "cover", ct);
-                if (!string.IsNullOrEmpty(game.BackgroundUrl))
-                    await TryCacheImageAsync(game.BackgroundUrl, folder, "background", ct);
-            }
+            if (forceImages && !string.IsNullOrEmpty(game.CoverUrl))
+                await TryCacheImageAsync(game.CoverUrl, folder, "cover", ct);
         }
 
         /// <summary>
@@ -262,7 +253,9 @@ namespace GameLauncher.Services
                 cts.CancelAfter(TimeSpan.FromSeconds(15));
 
                 var json = await _http.GetStringAsync(uri, cts.Token).ConfigureAwait(false);
-                Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+                var dir  = Path.GetDirectoryName(localPath);
+                if (!string.IsNullOrEmpty(dir))
+                    Directory.CreateDirectory(dir);
                 await File.WriteAllTextAsync(localPath, json, cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) { }

@@ -1592,14 +1592,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     $"{ach.Platform?.ToLower()}|{ach.GameTitle?.ToLower()}", out var titleId);
 
                 await _client.LogAchievementUnlockAsync(
-                    ach.Platform, ach.GameTitle, titleId,
-                    ach.Name, ach.IconUrl).ConfigureAwait(false);
+                    ach.Platform ?? "", ach.GameTitle ?? "", titleId,
+                    ach.Name ?? "", ach.IconUrl).ConfigureAwait(false);
 
                 // Cache the achievement icon locally
                 if (_metadataCache != null && !string.IsNullOrEmpty(titleId) && !string.IsNullOrEmpty(ach.IconUrl))
                 {
                     _ = _metadataCache.CacheAchievementIconAsync(
-                        ach.Platform, titleId, ach.AchievementId, ach.IconUrl);
+                        ach.Platform ?? "", titleId, ach.AchievementId, ach.IconUrl);
                 }
             }
         }

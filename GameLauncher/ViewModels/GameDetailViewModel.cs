@@ -61,7 +61,21 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     public string YoutubeVideoId => ExtractYoutubeVideoId(TrailerUrl);
 
-    partial void OnTrailerUrlChanged(string? value) => OnPropertyChanged(nameof(YoutubeVideoId));
+    /// <summary>
+    /// The YouTube embed URL used by the in-app WebView player
+    /// (e.g. <c>https://www.youtube.com/embed/dQw4w9WgXcQ?autoplay=1</c>).
+    /// Empty string when <see cref="TrailerUrl"/> is not a recognised YouTube URL.
+    /// </summary>
+    public string TrailerEmbedUrl =>
+        string.IsNullOrEmpty(YoutubeVideoId)
+            ? ""
+            : $"https://www.youtube.com/embed/{YoutubeVideoId}?autoplay=1&rel=0";
+
+    partial void OnTrailerUrlChanged(string? value)
+    {
+        OnPropertyChanged(nameof(YoutubeVideoId));
+        OnPropertyChanged(nameof(TrailerEmbedUrl));
+    }
 
     /// <summary>
     /// Extracts the YouTube video ID from <c>youtube.com/watch?v=</c>, <c>youtu.be/</c>,
@@ -1951,7 +1965,9 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         TrailerUrl   = url;
         HasTrailer   = !string.IsNullOrEmpty(url);
-        TrailerLabel = HasTrailer ? "▶  Watch Trailer on YouTube" : "▶  Watch Trailer";
+        TrailerLabel = HasTrailer
+            ? (string.IsNullOrEmpty(YoutubeVideoId) ? "▶  Watch Trailer on YouTube" : "▶  Watch Trailer")
+            : "▶  Watch Trailer";
     }
 
     private void PopulateScreenshots(List<string>? shots)
