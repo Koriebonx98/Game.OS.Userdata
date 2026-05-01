@@ -23,6 +23,7 @@ namespace GameLauncher.Services
     ///   <item>background.jpg / background.png</item>
     ///   <item>achievements.json</item>
     ///   <item>ach-icons\{achievementId}.png</item>
+    ///   <item>game_info.json — title, description, genre, release year, trailer, screenshots, store URL</item>
     /// </list>
     ///
     /// Store games are <b>never</b> cached — only games present in the local library.
@@ -121,6 +122,33 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Returns the local path to the cached game_info.json, or null when not cached.
+        /// </summary>
+        public string? GetCachedGameInfoPath(string platform, string? titleId, string? title = null)
+        {
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return null;
+            var path = Path.Combine(GameFolder(platform, key), "game_info.json");
+            return File.Exists(path) ? path : null;
+        }
+
+        /// <summary>
+        /// Loads the cached game_info.json for a game and returns it as a
+        /// <see cref="DatabaseGame"/>, or null when the file does not exist or cannot be parsed.
+        /// </summary>
+        public DatabaseGame? LoadCachedGameInfo(string platform, string? titleId, string? title = null)
+        {
+            var path = GetCachedGameInfoPath(platform, titleId, title);
+            if (path == null) return null;
+            try
+            {
+                var json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<DatabaseGame>(json, _jsonOpts);
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
         /// Returns the local path to a cached achievement icon, or null when not cached.
         /// </summary>
         public string? GetCachedAchievementIconPath(string platform, string titleId, string achievementId)
@@ -179,6 +207,31 @@ namespace GameLauncher.Services
 
             if (!string.IsNullOrEmpty(achievementsUrl) && GetCachedAchievementsPath(platform, titleId, title) == null)
                 await TryCacheJsonAsync(achievementsUrl, Path.Combine(folder, "achievements.json"), ct);
+        }
+
+        /// <summary>
+        /// Writes a game_info.json file containing rich metadata from the Games.Database
+        /// (title, description, genre, release year, trailer, screenshots, store URL, etc.)
+        /// so the detail view can display this information when the app is offline.
+        /// Always overwrites any existing file so the cache stays up to date.
+        /// </summary>
+        public async Task CacheGameInfoAsync(string platform, string? titleId, string title,
+                                             DatabaseGame info, CancellationToken ct = default)
+        {
+            if (info == null) return;
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return;
+
+            var folder = GameFolder(platform, key);
+            var path   = Path.Combine(folder, "game_info.json");
+            try
+            {
+                Directory.CreateDirectory(folder);
+                var json = JsonSerializer.Serialize(info, _jsonOpts);
+                await File.WriteAllTextAsync(path, json, ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) { }
+            catch { /* best-effort — a failed write just means the next launch re-fetches from network */ }
         }
 
         /// <summary>
