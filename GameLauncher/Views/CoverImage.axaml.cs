@@ -40,6 +40,13 @@ public partial class CoverImage : UserControl
     public static readonly StyledProperty<CornerRadius> ImageCornerRadiusProperty =
         AvaloniaProperty.Register<CoverImage, CornerRadius>(nameof(ImageCornerRadius));
 
+    /// <summary>
+    /// Optional local file path to a cached cover image (from <see cref="GameMetadataCacheService"/>).
+    /// When set, this is used instead of fetching <see cref="ImageUrl"/> over the network.
+    /// </summary>
+    public static readonly StyledProperty<string?> LocalCachePathProperty =
+        AvaloniaProperty.Register<CoverImage, string?>(nameof(LocalCachePath));
+
     public string? ImageUrl
     {
         get => GetValue(ImageUrlProperty);
@@ -76,6 +83,12 @@ public partial class CoverImage : UserControl
         set => SetValue(ImageCornerRadiusProperty, value);
     }
 
+    public string? LocalCachePath
+    {
+        get => GetValue(LocalCachePathProperty);
+        set => SetValue(LocalCachePathProperty, value);
+    }
+
     // ── Shared HTTP client ────────────────────────────────────────────────────
     private static readonly HttpClient _http = new HttpClient();
 
@@ -93,8 +106,8 @@ public partial class CoverImage : UserControl
     {
         base.OnPropertyChanged(change);
 
-        if (change.Property == ImageUrlProperty)
-            TriggerLoad(change.NewValue as string);
+        if (change.Property == ImageUrlProperty || change.Property == LocalCachePathProperty)
+            TriggerLoad(ImageUrl, LocalCachePath);
 
         if (change.Property == FallbackTextProperty)
             UpdateFallbackText(change.NewValue as string);
@@ -175,7 +188,7 @@ public partial class CoverImage : UserControl
         catch { color = default; return false; }
     }
 
-    private void TriggerLoad(string? url)
+    private void TriggerLoad(string? url, string? localCachePath = null)
     {
         // Cancel any previous load
         _loadCts?.Cancel();
@@ -186,11 +199,36 @@ public partial class CoverImage : UserControl
         if (this.FindControl<Border>("ImgBorder") is { } imgBorder)
             imgBorder.IsVisible = false;
 
+        // Prefer local cache file over network fetch (instant, works offline)
+        if (!string.IsNullOrEmpty(localCachePath) && File.Exists(localCachePath))
+        {
+            _ = LoadImageFromFileAsync(localCachePath);
+            return;
+        }
+
         if (string.IsNullOrWhiteSpace(url)) return;
 
         var cts = new CancellationTokenSource();
         _loadCts = cts;
         _ = LoadImageAsync(url, cts.Token);
+    }
+
+    private async Task LoadImageFromFileAsync(string path)
+    {
+        try
+        {
+            var bytes  = await File.ReadAllBytesAsync(path).ConfigureAwait(false);
+            await using var ms = new MemoryStream(bytes);
+            var bitmap = new Bitmap(ms);
+            await Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                if (this.FindControl<Image>("CoverImg") is { } img)
+                    img.Source = bitmap;
+                if (this.FindControl<Border>("ImgBorder") is { } ib)
+                    ib.IsVisible = true;
+            });
+        }
+        catch { /* best-effort — fall through to gradient fallback */ }
     }
 
     private async Task LoadImageAsync(string url, CancellationToken ct)
