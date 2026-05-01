@@ -55,20 +55,37 @@ public partial class IntroWindow : Window
         {
             if (!_vlcCoreInitialized)
             {
-                // Provide the app directory so VLC can locate its native DLLs even
-                // when the working directory differs from the executable's location.
+                // Resolve where VLC's native DLLs live.
+                // For framework-dependent builds the DLLs sit alongside the exe in
+                // AppContext.BaseDirectory; we pass that path explicitly.
+                // For self-contained single-file builds the .NET runtime embeds the
+                // DLLs and extracts them at startup to a per-version temp directory
+                // (%TEMP%\.net\<App>\<Hash>\).  In that case libvlc.dll is NOT in the
+                // exe directory, so we call Core.Initialize() without a path and let
+                // LibVLCSharp's NativeLibrary resolver (which covers the extraction
+                // directory) locate the DLLs automatically.
                 var appDir = AppContext.BaseDirectory;
                 DevLogService.Log($"[IntroWindow] App directory for VLC search: '{appDir}'");
 
-                if (!string.IsNullOrEmpty(appDir) && Directory.Exists(appDir))
+                if (!string.IsNullOrEmpty(appDir) && Directory.Exists(appDir)
+                    && File.Exists(Path.Combine(appDir, "libvlc.dll")))
                 {
-                    DevLogService.Log($"[IntroWindow] Calling Core.Initialize('{appDir}')…");
+                    // VLC DLLs are physically present alongside the exe
+                    // (framework-dependent build or manually-placed DLLs).
+                    DevLogService.Log($"[IntroWindow] libvlc.dll found in appDir — calling Core.Initialize('{appDir}')…");
                     Core.Initialize(appDir);
                     DevLogService.Log("[IntroWindow] Core.Initialize(appDir) succeeded.");
                 }
                 else
                 {
-                    DevLogService.Log("[IntroWindow] appDir is empty or missing — calling Core.Initialize().");
+                    // VLC DLLs are not in the exe directory.  This is expected for
+                    // self-contained single-file builds: the .NET runtime extracts
+                    // native libraries to a temp directory (%TEMP%\.net\<App>\<Hash>\)
+                    // and registers a NativeLibrary resolver that covers those paths.
+                    // Calling Core.Initialize() without a path lets LibVLCSharp use
+                    // that resolver (and the OS DLL search path) to locate libvlc.dll.
+                    // It also handles the case where VLC is installed system-wide.
+                    DevLogService.Log("[IntroWindow] libvlc.dll not found in appDir — calling Core.Initialize() with default search (single-file bundle or system VLC).");
                     Core.Initialize();
                     DevLogService.Log("[IntroWindow] Core.Initialize() succeeded.");
                 }
