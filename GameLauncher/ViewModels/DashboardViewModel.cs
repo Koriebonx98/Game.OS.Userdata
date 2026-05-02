@@ -31,6 +31,8 @@ public partial class DashboardViewModel : ViewModelBase
     // ── Constants ────────────────────────────────────────────────────────────
     /// <summary>Maximum number of games shown in "Continue Playing" and hero last-played lookup.</summary>
     private const int MaxRecentGames = 8;
+    /// <summary>Default card gradient used for cloud/activity-only game cards without a cover image.</summary>
+    private const string DefaultCloudCardGradient = "#0d2137,#163d5e";
 
     // Recently added / played (cloud + local combined)
     public ObservableCollection<Game> RecentGames { get; } = new();
@@ -84,6 +86,25 @@ public partial class DashboardViewModel : ViewModelBase
                 int localMins = PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
                 int cloudMins = PlaytimeService.GetCloudMinutes(c.Platform, c.EffectiveTitle);
                 totalMinutes += Math.Max(localMins, cloudMins);
+            }
+        }
+
+        // Also count activity-only games (played on another device, not in the library or local cards)
+        // so the total playtime stat includes cross-device sessions for all tracked games.
+        {
+            var countedKeys = new HashSet<string>(
+                library.Select(g => $"{g.Platform.ToLowerInvariant()}||{g.Title.ToLowerInvariant()}"),
+                StringComparer.OrdinalIgnoreCase);
+            if (localCards != null)
+            {
+                foreach (var c in localCards)
+                    countedKeys.Add($"{c.Platform.ToLowerInvariant()}||{c.EffectiveTitle.ToLowerInvariant()}");
+            }
+            foreach (var (platform, title, minutes, _) in PlaytimeService.GetAllCloudTotals()
+                .Where(t => t.Minutes > 0))
+            {
+                if (!countedKeys.Contains($"{platform.ToLowerInvariant()}||{title.ToLowerInvariant()}"))
+                    totalMinutes += minutes;
             }
         }
 
@@ -180,11 +201,50 @@ public partial class DashboardViewModel : ViewModelBase
                 Title           = g.Title,
                 Platform        = g.Platform,
                 CoverUrl        = g.CoverUrl,
-                CoverGradient   = g.CoverGradient ?? "#0d2137,#163d5e",
+                CoverGradient   = g.CoverGradient ?? DefaultCloudCardGradient,
                 SourceCloudGame = g,
             };
             card.PlaytimeLabel = FormatMinutes(g.PlaytimeMinutes);
             RecentLocalGames.Add(card);
+            addedKeys.Add($"{g.Platform}||{g.Title}");
+        }
+
+        // 3. Activity-log games that are NOT in the cloud library at all.
+        //    These are games played on another device that were only scanned locally there
+        //    (never added to games.json). The cloud activity log still recorded the sessions,
+        //    so we can show them here so "Continue Playing" matches the website timeline.
+        if (RecentLocalGames.Count < MaxRecentGames)
+        {
+            var libraryKeys = new HashSet<string>(
+                library.Select(g => $"{g.Platform.ToLowerInvariant()}||{g.Title.ToLowerInvariant()}"),
+                StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (platform, title, minutes, lastPlayed) in PlaytimeService.GetAllCloudTotals()
+                .Where(t => t.Minutes > 0 && !string.IsNullOrEmpty(t.LastPlayed))
+                .Where(t => !libraryKeys.Contains(
+                    $"{t.Platform.ToLowerInvariant()}||{t.Title.ToLowerInvariant()}"))
+                .Where(t => !addedKeys.Contains($"{t.Platform}||{t.Title}"))
+                .OrderByDescending(t => ParseDate(t.LastPlayed))
+                .Take(MaxRecentGames - RecentLocalGames.Count))
+            {
+                var syntheticGame = new Game
+                {
+                    Title           = title,
+                    Platform        = platform,
+                    PlaytimeMinutes = minutes,
+                    LastPlayedAt    = lastPlayed,
+                };
+                var card = new LocalGameCardVm
+                {
+                    Title         = title,
+                    Platform      = platform,
+                    CoverGradient = DefaultCloudCardGradient,
+                    SourceCloudGame = syntheticGame,
+                };
+                card.PlaytimeLabel = FormatMinutes(minutes);
+                RecentLocalGames.Add(card);
+                addedKeys.Add($"{platform}||{title}");
+            }
         }
 
         HasRecentLocalGames = RecentLocalGames.Count > 0;
