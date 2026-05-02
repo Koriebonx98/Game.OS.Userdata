@@ -157,6 +157,31 @@ namespace GameLauncher.Models
         public string LastSeen      { get; set; } = "Unknown";
         public bool   IsOnline      => Status == "Online";
         public bool   IsAway        => Status == "Away";
+        /// <summary>Game the friend is currently playing (shown on their card when Online/Away).</summary>
+        public string? CurrentGame      { get; set; }
+        /// <summary>Title of the most recently played game (shown on offline friend cards).</summary>
+        public string? RecentGameTitle  { get; set; }
+        /// <summary>Platform of the most recently played game (e.g. "PC", "Switch").</summary>
+        public string? RecentGamePlatform { get; set; }
+    }
+
+    /// <summary>An item in the Friends Recent Activity feed (what friends have been playing).</summary>
+    public class FriendActivityItem
+    {
+        public string Username     { get; set; } = "";
+        /// <summary>First character of Username for the avatar circle.</summary>
+        public string AvatarInitial =>
+            Username.Length > 0 ? Username[0].ToString().ToUpper() : "?";
+        /// <summary>Game title associated with this activity event.</summary>
+        public string GameTitle    { get; set; } = "";
+        /// <summary>Platform tag, e.g. "PC", "Switch", "Xbox 360".</summary>
+        public string Platform     { get; set; } = "";
+        /// <summary>Human-readable time ago, e.g. "2 hours ago".</summary>
+        public string TimeAgo      { get; set; } = "";
+        /// <summary>Short description shown in the activity row, e.g. "played for 45m".</summary>
+        public string ActivityText { get; set; } = "";
+        /// <summary>"🎮" for play sessions, "🏆" for achievement unlocks.</summary>
+        public string Icon         { get; set; } = "🎮";
     }
 
     /// <summary>An incoming friend request shown in the Friends screen.</summary>
