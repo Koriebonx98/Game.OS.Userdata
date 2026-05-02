@@ -1552,7 +1552,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Task.Run(async () =>
             {
                 try   { await OnHeartbeatTickAsync().ConfigureAwait(false); }
-                catch { /* heartbeat failure is non-fatal */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[Heartbeat] Tick failed (non-fatal): {ex.Message}");
+                }
             });
         }, null, HeartbeatInterval, HeartbeatInterval);
 
@@ -1590,7 +1594,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // If the timestamp hasn't advanced there is nothing new to fetch
+        // ISO 8601 strings produced by DateTime.ToString("o") / DateTimeOffset.ToString("o")
+        // sort lexicographically in the same order as chronologically, so a plain ordinal
+        // string comparison correctly identifies which timestamp is newer.
         if (string.Compare(latest, _lastKnownSyncSignal, StringComparison.Ordinal) <= 0)
             return;
 
