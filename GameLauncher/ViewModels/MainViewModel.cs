@@ -159,11 +159,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         };
 
         // Wire playtime tracking: when a game is launched from the detail view,
-        // pass the process to the PlaytimeService to record the session, then
-        // immediately refresh the dashboard so "Continue Playing" shows the game.
+        // pass the process to the PlaytimeService to record the session on a
+        // background thread so the UI never blocks, then immediately refresh the
+        // dashboard so "Continue Playing" shows the game.
         DetailVm.OnRequestPlaytimeTracking = (proc, title, platform) =>
         {
-            _playtimeSvc.TrackProcess(proc, title, platform, _library);
+            // Run TrackProcess on the thread pool — it sets up event handlers and
+            // timers but never blocks, and keeping it off the UI thread ensures the
+            // launcher stays responsive even if many games are tracked simultaneously.
+            _ = Task.Run(() => _playtimeSvc.TrackProcess(proc, title, platform, _library));
             // Refresh dashboard immediately so the game appears in "Continue Playing"
             RefreshDashboardLocalGames();
         };
@@ -472,8 +476,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         System.Globalization.DateTimeStyles.RoundtripKind, out var end))
                     end = DateTime.UtcNow;
 
+                // Look up the TitleId from the cloud library so the activity entry
+                // is correctly associated with Switch / PS3 / Xbox 360 games.
+                string? titleId = _library
+                    .FirstOrDefault(g =>
+                        string.Equals(g.Platform, session.Platform, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(g.Title,    session.Title,    StringComparison.OrdinalIgnoreCase))
+                    ?.TitleId;
+
                 await _client.LogActivityAsync(
-                    session.Platform, session.Title, null,
+                    session.Platform, session.Title, titleId,
                     start, end, session.Minutes).ConfigureAwait(false);
 
                 System.Diagnostics.Debug.WriteLine(
@@ -1652,7 +1664,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Background task: iterates all cloud library games and caches metadata + images
-    /// for any game not yet cached.  Reports progress via IsCachingGames / CacheSyncLabel.
+    /// for any game not yet cached.  For games whose CoverUrl or AchievementsUrl are
+    /// not yet populated on the in-memory object (e.g. because enrichment is still
+    /// running in parallel), the task fetches the missing data directly from the
+    /// Games.Database so all library games — including Switch ROMs — are fully cached.
+    /// Also saves a <c>game.json</c> file with rich game metadata.
+    /// Reports progress via IsCachingGames / CacheSyncLabel.
     /// </summary>
     private async Task BackgroundCacheLibraryAsync(List<Game> library)
     {
@@ -1661,16 +1678,81 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         Avalonia.Threading.Dispatcher.UIThread.Post(() => IsCachingGames = true);
         try
         {
-            foreach (var game in library)
+            // Group by platform so we fetch each Games.Database at most once
+            var byPlatform = library
+                .GroupBy(g => g.Platform, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(grp => grp.Key, grp => grp.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (platform, games) in byPlatform)
             {
-                try
+                // Fetch the platform database once — used to fill in missing CoverUrl /
+                // AchievementsUrl and to produce the game.json metadata file.
+                List<DatabaseGame>? dbGames = null;
+                bool anyNeedDb = games.Any(g =>
+                    string.IsNullOrEmpty(g.CoverUrl) ||
+                    string.IsNullOrEmpty(g.AchievementsUrl) ||
+                    !_metadataCache.IsGameInfoCached(g.Platform, g.TitleId, g.Title));
+                if (anyNeedDb)
                 {
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        CacheSyncLabel = $"Caching {game.Title}…");
-                    await _metadataCache.CacheGameAsync(game).ConfigureAwait(false);
+                    try { dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform).ConfigureAwait(false); }
+                    catch { /* best-effort — fall through to cache whatever we already have */ }
                 }
-                catch { /* best-effort */ }
+
+                foreach (var game in games)
+                {
+                    try
+                    {
+                        // Resolve effective CoverUrl and AchievementsUrl, falling back to
+                        // the Games.Database when the in-memory game object is incomplete.
+                        string? coverUrl       = game.CoverUrl;
+                        string? achievementsUrl = game.AchievementsUrl;
+                        DatabaseGame? dbGame   = null;
+
+                        if (dbGames != null &&
+                            (string.IsNullOrEmpty(coverUrl) ||
+                             string.IsNullOrEmpty(achievementsUrl) ||
+                             !_metadataCache.IsGameInfoCached(game.Platform, game.TitleId, game.Title)))
+                        {
+                            dbGame = FindDatabaseGame(dbGames, game.Title, game.TitleId);
+                            if (dbGame != null)
+                            {
+                                if (string.IsNullOrEmpty(coverUrl))
+                                    coverUrl = dbGame.CoverUrl;
+                                if (string.IsNullOrEmpty(achievementsUrl))
+                                    achievementsUrl = dbGame.AchievementsUrl;
+                            }
+                        }
+
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                            CacheSyncLabel = $"Caching {game.Title}…");
+
+                        // Create a minimal game record with the best-available CoverUrl and
+                        // AchievementsUrl for caching — avoids racing with
+                        // EnrichLibraryFromDatabaseAsync which may be updating the same game
+                        // objects concurrently on another thread.
+                        var gameForCache = new Models.Game
+                        {
+                            Platform        = game.Platform,
+                            Title           = game.Title,
+                            TitleId         = game.TitleId,
+                            CoverUrl        = coverUrl,
+                            AchievementsUrl = achievementsUrl,
+                        };
+                        await _metadataCache.CacheGameAsync(gameForCache).ConfigureAwait(false);
+
+                        // Save game.json with full metadata so the launcher can display
+                        // rich info (name, id, cover urls, description, etc.) offline.
+                        if (dbGame != null && !_metadataCache.IsGameInfoCached(game.Platform, game.TitleId, game.Title))
+                        {
+                            await _metadataCache.CacheGameInfoJsonAsync(
+                                game.Platform, game.TitleId ?? dbGame.TitleId, game.Title,
+                                dbGame).ConfigureAwait(false);
+                        }
+                    }
+                    catch { /* best-effort */ }
+                }
             }
+
             // Prune games that are no longer in the library
             try { _metadataCache.PruneMissingGames(library); }
             catch { /* best-effort */ }
@@ -1755,6 +1837,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                                     title,
                                     dbGame.CoverUrl,
                                     dbGame.AchievementsUrl).ConfigureAwait(false);
+
+                                // Save game.json with full metadata (name, id, cover urls, etc.)
+                                await _metadataCache.CacheGameInfoJsonAsync(
+                                    platform,
+                                    cacheKey,
+                                    title,
+                                    dbGame).ConfigureAwait(false);
                             }
                             catch { /* best-effort per game */ }
                         }
