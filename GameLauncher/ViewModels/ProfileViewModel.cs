@@ -107,6 +107,7 @@ public partial class ProfileViewModel : ViewModelBase
             return "";
 
         var ago = System.DateTimeOffset.UtcNow - ts;
+        if (ago.TotalSeconds < 60) return "just now";
         if (ago.TotalMinutes < 60) return $"{(int)ago.TotalMinutes} min ago";
         if (ago.TotalHours   < 24) return $"{(int)ago.TotalHours} hours ago";
         if (ago.TotalDays    < 30) return $"{(int)ago.TotalDays} days ago";

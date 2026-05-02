@@ -214,7 +214,7 @@ public partial class SettingsViewModel : ViewModelBase
         var entry = new Models.StartupAppEntry
         {
             Label     = string.IsNullOrWhiteSpace(NewStartupAppLabel)
-                            ? System.IO.Path.GetFileNameWithoutExtension(NewStartupAppPath.Trim())
+                            ? AppLabelFromPath(NewStartupAppPath.Trim())
                             : NewStartupAppLabel.Trim(),
             Path      = NewStartupAppPath.Trim(),
             Arguments = string.IsNullOrWhiteSpace(NewStartupAppArgs) ? null : NewStartupAppArgs.Trim(),
@@ -225,6 +225,20 @@ public partial class SettingsViewModel : ViewModelBase
         NewStartupAppPath  = "";
         NewStartupAppArgs  = "";
         NewStartupAppLabel = "";
+    }
+
+    // ── safe helper to extract a display name from a file path ───────────────
+    private static string AppLabelFromPath(string path)
+    {
+        try
+        {
+            var name = System.IO.Path.GetFileNameWithoutExtension(path);
+            return string.IsNullOrWhiteSpace(name) ? path : name;
+        }
+        catch
+        {
+            return path;
+        }
     }
 
     [RelayCommand]

@@ -1010,30 +1010,38 @@ public partial class GameDetailViewModel : ViewModelBase
         if (string.IsNullOrEmpty(path)) return;
         try
         {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName         = path,
-                UseShellExecute  = true,
-                WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? "",
-            };
-            if (!string.IsNullOrEmpty(args))
-                psi.Arguments = args;
-
             if (waitForReady)
             {
-                // Start the process and wait up to 30 seconds for it to be ready
-                // (main window created and input queue idle)
-                psi.UseShellExecute = false;
+                // WaitForInputIdle waits until the process finishes starting and its message
+                // loop is idle — meaning the main window is ready for input.
+                // NOTE: WaitForInputIdle only works for GUI applications with a Win32 message
+                // loop (e.g. Steam, Epic Games Launcher). It has no effect on console-only
+                // apps, services, or non-Windows platforms. For those, the game launches
+                // immediately after the process starts.
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName         = path,
+                    UseShellExecute  = false,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? "",
+                };
+                if (!string.IsNullOrEmpty(args))
+                    psi.Arguments = args;
                 var proc = System.Diagnostics.Process.Start(psi);
                 if (proc != null)
                 {
-                    // WaitForInputIdle waits for the process to finish starting and become
-                    // ready to receive user input (up to 30 seconds).
                     try { proc.WaitForInputIdle(30_000); } catch { /* best-effort */ }
                 }
             }
             else
             {
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName         = path,
+                    UseShellExecute  = true,
+                    WorkingDirectory = System.IO.Path.GetDirectoryName(path) ?? "",
+                };
+                if (!string.IsNullOrEmpty(args))
+                    psi.Arguments = args;
                 System.Diagnostics.Process.Start(psi);
             }
         }
