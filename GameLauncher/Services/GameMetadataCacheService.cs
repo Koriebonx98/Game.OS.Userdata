@@ -192,6 +192,28 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Reads the cached <c>game.json</c> metadata file for a game, or returns
+        /// <c>null</c> when no cache entry exists.
+        /// </summary>
+        public DatabaseGame? LoadCachedGameInfo(string platform, string? titleId, string? title = null)
+        {
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return null;
+            var path = Path.Combine(GameFolder(platform, key), "game.json");
+            if (!File.Exists(path)) return null;
+            try
+            {
+                var json = File.ReadAllText(path);
+                return JsonSerializer.Deserialize<DatabaseGame>(json, _jsonOpts);
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[Cache] LoadCachedGameInfo failed for {platform}/{key}: {ex.Message}");
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Saves a <c>game.json</c> metadata file in the game's cache folder.
         /// The file contains all known game info (title, TitleId, cover URL,
         /// description, genre, release year, etc.) so the launcher can display

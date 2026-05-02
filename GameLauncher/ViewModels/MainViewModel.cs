@@ -1032,7 +1032,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     () => DetailVm.EnrichFromDatabaseGame(dbGame));
             }
         }
-        catch { /* best-effort — basic info already displayed */ }
+        catch
+        {
+            var cached = _metadataCache.LoadCachedGameInfo(platform, titleId, localTitle);
+            if (cached != null)
+            {
+                DevLogService.Log($"[Detail] Using cached game.json for '{localTitle}' ({platform}) — network unavailable.");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => DetailVm.EnrichFromDatabaseGame(cached));
+            }
+        }
     }
 
     /// <summary>
@@ -1979,9 +1987,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                                 // Resolve the effective cache key: scanner titleId → database titleId → title
                                 string? cacheKey = titleId ?? dbGame.TitleId;
-
-                                if (string.IsNullOrEmpty(dbGame.CoverUrl) && string.IsNullOrEmpty(dbGame.AchievementsUrl))
-                                    continue;
 
                                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                                     CacheSyncLabel = $"Caching {dbGame.Title ?? title}…");
