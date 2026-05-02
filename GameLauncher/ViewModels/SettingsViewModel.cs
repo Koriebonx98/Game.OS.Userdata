@@ -38,15 +38,46 @@ public partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsEmulatorSection))]
     [NotifyPropertyChangedFor(nameof(IsPlaytimeSection))]
     [NotifyPropertyChangedFor(nameof(IsSyncSection))]
+    [NotifyPropertyChangedFor(nameof(IsAccountSection))]
     private string _selectedSection = "app";
 
     public bool IsAppSection      => SelectedSection == "app";
     public bool IsEmulatorSection => SelectedSection == "emulator";
     public bool IsPlaytimeSection => SelectedSection == "playtime";
     public bool IsSyncSection     => SelectedSection == "sync";
+    public bool IsAccountSection  => SelectedSection == "account";
 
     [RelayCommand]
     private void SelectSection(string section) => SelectedSection = section;
+
+    // ── Account section ────────────────────────────────────────────────────
+    [ObservableProperty] private string _accountUsername   = "";
+    [ObservableProperty] private string _accountEmail      = "";
+    [ObservableProperty] private string _accountMemberSince = "";
+    [ObservableProperty] private int    _accountGamesCount;
+
+    /// <summary>First character of AccountUsername, upper-cased, for the avatar circle.</summary>
+    public string AccountAvatarInitial =>
+        AccountUsername.Length > 0 ? AccountUsername[0].ToString().ToUpper() : "?";
+
+    partial void OnAccountUsernameChanged(string value) =>
+        OnPropertyChanged(nameof(AccountAvatarInitial));
+
+    /// <summary>
+    /// Populates the Account section with data from the logged-in user's profile.
+    /// Called by MainViewModel after a successful login.
+    /// </summary>
+    public void LoadAccount(UserProfile profile, List<Game> library)
+    {
+        AccountUsername   = profile.Username;
+        AccountEmail      = !string.IsNullOrEmpty(profile.Email) ? profile.Email : "—";
+        AccountGamesCount = library.Count;
+        if (DateTime.TryParse(profile.CreatedAt, System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+            AccountMemberSince = dt.ToString("MMMM d, yyyy");
+        else
+            AccountMemberSince = "—";
+    }
 
     // ── Sync section ───────────────────────────────────────────────────────
     /// <summary>True while a manual sync is in progress.</summary>

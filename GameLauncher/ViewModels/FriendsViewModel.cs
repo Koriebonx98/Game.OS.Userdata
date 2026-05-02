@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -30,7 +31,8 @@ public partial class FriendsViewModel : ViewModelBase
 
     public ObservableCollection<Message> ConversationMessages { get; } = new();
 
-    public bool HasNoFriends => TotalCount == 0 && !IsLoading;
+    public bool HasNoFriends      => TotalCount == 0 && !IsLoading;
+    public bool HasRecentActivity => RecentActivity.Count > 0;
 
     partial void OnTotalCountChanged(int value)  => OnPropertyChanged(nameof(HasNoFriends));
     partial void OnIsLoadingChanged(bool value)  => OnPropertyChanged(nameof(HasNoFriends));
@@ -38,6 +40,8 @@ public partial class FriendsViewModel : ViewModelBase
     public ObservableCollection<FriendEntry>          OnlineFriends   { get; } = new();
     public ObservableCollection<FriendEntry>          OfflineFriends  { get; } = new();
     public ObservableCollection<FriendRequestDisplay> PendingRequests { get; } = new();
+    /// <summary>Recent activity feed — what friends have been playing recently.</summary>
+    public ObservableCollection<FriendActivityItem>   RecentActivity  { get; } = new();
 
     private GameOsClient? _client;
     private string        _username = "";
@@ -64,16 +68,44 @@ public partial class FriendsViewModel : ViewModelBase
         OnlineFriends.Clear();
         OfflineFriends.Clear();
         PendingRequests.Clear();
+        RecentActivity.Clear();
 
-        // Demo online friends
-        OnlineFriends.Add(new FriendEntry { Username = "NintendoFan42", Status = "Online", LastSeen = "Now" });
-        OnlineFriends.Add(new FriendEntry { Username = "SwitchPlayer99", Status = "Away",  LastSeen = "12 min ago" });
-        OnlineFriends.Add(new FriendEntry { Username = "GamingWithLex",  Status = "Online", LastSeen = "Now" });
+        // Demo online friends — include what they're currently playing
+        OnlineFriends.Add(new FriendEntry
+        {
+            Username = "NintendoFan42", Status = "Online", LastSeen = "Now",
+            CurrentGame = "Mario Kart 8 Deluxe", RecentGameTitle = "Mario Kart 8 Deluxe",
+            RecentGamePlatform = "Switch"
+        });
+        OnlineFriends.Add(new FriendEntry
+        {
+            Username = "SwitchPlayer99", Status = "Away", LastSeen = "12 min ago",
+            CurrentGame = "Pokémon Scarlet", RecentGameTitle = "Pokémon Scarlet",
+            RecentGamePlatform = "Switch"
+        });
+        OnlineFriends.Add(new FriendEntry
+        {
+            Username = "GamingWithLex", Status = "Online", LastSeen = "Now",
+            CurrentGame = "Elden Ring", RecentGameTitle = "Elden Ring",
+            RecentGamePlatform = "PC"
+        });
 
-        // Demo offline friends
-        OfflineFriends.Add(new FriendEntry { Username = "ProGamer2025", Status = "Offline", LastSeen = "3h ago" });
-        OfflineFriends.Add(new FriendEntry { Username = "RetroKing",    Status = "Offline", LastSeen = "1 Mar" });
-        OfflineFriends.Add(new FriendEntry { Username = "SpeedRunner7", Status = "Offline", LastSeen = "28 Feb" });
+        // Demo offline friends — show their last played game
+        OfflineFriends.Add(new FriendEntry
+        {
+            Username = "ProGamer2025", Status = "Offline", LastSeen = "3h ago",
+            RecentGameTitle = "Call of Duty: Warzone", RecentGamePlatform = "PC"
+        });
+        OfflineFriends.Add(new FriendEntry
+        {
+            Username = "RetroKing", Status = "Offline", LastSeen = "1 Mar",
+            RecentGameTitle = "Halo 3", RecentGamePlatform = "Xbox 360"
+        });
+        OfflineFriends.Add(new FriendEntry
+        {
+            Username = "SpeedRunner7", Status = "Offline", LastSeen = "28 Feb",
+            RecentGameTitle = "Celeste", RecentGamePlatform = "PC"
+        });
 
         // Demo pending request
         PendingRequests.Add(new FriendRequestDisplay
@@ -82,6 +114,34 @@ public partial class FriendsViewModel : ViewModelBase
             SentAgo      = "2 hours ago"
         });
 
+        // Demo recent activity feed
+        RecentActivity.Add(new FriendActivityItem
+        {
+            Username = "NintendoFan42", GameTitle = "Mario Kart 8 Deluxe", Platform = "Switch",
+            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮", SortKey = 0
+        });
+        RecentActivity.Add(new FriendActivityItem
+        {
+            Username = "GamingWithLex", GameTitle = "Elden Ring", Platform = "PC",
+            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮", SortKey = 0
+        });
+        RecentActivity.Add(new FriendActivityItem
+        {
+            Username = "SwitchPlayer99", GameTitle = "Pokémon Scarlet", Platform = "Switch",
+            TimeAgo = "12 min ago", ActivityText = "played for 45m", Icon = "🎮", SortKey = 1
+        });
+        RecentActivity.Add(new FriendActivityItem
+        {
+            Username = "ProGamer2025", GameTitle = "Call of Duty: Warzone", Platform = "PC",
+            TimeAgo = "3 hours ago", ActivityText = "played for 2h 10m", Icon = "🎮", SortKey = 2
+        });
+        RecentActivity.Add(new FriendActivityItem
+        {
+            Username = "RetroKing", GameTitle = "Halo 3", Platform = "Xbox 360",
+            TimeAgo = "1 Mar", ActivityText = "played for 1h 30m", Icon = "🎮", SortKey = 3
+        });
+
+        OnPropertyChanged(nameof(HasRecentActivity));
         OnlineCount = OnlineFriends.Count;
         TotalCount  = OnlineFriends.Count + OfflineFriends.Count;
     }
@@ -205,6 +265,7 @@ public partial class FriendsViewModel : ViewModelBase
         OnlineFriends.Clear();
         OfflineFriends.Clear();
         PendingRequests.Clear();
+        RecentActivity.Clear();
 
         try
         {
@@ -226,26 +287,82 @@ public partial class FriendsViewModel : ViewModelBase
                 });
             }
 
-            // Fetch presence for each friend (in parallel, best-effort)
+            // Fetch presence AND last-played game for each friend in parallel (best-effort)
             var presenceTasks = new List<Task<(string username, string? lastSeen)>>();
+            var gamesTasks    = new List<Task<(string username, string? gameTitle, string? gamePlatform)>>();
+
             foreach (var friendName in friendUsernames)
             {
                 string name = friendName; // capture
-                presenceTasks.Add(_client.GetPresenceAsync(name)
-                    .ContinueWith(t => (name, t.IsCompletedSuccessfully ? t.Result : null)));
+                presenceTasks.Add(Task.Run(async () =>
+                {
+                    try { return (name, await _client.GetPresenceAsync(name)); }
+                    catch { return (name, (string?)null); }
+                }));
+
+                gamesTasks.Add(Task.Run(async () =>
+                {
+                    try
+                    {
+                        var games = await _client.GetFriendGamesAsync(name);
+                        var last  = games
+                            .Where(g => !string.IsNullOrEmpty(g.LastPlayedAt))
+                            .OrderByDescending(g => g.LastPlayedAt)
+                            .FirstOrDefault();
+                        return (name, last?.Title, last?.Platform);
+                    }
+                    catch { return (name, (string?)null, (string?)null); }
+                }));
             }
 
             var presenceResults = await Task.WhenAll(presenceTasks);
+            var gamesResults    = await Task.WhenAll(gamesTasks);
+
+            // Build a games lookup keyed by username
+            var gamesMap = new Dictionary<string, (string? Title, string? Platform)>(
+                StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, title, platform) in gamesResults)
+                gamesMap[name] = (title, platform);
+
+            var activityItems = new List<FriendActivityItem>();
 
             foreach (var (name, lastSeen) in presenceResults)
             {
-                var entry = BuildFriendEntry(name, lastSeen);
+                gamesMap.TryGetValue(name, out var gameInfo);
+                var entry = BuildFriendEntry(name, lastSeen, gameInfo.Title, gameInfo.Platform);
                 if (entry.IsOnline || entry.IsAway)
                     OnlineFriends.Add(entry);
                 else
                     OfflineFriends.Add(entry);
+
+                // Add to the recent activity feed if this friend has a recent game
+                if (!string.IsNullOrEmpty(gameInfo.Title))
+                {
+                    int sortKey = entry.IsOnline ? 0 : (entry.IsAway ? 1 : 2);
+                    activityItems.Add(new FriendActivityItem
+                    {
+                        Username     = name,
+                        GameTitle    = gameInfo.Title!,
+                        Platform     = gameInfo.Platform ?? "",
+                        TimeAgo      = entry.IsOnline || entry.IsAway
+                                           ? (entry.IsOnline ? "Just now" : entry.LastSeen)
+                                           : entry.LastSeen,
+                        ActivityText = entry.IsOnline || entry.IsAway
+                                           ? "is playing"
+                                           : "last played",
+                        Icon         = "🎮",
+                        SortKey      = sortKey,
+                    });
+                }
             }
 
+            // Sort activity: online first (SortKey=0), away second (1), offline last (2)
+            foreach (var item in activityItems.OrderBy(i => i.SortKey))
+            {
+                RecentActivity.Add(item);
+            }
+
+            OnPropertyChanged(nameof(HasRecentActivity));
             OnlineCount = OnlineFriends.Count;
             TotalCount  = friendUsernames.Count;
         }
@@ -267,7 +384,9 @@ public partial class FriendsViewModel : ViewModelBase
         }
     }
 
-    private static FriendEntry BuildFriendEntry(string username, string? lastSeenIso)
+    private static FriendEntry BuildFriendEntry(string username, string? lastSeenIso,
+                                                 string? recentGameTitle = null,
+                                                 string? recentGamePlatform = null)
     {
         string status   = "Offline";
         string lastSeen = "Unknown";
@@ -298,9 +417,12 @@ public partial class FriendsViewModel : ViewModelBase
 
         return new FriendEntry
         {
-            Username = username,
-            Status   = status,
-            LastSeen = lastSeen
+            Username           = username,
+            Status             = status,
+            LastSeen           = lastSeen,
+            RecentGameTitle    = recentGameTitle,
+            RecentGamePlatform = recentGamePlatform,
+            CurrentGame        = (status == "Online" || status == "Away") ? recentGameTitle : null,
         };
     }
 

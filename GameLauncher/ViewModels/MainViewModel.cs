@@ -347,9 +347,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.Load(GameCatalog.Store, _library, _profile, _client, false);
         ProfileVm.Load(_profile, _library, _achievements, false);
         FriendsVm.LoadDemo();
+        SettingsVm.LoadAccount(_profile, _library);
 
         // Pre-fetch cover art for the unified My Games cards
         _ = EnrichMyGamesListAsync();
+        _ = EnrichDashboardCoversAsync();
 
         // Open the inline conversation for screenshot purposes
         FriendsVm.OpenConversationDemo();
@@ -458,6 +460,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
         FriendsVm.Load(_client, profile.Username);
+        SettingsVm.LoadAccount(profile, library);
 
         if (!isOffline)
         {
@@ -467,6 +470,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Pre-fetch cover art for the unified My Games cards (scanner may already
             // have found games before login, so enrich what's there right away).
             _ = EnrichMyGamesListAsync();
+
+            // Enrich cover art for any dashboard "Continue Playing" cards that are
+            // activity-only or cloud cards without covers yet.
+            _ = EnrichDashboardCoversAsync();
 
             // Start background message polling (checks for new DMs every 60 seconds)
             StartMessagePolling();
@@ -1013,7 +1020,65 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Looks up <paramref name="localTitle"/> in the specified platform's Games.Database and,
+    /// Enriches "Continue Playing" dashboard cards that are missing cover art.
+    /// Handles activity-only and cloud-library cards whose CoverUrl was not set
+    /// when the dashboard was first built (e.g. before EnrichLibraryFromDatabaseAsync
+    /// completed).  Fetches the platform's Games.Database and updates the card's
+    /// CoverUrl on the UI thread so images appear progressively.
+    /// </summary>
+    private async Task EnrichDashboardCoversAsync()
+    {
+        try
+        {
+            // Snapshot of cards still missing covers (read on caller's thread)
+            var toEnrich = DashboardVm.RecentLocalGames
+                .Where(c => string.IsNullOrEmpty(c.CoverUrl))
+                .Select(c => (c.EffectiveTitle, c.Platform,
+                              TitleId: c.SourceRom?.TitleId ?? c.SourceCloudGame?.TitleId))
+                .Where(t => !string.IsNullOrEmpty(t.Platform))
+                .Distinct()
+                .ToList();
+
+            if (toEnrich.Count == 0) return;
+
+            var byPlatform = toEnrich
+                .GroupBy(t => t.Platform, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (var (platform, entries) in byPlatform)
+            {
+                try
+                {
+                    var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
+                    if (dbGames.Count == 0) continue;
+
+                    foreach (var (title, _, titleId) in entries)
+                    {
+                        var db = FindDatabaseGame(dbGames, title, titleId);
+                        if (string.IsNullOrEmpty(db?.CoverUrl)) continue;
+
+                        string cover = db.CoverUrl!;
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            foreach (var card in DashboardVm.RecentLocalGames
+                                .Where(c => string.IsNullOrEmpty(c.CoverUrl) &&
+                                            string.Equals(c.EffectiveTitle, title,
+                                                StringComparison.OrdinalIgnoreCase) &&
+                                            string.Equals(c.Platform, platform,
+                                                StringComparison.OrdinalIgnoreCase)))
+                            {
+                                card.CoverUrl = cover;
+                            }
+                        });
+                    }
+                }
+                catch { /* best-effort per platform */ }
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>
     /// if found, enriches the currently-open detail panel with cover, description, trailer,
     /// screenshots and achievements — the same data shown on the website.
     /// Title matching handles Windows-safe folder names such as
@@ -1110,8 +1175,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
                         LibraryVm.Load(_library);
-                        DashboardVm.Load(_profile, _library, _achievements);
+                        // Pass localCards so the "Continue Playing" section rebuilds with
+                        // newly-enriched cover URLs on cloud game cards.
+                        var cards = LibraryVm.GetMyGameSources()
+                            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
+                            .Where(c => c != null)
+                            .Cast<LocalGameCardVm>()
+                            .ToList();
+                        DashboardVm.Load(_profile, _library, _achievements, cards);
                     });
+                    // Also re-run cover enrichment for any dashboard cards still missing covers
+                    _ = EnrichDashboardCoversAsync();
                 }
             }
             catch { /* best-effort — library is still usable without enrichment */ }
