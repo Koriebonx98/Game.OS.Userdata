@@ -96,7 +96,9 @@ namespace GameLauncher.Services
         // the dashboard can show cross-device playtime for local ROM cards that
         // are not (yet) reflected in the local sessions.json.
 
-        private static readonly Dictionary<string, (int Minutes, string LastPlayed)> _cloudTotals =
+        // Value stores both the aggregated totals AND the original-case platform/title so
+        // the dashboard can create display cards for activity-only games (not in games.json).
+        private static readonly Dictionary<string, (int Minutes, string LastPlayed, string OriginalPlatform, string OriginalTitle)> _cloudTotals =
             new(StringComparer.OrdinalIgnoreCase);
 
         private static readonly object _cloudTotalsLock = new();
@@ -113,8 +115,10 @@ namespace GameLauncher.Services
                 .GroupBy(a => $"{a.Platform.ToLowerInvariant()}||{a.GameTitle.ToLowerInvariant()}")
                 .ToDictionary(
                     g => g.Key,
-                    g => (Minutes:    g.Sum(a => a.MinutesPlayed),
-                          LastPlayed: g.Max(a => a.SessionEnd ?? a.LoggedAt) ?? ""));
+                    g => (Minutes:          g.Sum(a => a.MinutesPlayed),
+                          LastPlayed:       g.Max(a => a.SessionEnd ?? a.LoggedAt) ?? "",
+                          OriginalPlatform: g.First().Platform,
+                          OriginalTitle:    g.First().GameTitle));
 
             lock (_cloudTotalsLock)
             {
@@ -122,6 +126,20 @@ namespace GameLauncher.Services
                 foreach (var kvp in totals)
                     _cloudTotals[kvp.Key] = kvp.Value;
             }
+        }
+
+        /// <summary>
+        /// Returns all cloud-sourced playtime totals as (Platform, Title, Minutes, LastPlayed)
+        /// tuples, preserving the original casing from the activity log.
+        /// Used by the dashboard to show games played on other devices that are not present
+        /// in the cloud library (local-only ROMs on another device).
+        /// </summary>
+        public static IReadOnlyList<(string Platform, string Title, int Minutes, string LastPlayed)> GetAllCloudTotals()
+        {
+            lock (_cloudTotalsLock)
+                return _cloudTotals.Values
+                    .Select(v => (v.OriginalPlatform, v.OriginalTitle, v.Minutes, v.LastPlayed))
+                    .ToList();
         }
 
         /// <summary>
@@ -323,8 +341,12 @@ namespace GameLauncher.Services
                     var key = $"{game.Platform.ToLowerInvariant()}||{game.Title.ToLowerInvariant()}";
                     if (grouped.TryGetValue(key, out var agg))
                     {
-                        game.PlaytimeMinutes = agg.TotalMinutes;
-                        if (!string.IsNullOrEmpty(agg.LastPlayed))
+                        // Use Math.Max so local sessions never overwrite a higher cloud total that
+                        // was already loaded into the library from games.json (cross-device playtime).
+                        game.PlaytimeMinutes = Math.Max(game.PlaytimeMinutes, agg.TotalMinutes);
+                        // Only advance LastPlayedAt — never roll it back to an older local session.
+                        if (!string.IsNullOrEmpty(agg.LastPlayed) &&
+                            string.Compare(agg.LastPlayed, game.LastPlayedAt, StringComparison.Ordinal) > 0)
                             game.LastPlayedAt = agg.LastPlayed;
                     }
                 }
