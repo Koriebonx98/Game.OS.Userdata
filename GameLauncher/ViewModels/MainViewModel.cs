@@ -977,7 +977,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     () => DetailVm.EnrichFromDatabaseGame(dbGame));
             }
         }
-        catch { /* best-effort — basic info already displayed */ }
+        catch
+        {
+            // Network unavailable or platform database not cached — fall back to the
+            // per-game game_info.json written by BackgroundCacheLocalGamesAsync so the
+            // detail view still shows description, genre, release year, etc. offline.
+            var cached = _metadataCache.LoadCachedGameInfo(platform, titleId, localTitle);
+            if (cached != null)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(
+                    () => DetailVm.EnrichFromDatabaseGame(cached));
+            }
+        }
     }
 
     /// <summary>
@@ -1743,12 +1754,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                                 // Resolve the effective cache key: scanner titleId → database titleId → title
                                 string? cacheKey = titleId ?? dbGame.TitleId;
 
-                                if (string.IsNullOrEmpty(dbGame.CoverUrl) && string.IsNullOrEmpty(dbGame.AchievementsUrl))
-                                    continue;
-
                                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                                     CacheSyncLabel = $"Caching {dbGame.Title ?? title}…");
 
+                                // Always cache game info (description, genre, year, etc.) so the
+                                // detail view can display metadata when the app is offline.
+                                await _metadataCache.CacheGameInfoAsync(
+                                    platform,
+                                    cacheKey,
+                                    title,
+                                    dbGame).ConfigureAwait(false);
+
+                                // Also cache cover image and achievements.json when URLs are available.
                                 await _metadataCache.CacheLocalGameAsync(
                                     platform,
                                     cacheKey,
