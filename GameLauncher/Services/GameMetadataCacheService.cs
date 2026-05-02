@@ -137,6 +137,16 @@ namespace GameLauncher.Services
         // ── Cache operations ─────────────────────────────────────────────────
 
         /// <summary>
+        /// Returns true if a <c>game.json</c> metadata file is already cached for this game.
+        /// </summary>
+        public bool IsGameInfoCached(string platform, string? titleId, string? title = null)
+        {
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return false;
+            return File.Exists(Path.Combine(GameFolder(platform, key), "game.json"));
+        }
+
+        /// <summary>
         /// Downloads and stores all cacheable assets for one cloud-library game.
         /// Uses TitleId as the cache key when available; otherwise falls back to the
         /// game title so PC games without a TitleId are also cached.
@@ -179,6 +189,34 @@ namespace GameLauncher.Services
 
             if (!string.IsNullOrEmpty(achievementsUrl) && GetCachedAchievementsPath(platform, titleId, title) == null)
                 await TryCacheJsonAsync(achievementsUrl, Path.Combine(folder, "achievements.json"), ct);
+        }
+
+        /// <summary>
+        /// Saves a <c>game.json</c> metadata file in the game's cache folder.
+        /// The file contains all known game info (title, TitleId, cover URL,
+        /// description, genre, release year, etc.) so the launcher can display
+        /// rich game info without a network round-trip.
+        /// Skips writing if the file already exists unless <paramref name="force"/> is true.
+        /// </summary>
+        public async Task CacheGameInfoJsonAsync(
+            string platform, string? titleId, string title,
+            DatabaseGame gameInfo, CancellationToken ct = default, bool force = false)
+        {
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return;
+
+            var folder   = GameFolder(platform, key);
+            var infoPath = Path.Combine(folder, "game.json");
+
+            if (!force && File.Exists(infoPath)) return;
+
+            try
+            {
+                Directory.CreateDirectory(folder);
+                var json = JsonSerializer.Serialize(gameInfo, _jsonOpts);
+                await File.WriteAllTextAsync(infoPath, json, ct).ConfigureAwait(false);
+            }
+            catch { /* best-effort */ }
         }
 
         /// <summary>
