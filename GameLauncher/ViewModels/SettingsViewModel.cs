@@ -72,7 +72,7 @@ public partial class SettingsViewModel : ViewModelBase
         AccountUsername   = profile.Username;
         AccountEmail      = !string.IsNullOrEmpty(profile.Email) ? profile.Email : "—";
         AccountGamesCount = library.Count;
-        if (DateTime.TryParse(profile.CreatedAt, null,
+        if (DateTime.TryParse(profile.CreatedAt, System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
             AccountMemberSince = dt.ToString("MMMM d, yyyy");
         else

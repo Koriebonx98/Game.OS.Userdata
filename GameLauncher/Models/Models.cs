@@ -182,6 +182,12 @@ namespace GameLauncher.Models
         public string ActivityText { get; set; } = "";
         /// <summary>"🎮" for play sessions, "🏆" for achievement unlocks.</summary>
         public string Icon         { get; set; } = "🎮";
+        /// <summary>
+        /// Numeric key used to sort activity items chronologically.
+        /// Lower values appear first.  Set to 0 for "just now" / currently playing,
+        /// increasing for older activity.
+        /// </summary>
+        public int SortKey         { get; set; }
     }
 
     /// <summary>An incoming friend request shown in the Friends screen.</summary>

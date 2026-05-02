@@ -118,27 +118,27 @@ public partial class FriendsViewModel : ViewModelBase
         RecentActivity.Add(new FriendActivityItem
         {
             Username = "NintendoFan42", GameTitle = "Mario Kart 8 Deluxe", Platform = "Switch",
-            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮"
+            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮", SortKey = 0
         });
         RecentActivity.Add(new FriendActivityItem
         {
             Username = "GamingWithLex", GameTitle = "Elden Ring", Platform = "PC",
-            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮"
+            TimeAgo = "Just now", ActivityText = "is playing", Icon = "🎮", SortKey = 0
         });
         RecentActivity.Add(new FriendActivityItem
         {
             Username = "SwitchPlayer99", GameTitle = "Pokémon Scarlet", Platform = "Switch",
-            TimeAgo = "12 min ago", ActivityText = "played for 45m", Icon = "🎮"
+            TimeAgo = "12 min ago", ActivityText = "played for 45m", Icon = "🎮", SortKey = 1
         });
         RecentActivity.Add(new FriendActivityItem
         {
             Username = "ProGamer2025", GameTitle = "Call of Duty: Warzone", Platform = "PC",
-            TimeAgo = "3 hours ago", ActivityText = "played for 2h 10m", Icon = "🎮"
+            TimeAgo = "3 hours ago", ActivityText = "played for 2h 10m", Icon = "🎮", SortKey = 2
         });
         RecentActivity.Add(new FriendActivityItem
         {
             Username = "RetroKing", GameTitle = "Halo 3", Platform = "Xbox 360",
-            TimeAgo = "1 Mar", ActivityText = "played for 1h 30m", Icon = "🎮"
+            TimeAgo = "1 Mar", ActivityText = "played for 1h 30m", Icon = "🎮", SortKey = 3
         });
 
         OnPropertyChanged(nameof(HasRecentActivity));
@@ -338,6 +338,7 @@ public partial class FriendsViewModel : ViewModelBase
                 // Add to the recent activity feed if this friend has a recent game
                 if (!string.IsNullOrEmpty(gameInfo.Title))
                 {
+                    int sortKey = entry.IsOnline ? 0 : (entry.IsAway ? 1 : 2);
                     activityItems.Add(new FriendActivityItem
                     {
                         Username     = name,
@@ -350,14 +351,13 @@ public partial class FriendsViewModel : ViewModelBase
                                            ? "is playing"
                                            : "last played",
                         Icon         = "🎮",
+                        SortKey      = sortKey,
                     });
                 }
             }
 
-            // Sort activity: online first, then by last-seen
-            foreach (var item in activityItems
-                .OrderBy(i => i.ActivityText == "is playing" ? 0 : 1)
-                .ThenBy(i => i.TimeAgo))
+            // Sort activity: online first (SortKey=0), away second (1), offline last (2)
+            foreach (var item in activityItems.OrderBy(i => i.SortKey))
             {
                 RecentActivity.Add(item);
             }
