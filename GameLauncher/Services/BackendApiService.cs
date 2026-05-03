@@ -93,6 +93,10 @@ namespace GameLauncher.Services
         private static readonly JsonSerializerOptions _jsonOpts = new()
         {
             PropertyNameCaseInsensitive = true,
+            // Allow numeric JSON values to be read as their string equivalents and vice versa.
+            // This prevents a JsonException when the backend returns playtime or other numeric
+            // fields wrapped in quotes (e.g. "playtimeMinutes": "5").
+            NumberHandling = JsonNumberHandling.AllowReadingFromString,
         };
 
         public BackendApiService()
@@ -122,9 +126,27 @@ namespace GameLauncher.Services
             if (resp.StatusCode == System.Net.HttpStatusCode.TooManyRequests)
                 throw new GameOsException(429, "Too many login attempts — please wait a minute and try again.");
 
-            var data = await resp.Content
-                .ReadFromJsonAsync<AuthTokenResponse>(_jsonOpts, ct)
-                ?? throw new GameOsException(500, "Empty response from backend.");
+            // Read the body as a string first so we can handle non-JSON responses
+            // (e.g., HTML error pages returned by a reverse proxy) without leaking
+            // a raw JsonException to the user as "Connection error: The JSON value…".
+            var responseBody = await resp.Content.ReadAsStringAsync(ct);
+
+            AuthTokenResponse? data;
+            try
+            {
+                data = JsonSerializer.Deserialize<AuthTokenResponse>(responseBody, _jsonOpts);
+            }
+            catch (JsonException)
+            {
+                throw new GameOsException(
+                    (int)resp.StatusCode,
+                    resp.IsSuccessStatusCode
+                        ? "The server returned an unexpected response. Please try again."
+                        : $"Sign-in failed (server error {(int)resp.StatusCode}). Please try again later.");
+            }
+
+            if (data == null)
+                throw new GameOsException(500, "Empty response from backend.");
 
             if (!resp.IsSuccessStatusCode || !data.Success)
                 throw new GameOsException(
@@ -172,11 +194,19 @@ namespace GameLauncher.Services
 
             resp.EnsureSuccessStatusCode();
 
-            var data = await resp.Content
-                .ReadFromJsonAsync<MeResponse>(_jsonOpts, ct)
-                ?? throw new GameOsException(500, "Empty response from backend.");
+            MeResponse? data;
+            try
+            {
+                data = await resp.Content.ReadFromJsonAsync<MeResponse>(_jsonOpts, ct);
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] GetProfile JSON parse error: {ex.Message}");
+                throw new GameOsException(500, "The server returned an unexpected profile response. Please sign in again.");
+            }
 
-            return data.Profile ?? throw new GameOsException(500, "Backend returned no profile.");
+            return data?.Profile ?? throw new GameOsException(500, "Backend returned no profile.");
         }
 
         // ── Games ─────────────────────────────────────────────────────────────
@@ -188,9 +218,18 @@ namespace GameLauncher.Services
             using var resp = await _http.GetAsync("/api/me/games", ct);
             resp.EnsureSuccessStatusCode();
 
-            var data = await resp.Content
-                .ReadFromJsonAsync<GamesResponse>(_jsonOpts, ct);
-            return data?.Games ?? new List<Game>();
+            try
+            {
+                var data = await resp.Content
+                    .ReadFromJsonAsync<GamesResponse>(_jsonOpts, ct);
+                return data?.Games ?? new List<Game>();
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] GetGames JSON parse error: {ex.Message}");
+                return new List<Game>();
+            }
         }
 
         /// <summary>Add a game to the authenticated user's library via POST /api/me/games.</summary>
@@ -261,9 +300,18 @@ namespace GameLauncher.Services
             using var resp = await _http.GetAsync("/api/me/achievements", ct);
             resp.EnsureSuccessStatusCode();
 
-            var data = await resp.Content
-                .ReadFromJsonAsync<AchievementsResponse>(_jsonOpts, ct);
-            return data?.Achievements ?? new List<Achievement>();
+            try
+            {
+                var data = await resp.Content
+                    .ReadFromJsonAsync<AchievementsResponse>(_jsonOpts, ct);
+                return data?.Achievements ?? new List<Achievement>();
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] GetAchievements JSON parse error: {ex.Message}");
+                return new List<Achievement>();
+            }
         }
 
         // ── Friends ───────────────────────────────────────────────────────────
@@ -431,9 +479,24 @@ namespace GameLauncher.Services
             var body = new { username, email, password };
             using var resp = await _http.PostAsJsonAsync("/api/create-account", body, ct);
 
-            var data = await resp.Content
-                .ReadFromJsonAsync<CreateAccountResponse>(_jsonOpts, ct)
-                ?? throw new GameOsException(500, "Empty response from backend.");
+            var responseBody = await resp.Content.ReadAsStringAsync(ct);
+
+            CreateAccountResponse? data;
+            try
+            {
+                data = JsonSerializer.Deserialize<CreateAccountResponse>(responseBody, _jsonOpts);
+            }
+            catch (JsonException)
+            {
+                throw new GameOsException(
+                    (int)resp.StatusCode,
+                    resp.IsSuccessStatusCode
+                        ? "The server returned an unexpected response. Please try again."
+                        : $"Registration failed (server error {(int)resp.StatusCode}). Please try again later.");
+            }
+
+            if (data == null)
+                throw new GameOsException(500, "Empty response from backend.");
 
             if (!resp.IsSuccessStatusCode || !data.Success)
                 throw new GameOsException(

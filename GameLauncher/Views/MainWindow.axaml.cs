@@ -18,10 +18,18 @@ public partial class MainWindow : Window
     {
         if (DataContext is MainViewModel vm)
         {
-            vm.MinimizeWindowRequested = () => WindowState = WindowState.Minimized;
+            // Capture the window state at the time of minimise so we can restore
+            // to the same state (FullScreen, Normal, Maximized) when the game exits.
+            WindowState _stateBeforeMinimize = WindowState;
+
+            vm.MinimizeWindowRequested = () =>
+            {
+                _stateBeforeMinimize = WindowState;
+                WindowState = WindowState.Minimized;
+            };
             vm.RestoreWindowRequested  = () =>
             {
-                WindowState = WindowState.Normal;
+                WindowState = _stateBeforeMinimize;
                 Activate();
             };
         }
