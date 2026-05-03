@@ -129,6 +129,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public FriendsViewModel   FriendsVm        { get; }
     public SettingsViewModel  SettingsVm       { get; }
     public GameDetailViewModel DetailVm        { get; }
+    public QuickMenuViewModel  QuickMenuVm     { get; }
 
     // ── Navigation state ───────────────────────────────────────────────────
     [ObservableProperty] private bool _showLogin         = true;
@@ -138,6 +139,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _activePage      = "dashboard";
     /// <summary>True when the left nav sidebar overlay is visible.</summary>
     [ObservableProperty] private bool _isNavExpanded     = false;
+    /// <summary>True when the Quick Menu overlay (Shift+Ctrl) is visible.</summary>
+    [ObservableProperty] private bool _showQuickMenu     = false;
     /// <summary>Username of the friend currently being viewed (shown in the friend-profile overlay).</summary>
     [ObservableProperty] private string _viewingFriendName = "";
     /// <summary>
@@ -177,12 +180,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FriendsVm      = new FriendsViewModel();
         SettingsVm     = new SettingsViewModel();
         DetailVm       = new GameDetailViewModel();
+        QuickMenuVm    = new QuickMenuViewModel();
 
         // Give the detail VM access to the per-system metadata cache so it can
         // load achievement JSON from disk instead of re-downloading every time.
         DetailVm.CacheService = _metadataCache;
 
         DetailVm.OnClose = () => ShowDetail = false;
+
+        // Wire Quick Menu callbacks
+        QuickMenuVm.OnDismiss  = () => ShowQuickMenu = false;
+        QuickMenuVm.OnExitGame = () =>
+        {
+            // Forward to DetailVm to kill the running game process
+            if (DetailVm.IsGameRunning)
+                DetailVm.ForceExitGame();
+        };
 
         // Wire Settings → SyncNow so the Resync button triggers TryRefreshUserDataAsync
         SettingsVm.SyncNowAction = async () =>
@@ -279,6 +292,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         catch { }
                     });
                 }
+
+                // Show a session-ended toast notification with the session duration
+                int sessionMinutes = PlaytimeService.GetTotalMinutes(platform, title);
+                if (sessionMinutes > 0)
+                    Services.NotificationService.ShowSessionEndedNotification(title, sessionMinutes);
             });
         };
 
@@ -474,6 +492,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // so playtime records are stored per-account, not per-device.
         PlaytimeService.SetCurrentUser(profile.Username);
 
+        // Attach the logged-in username to the detail view-model so review submissions
+        // are correctly attributed to the right user.
+        DetailVm.SetCurrentUser(profile.Username);
+
         // Apply stored playtime data to the library so the dashboard shows accurate totals
         PlaytimeService.ApplyStoredPlaytime(library);
 
@@ -634,10 +656,73 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 if (added > 0)
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        LibraryVm.Load(_library));
+                    {
+                        LibraryVm.Load(_library);
+                        ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
+                    });
                 }
             }
         });
+
+        // Auto-refresh Steam library in the background on login when the cache is stale
+        // (older than 24 hours) and the user has a Steam API key and Steam ID configured.
+        if (!isOffline)
+        {
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    var settings = Services.AppSettingsService.Load();
+                    if (string.IsNullOrWhiteSpace(settings.SteamApiKey) ||
+                        string.IsNullOrWhiteSpace(settings.SteamUserId))
+                        return;
+
+                    // Only auto-refresh if the cache is absent or older than 24 hours
+                    string cachePath = Services.SteamGameImportService.GetCachePath(profile.Username);
+                    if (System.IO.File.Exists(cachePath))
+                    {
+                        var age = DateTime.UtcNow - System.IO.File.GetLastWriteTimeUtc(cachePath);
+                        if (age.TotalHours < 24) return;
+                    }
+
+                    var steamGames = await Services.SteamGameImportService
+                        .FetchAndSaveAsync(settings.SteamApiKey, settings.SteamUserId, profile.Username)
+                        .ConfigureAwait(false);
+
+                    int added = 0;
+                    var existingTitles = new System.Collections.Generic.HashSet<string>(
+                        _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+                    foreach (var sg in steamGames)
+                    {
+                        if (!existingTitles.Contains(sg.Name))
+                        {
+                            _library.Add(new Models.Game
+                            {
+                                Platform        = "PC",
+                                Title           = sg.Name,
+                                CoverUrl        = sg.CoverUrl,
+                                AddedAt         = DateTime.UtcNow.ToString("O"),
+                                PlaytimeMinutes = sg.PlaytimeMinutes,
+                                TitleId         = $"steam:{sg.AppId}",
+                            });
+                            existingTitles.Add(sg.Name);
+                            added++;
+                        }
+                    }
+
+                    if (added > 0)
+                    {
+                        DevLogService.Log($"[Steam Auto-Sync] Added {added} new Steam games to library.");
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            LibraryVm.Load(_library);
+                            ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
+                        });
+                    }
+                }
+                catch { /* best-effort — Steam sync failure must not block login */ }
+            });
+        }
 
         if (!isOffline)
         {
@@ -984,6 +1069,50 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         ShowFriendProfile = false;
         ViewingFriendName = "";
+    }
+
+    /// <summary>
+    /// Toggles the Quick Menu overlay (shown by Left Shift + Left Ctrl from the main window).
+    /// Refreshes content before showing.
+    /// </summary>
+    public void ToggleQuickMenu()
+    {
+        if (ShowQuickMenu)
+        {
+            ShowQuickMenu = false;
+            return;
+        }
+
+        // Collect online friends
+        var onlineFriends = FriendsVm.OnlineFriends
+            .Select(f => new FriendPresenceVm
+            {
+                Username    = f.Username,
+                CurrentGame = f.CurrentGame ?? "",
+            })
+            .ToList();
+
+        // Achievement progress for current game
+        int unlocked = 0, total = 0;
+        if (DetailVm.HasAchievements)
+        {
+            unlocked = DetailVm.Achievements.Count(a => a.IsUnlocked);
+            total    = DetailVm.Achievements.Count;
+        }
+
+        QuickMenuVm.Refresh(
+            currentGameTitle:      DetailVm.IsGameRunning ? DetailVm.Title : null,
+            sessionStartedAt:      DetailVm.IsGameRunning
+                ? PlaytimeService.GetActiveSessionStart(DetailVm.Platform, DetailVm.Title)
+                  ?? PlaytimeService.GetAnyActiveSessionStart()
+                : null,
+            friends:               onlineFriends,
+            unreadCount:           0,
+            lastMessage:           null,
+            unlockedAchievements:  unlocked,
+            totalAchievements:     total);
+
+        ShowQuickMenu = true;
     }
 
     private async Task LoadFriendProfileAsync(string friendUsername)

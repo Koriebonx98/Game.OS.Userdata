@@ -47,10 +47,20 @@ public partial class MainWindow : Window
     ///   PageUp  / LB       → navigate to previous page (always available)
     ///   PageDown / RB      → navigate to next page (always available)
     ///   F5                 → refresh / reload library
+    ///   Left Shift + Left Ctrl → toggle Quick Menu overlay
     /// </summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         if (DataContext is not MainViewModel vm) return;
+
+        // Left Shift + Left Ctrl → Quick Menu toggle (takes priority)
+        if (e.Key == Key.LeftCtrl &&
+            e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            vm.ToggleQuickMenu();
+            e.Handled = true;
+            return;
+        }
 
         switch (e.Key)
         {
@@ -58,7 +68,12 @@ public partial class MainWindow : Window
             // Also close nav sidebar when open
             case Key.Escape:
             case Key.BrowserBack:
-                if (vm.ShowDetail)
+                if (vm.ShowQuickMenu)
+                {
+                    vm.ShowQuickMenu = false;
+                    e.Handled = true;
+                }
+                else if (vm.ShowDetail)
                 {
                     vm.DetailVm.CloseCommand.Execute(null);
                     e.Handled = true;

@@ -1,0 +1,135 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.QuickMenuOverlay"
+             x:DataType="vm:QuickMenuViewModel">
+
+    <!-- Semi-transparent backdrop -->
+    <Border Background="#CC0d1117" HorizontalAlignment="Right" VerticalAlignment="Stretch"
+            Width="340" Padding="0">
+        <Border Background="#161b22" CornerRadius="0,0,0,0" Padding="20,24">
+            <StackPanel Spacing="20">
+
+                <!-- Header -->
+                <Grid ColumnDefinitions="*,Auto">
+                    <TextBlock Grid.Column="0"
+                               Text="Quick Menu"
+                               FontSize="20" FontWeight="Bold"
+                               Foreground="White" VerticalAlignment="Center"/>
+                    <Button Grid.Column="1"
+                            Classes="btn-secondary"
+                            Padding="10,6"
+                            Command="{Binding DismissCommand}">
+                        <TextBlock Text="✕" FontSize="14" FontWeight="Bold"/>
+                    </Button>
+                </Grid>
+
+                <!-- ── Current Session ── -->
+                <Border Background="#0d2137" CornerRadius="10" Padding="16,14">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
+                            <TextBlock Text="Now Playing"
+                                       FontSize="13" FontWeight="Bold"
+                                       Foreground="#8b949e" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding CurrentGameTitle}"
+                                   FontSize="15" FontWeight="Bold"
+                                   Foreground="White"
+                                   IsVisible="{Binding IsPlayingGame}"
+                                   TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding CurrentSessionLabel}"
+                                   FontSize="12" Foreground="#0ea5e9"/>
+                        <!-- Exit Game button -->
+                        <Button Classes="btn-danger"
+                                Padding="16,8" Margin="0,6,0,0"
+                                IsVisible="{Binding IsPlayingGame}"
+                                Command="{Binding ExitGameCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="⏹" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="Exit Game" FontSize="13" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Achievements Progress ── -->
+                <Border Background="#1a1a2e" CornerRadius="10" Padding="16,14"
+                        IsVisible="{Binding HasAchievementsProgress}">
+                    <StackPanel Spacing="8">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="🏆" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="Achievements"
+                                       FontSize="13" FontWeight="Bold"
+                                       Foreground="#8b949e" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding AchievementsLabel}"
+                                   FontSize="13" Foreground="#f1c40f"/>
+                        <ProgressBar Value="{Binding AchievementsUnlocked}"
+                                     Maximum="{Binding AchievementsTotal}"
+                                     Minimum="0"
+                                     Height="6" CornerRadius="3"
+                                     Foreground="#f1c40f"
+                                     Background="#21262d"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Online Friends ── -->
+                <StackPanel Spacing="8">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="👥" FontSize="14" VerticalAlignment="Center"/>
+                        <TextBlock Text="Friends Online"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="#8b949e" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <ItemsControl ItemsSource="{Binding OnlineFriends}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FriendPresenceVm">
+                                <Border Background="#21262d" CornerRadius="8"
+                                        Padding="12,10" Margin="0,0,0,4">
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="{Binding Username}"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="White"/>
+                                            <TextBlock Text="{Binding StatusLabel}"
+                                                       FontSize="11" Foreground="#3fb950"/>
+                                        </StackPanel>
+                                        <Border Grid.Column="1"
+                                                Width="8" Height="8"
+                                                CornerRadius="4"
+                                                Background="#3fb950"
+                                                VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="No friends online right now."
+                               FontSize="12" Foreground="#484f58"
+                               IsVisible="{Binding !HasOnlineFriends}"/>
+                </StackPanel>
+
+                <!-- ── Inbox Preview ── -->
+                <Border Background="#1a1a2e" CornerRadius="10" Padding="16,14"
+                        IsVisible="{Binding HasUnreadMessages}">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <TextBlock Text="✉" FontSize="14" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding UnreadMessageCount, StringFormat='{}{0} unread message(s)'}"
+                                       FontSize="13" FontWeight="Bold"
+                                       Foreground="#f0883e" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding LastMessagePreview}"
+                                   FontSize="12" Foreground="#8b949e"
+                                   TextWrapping="Wrap"
+                                   IsVisible="{Binding LastMessagePreview, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
+                </Border>
+
+            </StackPanel>
+        </Border>
+    </Border>
+
+</UserControl>

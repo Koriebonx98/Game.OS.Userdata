@@ -232,6 +232,20 @@ public partial class GameDetailViewModel : ViewModelBase
         _runningProcess  = null;
     }
 
+    /// <summary>
+    /// Kills the currently running game process immediately (called from Quick Menu "Exit Game").
+    /// Has no effect when no process is being tracked.
+    /// </summary>
+    public void ForceExitGame()
+    {
+        try
+        {
+            if (_runningProcess != null && !_runningProcess.HasExited)
+                _runningProcess.Kill(entireProcessTree: true);
+        }
+        catch { /* best-effort */ }
+    }
+
     // ── Repack-available badge (shown alongside an installed game) ────────────
     /// <summary>True when the game is installed AND a matching repack archive is also available.</summary>
     [ObservableProperty] private bool _hasMatchingRepack;
@@ -256,6 +270,19 @@ public partial class GameDetailViewModel : ViewModelBase
 
     /// <summary>Steam AppId for locally-installed Steam games (0 for non-Steam games).</summary>
     private int _steamAppId;
+
+    /// <summary>
+    /// True when the game is a Steam-API-registered title that is not currently
+    /// installed locally.  Shows an "Install via Steam" button in the UI.
+    /// </summary>
+    [ObservableProperty] private bool   _isSteamInstallable;
+    /// <summary>steam://install/{AppId} URL for the Install via Steam button.</summary>
+    [ObservableProperty] private string _steamInstallUrl = "";
+    /// <summary>
+    /// True when a Steam AppId is known for this game, making a "▶ Launch via Steam"
+    /// entry available alongside other exe options in the settings panel.
+    /// </summary>
+    [ObservableProperty] private bool   _hasSteamLaunchOption;
 
     /// <summary>Cached reference to the current LocalRom (if any), used to expose AdditionalPaths in settings.</summary>
     private LocalRom? _currentLocalRom;
@@ -284,6 +311,66 @@ public partial class GameDetailViewModel : ViewModelBase
 
     /// <summary>Full path to the mods.json for the current Switch game, shown in the mods panel.</summary>
     [ObservableProperty] private string _switchModsJsonPath = "";
+
+    // ── Per-game reviews ──────────────────────────────────────────────────────
+    public System.Collections.ObjectModel.ObservableCollection<Models.GameReview> Reviews { get; } = new();
+    [ObservableProperty] private bool   _hasReviews;
+    [ObservableProperty] private bool   _showReviewPanel;
+    [ObservableProperty] private int    _newReviewRating = 5; // 1–5 stars
+    [ObservableProperty] private string _newReviewNote   = "";
+    [ObservableProperty] private string _reviewStatus    = "";
+
+    [RelayCommand]
+    private void ToggleReviewPanel() => ShowReviewPanel = !ShowReviewPanel;
+
+    [RelayCommand]
+    private void SubmitReview()
+    {
+        if (string.IsNullOrEmpty(_currentUsername)) return;
+        if (NewReviewRating < 1 || NewReviewRating > 5) return;
+
+        var review = new Models.GameReview
+        {
+            Username  = _currentUsername,
+            Rating    = NewReviewRating,
+            Note      = NewReviewNote.Trim(),
+            CreatedAt = System.DateTime.UtcNow.ToString("o"),
+        };
+
+        Services.GameReviewService.AddOrUpdateReview(Platform, Title, review);
+
+        // Refresh the displayed list
+        LoadReviews();
+
+        NewReviewNote  = "";
+        ReviewStatus   = "✓ Review saved!";
+    }
+
+    /// <summary>
+    /// The current user's username, set by <see cref="MainViewModel"/> after login
+    /// so the review panel knows which user is submitting.
+    /// </summary>
+    private string _currentUsername = "";
+
+    /// <summary>Wired by MainViewModel after login to attach the logged-in username.</summary>
+    public void SetCurrentUser(string username) => _currentUsername = username;
+
+    private void LoadReviews()
+    {
+        Reviews.Clear();
+        var all = Services.GameReviewService.LoadReviews(Platform, Title);
+        foreach (var r in all)
+            Reviews.Add(r);
+        HasReviews = Reviews.Count > 0;
+    }
+
+    // ── Per-game compatibility reports ────────────────────────────────────────
+    public System.Collections.ObjectModel.ObservableCollection<Models.GameCompatibility> CompatibilityReports { get; } = new();
+    [ObservableProperty] private bool   _hasCompatibilityReports;
+    [ObservableProperty] private bool   _showCompatibilityPanel;
+
+    [RelayCommand]
+    private void ToggleCompatibilityPanel() => ShowCompatibilityPanel = !ShowCompatibilityPanel;
 
     // ── Navigation back-action ────────────────────────────────────────────────
     public System.Action? OnClose { get; set; }
@@ -868,6 +955,22 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void CloseTrailerPlayer() => IsTrailerPlayerOpen = false;
 
+    /// <summary>Opens the Steam install page for this game via the Steam protocol URI.</summary>
+    [RelayCommand]
+    private void InstallViaSteam()
+    {
+        if (string.IsNullOrEmpty(SteamInstallUrl)) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = SteamInstallUrl,
+                UseShellExecute = true,
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
     /// <summary>Opens the game's store page URL in the system's default browser.</summary>
     [RelayCommand]
     private void OpenStorePage()
@@ -973,6 +1076,15 @@ public partial class GameDetailViewModel : ViewModelBase
                     // ── Switch log reader: read Ryujinx log after session ends ──────
                     if (readSwitchLog)
                         _ = WatchAndReadSwitchLogAsync(romProc, emuSettings.EmulatorPath, Title);
+
+                    // ── Xenia log reader: read achievement unlocks after session ends ──
+                    bool readXeniaLog = string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase)
+                        && emuSettings.EmulatorPath.ToLowerInvariant().Contains("xenia");
+                    if (readXeniaLog)
+                    {
+                        XeniaLogReaderService.DeleteOldLogs(emuSettings.EmulatorPath);
+                        _ = WatchAndReadXeniaLogAsync(romProc, emuSettings.EmulatorPath, Title);
+                    }
 
                     return;
                 }
@@ -1261,6 +1373,143 @@ public partial class GameDetailViewModel : ViewModelBase
         // Mark this TitleID as "snippet recorded" so future sessions are skipped
         if (!string.IsNullOrEmpty(titleId))
             SwitchLogReaderService.MarkLogSnippetRecorded(titleId);
+
+        // ── Switch log → Games.Database upload ────────────────────────────────
+        // If we have a valid TitleID that is NOT yet in the Games.Database, add it.
+        if (!string.IsNullOrEmpty(titleId) && !string.IsNullOrEmpty(gameTitle))
+        {
+            bool alreadyInDb = Services.GitHubDataService.IsTitleIdInLocalCache("Switch", titleId);
+            if (!alreadyInDb)
+            {
+                DevLogService.Log(
+                    $"[SwitchLog] '{gameTitle}' ({titleId}) not in DB — queuing submission.");
+                _ = System.Threading.Tasks.Task.Run(() => SubmitSwitchGameToDatabaseAsync(titleId, gameTitle));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Submits a minimal Switch game entry (TitleId, Title, platform=Switch) to the
+    /// Games.Database via the GitHub API, then invalidates the local disk cache so the
+    /// next store load picks up the new entry.
+    /// </summary>
+    private static async System.Threading.Tasks.Task SubmitSwitchGameToDatabaseAsync(
+        string titleId, string title)
+    {
+        try
+        {
+            DevLogService.Log($"[SwitchDb] Submitting '{title}' ({titleId}) to Games.Database…");
+            using var svc = new Services.GitHubDataService();
+            // Read the current Switch database file
+            const string path = "Switch.Games.json";
+            List<Models.DatabaseGame>? games;
+            string? sha;
+            try
+            {
+                (games, sha) = await svc.ReadGamesDatabaseFileAsync<List<Models.DatabaseGame>>(path);
+            }
+            catch
+            {
+                games = null;
+                sha   = null;
+            }
+
+            games ??= new List<Models.DatabaseGame>();
+
+            // Double-check the entry is still not there (another client may have uploaded)
+            if (games.Any(g =>
+                string.Equals(g.TitleId, titleId, StringComparison.OrdinalIgnoreCase)))
+            {
+                DevLogService.Log($"[SwitchDb] '{title}' ({titleId}) already exists — skipping.");
+                return;
+            }
+
+            games.Add(new Models.DatabaseGame
+            {
+                TitleId = titleId,
+                Title   = title,
+            });
+
+            await svc.WriteGamesDatabaseFileAsync(path, games,
+                $"Add Switch game: {title} ({titleId})", sha);
+
+            // Invalidate the local cache so the next fetch picks up the new entry
+            Services.GitHubDataService.InvalidatePlatformCache("Switch");
+            DevLogService.Log($"[SwitchDb] Successfully submitted '{title}' ({titleId}).");
+        }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[SwitchDb] Failed to submit '{title}': {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Waits for the Xenia emulator process to exit, then reads its log file for
+    /// achievement-unlock events.  New unlocks (not already in the local cache) are
+    /// toasted to the user and synced to the achievements cache.
+    /// </summary>
+    private async System.Threading.Tasks.Task WatchAndReadXeniaLogAsync(
+        System.Diagnostics.Process? gameProc, string xeniaExePath, string gameTitle)
+    {
+        if (gameProc != null)
+        {
+            try
+            {
+                using var cts = new System.Threading.CancellationTokenSource(
+                    System.TimeSpan.FromHours(MaxEmulatorWaitHours));
+                await gameProc.WaitForExitAsync(cts.Token);
+            }
+            catch { /* process may have already exited or be inaccessible */ }
+            finally
+            {
+                gameProc.Dispose();
+            }
+        }
+
+        // Give Xenia a moment to flush its log to disk
+        await System.Threading.Tasks.Task.Delay(LogFlushDelayMs);
+
+        // Load already-unlocked IDs from the achievements cache to avoid duplicates
+        // Use the local achievements.json file path from the cache service
+        string? cachePath = CacheService?.GetCachedAchievementsPath("Xbox 360", null, gameTitle);
+        var alreadyUnlocked = new System.Collections.Generic.HashSet<string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        if (!string.IsNullOrEmpty(cachePath) && System.IO.File.Exists(cachePath))
+        {
+            try
+            {
+                var cachedJson = System.IO.File.ReadAllText(cachePath);
+                var cached = System.Text.Json.JsonSerializer.Deserialize<List<Achievement>>(cachedJson);
+                if (cached != null)
+                {
+                    foreach (var a in cached.Where(a => a.IsUnlocked && !string.IsNullOrEmpty(a.AchievementId)))
+                        alreadyUnlocked.Add(a.AchievementId);
+                }
+            }
+            catch { /* best-effort */ }
+        }
+
+        var newUnlocks = XeniaLogReaderService.GetNewUnlocks(xeniaExePath, alreadyUnlocked);
+        if (newUnlocks.Count == 0) return;
+
+        // Fire toast for each newly unlocked achievement and mark it in the cache
+        foreach (var (id, name) in newUnlocks)
+        {
+            Services.NotificationService.ShowAchievementUnlockedNotification(name, gameTitle);
+
+            // Update the in-memory achievement list so the detail view reflects the unlock
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var existing = Achievements.FirstOrDefault(a =>
+                    string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase));
+                if (existing != null)
+                {
+                    existing.UnlockedAt = DateTime.UtcNow.ToString("o");
+                    RefreshVisibleAchievements();
+                }
+            });
+        }
     }
 
 
@@ -1664,6 +1913,19 @@ public partial class GameDetailViewModel : ViewModelBase
         // and returns immediately without file system operations.
         LoadSwitchMods();
         _steamAppId = 0;
+
+        // Extract Steam AppId from the TitleId (format: "steam:{AppId}")
+        if (game.TitleId?.StartsWith("steam:", StringComparison.OrdinalIgnoreCase) == true &&
+            int.TryParse(game.TitleId.AsSpan(6), out int steamId) && steamId > 0)
+        {
+            _steamAppId = steamId;
+        }
+
+        // "Install via Steam" shown for Steam-API games not yet installed locally
+        IsSteamInstallable   = _steamAppId > 0 && !IsInstalled && !IsRepack;
+        SteamInstallUrl      = _steamAppId > 0 ? $"steam://install/{_steamAppId}" : "";
+        HasSteamLaunchOption = _steamAppId > 0;
+        LoadReviews();
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
@@ -1703,7 +1965,11 @@ public partial class GameDetailViewModel : ViewModelBase
         // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
         // so stale Switch state from a previously viewed game is always cleared.
         LoadSwitchMods();
-        _steamAppId = 0;
+        _steamAppId          = 0;
+        IsSteamInstallable   = false;
+        SteamInstallUrl      = "";
+        HasSteamLaunchOption = false;
+        LoadReviews();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -1780,8 +2046,13 @@ public partial class GameDetailViewModel : ViewModelBase
         // For locally-installed Steam games, show the Steam store page link
         if (game.SteamAppId > 0)
             PopulateStoreUrl($"https://store.steampowered.com/app/{game.SteamAppId}", "PC", null);
+
+        // A locally-installed Steam game can also be launched via Steam (overlay, cloud saves)
+        IsSteamInstallable   = false; // already installed
+        SteamInstallUrl      = game.SteamAppId > 0 ? $"steam://install/{game.SteamAppId}" : "";
+        HasSteamLaunchOption = game.SteamAppId > 0;
+        LoadReviews();
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
     /// Sets up the detail overlay for a repack archive found on disk.
@@ -1836,6 +2107,11 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSwitchMods        = false;
         ShowModsPanel        = false;
         SwitchModsStatus     = "";
+        _steamAppId          = 0;
+        IsSteamInstallable   = false;
+        SteamInstallUrl      = "";
+        HasSteamLaunchOption = false;
+        LoadReviews();
     }
 
     public void LoadFromLocalRom(LocalRom rom)
@@ -1881,6 +2157,11 @@ public partial class GameDetailViewModel : ViewModelBase
         ApplyRomDriveInstances(rom);
         PopulatePlaytime(rom.Platform, rom.Title);
         LoadSwitchMods();
+        _steamAppId          = 0;
+        IsSteamInstallable   = false;
+        SteamInstallUrl      = "";
+        HasSteamLaunchOption = false;
+        LoadReviews();
     }
 
 

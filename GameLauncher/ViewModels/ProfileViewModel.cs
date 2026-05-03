@@ -17,6 +17,14 @@ public partial class ProfileViewModel : ViewModelBase
     [ObservableProperty] private string _modeBadge       = "LIVE";
     [ObservableProperty] private bool   _isAdmin         = false;
 
+    /// <summary>Total games owned across all sources (cloud library + Steam + local).</summary>
+    [ObservableProperty] private int    _totalOwned;
+
+    // ── GamerScore ────────────────────────────────────────────────────────────
+    [ObservableProperty] private int    _gamerScoreTotal;
+    /// <summary>Human-readable GamerScore label, e.g. "1 250 GS".</summary>
+    [ObservableProperty] private string _gamerScoreLabel = "0 GS";
+
     /// <summary>
     /// True when this view-model is showing a friend's profile (not the current user's own profile).
     /// Hides the email address and shows the activity feed instead.
@@ -35,6 +43,7 @@ public partial class ProfileViewModel : ViewModelBase
         Username          = profile.Username;
         Email             = profile.Email;
         GamesCount        = library.Count;
+        TotalOwned        = library.Count; // owned = cloud library (includes Steam + Epic + manual)
         AchievementsCount = achievements.Count;
         AvatarInitial     = profile.Username.Length > 0
             ? profile.Username[0].ToString().ToUpper() : "?";
@@ -45,6 +54,12 @@ public partial class ProfileViewModel : ViewModelBase
             MemberSince = dt.ToString("dd MMMM yyyy");
         else
             MemberSince = profile.CreatedAt;
+
+        // Compute GamerScore from total playtime + achievement count
+        int totalPlaytimeMinutes = library.Sum(g => g.PlaytimeMinutes);
+        var gs = GamerScore.Compute(totalPlaytimeMinutes, achievements.Count);
+        GamerScoreTotal = gs.Total;
+        GamerScoreLabel = gs.Label;
 
         AllAchievements.Clear();
         foreach (var a in achievements.OrderByDescending(a => a.UnlockedAt))

@@ -157,17 +157,30 @@
                         <!-- ── Install button when repack available ── -->
                         <StackPanel Margin="0,16,0,0" Spacing="6"
                                     IsVisible="{Binding IsRepack}">
-                            <Button Classes="btn-success"
-                                    Padding="24,12"
-                                    IsEnabled="{Binding !IsExtracting}"
-                                    Command="{Binding InstallRepackCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
-                                    <!-- Label changes to "Installing..." during extraction -->
-                                    <TextBlock Text="{Binding InstallButtonLabel}" FontSize="15" FontWeight="Bold"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="btn-success"
+                                        Padding="24,12"
+                                        IsEnabled="{Binding !IsExtracting}"
+                                        Command="{Binding InstallRepackCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
+                                        <!-- Label changes to "Installing..." during extraction -->
+                                        <TextBlock Text="{Binding InstallButtonLabel}" FontSize="15" FontWeight="Bold"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <!-- Steam option alongside repack when both available -->
+                                <Button Classes="btn-secondary"
+                                        Padding="20,12"
+                                        IsVisible="{Binding IsSteamInstallable}"
+                                        Command="{Binding InstallViaSteamCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="🎮" FontSize="14" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Install via Steam" FontSize="14" FontWeight="SemiBold"
+                                                   Foreground="#58a6ff" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
                             <TextBlock Text="{Binding RepackSizeLabel}"
                                        FontSize="11" Foreground="#8b949e"
                                        IsVisible="{Binding RepackSizeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
@@ -201,6 +214,22 @@
                                        TextWrapping="Wrap" Margin="0,4,0,0"/>
                         </StackPanel>
 
+                        <!-- ── Install via Steam (Steam-API game, not installed locally, no repack) ── -->
+                        <StackPanel Margin="0,16,0,0" Spacing="6"
+                                    IsVisible="{Binding IsSteamInstallable}">
+                            <Button Classes="btn-success"
+                                    Padding="24,12"
+                                    Command="{Binding InstallViaSteamCommand}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Install via Steam" FontSize="15" FontWeight="Bold"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Opens the Steam client to download and install this game."
+                                       FontSize="11" Foreground="#8b949e"/>
+                        </StackPanel>
+
                         <!-- ── Repack available badge (shown when game installed AND repack exists) ── -->
                         <Border IsVisible="{Binding HasMatchingRepack}"
                                 Background="#2d1b00" CornerRadius="6"
@@ -209,6 +238,19 @@
                             <TextBlock Text="{Binding MatchingRepackLabel}"
                                        FontSize="12" Foreground="#f0a030"
                                        FontWeight="SemiBold"/>
+                        </Border>
+
+                        <!-- ── "Launch via Steam" option (for installed Steam games) ── -->
+                        <Border IsVisible="{Binding HasSteamLaunchOption}"
+                                Background="#0d2137" CornerRadius="8"
+                                Padding="14,10" Margin="0,8,0,0"
+                                HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🎮" FontSize="14" VerticalAlignment="Center"/>
+                                <TextBlock Text="▶ Launch via Steam"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="#58a6ff" VerticalAlignment="Center"/>
+                            </StackPanel>
                         </Border>
 
                         <!-- ── Store page button ── -->
@@ -852,6 +894,95 @@
                                            IsVisible="{Binding ShowAllAchievements}"/>
                             </StackPanel>
                         </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Reviews section ── -->
+                <Border Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+
+                        <!-- Section header with toggle button -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="⭐" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Reviews"
+                                           FontSize="16" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                                <Border CornerRadius="10" Padding="8,3" Background="#f0a030"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding HasReviews}">
+                                    <TextBlock Text="{Binding Reviews.Count}"
+                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn-secondary"
+                                    Padding="14,6"
+                                    Command="{Binding ToggleReviewPanelCommand}">
+                                <TextBlock Text="Write a Review" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- Existing reviews list -->
+                        <ItemsControl ItemsSource="{Binding Reviews}"
+                                      IsVisible="{Binding HasReviews}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:GameReview">
+                                    <Border Background="#21262d" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,6">
+                                        <StackPanel Spacing="4">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Username}"
+                                                           FontSize="13" FontWeight="SemiBold"
+                                                           Foreground="#58a6ff"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding StarLabel}"
+                                                           FontSize="14" Foreground="#f1c40f"/>
+                                            </Grid>
+                                            <TextBlock Text="{Binding Note}"
+                                                       FontSize="12" Foreground="#c9d1d9"
+                                                       TextWrapping="Wrap"
+                                                       IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Write review form -->
+                        <Border IsVisible="{Binding ShowReviewPanel}"
+                                Background="#0d1117" CornerRadius="8" Padding="16,14">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Your Rating (1–5 stars)"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="#8b949e"/>
+                                <NumericUpDown Value="{Binding NewReviewRating}"
+                                              Minimum="1" Maximum="5" Increment="1"
+                                              Foreground="White" Background="#21262d"
+                                              BorderBrush="#30363d" CornerRadius="6"
+                                              HorizontalAlignment="Left" Width="120"/>
+                                <TextBox Text="{Binding NewReviewNote}"
+                                         Watermark="Write your review here… (optional)"
+                                         Background="#21262d" Foreground="White"
+                                         BorderBrush="#30363d" CornerRadius="6"
+                                         Padding="10,8" FontSize="12" AcceptsReturn="True"
+                                         Height="80"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-success" Padding="16,8"
+                                            Command="{Binding SubmitReviewCommand}">
+                                        <TextBlock Text="Submit Review" FontSize="13" FontWeight="SemiBold"/>
+                                    </Button>
+                                    <Button Classes="btn-secondary" Padding="14,8"
+                                            Command="{Binding ToggleReviewPanelCommand}">
+                                        <TextBlock Text="Cancel" FontSize="13"/>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding ReviewStatus}"
+                                           FontSize="12" Foreground="#3fb950"
+                                           IsVisible="{Binding ReviewStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
                 </Border>
 

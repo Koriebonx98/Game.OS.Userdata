@@ -482,6 +482,12 @@ namespace GameLauncher.Models
         /// Useful for Steam, Epic Games Launcher, etc. that need to be fully running first.
         /// </summary>
         [JsonPropertyName("waitForReady")] public bool    WaitForReady { get; set; } = false;
+        /// <summary>
+        /// When <see langword="true"/>, this entry represents a Steam launch action
+        /// (steam://launch/{AppId}) rather than a local executable path.
+        /// It is rendered with a Steam icon and no path-browse button.
+        /// </summary>
+        [JsonPropertyName("isSteamLaunch")] public bool   IsSteamLaunch { get; set; } = false;
     }
 
     /// <summary>
@@ -755,4 +761,62 @@ namespace GameLauncher.Models
         /// </summary>
         public static int CoinsFromScore(int gamerScore) => (gamerScore / 100) * 10;
     }
+
+    // ── Per-game review ────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// A per-game user review, stored locally in
+    /// <c>Data/GameCache/{platform}/{title}/reviews.json</c> and optionally uploaded
+    /// to the Games.Database repository via <see cref="GameLauncher.Services.GitHubDataService"/>.
+    /// </summary>
+    public class GameReview
+    {
+        [JsonPropertyName("username")]  public string  Username  { get; set; } = "";
+        /// <summary>Star rating from 1 (terrible) to 5 (excellent).</summary>
+        [JsonPropertyName("rating")]    public int     Rating    { get; set; }
+        /// <summary>Free-text review note (optional, may be empty).</summary>
+        [JsonPropertyName("note")]      public string  Note      { get; set; } = "";
+        [JsonPropertyName("createdAt")] public string  CreatedAt { get; set; } =
+            DateTime.UtcNow.ToString("o");
+
+        /// <summary>Returns the <see cref="Rating"/> rendered as Unicode stars, e.g. "★★★☆☆".</summary>
+        [JsonIgnore] public string StarLabel =>
+            new string('★', Rating) + new string('☆', 5 - Rating);
+    }
+
+    // ── Game compatibility report ──────────────────────────────────────────────
+
+    /// <summary>
+    /// A per-game compatibility report submitted by a user.  Records the hardware
+    /// configuration and observed performance so others can estimate what to expect.
+    /// Stored locally in <c>Data/GameCache/{platform}/{title}/compatibility.json</c>
+    /// and uploaded to the Games.Database via
+    /// <see cref="GameLauncher.Services.GitHubDataService"/>.
+    /// </summary>
+    public class GameCompatibility
+    {
+        [JsonPropertyName("cpu")]              public string  Cpu              { get; set; } = "";
+        [JsonPropertyName("gpu")]              public string  Gpu              { get; set; } = "";
+        [JsonPropertyName("ramGb")]            public int     RamGb            { get; set; }
+        /// <summary>Storage type: "HDD", "SSD", "NVMe", or "".</summary>
+        [JsonPropertyName("storageType")]      public string  StorageType      { get; set; } = "";
+        [JsonPropertyName("resolutionWidth")]  public int     ResolutionWidth  { get; set; }
+        [JsonPropertyName("resolutionHeight")] public int     ResolutionHeight { get; set; }
+        /// <summary>Observed frames-per-second (0 = not measured).</summary>
+        [JsonPropertyName("fps")]              public int     Fps              { get; set; }
+        [JsonPropertyName("platform")]         public string  Platform         { get; set; } = "";
+        /// <summary>Emulator name for non-PC platforms (e.g. "Ryujinx", "Xenia").</summary>
+        [JsonPropertyName("emulator")]         public string? Emulator         { get; set; }
+        [JsonPropertyName("userId")]           public string  UserId           { get; set; } = "";
+        [JsonPropertyName("createdAt")]        public string  CreatedAt        { get; set; } =
+            DateTime.UtcNow.ToString("o");
+
+        /// <summary>Human-readable summary, e.g. "1920×1080 · 60 fps · SSD".</summary>
+        [JsonIgnore] public string Summary =>
+            $"{ResolutionWidth}×{ResolutionHeight}" +
+            (Fps > 0 ? $" · {Fps} fps" : "") +
+            (!string.IsNullOrEmpty(StorageType) ? $" · {StorageType}" : "") +
+            (!string.IsNullOrEmpty(Emulator) ? $" · {Emulator}" : "");
+    }
 }
+

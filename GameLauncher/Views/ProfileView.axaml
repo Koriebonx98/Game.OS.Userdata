@@ -78,11 +78,11 @@
                         <!-- Games stat -->
                         <Border Background="#ffffff18" CornerRadius="10" Padding="20,12">
                             <StackPanel HorizontalAlignment="Center" Spacing="2">
-                                <TextBlock Text="{Binding GamesCount}"
+                                <TextBlock Text="{Binding TotalOwned}"
                                            FontSize="28" FontWeight="Black"
                                            Foreground="White"
                                            HorizontalAlignment="Center"/>
-                                <TextBlock Text="Games"
+                                <TextBlock Text="Games Owned"
                                            FontSize="11" Foreground="#93c5fd"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
@@ -95,6 +95,18 @@
                                            Foreground="White"
                                            HorizontalAlignment="Center"/>
                                 <TextBlock Text="Trophies"
+                                           FontSize="11" Foreground="#93c5fd"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+                        <!-- GamerScore stat -->
+                        <Border Background="#1f3a5f" CornerRadius="10" Padding="20,12">
+                            <StackPanel HorizontalAlignment="Center" Spacing="2">
+                                <TextBlock Text="{Binding GamerScoreLabel}"
+                                           FontSize="22" FontWeight="Black"
+                                           Foreground="#f1c40f"
+                                           HorizontalAlignment="Center"/>
+                                <TextBlock Text="🏅 GamerScore"
                                            FontSize="11" Foreground="#93c5fd"
                                            HorizontalAlignment="Center"/>
                             </StackPanel>
