@@ -556,21 +556,25 @@ public partial class LibraryViewModel : ViewModelBase
         var cloudResults = _allGames.AsEnumerable();
         if (plat != "All")
             cloudResults = cloudResults.Where(g =>
-                string.Equals(GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform),
+                string.Equals(PlatformHelper.NormalizePlatform(g.Platform),
                                plat, StringComparison.OrdinalIgnoreCase));
         if (!string.IsNullOrWhiteSpace(search))
             cloudResults = cloudResults.Where(g =>
                 g.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         // Apply install-status filter to cloud games (PC only — ROMs are always local)
-        if (installStatus == "Installed")
+        if (installStatus is "Installed" or "Not Installed")
+        {
+            bool wantInstalled = installStatus == "Installed";
             cloudResults = cloudResults.Where(g =>
-                !string.Equals(PlatformHelper.NormalizePlatform(g.Platform), "PC", StringComparison.OrdinalIgnoreCase) ||
-                installedPcTitles.Contains(PlatformHelper.StripSpecialSymbols(g.Title)));
-        else if (installStatus == "Not Installed")
-            cloudResults = cloudResults.Where(g =>
-                !string.Equals(PlatformHelper.NormalizePlatform(g.Platform), "PC", StringComparison.OrdinalIgnoreCase) ||
-                !installedPcTitles.Contains(PlatformHelper.StripSpecialSymbols(g.Title)));
+            {
+                bool isPC = string.Equals(PlatformHelper.NormalizePlatform(g.Platform),
+                                          "PC", StringComparison.OrdinalIgnoreCase);
+                if (!isPC) return true; // non-PC cloud games always shown
+                bool locallyInstalled = installedPcTitles.Contains(PlatformHelper.StripSpecialSymbols(g.Title));
+                return wantInstalled ? locallyInstalled : !locallyInstalled;
+            });
+        }
 
         foreach (var g in cloudResults.OrderByDescending(g => g.Rating ?? 0))
             FilteredGames.Add(g);

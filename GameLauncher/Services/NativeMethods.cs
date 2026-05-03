@@ -9,6 +9,9 @@ namespace GameLauncher.Services;
 /// </summary>
 internal static class NativeMethods
 {
+    /// <summary>Restores a minimised window to its normal or maximised state.</summary>
+    internal const int SW_RESTORE = 9;
+
     [DllImport("user32.dll", SetLastError = false)]
     [return: MarshalAs(UnmanagedType.Bool)]
     internal static extern bool SetForegroundWindow(nint hWnd);

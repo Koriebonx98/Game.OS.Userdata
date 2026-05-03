@@ -194,12 +194,12 @@ public partial class GameDetailViewModel : ViewModelBase
     private bool _isGameRunning;
 
     /// <summary>
-    /// Label shown on the main play button.
-    /// "▶  Play" normally, "▶  Playing..." while the process is active.
+    /// Label shown on the main play button text block (the arrow icon is separate in XAML).
+    /// "Play" normally, "Playing..." while the process is active.
     /// The "Resume" state is indicated by <see cref="PlayButtonIsResume"/> instead.
     /// </summary>
     public string PlayButtonLabel =>
-        IsGameRunning ? "▶  Playing..." : "▶  Play";
+        IsGameRunning ? "Playing..." : "Play";
 
     /// <summary>
     /// True once the game has been launched from this detail view and the process
@@ -1075,7 +1075,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 var hwnd = proc.MainWindowHandle;
                 if (hwnd != nint.Zero)
                 {
-                    Services.NativeMethods.ShowWindow(hwnd, 9 /* SW_RESTORE */);
+                    Services.NativeMethods.ShowWindow(hwnd, Services.NativeMethods.SW_RESTORE);
                     Services.NativeMethods.SetForegroundWindow(hwnd);
                     return;
                 }

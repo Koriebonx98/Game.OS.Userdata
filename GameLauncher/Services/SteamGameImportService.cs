@@ -88,11 +88,12 @@ public static class SteamGameImportService
 
         var games = root?.Response?.Games ?? new List<SteamOwnedGame>();
 
-        // Filter out demos: Steam names demos with "(Demo)" or "Demo" suffix in the title
+        // Filter out demos: Steam marks demos with a "(Demo)" or "Demo" suffix in the title.
+        // Only check the suffix (not Contains) to avoid filtering legitimate titles that
+        // contain the word "Demo" elsewhere in their name.
         games.RemoveAll(g =>
-            g.Name.Contains("Demo", StringComparison.OrdinalIgnoreCase) &&
-            (g.Name.EndsWith("Demo", StringComparison.OrdinalIgnoreCase) ||
-             g.Name.EndsWith("(Demo)", StringComparison.OrdinalIgnoreCase)));
+            g.Name.EndsWith(" Demo", StringComparison.OrdinalIgnoreCase) ||
+            g.Name.EndsWith("(Demo)", StringComparison.OrdinalIgnoreCase));
 
         // Persist to disk
         string cachePath = GetCachePath(username);
