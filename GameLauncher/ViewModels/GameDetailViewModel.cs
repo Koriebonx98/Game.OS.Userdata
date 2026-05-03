@@ -995,27 +995,18 @@ public partial class GameDetailViewModel : ViewModelBase
         }
         else if (_steamAppId > 0 && string.IsNullOrEmpty(saved.ExePath))
         {
-            // Launch through the Steam client so overlays and cloud saves work correctly
+            // Launch through the Steam client so overlays and cloud saves work correctly.
+            // steam:// is handled by the OS shell; we cannot track the resulting game process,
+            // so process-based playtime tracking and post-launch watchers are not applicable.
             try
             {
-                var psi = new System.Diagnostics.ProcessStartInfo
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName        = $"steam://launch/{_steamAppId}",
                     UseShellExecute = true,
-                };
-                var steamProc = System.Diagnostics.Process.Start(psi);
-                if (steamProc != null)
-                {
-                    _runningProcess    = steamProc;
-                    IsGameRunning      = true;
-                    PlayButtonIsResume = false;
-                    OnRequestPlaytimeTracking?.Invoke(steamProc, Title, Platform);
-                }
+                });
             }
             catch { /* best-effort */ }
-
-            if (saved.PostLaunch.Count > 0)
-                _ = WatchAndRunPostLaunchAsync(_runningProcess, saved.PostLaunch);
             return;
         }
         else if (_driveInstances.Count > 0)
