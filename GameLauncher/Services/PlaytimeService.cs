@@ -226,6 +226,35 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Returns the UTC start time of the current active session for the given game,
+        /// or <see langword="null"/> when the game is not being tracked.
+        /// </summary>
+        public static DateTime? GetActiveSessionStart(string platform, string title)
+        {
+            string key = MakeKey(platform, title);
+            lock (_activeSessionsLock)
+            {
+                if (_activeSessions.TryGetValue(key, out var startedAt))
+                    return startedAt;
+            }
+            return null;
+        }
+
+        /// <summary>
+        /// Returns the UTC start time of the first (oldest) active session across all
+        /// tracked games, or <see langword="null"/> when no game is currently running.
+        /// Used by the Quick Menu overlay to show current session elapsed time.
+        /// </summary>
+        public static DateTime? GetAnyActiveSessionStart()
+        {
+            lock (_activeSessionsLock)
+            {
+                if (_activeSessions.Count == 0) return null;
+                return _activeSessions.Values.Min();
+            }
+        }
+
+        /// <summary>
         /// Called after a game process has been started.
         /// The service monitors the process and records the session on exit.
         /// Immediately marks the game as "active" so callers can detect it without

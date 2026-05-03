@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
@@ -34,7 +35,7 @@ public partial class LibraryViewModel : ViewModelBase
 
     public bool IsInstallFilterAll          => FilterInstallStatus == "All";
     public bool IsInstallFilterInstalled    => FilterInstallStatus == "Installed";
-    public bool IsInstallFilterNotInstalled => FilterInstallStatus == "Not Installed";
+    public bool IsInstallFilterNotInstalled => FilterInstallStatus == "Uninstalled";
 
     // ── Cloud library ──────────────────────────────────────────────────────
     public ObservableCollection<Game>   FilteredGames { get; } = new();
@@ -403,6 +404,7 @@ public partial class LibraryViewModel : ViewModelBase
                 Platform      = "PC",
                 CoverGradient = "#0d2137,#163d5e",
                 SourceGame    = g,
+                PlaytimeLabel = FormatPlaytime(Services.PlaytimeService.GetTotalMinutes("PC", g.Title)),
             });
         }
 
@@ -449,6 +451,7 @@ public partial class LibraryViewModel : ViewModelBase
                 Platform      = r.Platform,
                 CoverGradient = "#0d1f3c,#1a3264",
                 SourceRom     = r,
+                PlaytimeLabel = FormatPlaytime(Services.PlaytimeService.GetTotalMinutes(r.Platform, r.Title)),
             });
         }
 
@@ -563,7 +566,7 @@ public partial class LibraryViewModel : ViewModelBase
                 g.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
 
         // Apply install-status filter to cloud games (PC only — ROMs are always local)
-        if (installStatus is "Installed" or "Not Installed")
+        if (installStatus is "Installed" or "Uninstalled")
         {
             bool wantInstalled = installStatus == "Installed";
             cloudResults = cloudResults.Where(g =>
@@ -576,7 +579,7 @@ public partial class LibraryViewModel : ViewModelBase
             });
         }
 
-        foreach (var g in cloudResults.OrderByDescending(g => g.Rating ?? 0))
+        foreach (var g in cloudResults.OrderBy(g => g.Title, StringComparer.OrdinalIgnoreCase))
             FilteredGames.Add(g);
 
         // ── Local installed games (assumed PC) — kept for legacy use ──────
@@ -627,8 +630,8 @@ public partial class LibraryViewModel : ViewModelBase
         if (!string.IsNullOrWhiteSpace(search))
             myResults = myResults.Where(c =>
                 c.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
-        // My Games are all local — "Not Installed" hides them, "Installed" keeps them
-        if (installStatus == "Not Installed")
+        // My Games are all local — "Uninstalled" hides them, "Installed" keeps them
+        if (installStatus == "Uninstalled")
             myResults = Enumerable.Empty<LocalGameCardVm>();
 
         foreach (var c in myResults.OrderBy(c => c.Title))
@@ -637,6 +640,19 @@ public partial class LibraryViewModel : ViewModelBase
 
         // Recalculate total to reflect filtered counts
         TotalGames = _allGames.Count + _allLocalGames.Count + _allRepacks.Count + _allRoms.Count;
+    }
+
+    /// <summary>
+    /// Formats a playtime value (minutes) into a short human-readable label.
+    /// Returns an empty string when minutes is zero or negative.
+    /// </summary>
+    private static string FormatPlaytime(int minutes)
+    {
+        if (minutes <= 0) return "";
+        if (minutes < 60) return $"{minutes}m";
+        int hours = minutes / 60;
+        int mins  = minutes % 60;
+        return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
     }
 }
 

@@ -297,5 +297,14 @@
             </Border>
 
         </Panel>
+
+        <!-- ══════════ QUICK MENU OVERLAY (Left Shift + Left Ctrl) ══════════ -->
+        <Border IsVisible="{Binding ShowQuickMenu}"
+                ZIndex="300"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch">
+            <views:QuickMenuOverlay DataContext="{Binding QuickMenuVm}"/>
+        </Border>
+
     </Grid>
 </Window>

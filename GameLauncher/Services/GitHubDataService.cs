@@ -964,6 +964,67 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Reads a JSON file from the public Koriebonx98/Games.Database repository.
+        /// Returns the deserialized content and the file SHA (needed for future writes).
+        /// Returns <c>(null, null)</c> if the file does not exist or cannot be read.
+        /// </summary>
+        public async Task<(T? Content, string? Sha)> ReadGamesDatabaseFileAsync<T>(
+            string filePath, CancellationToken ct = default)
+        {
+            try
+            {
+                var url  = $"https://api.github.com/repos/Koriebonx98/Games.Database/contents/{Uri.EscapeDataString(filePath)}";
+                var resp = await _http.GetAsync(url, ct);
+                if (!resp.IsSuccessStatusCode) return (default, null);
+
+                using var stream = await resp.Content.ReadAsStreamAsync(ct);
+                var file = await JsonSerializer.DeserializeAsync<GitHubFileResponse>(stream, _jsonOpts, ct);
+                if (file == null) return (default, null);
+
+                var bytes   = Convert.FromBase64String(file.Content.Replace("\n", ""));
+                var json    = Encoding.UTF8.GetString(bytes);
+                var content = JsonSerializer.Deserialize<T>(json, _jsonOpts);
+                return (content, file.Sha);
+            }
+            catch { return (default, null); }
+        }
+
+        /// <summary>
+        /// Creates or overwrites a JSON file in the public Koriebonx98/Games.Database repository.
+        /// Pass <paramref name="sha"/> when overwriting an existing file.
+        /// </summary>
+        public async Task WriteGamesDatabaseFileAsync(
+            string filePath, object content, string message,
+            string? sha = null, CancellationToken ct = default)
+        {
+            var json   = JsonSerializer.Serialize(content, _jsonOpts);
+            var base64 = Convert.ToBase64String(Encoding.UTF8.GetBytes(json));
+
+            var body = new GitHubWriteBody
+            {
+                Message   = message,
+                Content   = base64,
+                Sha       = sha,
+                Committer = new GitHubCommitter
+                {
+                    Name  = "Game.OS Bot",
+                    Email = "game-os-bot@users.noreply.github.com"
+                }
+            };
+
+            var url  = $"https://api.github.com/repos/Koriebonx98/Games.Database/contents/{Uri.EscapeDataString(filePath)}";
+            var resp = await _http.PutAsJsonAsync(url, body, ct);
+
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadAsStringAsync(ct);
+                throw new GameOsException(
+                    (int)resp.StatusCode,
+                    $"GitHub Games.Database write error {(int)resp.StatusCode}: {err}");
+            }
+        }
+
+        /// <summary>
         /// Checks the GitHub API to see whether the cached platform JSON files are
         /// up-to-date.  For each platform whose cached SHA differs from the current
         /// HEAD SHA on GitHub, the disk and in-memory caches are invalidated so the
@@ -1334,6 +1395,40 @@ namespace GameLauncher.Services
                     stripped, StringComparison.OrdinalIgnoreCase));
 
             return string.IsNullOrEmpty(match?.TitleId) ? null : match.TitleId;
+        }
+
+        /// <summary>
+        /// Checks whether <paramref name="titleId"/> already exists in the local
+        /// Games.Database cache for <paramref name="platform"/>.
+        /// Returns <c>false</c> when no cache data is available (to be safe, treats
+        /// "unknown" as already present to avoid accidental duplicates).
+        /// </summary>
+        public static bool IsTitleIdInLocalCache(string platform, string titleId)
+        {
+            if (string.IsNullOrWhiteSpace(titleId)) return false;
+            platform = NormalizePlatform(platform);
+
+            List<DatabaseGame>? games;
+            lock (_dbMemoryCache)
+                _dbMemoryCache.TryGetValue(platform, out games);
+
+            if (games == null || games.Count == 0)
+            {
+                try
+                {
+                    string file = Path.Combine(DbCacheDir, $"{platform}.json");
+                    if (File.Exists(file))
+                    {
+                        var opts = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                        games = JsonSerializer.Deserialize<List<DatabaseGame>>(File.ReadAllText(file), opts);
+                    }
+                }
+                catch { }
+            }
+
+            if (games == null || games.Count == 0) return false;
+            return games.Any(g =>
+                string.Equals(g.TitleId, titleId, StringComparison.OrdinalIgnoreCase));
         }
 
         // ── GitHub API response models ─────────────────────────────────────────

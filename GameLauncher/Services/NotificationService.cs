@@ -61,6 +61,43 @@ namespace GameLauncher.Services
             catch { }
         }
 
+        /// <summary>
+        /// Shows an "Achievement unlocked" toast notification.
+        /// </summary>
+        /// <param name="achievementName">Name of the unlocked achievement.</param>
+        /// <param name="gameTitle">Title of the game the achievement belongs to.</param>
+        public static void ShowAchievementUnlockedNotification(string achievementName, string gameTitle)
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            try
+            {
+                ShowWindowsToast(
+                    $"🏆 Achievement Unlocked!",
+                    $"{achievementName}  ·  {gameTitle}");
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Shows a "Game session ended" toast notification.
+        /// </summary>
+        /// <param name="gameTitle">Title of the game whose session just ended.</param>
+        /// <param name="sessionMinutes">Duration of the session in minutes.</param>
+        public static void ShowSessionEndedNotification(string gameTitle, int sessionMinutes)
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            try
+            {
+                string duration = sessionMinutes < 60
+                    ? $"{sessionMinutes}m"
+                    : $"{sessionMinutes / 60}h {sessionMinutes % 60}m";
+                ShowWindowsToast(
+                    $"Session ended — {gameTitle}",
+                    $"Played for {duration}");
+            }
+            catch { }
+        }
+
         // ── Windows Toast via PowerShell ──────────────────────────────────────
 
         /// <summary>
