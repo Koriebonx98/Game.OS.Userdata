@@ -1,0 +1,285 @@
+﻿<Window x:Class="PS5_OS.GuideMenu"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        WindowStyle="None"
+        WindowState="Maximized"
+        Topmost="True"
+        ShowInTaskbar="False"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        Title="Guide Menu">
+    <Window.Resources>
+        <!-- Simple Blur Effect -->
+        <BlurEffect x:Key="BlurEffect" Radius="1"/>
+        <!-- Focusable PS5-style button/icon style -->
+        <Style x:Key="GuideMenuIconButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="True"/>
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="MinWidth" Value="48"/>
+            <Setter Property="MinHeight" Value="48"/>
+            <Setter Property="MaxWidth" Value="48"/>
+            <Setter Property="MaxHeight" Value="48"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="10"
+                                BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#FFF"/>
+                                <Setter Property="BorderThickness" Value="3"/>
+                                <Setter Property="Background" Value="#222"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Switcher Tile Style -->
+        <Style x:Key="SwitcherTileStyle" TargetType="Button">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Height" Value="56"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Foreground" Value="White"/> <!-- Add this line -->
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#FFD700"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#FFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Recent Game Tile Style -->
+        <Style x:Key="RecentGameTileStyle" TargetType="Button">
+            <Setter Property="Background" Value="#222"/>
+            <Setter Property="BorderBrush" Value="#444"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Height" Value="140"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter Property="BorderBrush" Value="#FFD700"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="BorderBrush" Value="#FFF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+    <Grid>
+        <!-- Main overlay bar -->
+        <Border
+            Background="#CC222222"
+            CornerRadius="24"
+            Height="260"
+            VerticalAlignment="Bottom"
+            Margin="0,0,0,32"
+            Effect="{StaticResource BlurEffect}">
+            <Grid>
+                <!-- Centered label and subtitle -->
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+                    <TextBlock x:Name="MenuTitle" Text="Home" FontSize="32" FontWeight="SemiBold" Foreground="#FFF" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                    <TextBlock x:Name="MenuSubtitle" Text="Return to the home screen." FontSize="18" Foreground="#AAFFFFFF" HorizontalAlignment="Center" Margin="0,0,0,24"/>
+                </StackPanel>
+                <!-- Icon bar -->
+                <StackPanel x:Name="ButtonBar" Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,56">
+                    <!-- Settings Button: Move to the far left -->
+                    <Button x:Name="SettingsButton"
+                            Style="{StaticResource GuideMenuIconButtonStyle}"
+                            Focusable="True"
+                            Margin="16,0">
+                        <StackPanel>
+                            <TextBlock Text="Settings" Foreground="White" FontSize="10" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <!-- Home -->
+                    <Button x:Name="HomeButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="HomeButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding HomeIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Switcher -->
+                    <Button x:Name="SwitcherButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="SwitcherButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding SwitcherIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Recent Games -->
+                    <Button x:Name="RecentGamesButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="RecentGamesButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding RecentGamesIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Notifications -->
+                    <Button x:Name="NotificationsButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="NotificationsButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding NotificationsIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Downloads -->
+                    <Button x:Name="DownloadsButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="DownloadsButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding DownloadsIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform "/>
+                    </Button>
+                    <!-- Friends -->
+                    <Button x:Name="FriendsButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="FriendsButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding FriendsIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Inbox (Messages) -->
+                    <Button x:Name="InboxButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="InboxButton_Click">
+                        <Image Source="{Binding InboxIconPath}" Width="36" Height="36"/>
+                    </Button>
+                    <!-- Media Button -->
+                    <Button x:Name="MediaButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="MediaButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding MediaIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                    <!-- Browser Button: Added new button for Browser -->
+                    <Button x:Name="BrowserButton"
+                            Style="{StaticResource GuideMenuIconButtonStyle}"
+                            Margin="16,0"
+                            Click="BrowserButton_Click"
+                            Focusable="True">
+                        <Image Source="{Binding BrowserIconPath, RelativeSource={RelativeSource AncestorType=Window}}" Width="36" Height="36" Stretch="Uniform"/>
+                    </Button>
+                    <!-- Power Menu -->
+                    <Button x:Name="PowerMenuButton" Style="{StaticResource GuideMenuIconButtonStyle}" Margin="16,0" Click="PowerMenuButton_Click">
+                        <Image Width="36" Height="36"
+                               Source="{Binding PowerIconPath, RelativeSource={RelativeSource AncestorType=Window}}"
+                               Stretch="Uniform"/>
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </Border>
+        <!-- Hidden Controls bar at very bottom -->
+        <Border Background="#FF181818" Height="48" VerticalAlignment="Bottom" Margin="0,0,0,0" Opacity="0.85">
+            <TextBlock Text="Hidden Controls" FontSize="16" Foreground="#88FFFFFF" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+        <StackPanel x:Name="SwitcherPanel" Visibility="Collapsed" Margin="32,120,32,32"/>
+        <!-- Switcher Overlay (no RecentGamesPanel here) -->
+        <Border x:Name="SwitcherOverlay"
+            Background="#CC222222"
+            CornerRadius="18"
+            Padding="0"
+            Width="480"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Visibility="Collapsed"
+            Effect="{StaticResource BlurEffect}">
+            <StackPanel>
+                <TextBlock Text="Switcher" FontSize="24" Foreground="#FFF" FontWeight="SemiBold" Margin="24,24,0,0"/>
+                <TextBlock Text="Active" FontSize="16" Foreground="#AAA" Margin="24,18,0,0"/>
+                <Button x:Name="ActiveWindowTile" Style="{StaticResource SwitcherTileStyle}" Margin="16,8,16,0" Click="SwitcherTile_Click"/>
+                <StackPanel x:Name="OtherWindowsPanel" Margin="0,8,0,0"/>
+                <Button x:Name="MoreButton" Content="More..." Style="{StaticResource SwitcherTileStyle}" Margin="16,8,16,0" Visibility="Collapsed" PreviewKeyDown="MoreButton_PreviewKeyDown" Click="ShowAllWindows_Click"/>
+                <ScrollViewer x:Name="AllWindowsScroll" VerticalScrollBarVisibility="Auto" Height="220" Margin="0,8,0,0" Visibility="Collapsed">
+                    <StackPanel x:Name="AllWindowsPanel"/>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+        <!-- Recent Games overlay (only definition of RecentGamesPanel) -->
+        <Border x:Name="RecentGamesOverlay"
+            Background="#CC222222"
+            CornerRadius="18"
+            Padding="0"
+            Width="480"
+            HorizontalAlignment="Right"
+            VerticalAlignment="Center"
+            Visibility="Collapsed"
+            Effect="{StaticResource BlurEffect}">
+            <StackPanel>
+                <TextBlock Text="Recent Games" FontSize="24" Foreground="#FFF" FontWeight="SemiBold" Margin="24,24,0,0"/>
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Height="220" Margin="0,8,0,0">
+                    <StackPanel x:Name="RecentGamesPanel"/>
+                </ScrollViewer>
+            </StackPanel>
+        </Border>
+        <!-- Power Menu Overlay -->
+        <Border x:Name="PowerMenuOverlay"
+                Background="#CC222222"
+                CornerRadius="18"
+                Padding="0"
+                Width="400"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed"
+                Effect="{StaticResource BlurEffect}">
+            <StackPanel>
+                <TextBlock Text="Power" FontSize="24" Foreground="#FFF" FontWeight="SemiBold" Margin="24,24,0,0"/>
+                <TextBlock Text="Choose a power option:" FontSize="16" Foreground="#AAA" Margin="24,18,0,0"/>
+                <Button x:Name="ShutdownButton" Content="Shut Down" Style="{StaticResource SwitcherTileStyle}" Margin="16,8,16,0" Click="ShutdownButton_Click"/>
+                <Button x:Name="RestartButton" Content="Restart" Style="{StaticResource SwitcherTileStyle}" Margin="16,8,16,0" Click="RestartButton_Click"/>
+                <Button x:Name="SleepButton" Content="Sleep" Style="{StaticResource SwitcherTileStyle}" Margin="16,8,16,0" Click="SleepButton_Click"/>
+                <Button x:Name="ExitButton" Content="Exit" Style="{StaticResource SwitcherTileStyle}" Margin="16,0,16,16" Click="ExitButton_Click"/>
+            </StackPanel>
+        </Border>
+        <!-- Media Overlay -->
+        <Border x:Name="MediaOverlay"
+                Background="#CC222222"
+                CornerRadius="18"
+                Padding="0"
+                Width="480"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Visibility="Collapsed"
+                Effect="{StaticResource BlurEffect}">
+            <StackPanel>
+                <TextBlock Text="Media Controls" FontSize="24" Foreground="#FFF" FontWeight="SemiBold" Margin="24,24,0,0"/>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,24,0,0">
+                    <Button x:Name="RewindButton" Content="⏪" Style="{StaticResource SwitcherTileStyle}" Margin="8,0" Click="RewindButton_Click"/>
+                    <Button x:Name="PlayPauseButton" Content="⏯" Style="{StaticResource SwitcherTileStyle}" Margin="8,0" Click="PlayPauseButton_Click"/>
+                    <Button x:Name="StopButton" Content="⏹" Style="{StaticResource SwitcherTileStyle}" Margin="8,0" Click="StopButton_Click"/>
+                    <Button x:Name="FastForwardButton" Content="⏩" Style="{StaticResource SwitcherTileStyle}" Margin="8,0" Click="FastForwardButton_Click"/>
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,24,0,0">
+                    <TextBlock Text="Volume" FontSize="16" Foreground="#FFF" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Slider x:Name="VolumeSlider"
+                            Minimum="0"
+                            Maximum="100"
+                            TickFrequency="10"
+                            IsSnapToTickEnabled="True"
+                            Value="50"
+                            Width="180"
+                            Margin="0,0,0,0"
+                            ValueChanged="VolumeSlider_ValueChanged"
+                            GotFocus="VolumeSlider_GotFocus"
+                            LostFocus="VolumeSlider_LostFocus"/>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>
