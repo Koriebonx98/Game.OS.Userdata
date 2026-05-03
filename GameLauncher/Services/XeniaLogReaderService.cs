@@ -33,7 +33,8 @@ public static class XeniaLogReaderService
     /// Groups: 1 = achievement ID (numeric), 2 = achievement name (rest of line).
     /// </summary>
     private static readonly Regex _unlockPattern =
-        new(@"(?i)achievement\s+unlocked[:\s]+(\d+)\s+(.*)", RegexOptions.Compiled);
+        new(@"achievement\s+unlocked[:\s]+(\d+)\s+(.*)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // ── Log directory discovery ─────────────────────────────────────────────
 

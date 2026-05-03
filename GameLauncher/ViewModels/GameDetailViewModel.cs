@@ -1079,7 +1079,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
                     // ── Xenia log reader: read achievement unlocks after session ends ──
                     bool readXeniaLog = string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase)
-                        && emuSettings.EmulatorPath.ToLowerInvariant().Contains("xenia");
+                        && emuSettings.EmulatorPath.Contains("xenia", StringComparison.OrdinalIgnoreCase);
                     if (readXeniaLog)
                     {
                         XeniaLogReaderService.DeleteOldLogs(emuSettings.EmulatorPath);
