@@ -32,9 +32,9 @@ public partial class LibraryViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsInstallFilterNotInstalled))]
     private string _filterInstallStatus = "All";
 
-    public bool IsInstallFilterAll         => FilterInstallStatus == "All";
-    public bool IsInstallFilterInstalled   => FilterInstallStatus == "Installed";
-    public bool IsInstallFilterNotInstalled=> FilterInstallStatus == "Not Installed";
+    public bool IsInstallFilterAll          => FilterInstallStatus == "All";
+    public bool IsInstallFilterInstalled    => FilterInstallStatus == "Installed";
+    public bool IsInstallFilterNotInstalled => FilterInstallStatus == "Not Installed";
 
     // ── Cloud library ──────────────────────────────────────────────────────
     public ObservableCollection<Game>   FilteredGames { get; } = new();
