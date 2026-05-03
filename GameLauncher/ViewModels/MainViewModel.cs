@@ -614,6 +614,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 var existingTitles = new System.Collections.Generic.HashSet<string>(
                     _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
 
+                // Build a title→Game lookup to avoid O(n²) when updating SteamAppId on existing entries
+                var libraryByTitle = _library
+                    .Where(g => g.SteamAppId == null)
+                    .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                  StringComparer.OrdinalIgnoreCase);
+
                 foreach (var sg in steamGames)
                 {
                     if (!existingTitles.Contains(sg.Name))
@@ -632,13 +639,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         existingTitles.Add(sg.Name);
                         added++;
                     }
-                    else
+                    else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
                     {
-                        // Update SteamAppId on existing entry if not set yet
-                        var existing = _library.FirstOrDefault(g =>
-                            string.Equals(g.Title, sg.Name, StringComparison.OrdinalIgnoreCase));
-                        if (existing != null && !existing.SteamAppId.HasValue)
-                            existing.SteamAppId = sg.AppId;
+                        // Stamp SteamAppId on existing entry if not yet set
+                        existing.SteamAppId = sg.AppId;
                     }
                 }
 
@@ -694,6 +698,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 var existingTitles = new System.Collections.Generic.HashSet<string>(
                     _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+                var libraryByTitle = _library
+                    .Where(g => g.SteamAppId == null)
+                    .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                  StringComparer.OrdinalIgnoreCase);
                 int added = 0;
                 foreach (var sg in cached)
                 {
@@ -712,12 +721,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         existingTitles.Add(sg.Name);
                         added++;
                     }
-                    else
+                    else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
                     {
-                        var existing = _library.FirstOrDefault(g =>
-                            string.Equals(g.Title, sg.Name, StringComparison.OrdinalIgnoreCase));
-                        if (existing != null && !existing.SteamAppId.HasValue)
-                            existing.SteamAppId = sg.AppId;
+                        existing.SteamAppId = sg.AppId;
                     }
                 }
                 if (added > 0)
@@ -759,6 +765,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     int added = 0;
                     var existingTitles = new System.Collections.Generic.HashSet<string>(
                         _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+                    var libraryByTitle = _library
+                        .Where(g => g.SteamAppId == null)
+                        .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                      StringComparer.OrdinalIgnoreCase);
                     foreach (var sg in steamGames)
                     {
                         if (!existingTitles.Contains(sg.Name))
@@ -776,12 +787,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             existingTitles.Add(sg.Name);
                             added++;
                         }
-                        else
+                        else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
                         {
-                            var existing = _library.FirstOrDefault(g =>
-                                string.Equals(g.Title, sg.Name, StringComparison.OrdinalIgnoreCase));
-                            if (existing != null && !existing.SteamAppId.HasValue)
-                                existing.SteamAppId = sg.AppId;
+                            existing.SteamAppId = sg.AppId;
                         }
                     }
 

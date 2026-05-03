@@ -469,12 +469,23 @@ public partial class SettingsViewModel : ViewModelBase
             string steamId = SteamUserId.Trim();
             _ = System.Threading.Tasks.Task.Run(async () =>
             {
-                string? err = await LinkSteamIdAction(steamId);
-                if (!string.IsNullOrEmpty(err))
+                try
+                {
+                    string? err = await LinkSteamIdAction(steamId);
+                    if (!string.IsNullOrEmpty(err))
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            StatusMessage = $"⚠ Steam ID: {err}";
+                            IsSaveSuccess = false;
+                        });
+                    }
+                }
+                catch (Exception ex)
                 {
                     Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                     {
-                        StatusMessage = $"⚠ Steam ID: {err}";
+                        StatusMessage = $"⚠ Steam ID link error: {ex.Message}";
                         IsSaveSuccess = false;
                     });
                 }

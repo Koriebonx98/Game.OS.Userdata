@@ -589,7 +589,7 @@ namespace GameLauncher.Services
             if (externalMinutes <= 0) return;
 
             int localMinutes = GetTotalMinutes(platform, title);
-            if (externalMinutes <= localMinutes) return; // local data is already higher
+            if (externalMinutes <= localMinutes) return; // local data is already equal or higher
 
             // Write a synthetic session representing only the delta so the local total
             // reaches exactly externalMinutes (taking the max, not summing).
