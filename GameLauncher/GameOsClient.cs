@@ -395,6 +395,18 @@ namespace GameLauncher
             // GitHub-direct mode: no /api/me/profile endpoint available
         }
 
+        /// <summary>
+        /// Links a Steam 64-bit user ID to the current account via POST /api/link-steam.
+        /// Returns <c>null</c> on success, or an error message string when the Steam ID is
+        /// already linked to another account.  No-op (returns null) in GitHub-direct mode.
+        /// </summary>
+        public async Task<string?> LinkSteamIdAsync(string steamUserId, CancellationToken ct = default)
+        {
+            if (_backend != null)
+                return await _backend.LinkSteamIdAsync(steamUserId, ct);
+            return null; // GitHub-direct mode — no uniqueness enforcement
+        }
+
         // ── Messages ──────────────────────────────────────────────────────────
         public async Task SendMessageAsync(
             string toUsername, string text, CancellationToken ct = default)

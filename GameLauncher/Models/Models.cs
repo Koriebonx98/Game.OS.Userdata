@@ -38,6 +38,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("sysSpecRecommended")] public SystemSpec?   SysSpecRecommended { get; set; }
         [JsonPropertyName("achievementsUrl")]    public string?       AchievementsUrl    { get; set; }
         [JsonPropertyName("trailerUrl")]         public string?       TrailerUrl         { get; set; }
+        /// <summary>Steam App ID for games sourced from the Steam API (0 or null = not a Steam game).</summary>
+        [JsonPropertyName("steamAppId")]         public long?         SteamAppId         { get; set; }
         // UI-only (not persisted) – enriched from demo data
         [JsonIgnore] public string?  CoverColor    { get; set; }
         [JsonIgnore] public string?  CoverGradient { get; set; }
@@ -51,6 +53,21 @@ namespace GameLauncher.Models
             PlaytimeMinutes >= 60
                 ? $"{PlaytimeMinutes / 60}h {PlaytimeMinutes % 60}m"
                 : PlaytimeMinutes > 0 ? $"{PlaytimeMinutes}m" : "";
+        /// <summary>
+        /// Achievement count label shown on library cards (e.g. "🏆 12 / 50").
+        /// Returns empty string when no achievements are loaded.
+        /// </summary>
+        [JsonIgnore] public string AchievementCountLabel
+        {
+            get
+            {
+                if (GameAchievements == null || GameAchievements.Count == 0) return "";
+                int unlocked = 0;
+                foreach (var a in GameAchievements)
+                    if (a.IsUnlocked) unlocked++;
+                return $"🏆 {unlocked} / {GameAchievements.Count}";
+            }
+        }
     }
 
     public class ModLink
@@ -171,6 +188,11 @@ namespace GameLauncher.Models
         public string? RecentGameTitle  { get; set; }
         /// <summary>Platform of the most recently played game (e.g. "PC", "Switch").</summary>
         public string? RecentGamePlatform { get; set; }
+        /// <summary>Friend's GamerScore total (fetched from their cloud profile).</summary>
+        public int     GamerScore    { get; set; }
+        /// <summary>Human-readable GamerScore label, e.g. "1,250 GS". Empty when GamerScore is 0.</summary>
+        public string  GamerScoreLabel =>
+            GamerScore > 0 ? $"{GamerScore:N0} GS" : "";
     }
 
     /// <summary>An item in the Friends Recent Activity feed (what friends have been playing).</summary>
@@ -435,6 +457,20 @@ namespace GameLauncher.Models
         /// Used alongside <see cref="ExophaseUsername"/> to authenticate scrape requests.
         /// </summary>
         [JsonPropertyName("exophasePassword")] public string ExophasePassword { get; set; } = "";
+
+        // ── Developer / Feature flags ────────────────────────────────────────
+
+        /// <summary>
+        /// When <see langword="true"/>, automatically syncs Steam playtime into Game.OS
+        /// after each Steam library import (takes the maximum of local and Steam values).
+        /// </summary>
+        [JsonPropertyName("enableSteamSync")] public bool EnableSteamSync { get; set; } = true;
+
+        /// <summary>
+        /// When <see langword="true"/>, automatically records and syncs achievement
+        /// unlocks detected from Xenia / Ryujinx log files.
+        /// </summary>
+        [JsonPropertyName("enableAchievementAutoSync")] public bool EnableAchievementAutoSync { get; set; } = true;
 
         // ── Placeholder future feature ───────────────────────────────────────
 

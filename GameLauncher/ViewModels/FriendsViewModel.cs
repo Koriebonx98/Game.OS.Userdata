@@ -294,6 +294,7 @@ public partial class FriendsViewModel : ViewModelBase
             //   - null     → friend is at the Dashboard (even if online)
             var presenceTasks = new List<Task<(string username, Models.PresenceData? presence)>>();
             var gamesTasks    = new List<Task<(string username, string? gameTitle, string? gamePlatform)>>();
+            var profileTasks  = new List<Task<(string username, Models.UserProfile? profile)>>();
 
             foreach (var friendName in friendUsernames)
             {
@@ -317,16 +318,29 @@ public partial class FriendsViewModel : ViewModelBase
                     }
                     catch { return (name, (string?)null, (string?)null); }
                 }));
+
+                profileTasks.Add(Task.Run(async () =>
+                {
+                    try { return (name, await _client.GetFriendProfileAsync(name)); }
+                    catch { return (name, (Models.UserProfile?)null); }
+                }));
             }
 
             var presenceResults = await Task.WhenAll(presenceTasks);
             var gamesResults    = await Task.WhenAll(gamesTasks);
+            var profileResults  = await Task.WhenAll(profileTasks);
 
             // Build a games lookup (last-played) keyed by username — used for offline cards
             var gamesMap = new Dictionary<string, (string? Title, string? Platform)>(
                 StringComparer.OrdinalIgnoreCase);
             foreach (var (name, title, platform) in gamesResults)
                 gamesMap[name] = (title, platform);
+
+            // Build a GamerScore lookup by username
+            var gamerScoreMap = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (name, p) in profileResults)
+                if (p?.GamerScore.HasValue == true)
+                    gamerScoreMap[name] = p.GamerScore!.Value;
 
             var activityItems = new List<FriendActivityItem>();
 
@@ -338,6 +352,8 @@ public partial class FriendsViewModel : ViewModelBase
                 // Use currentGame from presence for "now playing"; use last-played from games.json
                 // only for the offline "recently played" card display.
                 var entry = BuildFriendEntry(name, lastSeen, currentGame, gameInfo.Title, gameInfo.Platform);
+                gamerScoreMap.TryGetValue(name, out int gs);
+                entry.GamerScore = gs;
                 if (entry.IsOnline || entry.IsAway)
                     OnlineFriends.Add(entry);
                 else
