@@ -48,6 +48,12 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Broadcast to friends when the user comes online.</summary>
     [ObservableProperty] private bool _broadcastUserOnline = false;
 
+    // ── Developer / Feature flags ──────────────────────────────────────────
+    /// <summary>Sync Steam playtime into Game.OS after each Steam import.</summary>
+    [ObservableProperty] private bool _enableSteamSync = true;
+    /// <summary>Automatically record and sync achievement unlocks from emulator logs.</summary>
+    [ObservableProperty] private bool _enableAchievementAutoSync = true;
+
     // ── Third-party integration settings (stored locally, never synced) ────
     /// <summary>Steam Web API key — local only.</summary>
     [ObservableProperty] private string _steamApiKey = "";
@@ -73,6 +79,13 @@ public partial class SettingsViewModel : ViewModelBase
     /// Stored in SettingsViewModel so the button command can trigger it.
     /// </summary>
     public Func<string, string, Task<string>>? ImportSteamLibraryAction { get; set; }
+
+    /// <summary>
+    /// Wired by MainViewModel: invoked after Save() when a non-empty Steam User ID
+    /// is present, to link/verify it on the backend.
+    /// Returns <c>null</c> on success or an error message string.
+    /// </summary>
+    public Func<string, Task<string?>>? LinkSteamIdAction { get; set; }
 
     [RelayCommand]
     private async Task ImportSteamLibrary()
@@ -121,6 +134,20 @@ public partial class SettingsViewModel : ViewModelBase
         catch { /* best-effort */ }
     }
 
+    /// <summary>
+    /// Fires one of each toast notification type with dummy data so the developer
+    /// can verify that toasts appear correctly without running a real game session.
+    /// </summary>
+    [RelayCommand]
+    private void TestToastNotifications()
+    {
+        Services.NotificationService.ShowFriendOnlineNotification("TestFriend");
+        Services.NotificationService.ShowAchievementUnlockedNotification("Test Achievement", "Test Game");
+        Services.NotificationService.ShowGameSessionStartedNotification("Test Game");
+        Services.NotificationService.ShowSessionEndedNotification("Test Game", 42);
+        Services.NotificationService.ShowMessageNotification("TestFriend", "Hello from Game.OS!");
+    }
+
     // ── Active settings section (Steam-style left-nav) ────────────────────
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAppSection))]
@@ -130,6 +157,7 @@ public partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsAccountSection))]
     [NotifyPropertyChangedFor(nameof(IsSystemSection))]
     [NotifyPropertyChangedFor(nameof(IsNotificationsSection))]
+    [NotifyPropertyChangedFor(nameof(IsDeveloperSection))]
     private string _selectedSection = "app";
 
     public bool IsAppSection           => SelectedSection == "app";
@@ -139,6 +167,7 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsAccountSection       => SelectedSection == "account";
     public bool IsSystemSection        => SelectedSection == "system";
     public bool IsNotificationsSection => SelectedSection == "notifications";
+    public bool IsDeveloperSection     => SelectedSection == "developer";
 
     [RelayCommand]
     private void SelectSection(string section) => SelectedSection = section;
@@ -246,6 +275,8 @@ public partial class SettingsViewModel : ViewModelBase
         SteamUserId            = appSettings.SteamUserId;
         ExophaseUsername       = appSettings.ExophaseUsername;
         ExophasePassword       = appSettings.ExophasePassword;
+        EnableSteamSync        = appSettings.EnableSteamSync;
+        EnableAchievementAutoSync = appSettings.EnableAchievementAutoSync;
 
         // ── Startup apps: merge saved entries with the built-in presets ──
         LoadStartupApps(appSettings.StartupApps);
@@ -417,6 +448,8 @@ public partial class SettingsViewModel : ViewModelBase
             SteamUserId           = SteamUserId,
             ExophaseUsername      = ExophaseUsername,
             ExophasePassword      = ExophasePassword,
+            EnableSteamSync       = EnableSteamSync,
+            EnableAchievementAutoSync = EnableAchievementAutoSync,
             StartupApps           = StartupApps.Select(r => new Models.StartupAppEntry
             {
                 Label     = r.Label,
@@ -429,6 +462,35 @@ public partial class SettingsViewModel : ViewModelBase
 
         StatusMessage = "✅ Settings saved!";
         IsSaveSuccess = true;
+
+        // Link Steam ID to the current account in the background (prevents duplicate SteamID).
+        if (LinkSteamIdAction != null && !string.IsNullOrWhiteSpace(SteamUserId))
+        {
+            string steamId = SteamUserId.Trim();
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    string? err = await LinkSteamIdAction(steamId);
+                    if (!string.IsNullOrEmpty(err))
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            StatusMessage = $"⚠ Steam ID: {err}";
+                            IsSaveSuccess = false;
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        StatusMessage = $"⚠ Steam ID link error: {ex.Message}";
+                        IsSaveSuccess = false;
+                    });
+                }
+            });
+        }
     }
 
     [RelayCommand]

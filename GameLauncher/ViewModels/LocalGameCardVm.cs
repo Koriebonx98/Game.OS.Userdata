@@ -82,4 +82,10 @@ public partial class LocalGameCardVm : ViewModelBase
 
     /// <summary>Per-game playtime label (e.g. "3h 20m played"). Populated when PlaytimeService data is available.</summary>
     [ObservableProperty] private string _playtimeLabel = "";
+
+    /// <summary>
+    /// Achievement count label (e.g. "🏆 3"). Populated by MainViewModel after
+    /// matching this card against the user's unlocked achievements.
+    /// </summary>
+    [ObservableProperty] private string _achievementLabel = "";
 }

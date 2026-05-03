@@ -98,6 +98,17 @@
                     </StackPanel>
                 </Button>
 
+                <Button Classes="settings-nav-item"
+                        Classes.active="{Binding IsDeveloperSection}"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="developer">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🛠" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Developer" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
             </StackPanel>
         </Border>
 
@@ -935,6 +946,119 @@
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1"
                                               IsChecked="{Binding BroadcastGameStart}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Save button -->
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                        <Button Classes="btn-primary"
+                                Content="💾  Save Settings"
+                                Command="{Binding SaveCommand}"
+                                Width="180"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="#3fb950"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding IsSaveSuccess}"/>
+                    </StackPanel>
+
+                </StackPanel>
+
+                <!-- ── Developer Section ── -->
+                <StackPanel IsVisible="{Binding IsDeveloperSection}" Spacing="0">
+
+                    <TextBlock Text="Developer" Classes="page-title" Margin="0,0,0,4"/>
+                    <TextBlock Text="Testing tools and feature flags for development."
+                               Classes="page-subtitle" Margin="0,0,0,24"/>
+
+                    <!-- Test Toast Notifications card -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🔔" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Test Toast Notifications"
+                                           FontSize="15" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock Text="Fires one of each notification type with dummy data so you can verify they appear correctly."
+                                       FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            <Button Classes="btn-secondary" Padding="16,10"
+                                    HorizontalAlignment="Left"
+                                    Command="{Binding TestToastNotificationsCommand}">
+                                <TextBlock Text="🔔  Fire Test Notifications" FontSize="13" FontWeight="SemiBold"/>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Dev.log toggle card -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="📋" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Dev.log"
+                                           FontSize="15" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Write debug output to Dev.log"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Logs debug messages and unhandled exceptions to a Dev.log file next to the executable."
+                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding DevLogs}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Feature Flags card -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🚩" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Feature Flags"
+                                           FontSize="15" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+
+                            <Rectangle Height="1" Fill="#21262d"/>
+
+                            <!-- Steam Sync -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Steam playtime sync"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="After each Steam library import, merge Steam playtime into Game.OS (takes the maximum of local and Steam values)."
+                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding EnableSteamSync}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="#21262d"/>
+
+                            <!-- Achievement Auto-Sync -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Achievement auto-sync"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Automatically record and sync achievement unlocks detected from Xenia / Ryujinx log files."
+                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding EnableAchievementAutoSync}"
                                               OffContent="" OnContent=""
                                               VerticalAlignment="Center"
                                               Margin="16,0,0,0"/>

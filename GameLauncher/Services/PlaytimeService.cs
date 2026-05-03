@@ -571,6 +571,65 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Merges external playtime (e.g. from Steam) into the persisted local sessions.
+        /// Uses the <b>maximum</b> of the local total and <paramref name="externalMinutes"/>
+        /// to avoid double-counting: if the user played 60 minutes locally and Steam
+        /// reports 90 minutes, the result is 90.  If a synthetic session was already written
+        /// for this source the earlier one is not removed — the stored value is simply
+        /// left at the higher of the two to preserve the local detail.
+        /// Also updates <paramref name="library"/> so the in-memory playtime reflects the merge.
+        /// </summary>
+        /// <param name="platform">Platform key (e.g. "PC").</param>
+        /// <param name="title">Game title.</param>
+        /// <param name="externalMinutes">Playtime reported by the external source (Steam, etc.).</param>
+        /// <param name="library">In-memory library list to update (may be null).</param>
+        public static void MergeExternalMinutes(string platform, string title,
+                                                 int externalMinutes, List<Game>? library = null)
+        {
+            if (externalMinutes <= 0) return;
+
+            int localMinutes = GetTotalMinutes(platform, title);
+            if (externalMinutes <= localMinutes) return; // local data is already equal or higher
+
+            // Write a synthetic session representing only the delta so the local total
+            // reaches exactly externalMinutes (taking the max, not summing).
+            int delta = externalMinutes - localMinutes;
+            var syntheticSession = new PlaySession
+            {
+                Platform  = platform,
+                Title     = title,
+                StartedAt = DateTime.UtcNow.ToString("o"),
+                EndedAt   = DateTime.UtcNow.ToString("o"),
+                Minutes   = delta,
+            };
+
+            try
+            {
+                Directory.CreateDirectory(DataDir);
+                List<PlaySession> existing = new();
+                if (File.Exists(SessionsFile))
+                {
+                    var raw = File.ReadAllText(SessionsFile);
+                    existing = JsonSerializer.Deserialize<List<PlaySession>>(raw) ?? new();
+                }
+                existing.Add(syntheticSession);
+                File.WriteAllText(SessionsFile,
+                    JsonSerializer.Serialize(existing, _jsonOpts));
+            }
+            catch { /* best-effort */ }
+
+            // Update the in-memory library entry if provided
+            if (library != null)
+            {
+                var game = library.FirstOrDefault(g =>
+                    string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(g.Title,    title,    StringComparison.OrdinalIgnoreCase));
+                if (game != null)
+                    game.PlaytimeMinutes = Math.Max(game.PlaytimeMinutes, externalMinutes);
+            }
+        }
+
+        /// <summary>
         /// Returns the UTC <see cref="DateTime"/> when the given game was last played
         /// according to persisted sessions, or <see cref="DateTime.MinValue"/> if never.
         /// </summary>

@@ -214,6 +214,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             var settings = Services.AppSettingsService.Load();
 
+            // ── Game-start toast notification ───────────────────────────────
+            Services.NotificationService.ShowGameSessionStartedNotification(title);
+
             // ── Game-start broadcast ────────────────────────────────────────
             if (settings.BroadcastGameStart)
             {
@@ -332,7 +335,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Wire the rebuild-complete callback so cover enrichment always runs after
         // _allMyGames is fully populated — eliminates the race condition where
         // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
-        LibraryVm.OnMyGamesRebuilt = () => _ = EnrichMyGamesListAsync();
+        LibraryVm.OnMyGamesRebuilt = () =>
+        {
+            _ = EnrichMyGamesListAsync();
+            // Populate achievement labels on My Games cards from the in-memory achievements list
+            EnrichMyGamesAchievementLabels();
+        };
         _scanner.GamesUpdated += games =>
         {
             DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found.");
@@ -606,6 +614,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 var existingTitles = new System.Collections.Generic.HashSet<string>(
                     _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
 
+                // Build a title→Game lookup to avoid O(n²) when updating SteamAppId on existing entries
+                var libraryByTitle = _library
+                    .Where(g => g.SteamAppId == null)
+                    .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                  StringComparer.OrdinalIgnoreCase);
+
                 foreach (var sg in steamGames)
                 {
                     if (!existingTitles.Contains(sg.Name))
@@ -618,11 +633,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             AddedAt         = DateTime.UtcNow.ToString("O"),
                             PlaytimeMinutes = sg.PlaytimeMinutes,
                             TitleId         = $"steam:{sg.AppId}",
+                            SteamAppId      = sg.AppId,
                         };
                         _library.Add(newGame);
                         existingTitles.Add(sg.Name);
                         added++;
                     }
+                    else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
+                    {
+                        // Stamp SteamAppId on existing entry if not yet set
+                        existing.SteamAppId = sg.AppId;
+                    }
+                }
+
+                // Merge Steam playtime into local sessions (take the maximum, avoid double-counting)
+                var importSettings = Services.AppSettingsService.Load();
+                if (importSettings.EnableSteamSync)
+                {
+                    foreach (var sg in steamGames.Where(g => g.PlaytimeMinutes > 0))
+                        Services.PlaytimeService.MergeExternalMinutes("PC", sg.Name,
+                            sg.PlaytimeMinutes, _library);
                 }
 
                 // Refresh the library view with the updated data
@@ -653,6 +683,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
         };
 
+        // Wire Steam ID linking to enforce uniqueness on the backend
+        SettingsVm.LinkSteamIdAction = async steamId =>
+        {
+            try { return await _client.LinkSteamIdAsync(steamId).ConfigureAwait(false); }
+            catch { return null; /* non-critical — link errors shown inline */ }
+        };
+
         // Load cached Steam games from the previous session into the library immediately
         _ = Task.Run(() =>
         {
@@ -661,6 +698,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 var existingTitles = new System.Collections.Generic.HashSet<string>(
                     _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+                var libraryByTitle = _library
+                    .Where(g => g.SteamAppId == null)
+                    .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                    .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                  StringComparer.OrdinalIgnoreCase);
                 int added = 0;
                 foreach (var sg in cached)
                 {
@@ -674,9 +716,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             AddedAt         = DateTime.UtcNow.ToString("O"),
                             PlaytimeMinutes = sg.PlaytimeMinutes,
                             TitleId         = $"steam:{sg.AppId}",
+                            SteamAppId      = sg.AppId,
                         });
                         existingTitles.Add(sg.Name);
                         added++;
+                    }
+                    else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
+                    {
+                        existing.SteamAppId = sg.AppId;
                     }
                 }
                 if (added > 0)
@@ -718,6 +765,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     int added = 0;
                     var existingTitles = new System.Collections.Generic.HashSet<string>(
                         _library.Select(g => g.Title), StringComparer.OrdinalIgnoreCase);
+                    var libraryByTitle = _library
+                        .Where(g => g.SteamAppId == null)
+                        .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
+                        .ToDictionary(grp => grp.Key, grp => grp.First(),
+                                      StringComparer.OrdinalIgnoreCase);
                     foreach (var sg in steamGames)
                     {
                         if (!existingTitles.Contains(sg.Name))
@@ -730,10 +782,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                                 AddedAt         = DateTime.UtcNow.ToString("O"),
                                 PlaytimeMinutes = sg.PlaytimeMinutes,
                                 TitleId         = $"steam:{sg.AppId}",
+                                SteamAppId      = sg.AppId,
                             });
                             existingTitles.Add(sg.Name);
                             added++;
                         }
+                        else if (libraryByTitle.TryGetValue(sg.Name, out var existing))
+                        {
+                            existing.SteamAppId = sg.AppId;
+                        }
+                    }
+
+                    // Merge Steam playtime (take max, avoid double-counting)
+                    if (settings.EnableSteamSync)
+                    {
+                        foreach (var sg in steamGames.Where(g => g.PlaytimeMinutes > 0))
+                            Services.PlaytimeService.MergeExternalMinutes("PC", sg.Name,
+                                sg.PlaytimeMinutes, _library);
                     }
 
                     if (added > 0)
@@ -1369,6 +1434,34 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch { /* best-effort */ }
     }
 
+
+    /// <summary>
+    /// Updates the <see cref="LocalGameCardVm.AchievementLabel"/> on all My Games cards
+    /// using the in-memory <c>_achievements</c> list loaded at login.
+    /// Called on the UI thread (already inside <c>Dispatcher.UIThread.Post</c>) after each
+    /// My Games rebuild so the achievement count appears without waiting for the cloud.
+    /// </summary>
+    private void EnrichMyGamesAchievementLabels()
+    {
+        if (_achievements.Count == 0) return;
+
+        // Build a count lookup: (platform||title) → unlocked count
+        var unlockCounts = _achievements
+            .GroupBy(a => $"{a.Platform.ToLowerInvariant()}||{a.GameTitle.ToLowerInvariant()}")
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+        if (unlockCounts.Count == 0) return;
+
+        foreach (var source in LibraryVm.GetMyGameSources())
+        {
+            string key = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
+            if (!unlockCounts.TryGetValue(key, out int count)) continue;
+
+            var card = LibraryVm.FindMyGameCard(source.Title, source.Platform);
+            if (card != null && count > 0)
+                card.AchievementLabel = $"🏆 {count}";
+        }
+    }
 
     /// "My Games" list from the Games.Database.  Groups cards by platform to
     /// minimise API calls; results are cached on disk (24 h TTL) so subsequent

@@ -674,6 +674,28 @@ namespace GameLauncher.Services
             catch { return false; }
         }
 
+        // ── Steam ID linking ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Links a Steam 64-bit user ID to the currently authenticated Game.OS account
+        /// via POST /api/link-steam.  Returns <c>null</c> on success, or an error message
+        /// string when the Steam ID is already linked to another account.
+        /// </summary>
+        public async Task<string?> LinkSteamIdAsync(string steamUserId, CancellationToken ct = default)
+        {
+            try
+            {
+                EnsureAuthenticated();
+                var body = new { steamUserId };
+                using var resp = await _http.PostAsJsonAsync("/api/link-steam", body, ct);
+                if (resp.IsSuccessStatusCode) return null; // success
+
+                var data = await resp.Content.ReadFromJsonAsync<ErrorResponse>(_jsonOpts, ct);
+                return data?.Message ?? $"Server error {(int)resp.StatusCode}";
+            }
+            catch (Exception ex) { return ex.Message; }
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────
 
         private void EnsureAuthenticated()

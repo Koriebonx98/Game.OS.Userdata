@@ -79,6 +79,22 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Shows a "Game session started" toast notification.
+        /// </summary>
+        /// <param name="gameTitle">Title of the game that was just launched.</param>
+        public static void ShowGameSessionStartedNotification(string gameTitle)
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            try
+            {
+                ShowWindowsToast(
+                    "🎮 Now Playing",
+                    gameTitle);
+            }
+            catch { }
+        }
+
+        /// <summary>
         /// Shows a "Game session ended" toast notification.
         /// </summary>
         /// <param name="gameTitle">Title of the game whose session just ended.</param>
