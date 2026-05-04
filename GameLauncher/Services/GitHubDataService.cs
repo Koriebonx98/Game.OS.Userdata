@@ -1497,7 +1497,11 @@ namespace GameLauncher.Services
 
             System.Text.Json.Nodes.JsonNode? root;
             try { root = System.Text.Json.Nodes.JsonNode.Parse(rawJson ?? "null"); }
-            catch { return; }
+            catch (System.Text.Json.JsonException ex)
+            {
+                DevLogService.Log($"[GamesDB] Could not parse PC.Games.json: {ex.Message}");
+                return;
+            }
 
             System.Text.Json.Nodes.JsonArray? gamesArray;
             bool isRootArray = root is System.Text.Json.Nodes.JsonArray;

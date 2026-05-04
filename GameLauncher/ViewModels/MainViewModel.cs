@@ -2940,7 +2940,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 });
             }
         }
-        catch { /* best-effort */ }
+        catch (Exception ex) { DevLogService.Log($"[SteamAch] TryContributeSteamGameAchievementsAsync failed for appId={appId}: {ex.Message}"); }
     }
 
     /// <summary>
