@@ -250,6 +250,37 @@ public sealed class GameScannerService : IDisposable
                 ScanRepacksDir(driveRoot, foundRepacks);
                 ScanRomsDir(driveRoot, foundRomsRaw);
             }
+
+            // ── Normalize abbreviated folder names found in Games/ directories ──
+            // Steam uses short install-directory names (e.g. "LHPCR" for
+            // "LEGO® Harry Potter™ Collection") that differ from the game's
+            // display name.  ACF manifest scanning (ScanSteamAcfManifests) runs
+            // alongside ScanGamesDir and records the proper name for each
+            // installdir.  Build a folder-name → proper-title lookup from those
+            // ACF-discovered entries (Source = "Steam") and apply it to any
+            // Games/-folder entries (Source = "Local") whose title matches a raw
+            // Steam install directory name.
+            var steamNameByFolder = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var g in foundGamesRaw)
+            {
+                if (g.Source != "Steam" || string.IsNullOrEmpty(g.FolderPath)) continue;
+                string folderKey = Path.GetFileName(g.FolderPath);
+                if (!steamNameByFolder.ContainsKey(folderKey))
+                    steamNameByFolder[folderKey] = g.Title;
+            }
+
+            foreach (var g in foundGamesRaw)
+            {
+                if (g.Source != "Local" || string.IsNullOrEmpty(g.FolderPath)) continue;
+                string folderName = Path.GetFileName(g.FolderPath);
+                if (steamNameByFolder.TryGetValue(folderName, out var properName) &&
+                    !string.Equals(g.Title, properName, StringComparison.OrdinalIgnoreCase))
+                {
+                    DevLogService.Log(
+                        $"[Scanner] Normalized local game title: \"{g.Title}\" → \"{properName}\"");
+                    g.Title = properName;
+                }
+            }
         }, ct);
 
         // Group same-title games found on multiple drives into a single LocalGame.
