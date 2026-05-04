@@ -31,6 +31,12 @@ public sealed class GameScannerService : IDisposable
     private readonly List<FileSystemWatcher>  _watchers= new();
     private readonly SemaphoreSlim            _lock    = new(1, 1);
     private CancellationTokenSource?          _debounceCts;
+    // Lifetime CTS — cancelled in Dispose() to stop the periodic rescan loop.
+    private readonly CancellationTokenSource  _lifetimeCts = new();
+
+    // How often the background timer rescans all drives.  Two minutes is short
+    // enough to notice a freshly-mounted USB drive without hammering the disk.
+    private static readonly TimeSpan PeriodicInterval = TimeSpan.FromMinutes(2);
 
     // ── Cache paths ───────────────────────────────────────────────────────────
     private static readonly string CacheDir  = Path.Combine(
@@ -50,33 +56,73 @@ public sealed class GameScannerService : IDisposable
     // ─────────────────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Performs an initial scan (with cache fallback) and starts background watchers.
+    /// Performs an initial scan (with cache fallback), starts background watchers,
+    /// and kicks off a periodic background rescan to detect newly mounted drives.
     /// </summary>
     public async Task StartAsync(CancellationToken ct = default)
     {
-        DevLogService.Log("[Scanner] StartAsync — beginning scan.");
-        // Try loading from cache first for faster startup
-        if (TryLoadCache())
+        try
         {
-            DevLogService.Log($"[Scanner] Cache loaded: {_games.Count} games, {_repacks.Count} repacks, {_roms.Count} ROMs.");
-            GamesUpdated?.Invoke(new List<LocalGame>(_games));
-            RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
-            RomsUpdated?.Invoke(new List<LocalRom>(_roms));
-        }
-        else
-        {
-            DevLogService.Log("[Scanner] No cache found — starting fresh scan.");
-        }
+            DevLogService.Log("[Scanner] StartAsync — beginning scan.");
+            // Try loading from cache first for faster startup
+            if (TryLoadCache())
+            {
+                DevLogService.Log($"[Scanner] Cache loaded: {_games.Count} games, {_repacks.Count} repacks, {_roms.Count} ROMs.");
+                GamesUpdated?.Invoke(new List<LocalGame>(_games));
+                RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
+                RomsUpdated?.Invoke(new List<LocalRom>(_roms));
+            }
+            else
+            {
+                DevLogService.Log("[Scanner] No cache found — starting fresh scan.");
+            }
 
-        // Always do a fresh scan to stay current
-        await ScanAllDrivesAsync(ct);
-        StartWatchers();
+            // Always do a fresh scan to stay current
+            await ScanAllDrivesAsync(ct);
+            StartWatchers();
+
+            // Kick off the periodic rescan loop (uses the lifetime CTS so it stops on Dispose).
+            _ = PeriodicRescanAsync(_lifetimeCts.Token);
+        }
+        catch (OperationCanceledException) { /* shutdown */ }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[Scanner] StartAsync failed: {ex.Message}");
+        }
     }
 
     /// <summary>Re-scans all drives on demand.</summary>
     public async Task RescanAsync(CancellationToken ct = default)
     {
         await ScanAllDrivesAsync(ct);
+    }
+
+    /// <summary>
+    /// Background loop that rescans all drives every <see cref="PeriodicInterval"/> so
+    /// that drives mounted after startup (e.g. USB sticks or newly shared folders) are
+    /// discovered automatically without requiring the user to restart the app.
+    /// Also refreshes file-system watchers so any new game/repack/ROM directories are
+    /// monitored for live changes.
+    /// </summary>
+    private async Task PeriodicRescanAsync(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(PeriodicInterval, ct).ConfigureAwait(false);
+                DevLogService.Log("[Scanner] Periodic rescan triggered.");
+                await ScanAllDrivesAsync(ct).ConfigureAwait(false);
+                // Re-create watchers so any directories that now exist (but didn't at
+                // startup) are monitored for live file-system changes.
+                StartWatchers();
+            }
+            catch (OperationCanceledException) { return; }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[Scanner] Periodic rescan error: {ex.Message}");
+            }
+        }
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -88,28 +134,66 @@ public sealed class GameScannerService : IDisposable
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
         {
-            foreach (var drive in DriveInfo.GetDrives())
-                if (drive.IsReady)
+            DriveInfo[] drives;
+            try { drives = DriveInfo.GetDrives(); }
+            catch { yield break; }
+
+            foreach (var drive in drives)
+            {
+                bool isReady = false;
+                try { isReady = drive.IsReady; } catch { }
+                if (isReady)
                     yield return drive.RootDirectory.FullName; // e.g. C:\
+            }
         }
         else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
         {
             // macOS: volumes live under /Volumes
             yield return "/";
             if (Directory.Exists("/Volumes"))
-                foreach (var v in Directory.EnumerateDirectories("/Volumes"))
+            {
+                IEnumerable<string> volumes;
+                try { volumes = Directory.EnumerateDirectories("/Volumes"); }
+                catch { yield break; }
+                foreach (var v in volumes)
                     yield return v;
+            }
         }
         else
         {
-            // Linux: /mnt, /media, and home directory
+            // Linux: root, /mnt, /media, and home directory.
             yield return "/";
-            foreach (var mountRoot in new[] { "/mnt", "/media" })
-                if (Directory.Exists(mountRoot))
-                    foreach (var sub in Directory.EnumerateDirectories(mountRoot))
-                        yield return sub;
 
-            // Also scan user-level subdirs under /media/<username>
+            foreach (var mountRoot in new[] { "/mnt", "/media" })
+            {
+                if (!Directory.Exists(mountRoot)) continue;
+
+                IEnumerable<string> level1;
+                try { level1 = Directory.EnumerateDirectories(mountRoot).ToList(); }
+                catch (UnauthorizedAccessException) { continue; }
+                catch (IOException) { continue; }
+
+                foreach (var sub in level1)
+                {
+                    yield return sub; // e.g. /mnt/disk1 or /media/username
+
+                    // On Ubuntu/Debian removable drives are mounted at
+                    // /media/<username>/<label> (two levels deep), so we must
+                    // descend one extra level for /media/* entries.
+                    if (!string.Equals(mountRoot, "/media", StringComparison.Ordinal))
+                        continue;
+
+                    IEnumerable<string> level2;
+                    try { level2 = Directory.EnumerateDirectories(sub).ToList(); }
+                    catch (UnauthorizedAccessException) { continue; }
+                    catch (IOException) { continue; }
+
+                    foreach (var sub2 in level2)
+                        yield return sub2; // e.g. /media/username/MyUSBDrive
+                }
+            }
+
+            // Also include the user's home directory so ~/Games etc. are found.
             string home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
             if (!string.IsNullOrEmpty(home) && Directory.Exists(home))
                 yield return home;
@@ -1356,7 +1440,12 @@ public sealed class GameScannerService : IDisposable
         _ = Task.Delay(500, cts.Token).ContinueWith(async t =>
         {
             if (t.IsCanceled) return;
-            try { await ScanAllDrivesAsync(CancellationToken.None); }
+            try
+            {
+                await ScanAllDrivesAsync(CancellationToken.None);
+                // Refresh watchers so any new subdirectories are also monitored.
+                StartWatchers();
+            }
             catch { }
         }, TaskScheduler.Default);
     }
@@ -1418,6 +1507,8 @@ public sealed class GameScannerService : IDisposable
     public void Dispose()
     {
         DisposeWatchers();
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
         _debounceCts?.Cancel();
         _debounceCts?.Dispose();
         _lock.Dispose();
