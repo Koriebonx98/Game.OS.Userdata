@@ -105,6 +105,10 @@ public sealed class GameScannerService : IDisposable
     /// discovered automatically without requiring the user to restart the app.
     /// Also refreshes file-system watchers so any new game/repack/ROM directories are
     /// monitored for live changes.
+    /// <para>
+    /// The loop is sequential: the <see cref="PeriodicInterval"/> delay begins AFTER
+    /// the previous scan completes, so concurrent scans never accumulate.
+    /// </para>
     /// </summary>
     private async Task PeriodicRescanAsync(CancellationToken ct)
     {
@@ -121,7 +125,12 @@ public sealed class GameScannerService : IDisposable
                     // startup) are monitored for live file-system changes.
                     StartWatchers();
                 }
-                catch (OperationCanceledException) { return; }
+                catch (OperationCanceledException)
+                {
+                    // Intentional shutdown via Dispose() — return cleanly without logging
+                    // "terminated unexpectedly", which is reserved for genuine errors.
+                    return;
+                }
                 catch (Exception ex)
                 {
                     DevLogService.Log($"[Scanner] Periodic rescan error: {ex.Message}");
@@ -1527,8 +1536,10 @@ public sealed class GameScannerService : IDisposable
     {
         DisposeWatchers();
         _lifetimeCts.Cancel();
-        // Give the periodic rescan task a brief window to observe the cancellation
-        // and exit cleanly before the CTS is disposed.
+        // Give the periodic task a brief window to observe the cancellation and exit.
+        // We use Wait(timeout) rather than GetAwaiter().GetResult() to avoid an
+        // indefinite block; PeriodicRescanAsync uses ConfigureAwait(false) so it is
+        // not tied to the UI thread and should exit promptly once the token is cancelled.
         try { _periodicTask?.Wait(TimeSpan.FromMilliseconds(200)); } catch { }
         _lifetimeCts.Dispose();
         _debounceCts?.Cancel();
