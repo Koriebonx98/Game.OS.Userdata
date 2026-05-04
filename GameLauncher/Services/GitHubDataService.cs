@@ -1431,6 +1431,187 @@ namespace GameLauncher.Services
                 string.Equals(g.TitleId, titleId, StringComparison.OrdinalIgnoreCase));
         }
 
+        // ── Steam game contribution to public Games.Database ─────────────────
+
+        /// <summary>
+        /// Contributes new Steam PC games to the public Games.Database <c>PC.Games.json</c>
+        /// when they are not already present (checked by AppId and title).
+        /// Reads the existing file, appends missing entries, and writes back in one operation.
+        /// Best-effort: failures are logged but never thrown to the caller.
+        /// </summary>
+        public async Task ContributeSteamGamesToDatabaseAsync(
+            IReadOnlyList<SteamOwnedGame> newGames, CancellationToken ct = default)
+        {
+            if (newGames.Count == 0) return;
+
+            // Filter to games that are absent from the in-memory/disk cache
+            var toContribute = new List<SteamOwnedGame>();
+            lock (_dbMemoryCache)
+            {
+                if (_dbMemoryCache.TryGetValue("PC", out var cached))
+                {
+                    var existingIds = new HashSet<long>(
+                        cached.Where(g => g.AppId.HasValue).Select(g => g.AppId!.Value));
+                    var existingTitles = new HashSet<string>(
+                        cached.Select(g => g.Title ?? ""), StringComparer.OrdinalIgnoreCase);
+                    toContribute = newGames
+                        .Where(g => g.AppId > 0 &&
+                                    !existingIds.Contains(g.AppId) &&
+                                    !existingTitles.Contains(g.Name))
+                        .ToList();
+                }
+                else
+                {
+                    // Cache not populated yet — proceed with the full list; duplicates will
+                    // be caught by the in-file check below.
+                    toContribute = newGames.Where(g => g.AppId > 0).ToList();
+                }
+            }
+
+            if (toContribute.Count == 0) return;
+
+            const string filePath = "PC.Games.json";
+            string? rawJson = null;
+            string? sha = null;
+
+            try
+            {
+                var url = $"https://api.github.com/repos/Koriebonx98/Games.Database/contents/{Uri.EscapeDataString(filePath)}";
+                var resp = await _http.GetAsync(url, ct).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode) return;
+
+                var file = await resp.Content
+                    .ReadFromJsonAsync<GitHubFileResponse>(cancellationToken: ct)
+                    .ConfigureAwait(false);
+                if (file == null) return;
+
+                var bytes = Convert.FromBase64String(file.Content.Replace("\n", ""));
+                rawJson = System.Text.Encoding.UTF8.GetString(bytes);
+                sha     = file.Sha;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[GamesDB] Could not read PC.Games.json: {ex.Message}");
+                return;
+            }
+
+            System.Text.Json.Nodes.JsonNode? root;
+            try { root = System.Text.Json.Nodes.JsonNode.Parse(rawJson ?? "null"); }
+            catch { return; }
+
+            System.Text.Json.Nodes.JsonArray? gamesArray;
+            bool isRootArray = root is System.Text.Json.Nodes.JsonArray;
+            if (isRootArray)
+            {
+                gamesArray = (System.Text.Json.Nodes.JsonArray)root!;
+            }
+            else if (root is System.Text.Json.Nodes.JsonObject obj)
+            {
+                gamesArray = (obj["Games"] ?? obj["games"]) as System.Text.Json.Nodes.JsonArray;
+                if (gamesArray == null) return;
+            }
+            else return;
+
+            // Build in-file duplicate sets
+            var existingFileIds    = new HashSet<long>();
+            var existingFileTitles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var item in gamesArray)
+            {
+                if (item is not System.Text.Json.Nodes.JsonObject entry) continue;
+                if (entry["appid"] is System.Text.Json.Nodes.JsonValue av &&
+                    av.TryGetValue<long>(out var id)) existingFileIds.Add(id);
+                var t = entry["Title"]?.GetValue<string?>()
+                     ?? entry["title"]?.GetValue<string?>();
+                if (!string.IsNullOrEmpty(t)) existingFileTitles.Add(t);
+            }
+
+            int added = 0;
+            foreach (var sg in toContribute)
+            {
+                if (existingFileIds.Contains(sg.AppId) ||
+                    existingFileTitles.Contains(sg.Name)) continue;
+
+                gamesArray.Add(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["Title"] = sg.Name,
+                    ["appid"] = sg.AppId,
+                });
+                existingFileIds.Add(sg.AppId);
+                existingFileTitles.Add(sg.Name);
+                added++;
+            }
+
+            if (added == 0) return;
+
+            try
+            {
+                // Serialize the root node (contains the updated games array in-place)
+                object toWrite = isRootArray ? (object)gamesArray : root!;
+                await WriteGamesDatabaseFileAsync(
+                    filePath, toWrite,
+                    $"Add {added} Steam PC game(s) contributed via user import",
+                    sha, ct).ConfigureAwait(false);
+
+                // Invalidate cache so the next FetchGamesDatabaseAsync re-downloads fresh data
+                InvalidatePlatformCache("PC");
+                DevLogService.Log($"[GamesDB] Contributed {added} new Steam PC game(s) to PC.Games.json.");
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[GamesDB] Failed to write PC.Games.json contributions: {ex.Message}");
+            }
+        }
+
+        /// <summary>
+        /// Uploads the full achievement schema for a Steam game to
+        /// <c>Data/PC/Games/{appId}/achievements.json</c> in the Games.Database repository.
+        /// Returns the raw URL to the uploaded file on success, or <c>null</c> on failure.
+        /// If an achievements file already exists it is not overwritten.
+        /// </summary>
+        public async Task<string?> UploadSteamAchievementsToDatabaseAsync(
+            int appId, string gameTitle, IReadOnlyList<SteamSchemaAchievement> achievements,
+            CancellationToken ct = default)
+        {
+            if (achievements.Count == 0 || appId <= 0) return null;
+
+            // Format understood by FetchAndDisplayAchievementsAsync:
+            // [{ "name": "...", "description": "...", "iconUrl": "..." }]
+            var dbAchievements = achievements.Select(a => new
+            {
+                name        = string.IsNullOrWhiteSpace(a.DisplayName) ? a.ApiName : a.DisplayName,
+                description = a.Description,
+                iconUrl     = string.IsNullOrEmpty(a.Icon) ? null : a.Icon,
+            }).ToList();
+
+            string filePath = $"Data/PC/Games/{appId}/achievements.json";
+            string achUrl   = $"{GamesDbRawBase}/Data/PC/Games/{appId}/achievements.json";
+
+            try
+            {
+                // Check whether the file already exists (get SHA for update, or null for create)
+                var (existing, sha) = await ReadGamesDatabaseFileAsync<object>(filePath, ct)
+                    .ConfigureAwait(false);
+
+                // Do not overwrite an already-present achievements file
+                if (existing != null) return achUrl;
+
+                await WriteGamesDatabaseFileAsync(
+                    filePath, dbAchievements,
+                    $"Add Steam achievements for {gameTitle} (AppId {appId})",
+                    sha, ct).ConfigureAwait(false);
+
+                DevLogService.Log(
+                    $"[GamesDB] Uploaded {achievements.Count} achievements for '{gameTitle}' (AppId {appId}).");
+                return achUrl;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[GamesDB] Failed to upload achievements for '{gameTitle}': {ex.Message}");
+                return null;
+            }
+        }
+
         // ── Review upload to Games.Database ──────────────────────────────────
 
         /// <summary>

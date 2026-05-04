@@ -156,6 +156,39 @@ public static class SteamGameImportService
         }
     }
 
+    /// <summary>
+    /// Fetches the full achievement schema (ALL achievements, both locked and unlocked)
+    /// for a Steam game via <c>ISteamUserStats/GetSchemaForGame</c>.
+    /// Returns an empty list when the game has no stats, when the API key is invalid,
+    /// or on any network/parsing error.
+    /// </summary>
+    public static async Task<List<SteamSchemaAchievement>> FetchSchemaForGameAsync(
+        string apiKey, int appId)
+    {
+        if (string.IsNullOrWhiteSpace(apiKey) || appId <= 0)
+            return new List<SteamSchemaAchievement>();
+
+        try
+        {
+            string url =
+                $"https://api.steampowered.com/ISteamUserStats/GetSchemaForGame/v0002/" +
+                $"?appid={appId}" +
+                $"&key={Uri.EscapeDataString(apiKey)}" +
+                $"&l=en";
+
+            string body = await _http.GetStringAsync(url).ConfigureAwait(false);
+            var root = JsonSerializer.Deserialize<SteamGetSchemaForGameResponse>(body,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+            return root?.Game?.AvailableGameStats?.Achievements
+                ?? new List<SteamSchemaAchievement>();
+        }
+        catch
+        {
+            return new List<SteamSchemaAchievement>();
+        }
+    }
+
     private static string SanitiseName(string name)
         => string.Concat(name.Split(Path.GetInvalidFileNameChars()));
 }
@@ -226,4 +259,40 @@ public class SteamPlayerAchievement
         Achieved == 1 && UnlockTime > 0
             ? DateTimeOffset.FromUnixTimeSeconds(UnlockTime).UtcDateTime
             : DateTime.MinValue;
+}
+
+// ── Steam GetSchemaForGame response models ────────────────────────────────────
+
+/// <summary>Root wrapper from ISteamUserStats/GetSchemaForGame.</summary>
+public class SteamGetSchemaForGameResponse
+{
+    [JsonPropertyName("game")] public SteamGameSchema? Game { get; set; }
+}
+
+public class SteamGameSchema
+{
+    [JsonPropertyName("availableGameStats")] public SteamAvailableGameStats? AvailableGameStats { get; set; }
+}
+
+public class SteamAvailableGameStats
+{
+    [JsonPropertyName("achievements")] public List<SteamSchemaAchievement>? Achievements { get; set; }
+}
+
+/// <summary>
+/// A single achievement entry from the GetSchemaForGame response.
+/// Represents the full achievement template (both locked and unlocked).
+/// </summary>
+public class SteamSchemaAchievement
+{
+    /// <summary>Internal Steam API name (e.g. "ACH_FIRST_KILL").</summary>
+    [JsonPropertyName("name")]        public string ApiName     { get; set; } = "";
+    /// <summary>Localised display name shown in the Steam overlay.</summary>
+    [JsonPropertyName("displayName")] public string DisplayName { get; set; } = "";
+    /// <summary>Localised description of the achievement.</summary>
+    [JsonPropertyName("description")] public string Description { get; set; } = "";
+    /// <summary>URL to the colour (unlocked) achievement icon.</summary>
+    [JsonPropertyName("icon")]        public string Icon        { get; set; } = "";
+    /// <summary>URL to the greyscale (locked) achievement icon.</summary>
+    [JsonPropertyName("icongray")]    public string IconGray    { get; set; } = "";
 }
