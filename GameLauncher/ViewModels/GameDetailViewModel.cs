@@ -2580,7 +2580,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasPlaytime = true;
     }
 
-    private void PopulateAchievements(List<Achievement>? achievements)
+    internal void PopulateAchievements(List<Achievement>? achievements)
     {
         Achievements.Clear();
         if (achievements != null)

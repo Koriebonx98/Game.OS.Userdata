@@ -502,7 +502,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                                 List<Achievement> achievements, bool isOffline)
     {
         _profile      = profile;
-        _library      = library;
+        _library      = DeduplicateLibrary(library);
         _achievements = achievements;
 
         IsOfflineMode = isOffline;
@@ -627,8 +627,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     .ToDictionary(grp => grp.Key, grp => grp.First(),
                                   StringComparer.OrdinalIgnoreCase);
 
+                // Also build an AppId→Game lookup so that games already in the library
+                // under a different title variant are not re-added as duplicates.
+                var libraryByAppId = _library
+                    .Where(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0)
+                    .GroupBy(g => g.SteamAppId!.Value)
+                    .ToDictionary(grp => grp.Key, grp => grp.First());
+
                 foreach (var sg in steamGames)
                 {
+                    // Skip if already present by AppId (handles same game under a different title)
+                    if (sg.AppId > 0 && libraryByAppId.ContainsKey(sg.AppId)) continue;
+
                     if (!existingTitles.Contains(sg.Name))
                     {
                         var newGame = new Models.Game
@@ -671,6 +681,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     _ = SyncSteamAchievementsAsync(apiKey, steamUserId,
                             steamGames.Where(g => g.HasCommunityStats && g.PlaytimeMinutes > 0)
                                       .ToList());
+                }
+
+                // Contribute new Steam games to the public Games.Database so other
+                // users who have the same game can benefit from the metadata.
+                if (added > 0)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var ghSvc = new Services.GitHubDataService();
+                            await ghSvc.ContributeSteamGamesToDatabaseAsync(steamGames)
+                                       .ConfigureAwait(false);
+                        }
+                        catch { /* best-effort */ }
+                    });
                 }
 
                 // Refresh the library view with the updated data
@@ -721,9 +747,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
                     .ToDictionary(grp => grp.Key, grp => grp.First(),
                                   StringComparer.OrdinalIgnoreCase);
+                var libraryByAppId = _library
+                    .Where(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0)
+                    .GroupBy(g => g.SteamAppId!.Value)
+                    .ToDictionary(grp => grp.Key, grp => grp.First());
                 int added = 0;
                 foreach (var sg in cached)
                 {
+                    if (sg.AppId > 0 && libraryByAppId.ContainsKey(sg.AppId)) continue;
                     if (!existingTitles.Contains(sg.Name))
                     {
                         _library.Add(new Models.Game
@@ -788,8 +819,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         .GroupBy(g => g.Title, StringComparer.OrdinalIgnoreCase)
                         .ToDictionary(grp => grp.Key, grp => grp.First(),
                                       StringComparer.OrdinalIgnoreCase);
+                    var libraryByAppId = _library
+                        .Where(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0)
+                        .GroupBy(g => g.SteamAppId!.Value)
+                        .ToDictionary(grp => grp.Key, grp => grp.First());
                     foreach (var sg in steamGames)
                     {
+                        if (sg.AppId > 0 && libraryByAppId.ContainsKey(sg.AppId)) continue;
                         if (!existingTitles.Contains(sg.Name))
                         {
                             _library.Add(new Models.Game
@@ -1185,6 +1221,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (!string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
             string.IsNullOrEmpty(game.AchievementsUrl))
             _ = EnrichGameAchievementsAsync(game);
+
+        // For PC Steam games with no achievements in the database, fetch the schema
+        // from the Steam API, upload it to the Games.Database, and sync the player's unlocks.
+        if (string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+            string.IsNullOrEmpty(game.AchievementsUrl) &&
+            game.SteamAppId.HasValue && game.SteamAppId.Value > 0)
+            _ = TryContributeSteamGameAchievementsAsync((int)game.SteamAppId.Value, game.Title);
     }
 
     private void OpenDetailFromStoreGame(StoreGame game)
@@ -1328,7 +1371,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowDetail = true;
 
         // Asynchronously enrich with cover/description/trailer from Games.Database
-        _ = EnrichLocalGameDetailAsync(game.Title, "PC");
+        _ = EnrichLocalGameDetailAsync(game.Title, "PC", steamAppId: game.SteamAppId);
     }
 
     private void OpenDetailFromLocalRepack(LocalRepack repack)
@@ -1639,14 +1682,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// screenshots and achievements — the same data shown on the website.
     /// Title matching handles Windows-safe folder names such as
     /// "Call of Duty - Black Ops II" → "Call of Duty: Black Ops II".
+    /// When <paramref name="steamAppId"/> is provided and the game has no achievements in the
+    /// database, the Steam API is queried to fetch and upload a fresh achievement schema.
     /// </summary>
     private async Task EnrichLocalGameDetailAsync(string localTitle, string platform,
-                                                   string? titleId = null)
+                                                   string? titleId = null, int steamAppId = 0)
     {
+        DatabaseGame? dbGame = null;
         try
         {
             var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
-            var dbGame  = FindDatabaseGame(dbGames, localTitle, titleId);
+            dbGame = FindDatabaseGame(dbGames, localTitle, titleId);
+
+            // Resolve effective Steam AppId: prefer the caller's value, fall back to DB entry
+            if (steamAppId <= 0 && dbGame?.AppId.HasValue == true)
+                steamAppId = (int)dbGame.AppId!.Value;
+
             if (dbGame != null)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(
@@ -1660,7 +1711,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 DevLogService.Log($"[Detail] Using cached game.json for '{localTitle}' ({platform}) — network unavailable.");
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => DetailVm.EnrichFromDatabaseGame(cached));
+                if (steamAppId <= 0 && cached.AppId.HasValue)
+                    steamAppId = (int)cached.AppId!.Value;
             }
+        }
+
+        // For PC Steam games whose achievements are missing from the database, automatically
+        // fetch the schema from Steam, upload it to the Games.Database, and sync the
+        // player's unlocked achievements so the detail view shows them immediately.
+        bool noDbAchievements = string.IsNullOrEmpty(dbGame?.AchievementsUrl);
+        if (noDbAchievements && steamAppId > 0 &&
+            string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase))
+        {
+            _ = TryContributeSteamGameAchievementsAsync(steamAppId, localTitle);
         }
     }
 
@@ -1824,6 +1887,51 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (byAltName != null) return byAltName;
 
         return null;
+    }
+
+    /// <summary>
+    /// Removes duplicate library entries that share the same platform + title.
+    /// This can happen when a game was added manually and then again via Steam import,
+    /// or when the Games.Database contains multiple entries for the same title with
+    /// different AppIds.  The entry that carries a SteamAppId (or the most complete
+    /// data) is kept; the others are discarded.
+    /// </summary>
+    private static List<Game> DeduplicateLibrary(List<Game> library)
+    {
+        var seen   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<Game>(library.Count);
+
+        // Process games with a SteamAppId first so they are preferred over stub entries
+        var ordered = library
+            .OrderByDescending(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0 ? 1 : 0)
+            .ThenByDescending(g => string.IsNullOrEmpty(g.CoverUrl) ? 0 : 1);
+
+        foreach (var game in ordered)
+        {
+            string key = $"{game.Platform?.ToLowerInvariant()}||{game.Title?.ToLowerInvariant()}";
+            if (seen.Add(key))
+            {
+                result.Add(game);
+            }
+            else
+            {
+                // Merge useful fields from the duplicate into the already-kept entry
+                var kept = result.FirstOrDefault(g =>
+                    string.Equals(g.Platform, game.Platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(g.Title,    game.Title,    StringComparison.OrdinalIgnoreCase));
+                if (kept != null)
+                {
+                    if (!kept.SteamAppId.HasValue && game.SteamAppId.HasValue)
+                        kept.SteamAppId = game.SteamAppId;
+                    if (string.IsNullOrEmpty(kept.CoverUrl) && !string.IsNullOrEmpty(game.CoverUrl))
+                        kept.CoverUrl = game.CoverUrl;
+                    if (string.IsNullOrEmpty(kept.AchievementsUrl) && !string.IsNullOrEmpty(game.AchievementsUrl))
+                        kept.AchievementsUrl = game.AchievementsUrl;
+                }
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -2722,6 +2830,117 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         });
 
         DevLogService.Log($"[SteamAchievements] Synced achievements for {processed} Steam games.");
+    }
+
+    /// <summary>
+    /// When a Steam PC game is opened and has no achievement data in the Games.Database,
+    /// fetches the full achievement schema from the Steam API, uploads it to the public
+    /// Games.Database so all users benefit, then syncs the player's unlocked achievements
+    /// to their Game OS profile and displays them in the currently-open detail view.
+    /// </summary>
+    private async Task TryContributeSteamGameAchievementsAsync(int appId, string gameName)
+    {
+        if (appId <= 0) return;
+        try
+        {
+            var settings = Services.AppSettingsService.Load();
+            if (string.IsNullOrWhiteSpace(settings.SteamApiKey)) return;
+
+            // 1. Fetch ALL achievements (template) from Steam — this includes both locked
+            //    and unlocked achievements, giving us the canonical achievement list.
+            var schema = await Services.SteamGameImportService
+                .FetchSchemaForGameAsync(settings.SteamApiKey, appId)
+                .ConfigureAwait(false);
+            if (schema.Count == 0) return;
+
+            // 2. Upload the schema to the public Games.Database so future users of this
+            //    game will automatically get achievements without needing a Steam API call.
+            string? achUrl = null;
+            try
+            {
+                var ghSvc = new Services.GitHubDataService();
+                achUrl = await ghSvc.UploadSteamAchievementsToDatabaseAsync(appId, gameName, schema)
+                                    .ConfigureAwait(false);
+            }
+            catch { /* best-effort — proceed to display even if upload fails */ }
+
+            // 3. Build the Achievement list from the schema so the detail view can show them
+            var achievements = schema
+                .Select(a => new Models.Achievement
+                {
+                    Platform      = "PC",
+                    GameTitle     = gameName,
+                    AchievementId = a.ApiName,
+                    Name          = string.IsNullOrWhiteSpace(a.DisplayName) ? a.ApiName : a.DisplayName,
+                    Description   = a.Description,
+                    IconUrl       = string.IsNullOrEmpty(a.Icon) ? null : a.Icon,
+                })
+                .ToList();
+
+            // Update the library entry and detail view on the UI thread
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                // Stamp the achievements URL onto the in-memory library entry
+                if (!string.IsNullOrEmpty(achUrl))
+                {
+                    var libEntry = _library.FirstOrDefault(g =>
+                        g.SteamAppId == appId ||
+                        string.Equals(g.Title, gameName, StringComparison.OrdinalIgnoreCase));
+                    if (libEntry != null && string.IsNullOrEmpty(libEntry.AchievementsUrl))
+                        libEntry.AchievementsUrl = achUrl;
+                }
+
+                // Display in the currently-open detail panel if it's still showing this game
+                if (string.Equals(DetailVm.Title, gameName, StringComparison.OrdinalIgnoreCase) &&
+                    !DetailVm.HasAchievements)
+                {
+                    DetailVm.PopulateAchievements(achievements);
+                }
+            });
+
+            // 4. Sync the player's own unlocked achievements from Steam to their profile
+            if (!string.IsNullOrWhiteSpace(settings.SteamUserId))
+            {
+                var steamGame = new Services.SteamOwnedGame { AppId = appId, Name = gameName };
+                await SyncSteamAchievementsAsync(
+                    settings.SteamApiKey, settings.SteamUserId,
+                    new List<Services.SteamOwnedGame> { steamGame })
+                    .ConfigureAwait(false);
+
+                // Re-stamp unlocked status on the displayed achievements
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (!string.Equals(DetailVm.Title, gameName, StringComparison.OrdinalIgnoreCase))
+                        return;
+
+                    var unlockedKeys = new HashSet<string>(
+                        _achievements
+                            .Where(a => string.Equals(a.GameTitle, gameName, StringComparison.OrdinalIgnoreCase) &&
+                                        !string.IsNullOrEmpty(a.UnlockedAt))
+                            .Select(a => a.AchievementId ?? a.Name),
+                        StringComparer.OrdinalIgnoreCase);
+
+                    if (unlockedKeys.Count == 0) return;
+
+                    // Rebuild achievement list with unlock dates merged in
+                    var merged = DetailVm.Achievements
+                        .Select(a =>
+                        {
+                            var cloud = _achievements.FirstOrDefault(ca =>
+                                string.Equals(ca.GameTitle, gameName, StringComparison.OrdinalIgnoreCase) &&
+                                (string.Equals(ca.AchievementId, a.AchievementId, StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(ca.Name, a.Name, StringComparison.OrdinalIgnoreCase)));
+                            if (cloud != null && !string.IsNullOrEmpty(cloud.UnlockedAt))
+                                a.UnlockedAt = cloud.UnlockedAt;
+                            return a;
+                        })
+                        .ToList();
+
+                    DetailVm.PopulateAchievements(merged);
+                });
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[SteamAch] TryContributeSteamGameAchievementsAsync failed for appId={appId}: {ex.Message}"); }
     }
 
     /// <summary>
