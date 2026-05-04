@@ -331,10 +331,14 @@ public sealed class GameScannerService : IDisposable
         string gamesPath = Path.Combine(driveRoot, "Games");
         if (!Directory.Exists(gamesPath)) return;
 
+        int beforeCount = results.Count;
+        int folderCount = 0;
+
         try
         {
             foreach (var gameFolder in Directory.EnumerateDirectories(gamesPath))
             {
+                folderCount++;
                 // Try top-level first, then fall back to two levels deep for games
                 // whose main executable is inside a sub-directory (e.g. Binaries/Win64/).
                 var exe = FindExecutable(gameFolder)
@@ -354,10 +358,17 @@ public sealed class GameScannerService : IDisposable
                     DriveRoot      = driveRoot,
                     Source         = "Local",
                 });
+
+                DevLogService.LogGamesAdvanced($"[Games] Found: \"{title}\" ({gameFolder})");
             }
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
+
+        int found = results.Count - beforeCount;
+        DevLogService.LogGames(
+            $"[Games] Drive \"{driveRoot}\" — path: \"{gamesPath}\" | " +
+            $"Total Folders: {folderCount}, Games Found: {found}");
     }
 
     /// <summary>
@@ -393,6 +404,7 @@ public sealed class GameScannerService : IDisposable
                             string source = "Local")
         {
             if (!Directory.Exists(path)) return;
+            int beforeCount = results.Count;
             try
             {
                 // Pre-build the existing folder-path set (O(n)) so each per-folder
@@ -426,6 +438,10 @@ public sealed class GameScannerService : IDisposable
             }
             catch (UnauthorizedAccessException) { }
             catch (IOException) { }
+            int added = results.Count - beforeCount;
+            if (added > 0)
+                DevLogService.LogLocalSteam(
+                    $"[LocalSteam/{source}] Dir \"{path}\" — {added} game(s) added via folder scan");
         }
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -684,6 +700,9 @@ public sealed class GameScannerService : IDisposable
         string commonDir = Path.Combine(steamAppsDir, "common");
         if (!Directory.Exists(commonDir)) return;
 
+        DevLogService.LogLocalSteam($"[LocalSteam/ACF] Scanning \"{steamAppsDir}\"");
+        int beforeCount = results.Count;
+
         try
         {
             foreach (var acfFile in Directory.EnumerateFiles(steamAppsDir, "appmanifest_*.acf"))
@@ -737,6 +756,10 @@ public sealed class GameScannerService : IDisposable
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
+
+        int added = results.Count - beforeCount;
+        DevLogService.LogLocalSteam(
+            $"[LocalSteam/ACF] \"{steamAppsDir}\" — {added} game(s) added from ACF manifests");
     }
 
     /// <summary>
