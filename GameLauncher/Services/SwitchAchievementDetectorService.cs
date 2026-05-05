@@ -33,37 +33,39 @@ public static class SwitchAchievementDetectorService
         new(StringComparer.OrdinalIgnoreCase)
         {
             // Original cups
-            ["Magic Mushroom's"]           = ["Gu_FirstCircuit",  "Gu_WaterPark",    "Gu_Cake",       "Gu_DossunIseki"],
-            ["Flower Power"]               = ["Gu_MarioCircuit",  "Gu_City",         "Gu_HorrorHouse","Gu_Expert"],
-            ["Star Light"]                 = ["Gu_Airport",       "Gu_Ocean",        "Gu_Techno",     "Gu_SnowMountain"],
-            ["Special Delivery"]           = ["Gu_Cloud",         "Gu_Desert",       "Gu_BowserCastle","Gu_RainbowRoad"],
+            ["Magic Mushroom's"]           = ["Gu_FirstCircuit",  "Gu_WaterPark",      "Gu_Cake",              "Gu_DossunIseki"],
+            ["Flower Power"]               = ["Gu_MarioCircuit",  "Gu_City",           "Gu_HorrorHouse",       "Gu_Expert"],
+            ["Star Light"]                 = ["Gu_Airport",       "Gu_Ocean",          "Gu_Techno",            "Gu_SnowMountain"],
+            ["Special Delivery"]           = ["Gu_Cloud",         "Gu_Desert",         "Gu_BowserCastle",      "Gu_RainbowRoad"],
             // Retro Egg Cup
-            ["Egg Hunt"]                   = ["Dgc_YoshiCircuit", "Du_ExciteBike",   "Du_DragonRoad", "Du_MuteCity"],
+            ["Egg Hunt"]                   = ["Dgc_YoshiCircuit", "Du_ExciteBike",     "Du_DragonRoad",        "Du_MuteCity"],
             // Retro Cross Cup
-            ["Cross Country"]              = ["Dgc_BabyPark",     "Dagb_CheeseLand", "Du_Woods",      "Du_Animal_Summer"],
+            ["Cross Country"]              = ["Dgc_BabyPark",     "Dagb_CheeseLand",   "Du_Woods",             "Du_Animal_Summer"],
             // Retro Shell Cup
-            ["Shell Shock"]                = ["Gwii_MooMooMeadows","Gagb_MarioCircuit","Gds_PukupukuBeach","G64_KinopioHighway"],
+            ["Shell Shock"]                = ["Gwii_MooMooMeadows","Gagb_MarioCircuit", "Gds_PukupukuBeach",   "G64_KinopioHighway"],
             // Retro Banana Cup
-            ["Going Bananas"]              = ["Ggc_DryDryDesert", "Gsfc_DonutsPlain3","G64_PeachCircuit","G3ds_DKJungle"],
+            ["Going Bananas"]              = ["Ggc_DryDryDesert", "Gsfc_DonutsPlain3", "G64_PeachCircuit",     "G3ds_DKJungle"],
             // Retro Leaf Cup
-            ["Leaf It To Me"]              = ["Gds_WarioStadium", "Ggc_SherbetLand", "G3ds_MusicPark","G64_YoshiValley"],
+            ["Leaf It To Me"]              = ["Gds_WarioStadium", "Ggc_SherbetLand",   "G3ds_MusicPark",       "G64_YoshiValley"],
             // Retro Lightning Cup
-            ["Lightning Fast"]             = ["Gds_TickTockClock","G3ds_PackunSlider","Gwii_GrumbleVolcano","G64_RainbowRoad"],
-            // Booster Course Pass cups (BCP wave 1)
-            ["Golden Dash Cup"]            = ["Cnsw_11","Cnsw_12","Cnsw_13","Cnsw_14"],
-            ["Lucky Cat Cup"]              = ["Cnsw_15","Cnsw_16","Cnsw_17","Cnsw_18"],
-            ["Turnip Cup"]                 = ["Cnsw_21","Cnsw_22","Cnsw_23","Cnsw_24"],
-            // BCP wave 2
-            ["Paper, Sissors, Rock"]       = ["Cnsw_31","Cnsw_33","Cnsw_34","Cnsw_62"],
-            ["Flying High"]                = ["Cnsw_25","Cnsw_26","Cnsw_27","Cnsw_28"],
-            ["First Mii On The Moon"]      = ["Cnsw_35","Cnsw_32","Cnsw_37","Cnsw_38"],
-            ["A Bit of a Fruity Taste"]    = ["Cnsw_41","Cnsw_47","Cnsw_42","Cnsw_44"],
-            ["What Goes Around, Comes Around"] = ["Cnsw_55","Cnsw_43","Cnsw_36","Cnsw_45"],
-            ["Light As a Feather"]         = ["Cnsw_65","Cnsw_46","Cnsw_63","Cnsw_58"],
-            ["Tangfastic"]                 = ["Cnsw_48","Cnsw_53","Cnsw_52","Cnsw_61"],
-            ["Pretty Nuts"]                = ["Cnsw_54","Cnsw_55","Cnsw_62","Cnsw_61"],
-            ["Sonic, The Turtle"]          = ["Cnsw_45","Cnsw_46","Cnsw_47","Cnsw_48"],
-            ["Propeller Cup"]              = ["Cnsw_25","Cnsw_26","Cnsw_27","Cnsw_28"],
+            ["Lightning Fast"]             = ["Gds_TickTockClock","G3ds_PackunSlider", "Gwii_GrumbleVolcano",  "G64_RainbowRoad"],
+            // Booster Course Pass cups (wave 1)
+            ["Golden Dash Cup"]            = ["Cnsw_11",          "Cnsw_12",           "Cnsw_13",              "Cnsw_14"],
+            ["Lucky Cat Cup"]              = ["Cnsw_15",          "Cnsw_16",           "Cnsw_17",              "Cnsw_18"],
+            ["Turnip Cup"]                 = ["Cnsw_21",          "Cnsw_22",           "Cnsw_23",              "Cnsw_24"],
+            ["Propeller Cup"]              = ["Cnsw_25",          "Cnsw_26",           "Cnsw_27",              "Cnsw_28"],
+            // Booster Course Pass cups (wave 2)
+            ["Rock Cup"]                   = ["Cnsw_31",          "Cnsw_32",           "Cnsw_33",              "Cnsw_34"],
+            ["Moon Cup"]                   = ["Cnsw_35",          "Cnsw_36",           "Cnsw_37",              "Cnsw_38"],
+            // Booster Course Pass cups (wave 3)
+            ["Fruit Cup"]                  = ["Cnsw_41",          "Cnsw_42",           "Cnsw_43",              "Cnsw_44"],
+            ["Boomerang Cup"]              = ["Cnsw_45",          "Cnsw_46",           "Cnsw_47",              "Cnsw_48"],
+            // Booster Course Pass cups (wave 4)
+            ["Feather Cup"]                = ["Cnsw_51",          "Cnsw_52",           "Cnsw_53",              "Cnsw_54"],
+            ["Cherry Cup"]                 = ["Cnsw_55",          "Cnsw_56",           "Cnsw_57",              "Cnsw_58"],
+            // Booster Course Pass cups (wave 5)
+            ["Acorn Cup"]                  = ["Cnsw_61",          "Cnsw_62",           "Cnsw_63",              "Cnsw_64"],
+            ["Spiny Cup"]                  = ["Cnsw_65",          "Cnsw_66",           "Cnsw_67",              "Cnsw_68"],
         };
 
     // Coin-threshold achievements: key = achievement name, value = required total coins.
