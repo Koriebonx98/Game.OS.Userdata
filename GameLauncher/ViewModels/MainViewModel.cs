@@ -2837,7 +2837,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Limit concurrent requests — process up to 40 games per sync
         const int MaxGames = 40;
         int processed = 0;
-        var newlyUnlocked = new List<Models.Achievement>();
+        var newlyUnlockedAchievements = new List<Models.Achievement>();
 
         foreach (var sg in games)
         {
@@ -2878,7 +2878,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     };
                     // Add to local in-memory list and track as new for cloud sync
                     _achievements.Add(achievement);
-                    newlyUnlocked.Add(achievement);
+                    newlyUnlockedAchievements.Add(achievement);
                     known.Add(key);
 
                     // Log unlock event to the activity feed (non-fatal)
@@ -2900,12 +2900,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Persist all newly-unlocked achievements to the cloud user repo
         // (accounts/{username}/achievements.json) so they survive across sessions
         // and are visible on other devices / the web profile.
-        if (newlyUnlocked.Count > 0)
+        if (newlyUnlockedAchievements.Count > 0)
         {
             try
             {
-                await _client.SaveAchievementsAsync(newlyUnlocked).ConfigureAwait(false);
-                DevLogService.Log($"[SteamAchievements] Saved {newlyUnlocked.Count} new unlocks to cloud.");
+                await _client.SaveAchievementsAsync(newlyUnlockedAchievements).ConfigureAwait(false);
+                DevLogService.Log($"[SteamAchievements] Saved {newlyUnlockedAchievements.Count} new unlocks to cloud.");
             }
             catch { /* best-effort — sync must not block the UI */ }
         }

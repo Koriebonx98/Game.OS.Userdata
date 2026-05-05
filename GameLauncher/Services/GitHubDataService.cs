@@ -541,9 +541,9 @@ namespace GameLauncher.Services
             {
                 try
                 {
-                    var (existing, sha) = await ReadFileAsync<List<Achievement>>(key, ct)
+                    var (existingAchievements, sha) = await ReadFileAsync<List<Achievement>>(key, ct)
                         .ConfigureAwait(false);
-                    var list = existing ?? new List<Achievement>();
+                    var list = existingAchievements ?? new List<Achievement>();
 
                     bool changed = false;
                     foreach (var a in newAchievements)

@@ -2448,15 +2448,15 @@ public partial class GameDetailViewModel : ViewModelBase
             var list = new List<Achievement>();
             foreach (var item in arr.EnumerateArray())
             {
-                string name  = TryGetStringProp(item, "name", "Name");
-                string desc  = TryGetStringProp(item, "description", "Description");
-                string icon  = TryGetStringProp(item, "iconUrl", "IconUrl");
-                string achId = TryGetStringProp(item, "achievementId", "AchievementId");
+                string name          = TryGetStringProp(item, "name", "Name");
+                string desc          = TryGetStringProp(item, "description", "Description");
+                string icon          = TryGetStringProp(item, "iconUrl", "IconUrl");
+                string achievementId = TryGetStringProp(item, "achievementId", "AchievementId");
 
                 if (string.IsNullOrEmpty(name)) continue;
                 list.Add(new Achievement
                 {
-                    AchievementId = achId,
+                    AchievementId = achievementId,
                     Name          = name,
                     Description   = desc,
                     IconUrl       = string.IsNullOrEmpty(icon) ? null : icon,
