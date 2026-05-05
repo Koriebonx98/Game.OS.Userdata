@@ -1077,6 +1077,13 @@ class Program
     /// Verifies that when the same game folder exists in Steam common/ AND has an ACF
     /// manifest with a proper display name, the ACF name wins over the raw folder name.
     /// E.g. folder "LHPCR" → ACF name "LEGO® Harry Potter™ Collection".
+    ///
+    /// Tests two sub-cases:
+    /// 1. ACF StateFlags=516 (installed + update paused) — bit 4 IS set, so ACF scan
+    ///    adds the game directly with the proper name.
+    /// 2. ACF StateFlags=2 (download queued) — bit 4 is NOT set, so ACF scan skips the
+    ///    game.  The folder-scan fallback must still use the proper ACF name via
+    ///    <see cref="GameScannerService.BuildAcfInstallDirNames"/>.
     /// </summary>
     private static bool TestSteamAcfNamePriority()
     {
@@ -1093,10 +1100,8 @@ class Program
             Directory.CreateDirectory(gameDir);
             File.WriteAllText(Path.Combine(gameDir, "game.exe"), "fake");
 
-            // Write an ACF manifest that gives the proper display name.
-            // Use StateFlags="516" (installed + update paused) to reproduce the real-world
-            // case where the naive stateFlags != "4" check would drop the game and the
-            // directory scan would fall back to the cryptic folder name "LHPCR".
+            // ── Case 1: StateFlags=516 (installed + update paused, bit 4 IS set) ─
+            // ACF scan adds the game → folder scan skips it → proper name used.
             WriteAcfManifest(steamAppsDir, appId: "400750",
                              name: "LEGO Harry Potter Collection",
                              installDir: "LHPCR", stateFlags: "516");
@@ -1107,22 +1112,20 @@ class Program
 
             // Simulate what ScanStorefrontDirs.ScanDir does (with the new duplicate check)
             // by only adding if the folder is not already in results.
+            var acfNames = GameScannerService.BuildAcfInstallDirNames(steamAppsDir);
             if (!results.Any(g => string.Equals(g.FolderPath, gameDir, StringComparison.OrdinalIgnoreCase)))
             {
-                results.Add(new LocalGame
-                {
-                    Title      = Path.GetFileName(gameDir), // would be "LHPCR"
-                    FolderPath = gameDir,
-                    Source     = "Steam",
-                });
+                string folderName = Path.GetFileName(gameDir);
+                string title = acfNames.TryGetValue(folderName, out var n) ? n : folderName;
+                results.Add(new LocalGame { Title = title, FolderPath = gameDir, Source = "Steam" });
             }
 
             // There must be exactly one entry (no duplicate cards)
             if (results.Count == 1)
-                Console.WriteLine($"  ✅  Exactly 1 entry (no duplicate): \"{results[0].Title}\"");
+                Console.WriteLine($"  ✅  [StateFlags=516] Exactly 1 entry (no duplicate): \"{results[0].Title}\"");
             else
             {
-                Console.WriteLine($"  ❌  Expected 1 entry but got {results.Count} — duplicate detection broken");
+                Console.WriteLine($"  ❌  [StateFlags=516] Expected 1 entry but got {results.Count} — duplicate detection broken");
                 passed = false;
             }
 
@@ -1130,11 +1133,74 @@ class Program
             var entry = results.FirstOrDefault();
             if (entry != null &&
                 string.Equals(entry.Title, "LEGO Harry Potter Collection", StringComparison.OrdinalIgnoreCase))
-                Console.WriteLine($"  ✅  Title from ACF manifest: \"{entry.Title}\" (not raw \"LHPCR\")");
+                Console.WriteLine($"  ✅  [StateFlags=516] Title from ACF manifest: \"{entry.Title}\" (not raw \"LHPCR\")");
             else
             {
-                Console.WriteLine($"  ❌  Title was \"{entry?.Title}\" — expected ACF name to take priority over \"LHPCR\"");
+                Console.WriteLine($"  ❌  [StateFlags=516] Title was \"{entry?.Title}\" — expected ACF name to take priority over \"LHPCR\"");
                 passed = false;
+            }
+
+            // ── Case 2: StateFlags=2 (download queued, bit 4 NOT set) ─────────
+            // ACF scan skips the game.  Folder-scan fallback must use the ACF name
+            // via BuildAcfInstallDirNames (which reads all ACF files regardless of
+            // StateFlags).  This reproduces the "LHPCR vs LEGO Harry Potter" bug
+            // where the game shows as a cryptic folder name instead of its title.
+            string tempRoot2     = Path.Combine(Path.GetTempPath(), "GameOS_AcfPrio2_" + Path.GetRandomFileName());
+            string steamApps2    = Path.Combine(tempRoot2, "steamapps");
+            string commonDir2    = Path.Combine(steamApps2, "common");
+            string gameDir2      = Path.Combine(commonDir2, "LHPCR");
+            try
+            {
+                Directory.CreateDirectory(gameDir2);
+                File.WriteAllText(Path.Combine(gameDir2, "game.exe"), "fake");
+
+                // StateFlags=2 → bit 4 NOT set → ACF scan skips the game
+                WriteAcfManifest(steamApps2, appId: "400750",
+                                 name: "LEGO Harry Potter Collection",
+                                 installDir: "LHPCR", stateFlags: "2");
+
+                var results2 = new List<LocalGame>();
+                GameScannerService.ScanSteamAcfManifests(steamApps2, results2);
+
+                // ACF scan must have skipped this game
+                if (results2.Count == 0)
+                    Console.WriteLine("  ✅  [StateFlags=2] ACF scan correctly skipped game (bit 4 not set)");
+                else
+                {
+                    Console.WriteLine($"  ❌  [StateFlags=2] Expected ACF scan to skip game but got {results2.Count} entries");
+                    passed = false;
+                }
+
+                // BuildAcfInstallDirNames must still return the proper name
+                var acfNames2 = GameScannerService.BuildAcfInstallDirNames(steamApps2);
+                if (acfNames2.TryGetValue("LHPCR", out var mappedName) &&
+                    string.Equals(mappedName, "LEGO Harry Potter Collection", StringComparison.OrdinalIgnoreCase))
+                    Console.WriteLine($"  ✅  [StateFlags=2] BuildAcfInstallDirNames returns proper name: \"{mappedName}\"");
+                else
+                {
+                    Console.WriteLine($"  ❌  [StateFlags=2] BuildAcfInstallDirNames did not return proper name for \"LHPCR\" (got \"{mappedName}\")");
+                    passed = false;
+                }
+
+                // Simulate folder-scan fallback: game not in results → use acfNames2 for title
+                string folderName2 = Path.GetFileName(gameDir2);
+                string title2 = acfNames2.TryGetValue(folderName2, out var n2) ? n2 : folderName2;
+                results2.Add(new LocalGame { Title = title2, FolderPath = gameDir2, Source = "Steam" });
+
+                // The folder-scan fallback must use the proper ACF name, not "LHPCR"
+                var entry2 = results2.FirstOrDefault();
+                if (entry2 != null &&
+                    string.Equals(entry2.Title, "LEGO Harry Potter Collection", StringComparison.OrdinalIgnoreCase))
+                    Console.WriteLine($"  ✅  [StateFlags=2] Folder-scan fallback uses ACF name: \"{entry2.Title}\" (not raw \"LHPCR\")");
+                else
+                {
+                    Console.WriteLine($"  ❌  [StateFlags=2] Folder-scan fallback used raw name \"{entry2?.Title}\" — expected \"LEGO Harry Potter Collection\"");
+                    passed = false;
+                }
+            }
+            finally
+            {
+                try { if (Directory.Exists(tempRoot2)) Directory.Delete(tempRoot2, recursive: true); } catch { }
             }
         }
         catch (Exception ex)
