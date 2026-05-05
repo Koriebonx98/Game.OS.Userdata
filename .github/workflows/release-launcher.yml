@@ -149,12 +149,16 @@ jobs:
           fi
 
       - name: Publish Linux x64 standalone binary
+        # IncludeNativeLibrariesForSelfExtract=true bundles libSkiaSharp.so and
+        # libHarfBuzzSharp.so INTO the single-file binary so users don't need
+        # those .so files alongside the launcher (fixes the Bazzite/Linux crash).
         run: |
           dotnet publish GameLauncher/GameLauncher.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained true \
             -p:PublishSingleFile=true \
+            -p:IncludeNativeLibrariesForSelfExtract=true \
             -o /tmp/GameOS-Launcher-linux-x64
           cp /tmp/GameOS-Launcher-win-x64/gameos-backend.url /tmp/GameOS-Launcher-linux-x64/gameos-backend.url 2>/dev/null || true
           cp /tmp/GameOS-Launcher-win-x64/gameos-token.dat   /tmp/GameOS-Launcher-linux-x64/gameos-token.dat   2>/dev/null || true
