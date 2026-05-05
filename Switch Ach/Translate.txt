@@ -1,0 +1,292 @@
+## "Mario Kart 8 Deluxe" ##
+
+# find in log:
+"Room: match" 
+"FinishReason": "Finish"  
+
+#Tracks:
+# Mushroom Cup:
+Gu_FirstCircuit = Mario Kart Stadium
+Gu_WaterPark = Water Park
+Gu_Cake = Sweet Sweet Canyon
+Gu_DossunIseki = Thwomp Ruins
+# Flower Cup:
+Gu_MarioCircuit = Mario Circit 
+Gu_City = Toad Harbor 
+Gu_HorrorHouse = Twisted Mansion
+Gu_Expert = Shy Guy Falls
+#Star Cup:
+Gu_Airport = Sunshine Airport 
+Gu_Ocean = Dolphin Shoals
+Gu_Techno = Electrodrome 
+Gu_SnowMountain = Mount Wario
+# Special Cup:
+Gu_Cloud = Cloudtop Cruise
+Gu_Desert = Bone-Dry Dunes
+Gu_BowserCastle = Browsers Castle
+Gu_RainbowRoad = Rainbow Road
+# Egg Cup:
+Dgc_YoshiCircuit = Yoshi Circit
+Du_ExciteBike = Excitebike Arena
+Du_DragonRoad = Dragon Dritway
+Du_MuteCity = Mute City
+# Cross Cup:
+Dgc_BabyPark = Baby Park
+Dagb_CheeseLand = Cheese Land 
+Du_Woods = Wild Woods
+Du_Animal_Summer = Animal Crossing 
+# Shell Cup
+Gwii_MooMooMeadows = Moo Moo Meadows 
+Gagb_MarioCircuit = Mario Circit (GBA)
+Gds_PukupukuBeach = Cheap Cheap Beach
+G64_KinopioHighway = Toad's Turnpike
+# Banana Cup
+Ggc_DryDryDesert = Dry Dry Desert
+Gsfc_DonutsPlain3 = Donut Plains 3
+G64_PeachCircuit = Royal Raceway
+G3ds_DKJungle = DK Jungle
+# Leaf Cup:
+Gds_WarioStadium = Wario Stadium
+Ggc_SherbetLand = Sherbert Land 
+G3ds_MusicPark = Music Park
+G64_YoshiValley = Yoshi Valley
+# Lightning Cup
+Gds_TickTockClock = Tick-Tock Clock
+G3ds_PackunSlider = Piranha Plant Slide
+Gwii_GrumbleVolcano = Grumble Volcano 
+G64_RainbowRoad = Rainbow Road (N64)
+# Triforce Cup:
+Dwii_WariosMine = Wario's Gold Mine 
+Dsfc_RainbowRoad = Rainbow Road (Snes)
+Du_IcePark = Ice Ice Outpost
+Du_Hyrule = Hyrule Circit
+# Bell Cup:
+D3ds_NeoBowserCity = Neo Bowser City
+Dagb_RibbonRoad = Ribbon Road
+Du_Metro = Super Bell Subway
+Du_BigBlue = Big Blue
+# Golden Dash Cup:
+Cnsw_11 = Paris Promendae
+Cnsw_12 = Toad Circuit 
+Cnsw_13 = Chococ Mountain 
+Cnsw_14 = Coconut Mall
+# Lucky Cat Cup
+Cnsw_15 = Tokyo Blur
+Cnsw_16 = Shroom Ridge
+Cnsw_17 = Sky Garden
+Cnsw_18 = Ninja Hideway
+# Turnip Cup:
+Cnsw_21 = New York Minute
+Cnsw_22 = Mario Circit 3
+Cnsw_23 = Kalimar Desert
+Cnsw_24 = Walugi Pinball
+#Propeller Cup
+Cnsw_25 = Sydney Sprint 
+Cnsw_26 = Snow Land
+Cnsw_27 = Mushroom Gorge 
+Cnsw_28 = Sky-High Sundae
+#Rock Cup:
+Cnsw_31 = London Loop
+Cnsw_33 = Boo Lake
+Cnsw_34 = Rock Rock Mountain
+Cnsw_62 = Maple Treeway
+# Moon Cup:
+Cnsw_35 = Berlin Byways
+Cnsw_32 = Peach Gardens
+Cnsw_37 = Merry Mountain
+Cnsw_38 = Rainbow Road (3DS)
+# Fruit Cup
+Cnsw_41 = Amsterdam Drift
+Cnsw_47 = Riverside Park
+Cnsw_42 = DK Summit
+Cnsw_44 = Yoshi's Island
+#Boomerang cup:
+Cnsw_55 = Bangkok Rush
+Cnsw_43 = Mario Circit (DS)
+Cnsw_36 = Waluigi Stadium
+Cnsw_45 = Singapore Speedway
+# Feather Cup:
+Cnsw_65 = Athens Dash
+Cnsw_46 = Daisy Cruiser
+Cnsw_63 = Moonview Highway
+Cnsw_58 = Squeaky Clean Sprint
+# Cherry Cup:
+Cnsw_48 = Los Angeles Laps
+Cnsw_53 = Sunset Wilds
+Cnsw_52 = Koopa Cape
+Cnsw_61 = Vancouver Velocity
+# Acorn Cup:
+Cnsw_54 = Rome Aavanti
+DK Mountain 
+Daisy Circuit
+Piranha Plant Cove
+# Spiny Cup:
+Madrid Drive 
+Rosalina's Ice World
+Bowser Castle 3
+Rainbow Road (Wii)
+
+# Battle Tracks:
+Bu_BattleStadium = Battle Stadium
+Bu_Sweets = Sweet Sweet Kingdom
+Bu_Dojo = Dragon Palace
+Bu_Moon = Lunar Colony
+
+# Drivers:
+Mario = Mario 
+Luigi = Luigi
+Peach = Peach
+Daisy = Daisy
+Rosetta = Rosalina
+TanukiMario = Ttanooki Mario
+CatPeach = Cat Peach
+DrvChr01 = Birdo pink
+Yoshi= Green
+Kinopio = Toad
+Nokonoko = Koopa Troopa 
+Heyho = Shy Guy Red
+Jugem = Lakitu 
+Kinopico = Toadette
+KingTeresa = King boo
+DrvChr03 = Petey Piranha  
+MetalMario = Metal Mario
+MetalPeach = Pink Gold Peach
+DrvChr04 = Wiggler
+Wario = Wario 
+Waluigi = Waluigi
+DK = Donkey Kong
+Koopa = Bowser 
+Karon = Dry Bones
+KoopaJr = Baby Bowser
+HoneKoopa = Dry Bowser
+DrvChr02 = Kamek 
+Lemmy = Lemmy
+Larry = Larry
+Wendy = Wendy
+Ludwig = Ludwig
+Iggy = Iggy
+Roy = Roy
+Morton = Morton
+DrvChr07 = Peachette
+SplatoonGirl = Inking Girl Orange
+AnimalBoyA = Villager Boy
+AnimalGirlA = Villager Girl
+Shizue = Isabelle
+LinkBotw = Link #1
+Link = Link #2
+DrvChr05 = Diddy Kong
+DrvChr06 = Funky Kong
+DrvChr08 = Pauline
+Mii = Mii 1
+
+# Baby Drivers:
+BbMario = Baby Mario
+BbLuigi = Baby Luigi
+bbPeach = Baby Peach
+BBDaisy = Baby Daisy 
+BBRosetta = Baby Rosalina
+
+# Karts:
+
+# Body:
+K_Std = Standard Kart
+K_Sbm = Steel Driver
+K_Fml = Circuit Special
+K_Snk = Sneaker
+K_Btl = Streetle
+B_Std = Bike Standard
+B_Fro = Commet Bike
+B_Bow = Master Cycle Zero
+B_Sct = City Tripper
+V-Atv  = Standard Atv
+V_Spl = Splat Buggy
+
+# Tire:
+Std = Standard Tires
+Big = Monster Tires
+Sml = Roller Tires
+Rng = Slim Tires
+Ofr = Off Road Tires
+Spg = Sponge Tires
+Bow = Ancient Tires 
+
+# Wing:
+Std = Standard Wing
+Prc = Parachute Wing
+Prf = Parafoil Wing 
+Spl = Plane Glider Wing
+Bow = Paraglider Wing
+
+# Engine: 
+200cc = 200cc
+150cc = 150cc
+100cc = 100cc
+50cc = 50cc
+Mirror = Reverse
+Battle = Battle
+
+# Race Type:
+Balloon = Ballon Battle
+GP = Grand Prix
+Keidoro = Renegade Roundup
+Bomb = Bob-omb Blast
+Coin = Coin Runners
+VS = VS
+
+# Team Type:
+Police = Police
+
+# Other:
+CoinNum = Coins
+JugemRescue = Rescue 
+
+# CPU:
+Normal = Normal
+Easy = Easy
+
+
+## End of: "Mario Kart 8 Deluxe" ##
+
+## "Super Mario 3D World & Bowsers Fury" ##
+
+# Info:
+World_id = World
+stage_id = Level
+green_stars = Green Stars
+
+# Green Stars
+[ 0, 1, 2 ] = all 3x Green Stars 
+
+# Bonus:
+ 
+# Boss Levels:
+World 1, Level 11 = First Mini Boss
+
+# Toad Houses:
+World 1, Stage id 6 = Toad House #1
+
+## End of: "Super Mario 3D World & Bowsers Fury" ##
+
+## "Super Mario Bros. Wonder" ##
+
+#course data:
+Room: course_result = End of Level
+world_no = World
+course_no = Level
+" "net_mode": False" = Offline
+" "net_mode": True" = Online
+" "local_player_num": 1" = 1 Player
+
+## End of: "Super Mario Bros. Wonder" ##
+
+## "Super Mario Odsey" ##
+# look for "Room: complete_main_scenario_event"
+# world_id = World
+# main_scenario_no
+
+
+## End of: "Super Mario Odsey" ##
+
+## "Kirby Return to Dreamland" ##
+
+## End of: "Kirby Return to Dreamland" ##
