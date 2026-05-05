@@ -2611,10 +2611,23 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         Achievements.Clear();
         if (achievements != null)
-            foreach (var a in achievements) Achievements.Add(a);
+        {
+            // Sort: unlocked achievements first (most recently unlocked at top),
+            // then locked achievements in their original order.
+            var sorted = achievements
+                .OrderByDescending(a => a.IsUnlocked)
+                .ThenByDescending(a =>
+                {
+                    if (!a.IsUnlocked) return DateTime.MinValue;
+                    return DateTime.TryParse(a.UnlockedAt, null,
+                        System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
+                        ? dt : DateTime.MinValue;
+                });
+            foreach (var a in sorted) Achievements.Add(a);
+        }
         HasAchievements   = Achievements.Count > 0;
-        ShowAllAchievements = false;
-        HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
+        ShowAllAchievements = true;
+        HasMoreAchievements = false;
         AchievementsLabel = HasAchievements
             ? $"🏆  Achievements  ({Achievements.Count})"
             : "🏆  Achievements";
@@ -2629,7 +2642,7 @@ public partial class GameDetailViewModel : ViewModelBase
             : Achievements.Take(AchievementsPreviewCount);
         foreach (var a in source)
             VisibleAchievements.Add(a);
-        HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
+        HasMoreAchievements = !ShowAllAchievements && Achievements.Count > AchievementsPreviewCount;
     }
 
     private void PopulateRegions(List<string>? regions)
