@@ -4,8 +4,11 @@
 
 A modern, secure web application with account registration, login, a multi-platform game library, a friends system, inbox, user profiles, and API token support. Works in demo mode (browser localStorage) right out of the box, with optional GitHub repository-based storage for production use.
 
+🌐 **Live site:** [koriebonx98.github.io/Game.OS.Userdata](https://koriebonx98.github.io/Game.OS.Userdata/)
+
 ## 📋 Table of Contents
 
+- [Game.OS Launcher (Desktop App)](#-gameos-launcher-desktop-app)
 - [Features](#features)
 - [Pages](#pages)
 - [Demo Mode](#demo-mode)
@@ -14,6 +17,74 @@ A modern, secure web application with account registration, login, a multi-platf
 - [Setup Instructions](#setup-instructions)
 - [Usage](#usage)
 - [Security Considerations](#security-considerations)
+
+---
+
+## 🖥️ Game.OS Launcher (Desktop App)
+
+The **Game.OS Launcher** is a native desktop application (Windows, Linux, macOS) built with .NET 8 and Avalonia UI. It connects to the same Game.OS account system as the website — use the same login credentials you created on the site.
+
+### Launcher Features
+
+| Feature | Description |
+|---|---|
+| 🔐 **Sign In** | Log in with your Game.OS username/email and password |
+| 📚 **Library** | Browse and manage your full multi-platform game library |
+| 🗂️ **Dashboard** | At-a-glance view of recent games and stats |
+| 🏪 **Store** | Discover and add new games from the Game.OS catalogue |
+| 👥 **Friends** | View your friends list and shared game activity |
+| 👤 **Profile** | View your public profile and achievements |
+| 🎬 **Trailer Player** | Watch game trailers in-app (powered by libVLC) |
+| ⚙️ **Settings** | Configure auto-update, intro video, dev logs, and more |
+| 🌐 **Web Panels** | Embedded web views for rich in-app content |
+
+### Download
+
+Pre-built binaries are attached to each [GitHub Release](../../releases/latest):
+
+| Platform | File |
+|---|---|
+| **Windows** (x64) | `GameOS-Launcher-win-x64.zip` — extract and run `GameLauncher.exe` |
+| **Linux** (x64) | `GameOS-Launcher-linux-x64.tar.gz` — extract and run `install-linux.sh` |
+| **macOS** (Intel) | `GameOS-Launcher-osx-x64.tar.gz` |
+| **macOS** (Apple Silicon) | `GameOS-Launcher-osx-arm64.tar.gz` |
+
+### Linux Installation (Bazzite, Fedora, Ubuntu, Arch…)
+
+The Linux release is a **self-contained single-file binary** — the .NET runtime and all Skia/HarfBuzz rendering libs are bundled inside it, so no separate .so files are required.
+
+Two system libraries **cannot** be bundled and must be present on the host:
+
+| Library | Used for | Package name |
+|---|---|---|
+| **libvlc** | Trailer / video playback | `vlc` |
+| **webkit2gtk** | In-app web view panels | `webkit2gtk4.1` |
+
+**Quick install steps:**
+
+```bash
+# 1. Download and extract the Linux tarball from the latest GitHub Release
+tar -xzf GameOS-Launcher-linux-x64.tar.gz
+cd GameOS-Launcher-linux-x64
+
+# 2. Run the installer (handles deps + desktop menu entry)
+chmod +x install-linux.sh && ./install-linux.sh
+```
+
+The installer detects your distro and offers to install missing dependencies automatically.
+
+**Manual dependency install by distro:**
+
+| Distro | Command |
+|---|---|
+| **Bazzite / Silverblue** (immutable) | `sudo rpm-ostree install vlc webkit2gtk4.1` then reboot |
+| **Fedora** | `sudo dnf install vlc webkit2gtk4.1` |
+| **Ubuntu / Debian** | `sudo apt install vlc libwebkit2gtk-4.1-0` |
+| **Arch / Manjaro** | `sudo pacman -S vlc webkit2gtk-4.1` |
+
+After installation the launcher appears in your **application menu** as **Game.OS Launcher** — just click it to launch. No terminal required.
+
+---
 
 ## ✨ Features
 
