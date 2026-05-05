@@ -73,14 +73,17 @@ chmod +x install-linux.sh && ./install-linux.sh
 
 The installer detects your distro and offers to install missing dependencies automatically.
 
+> **Bazzite / immutable Fedora note:** `rpm-ostree install` layers packages into the
+> next boot image. A **reboot is required** after installation before the launcher will start.
+
 **Manual dependency install by distro:**
 
 | Distro | Command |
 |---|---|
-| **Bazzite / Silverblue** (immutable) | `sudo rpm-ostree install vlc webkit2gtk4.1` then reboot |
+| **Bazzite / Silverblue** (immutable) | `sudo rpm-ostree install vlc webkit2gtk4.1` — then **reboot** |
 | **Fedora** | `sudo dnf install vlc webkit2gtk4.1` |
 | **Ubuntu / Debian** | `sudo apt install vlc libwebkit2gtk-4.1-0` |
-| **Arch / Manjaro** | `sudo pacman -S vlc webkit2gtk-4.1` |
+| **Arch / Manjaro** | `sudo pacman -Syu vlc webkit2gtk-4.1` |
 
 After installation the launcher appears in your **application menu** as **Game.OS Launcher** — just click it to launch. No terminal required.
 

@@ -79,17 +79,16 @@ fi
 MISSING_DEPS=()
 
 check_lib() {
-    # Returns 0 (found) or 1 (missing).  Checks ldconfig cache and
-    # common .so symlinks under /usr and /lib.
+    # Returns 0 (found) or 1 (missing).  Checks ldconfig cache for an exact
+    # library name match (e.g. "libvlc.so" for libname="vlc").
     local libname="$1"
-    ldconfig -p 2>/dev/null | grep -qi "${libname}" && return 0
-    ls /usr/lib*/lib${libname}* /lib*/lib${libname}* 2>/dev/null | grep -q . && return 0
+    ldconfig -p 2>/dev/null | grep -q "lib${libname}\.so" && return 0
     return 1
 }
 
 echo -e "${BOLD}Checking system dependencies…${NC}"
 
-# libvlc
+# libvlc runtime
 if check_lib "vlc"; then
     _ok "libvlc found"
 else
@@ -97,8 +96,8 @@ else
     MISSING_DEPS+=("libvlc")
 fi
 
-# webkit2gtk (try both -4.1 and -4.0 variants)
-if check_lib "webkit2gtk-4.1" || check_lib "webkit2gtk-4.0" || check_lib "WebKitGTK"; then
+# webkit2gtk (try 4.1 first, then 4.0 fallback)
+if check_lib "webkit2gtk-4.1" || check_lib "webkit2gtk-4.0"; then
     _ok "webkit2gtk found"
 else
     _warn "webkit2gtk not found — in-app web panels may not display"
@@ -122,17 +121,16 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
         echo ""
         echo -e "  ${CYAN}sudo rpm-ostree install vlc webkit2gtk4.1${NC}"
         echo ""
-        echo "  Alternatively, skip the reboot by using a Distrobox container:"
-        echo ""
-        echo -e "  ${CYAN}distrobox-enter -- bash -c 'sudo dnf install -y vlc webkit2gtk4.1'${NC}"
-        echo ""
         if [ "${IS_IMMUTABLE}" = "true" ]; then
             read -r -p "Would you like to run 'rpm-ostree install' now? (y/N) " REPLY
             if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
                 sudo rpm-ostree install vlc webkit2gtk4.1 || \
                     _warn "rpm-ostree install failed — install manually then reboot."
+                echo ""
+                _warn "A reboot is required before the new packages take effect."
+                echo "  Reboot now and then run the launcher from your application menu."
             else
-                _info "Skipping dependency install — run the command above before first launch."
+                _info "Skipping — run the command above, reboot, then launch from the app menu."
             fi
         fi
         ;;
@@ -153,8 +151,8 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
         read -r -p "Install missing dependencies now? (y/N) " REPLY
         if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
             sudo apt-get update -qq
-            sudo apt-get install -y vlc libvlc-dev libwebkit2gtk-4.1-0 || \
-            sudo apt-get install -y vlc libvlc-dev libwebkit2gtk-4.0-37 || \
+            sudo apt-get install -y vlc libwebkit2gtk-4.1-0 || \
+            sudo apt-get install -y vlc libwebkit2gtk-4.0-37 || \
                 _warn "apt install failed — install manually: sudo apt install vlc libwebkit2gtk-4.1-0"
         fi
         ;;
@@ -162,11 +160,12 @@ if [ ${#MISSING_DEPS[@]} -gt 0 ]; then
       # ── Arch / Manjaro / EndeavourOS ──────────────────────────────
       arch|manjaro|endeavouros|garuda)
         echo -e "${BOLD}Arch Linux detected (pacman)${NC}"
-        read -r -p "Install missing dependencies now? (y/N) " REPLY
+        echo "  Note: Arch requires a fully up-to-date system before installing new packages."
+        read -r -p "Run 'pacman -Syu' to update and install dependencies now? (y/N) " REPLY
         if [[ "${REPLY}" =~ ^[Yy]$ ]]; then
-            sudo pacman -Sy --noconfirm vlc webkit2gtk-4.1 || \
-            sudo pacman -Sy --noconfirm vlc webkit2gtk || \
-                _warn "pacman install failed — install manually: sudo pacman -S vlc webkit2gtk-4.1"
+            sudo pacman -Syu --noconfirm vlc webkit2gtk-4.1 || \
+            sudo pacman -Syu --noconfirm vlc webkit2gtk || \
+                _warn "pacman install failed — install manually: sudo pacman -Syu vlc webkit2gtk-4.1"
         fi
         ;;
 
