@@ -591,11 +591,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             StartOfflineReconnectTimer();
         }
 
-        var localCards = LibraryVm.GetMyGameSources()
-            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-            .Where(c => c != null)
-            .Cast<LocalGameCardVm>()
-            .ToList();
+        var localCards = GetDashboardCards();
 
         DevLogService.Log($"[MainViewModel] Local game cards found: {localCards.Count}. Loading child view models…");
         DashboardVm.Load(profile, library, achievements, localCards);
@@ -1091,12 +1087,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // reflected with correct (zero) playtime rather than stale data.
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var cards = LibraryVm.GetMyGameSources()
-                        .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                        .Where(c => c != null)
-                        .Cast<LocalGameCardVm>()
-                        .ToList();
-                    DashboardVm.Load(_profile, library, _achievements, cards);
+                    DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
                 });
                 return;
             }
@@ -1132,12 +1123,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log("[Playtime] Applied cloud playtime totals to library and cache.");
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                var cards = LibraryVm.GetMyGameSources()
-                    .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                    .Where(c => c != null)
-                    .Cast<LocalGameCardVm>()
-                    .ToList();
-                DashboardVm.Load(_profile, library, _achievements, cards);
+                DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
                 LibraryVm.Load(library);
             });
         }
@@ -1205,11 +1191,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private void RefreshDashboardLocalGames()
     {
         if (!ShowMain) return; // not logged in yet
-        var localCards = LibraryVm.GetMyGameSources()
-            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-            .Where(c => c != null)
-            .Cast<LocalGameCardVm>()
-            .ToList();
+        var localCards = GetDashboardCards();
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             DashboardVm.Load(_profile, _library, _achievements, localCards));
     }
@@ -1432,6 +1414,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // FindDatabaseGame, so "[FitGirl Repack]" suffixes are stripped automatically.
         _ = EnrichLocalGameDetailAsync(repack.Title, "PC");
     }
+
+    /// <summary>
+    /// Returns a snapshot of the unified My Games card list used to populate the
+    /// dashboard "Continue Playing" section and the Recent Achievements game list.
+    /// Extracted into a helper to avoid duplicating the same LINQ chain at every call site.
+    /// </summary>
+    private List<LocalGameCardVm> GetDashboardCards() =>
+        LibraryVm.GetMyGameSources()
+            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
+            .Where(c => c != null)
+            .Cast<LocalGameCardVm>()
+            .ToList();
 
     /// <summary>
     /// Opens the detail overlay for a card from the unified "My Games" section.
@@ -1855,12 +1849,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         LibraryVm.Load(_library);
                         // Pass localCards so the "Continue Playing" section rebuilds with
                         // newly-enriched cover URLs on cloud game cards.
-                        var cards = LibraryVm.GetMyGameSources()
-                            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                            .Where(c => c != null)
-                            .Cast<LocalGameCardVm>()
-                            .ToList();
-                        DashboardVm.Load(_profile, _library, _achievements, cards);
+                        DashboardVm.Load(_profile, _library, _achievements, GetDashboardCards());
                     });
                     // Also re-run cover enrichment for any dashboard cards still missing covers
                     _ = EnrichDashboardCoversAsync();
@@ -2415,11 +2404,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 _achievements = achievements;
                 IsOfflineMode = false;
 
-                var localCards = LibraryVm.GetMyGameSources()
-                    .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                    .Where(c => c != null)
-                    .Cast<LocalGameCardVm>()
-                    .ToList();
+                var localCards = GetDashboardCards();
                 DashboardVm.Load(_profile, _library, _achievements, localCards);
                 LibraryVm.Load(_library);
                 StoreVm.Load(GameCatalog.Store, _library, _profile, _client, _client.IsAdmin);

@@ -665,7 +665,8 @@ public partial class LibraryViewModel : ViewModelBase
         // ── Unified My Games (Cloud + LocalGames + Repacks + ROMs) ───────────
         // Refresh playtime labels on cloud game cards so they reflect the latest
         // PlaytimeMinutes values (which may have been updated by ApplyCloudPlaytimeAsync
-        // after the cards were initially built).
+        // after the cards were initially built). Only cloud cards need this — local game
+        // and ROM cards source their playtime from PlaytimeService directly.
         foreach (var card in _allMyGames)
         {
             if (card.SourceCloudGame != null)
