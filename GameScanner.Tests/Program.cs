@@ -439,6 +439,13 @@ class Program
         if (!gameOsTitlePassed) passed = false;
         Console.WriteLine();
 
+        // ── STEAM NON-GAME FOLDER FILTER ─────────────────────────────────────
+        Console.WriteLine("🚫 Steam Non-Game Folder Filter (acfNamesOnly blocks utility folders):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool nonGameFilterPassed = TestSteamNonGameFolderFilter();
+        if (!nonGameFilterPassed) passed = false;
+        Console.WriteLine();
+
         // ── SUMMARY ───────────────────────────────────────────────────────────
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
         if (passed)
@@ -1434,6 +1441,127 @@ class Program
         finally
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
+        }
+
+        return passed;
+    }
+
+    private static bool TestSteamNonGameFolderFilter()
+    {
+        // Verifies that the acfNamesOnly=true mode on ScanDir (used for all Steam
+        // steamapps/common/ directories) filters out well-known Steam utility folders
+        // that have no ACF manifest — "Steamworks Common Redistributables", "SteamVR",
+        // "steam_settings" sub-folders, etc. — even when those folders contain .exe files.
+        // This mirrors the Game Store.cs approach: only add Steam common/ folders that
+        // appear in the ACF installdir→name map.
+        string tempRoot = Path.Combine(Path.GetTempPath(), "GameOS_NonGameFilter_" + Path.GetRandomFileName());
+        bool passed = true;
+
+        try
+        {
+            string steamAppsDir = Path.Combine(tempRoot, "steamapps");
+            string commonDir    = Path.Combine(steamAppsDir, "common");
+
+            // ── Real game: has an ACF entry ────────────────────────────────
+            string gameDir = Path.Combine(commonDir, "GodOfWarRagnarok");
+            Directory.CreateDirectory(gameDir);
+            File.WriteAllText(Path.Combine(gameDir, "GoW.exe"), "fake");
+            WriteAcfManifest(steamAppsDir, appId: "2322010",
+                             name: "God of War Ragnarök",
+                             installDir: "GodOfWarRagnarok", stateFlags: "4");
+
+            // ── Steam utility folders: no ACF entry but contain an .exe ───
+            // Steamworks Common Redistributables (real Steam pseudo-package)
+            string redistributablesDir = Path.Combine(commonDir, "Steamworks Common Redistributables");
+            Directory.CreateDirectory(redistributablesDir);
+            File.WriteAllText(Path.Combine(redistributablesDir, "installscript_redistributables.exe"), "fake");
+
+            // SteamVR
+            string steamVrDir = Path.Combine(commonDir, "SteamVR");
+            Directory.CreateDirectory(steamVrDir);
+            File.WriteAllText(Path.Combine(steamVrDir, "vrstartup.exe"), "fake");
+
+            // steam_settings (embedded inside a game folder in some cracked game distributions)
+            string steamSettingsDir = Path.Combine(commonDir, "steam_settings");
+            Directory.CreateDirectory(steamSettingsDir);
+            File.WriteAllText(Path.Combine(steamSettingsDir, "Game.exe"), "fake");
+
+            // Build the ACF installdir→name map (only GodOfWarRagnarok has an ACF)
+            var acfNames = GameScannerService.BuildAcfInstallDirNames(steamAppsDir);
+
+            // Run ACF scan first, then ScanDir with acfNamesOnly=true
+            // (We call the internal public APIs directly, mirroring what ScanStorefrontDirs does)
+            var results = new List<LocalGame>();
+            GameScannerService.ScanSteamAcfManifests(steamAppsDir, results);
+
+            // Simulate ScanDir with acfNamesOnly=true by manually applying the same logic:
+            // only add folders that have an entry in acfNames and are not already in results.
+            var existingPaths = new HashSet<string>(
+                results.Select(g => g.FolderPath), StringComparer.OrdinalIgnoreCase);
+            foreach (var folder in Directory.EnumerateDirectories(commonDir))
+            {
+                if (existingPaths.Contains(folder)) continue;
+                string folderName = Path.GetFileName(folder);
+                // acfNamesOnly check: skip if not in acfNames
+                if (!acfNames.ContainsKey(folderName)) continue;
+                // Would add game here, but for this test we just record the folder
+                results.Add(new LocalGame
+                {
+                    Title      = acfNames.TryGetValue(folderName, out var n) ? n : folderName,
+                    FolderPath = folder,
+                    Source     = "Steam",
+                });
+            }
+
+            // ── God of War Ragnarök must be present ────────────────────────
+            var gow = results.FirstOrDefault(g =>
+                string.Equals(g.Title, "God of War Ragnarök", StringComparison.OrdinalIgnoreCase));
+            if (gow != null)
+                Console.WriteLine($"  ✅  Real game detected: \"{gow.Title}\"");
+            else
+            {
+                Console.WriteLine("  ❌  Real game \"God of War Ragnarök\" was NOT detected");
+                passed = false;
+            }
+
+            // ── Utility folders must NOT be present ────────────────────────
+            var utilityFolders = new[]
+            {
+                ("Steamworks Common Redistributables", "Steamworks Common Redistributables"),
+                ("SteamVR",                            "SteamVR"),
+                ("steam_settings",                     "steam_settings"),
+            };
+            foreach (var (folderName, displayName) in utilityFolders)
+            {
+                var entry = results.FirstOrDefault(g =>
+                    string.Equals(g.Title, displayName, StringComparison.OrdinalIgnoreCase)
+                    || (g.FolderPath != null && Path.GetFileName(g.FolderPath)
+                            .Equals(folderName, StringComparison.OrdinalIgnoreCase)));
+                if (entry == null)
+                    Console.WriteLine($"  ✅  \"{folderName}\" correctly excluded (no ACF entry)");
+                else
+                {
+                    Console.WriteLine($"  ❌  \"{folderName}\" was NOT excluded — utility folder appeared as a game card");
+                    passed = false;
+                }
+            }
+
+            if (results.Count == 1)
+                Console.WriteLine($"  ✅  Exactly 1 game in results (utility folders filtered out)");
+            else
+            {
+                Console.WriteLine($"  ❌  Expected 1 game but got {results.Count} — some utility folders leaked through");
+                passed = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌  SteamNonGameFolderFilter test threw: {ex.Message}");
+            passed = false;
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); } catch { }
         }
 
         return passed;

@@ -437,9 +437,17 @@ public sealed class GameScannerService : IDisposable
         // name for games that the StateFlags-filtered ACF scan skipped (e.g. a game
         // whose ACF has StateFlags=2 meaning "download queued" but whose folder and
         // executable already exist on disk).
+        //
+        // acfNamesOnly: when true, only adds folders that appear in acfNames.
+        // This mirrors the Game Store reference code which builds an ACF installdir→name
+        // map and ONLY adds game folders that exist in that map.  The practical effect
+        // is that Steam utility folders with no ACF file — "Steamworks Common
+        // Redistributables", "SteamVR", a game's internal "steam_settings" directory,
+        // etc. — are never surfaced as fake game cards in the library.
         static void ScanDir(string path, List<LocalGame> results, string driveRoot,
                             string source = "Local",
-                            IReadOnlyDictionary<string, string>? acfNames = null)
+                            IReadOnlyDictionary<string, string>? acfNames = null,
+                            bool acfNamesOnly = false)
         {
             if (!Directory.Exists(path)) return;
             int beforeCount = results.Count;
@@ -456,6 +464,16 @@ public sealed class GameScannerService : IDisposable
                     if (existingPaths.Contains(gameFolder))
                         continue;
 
+                    string folderName = Path.GetFileName(gameFolder);
+
+                    // When acfNamesOnly is true (used for steamapps/common), skip any
+                    // folder that has no ACF manifest — this is how Game Store.cs filters
+                    // out Steam utility packages (Steamworks Common Redistributables,
+                    // SteamVR, internal steam_settings sub-folders, etc.) that contain
+                    // executables but are not real games.
+                    if (acfNamesOnly && (acfNames == null || !acfNames.ContainsKey(folderName)))
+                        continue;
+
                     var exe = FindExecutable(gameFolder);
                     if (exe is null) continue;
 
@@ -463,7 +481,6 @@ public sealed class GameScannerService : IDisposable
                     // The ACF name is used even when the ACF scan skipped the game due
                     // to StateFlags (e.g. "download queued"), so the user sees a proper
                     // display name instead of a cryptic installdir like "LHPCR".
-                    string folderName = Path.GetFileName(gameFolder);
                     string title = ReadGameOsTitle(gameFolder)
                                 ?? (acfNames?.TryGetValue(folderName, out var acfName) == true
                                         ? acfName
@@ -504,7 +521,7 @@ public sealed class GameScannerService : IDisposable
             // (e.g. "LEGO® Harry Potter™ Collection" instead of raw folder name "LHPCR").
             // ScanDir runs afterwards as a fallback and skips folders already added.
             ScanSteamAcfManifests(steamApps, results);
-            ScanDir(steamCommon, results, driveRoot, "Steam", steamAcfNames);
+            ScanDir(steamCommon, results, driveRoot, "Steam", steamAcfNames, acfNamesOnly: true);
 
             // Additional Steam library folders declared in libraryfolders.vdf
             string vdfPath = Path.Combine(steamApps, "libraryfolders.vdf");
@@ -514,7 +531,7 @@ public sealed class GameScannerService : IDisposable
                 string libCommon    = Path.Combine(libSteamApps, "common");
                 var libAcfNames = BuildAcfInstallDirNames(libSteamApps);
                 ScanSteamAcfManifests(libSteamApps, results);
-                ScanDir(libCommon, results, libPath, "Steam", libAcfNames);
+                ScanDir(libCommon, results, libPath, "Steam", libAcfNames, acfNamesOnly: true);
             }
 
             // ── Epic Games — manifest-based discovery ──────────────────────
@@ -558,7 +575,7 @@ public sealed class GameScannerService : IDisposable
                     "Steam", "steamapps");
             var macAcfNames = BuildAcfInstallDirNames(macSteamApps);
             ScanSteamAcfManifests(macSteamApps, results);
-            ScanDir(Path.Combine(macSteamApps, "common"), results, home, "Steam", macAcfNames);
+            ScanDir(Path.Combine(macSteamApps, "common"), results, home, "Steam", macAcfNames, acfNamesOnly: true);
 
             // Epic Games Launcher on macOS — manifest-based discovery
             string epicManifestsMac = Path.Combine(home, "Library", "Application Support",
@@ -582,9 +599,9 @@ public sealed class GameScannerService : IDisposable
             ScanSteamAcfManifests(nativeSteamApps,  results);
             ScanSteamAcfManifests(localSteamApps,   results);
             ScanSteamAcfManifests(flatpakSteamApps, results);
-            ScanDir(Path.Combine(nativeSteamApps,  "common"), results, home, "Steam", nativeAcfNames);
-            ScanDir(Path.Combine(localSteamApps,   "common"), results, home, "Steam", localAcfNames);
-            ScanDir(Path.Combine(flatpakSteamApps, "common"), results, home, "Steam", flatpakAcfNames);
+            ScanDir(Path.Combine(nativeSteamApps,  "common"), results, home, "Steam", nativeAcfNames,  acfNamesOnly: true);
+            ScanDir(Path.Combine(localSteamApps,   "common"), results, home, "Steam", localAcfNames,   acfNamesOnly: true);
+            ScanDir(Path.Combine(flatpakSteamApps, "common"), results, home, "Steam", flatpakAcfNames, acfNamesOnly: true);
 
             // Additional Steam library folders from the VDF in the native location
             string vdfLinux = Path.Combine(home, ".local", "share",
@@ -594,7 +611,7 @@ public sealed class GameScannerService : IDisposable
                 string libSteamApps = Path.Combine(libPath, "steamapps");
                 var libAcfNames = BuildAcfInstallDirNames(libSteamApps);
                 ScanSteamAcfManifests(libSteamApps, results);
-                ScanDir(Path.Combine(libSteamApps, "common"), results, libPath, "Steam", libAcfNames);
+                ScanDir(Path.Combine(libSteamApps, "common"), results, libPath, "Steam", libAcfNames, acfNamesOnly: true);
             }
 
             // Heroic Games Launcher (Epic/GOG on Linux)
