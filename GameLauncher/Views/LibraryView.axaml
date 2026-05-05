@@ -2,7 +2,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
-             xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.LibraryView"
              x:DataType="vm:LibraryViewModel"
              Background="#0d1117">
@@ -56,47 +55,53 @@
             </Button>
         </StackPanel>
 
-        <!-- Game card grid -->
-        <ItemsControl ItemsSource="{Binding FilteredGames}">
+        <!-- Unified game card grid (cloud + local + ROMs in one sorted list) -->
+        <ItemsControl ItemsSource="{Binding FilteredMyGames}">
             <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
                     <WrapPanel/>
                 </ItemsPanelTemplate>
             </ItemsControl.ItemsPanel>
             <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:Game">
+                <DataTemplate x:DataType="vm:LocalGameCardVm">
                     <Button Classes="game-card-btn"
-                            Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                            Width="170" Margin="0,0,10,10"
+                            Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
                             CommandParameter="{Binding}">
                         <StackPanel>
-                            <!-- Cover art -->
+                            <!-- Cover art (real image if available, gradient placeholder otherwise) -->
                             <Border Height="130" CornerRadius="10,10,0,0" ClipToBounds="True">
                                 <views:CoverImage
                                     ImageUrl="{Binding CoverUrl}"
-                                    FallbackText="{Binding Title}"
+                                    FallbackText="{Binding EffectiveTitle}"
                                     FallbackGradient="{Binding CoverGradient}"
                                     SubText="{Binding Platform}"
-                                    LetterFontSize="52"
+                                    LetterFontSize="48"
                                     ImageCornerRadius="10,10,0,0"
                                     Height="130"/>
                             </Border>
                             <!-- Info -->
-                            <Border Padding="10,10,10,12">
-                                <StackPanel Spacing="4">
-                                    <TextBlock Text="{Binding Title}"
-                                               Classes="game-card-title"/>
-                                    <Border CornerRadius="3" Padding="5,2"
-                                            Background="#1f6feb"
-                                            HorizontalAlignment="Left">
-                                        <TextBlock Text="{Binding Platform}"
-                                                   FontSize="10" FontWeight="Bold"
-                                                   Foreground="White"/>
-                                    </Border>
-                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,2,0,0">
-                                        <TextBlock Text="{Binding RatingStars}"
-                                                   FontSize="11" Foreground="#f1c40f"/>
-                                        <TextBlock Text="{Binding Genre}"
-                                                   Classes="game-card-meta"/>
+                            <Border Padding="10,8,10,10">
+                                <StackPanel Spacing="3">
+                                    <TextBlock Text="{Binding EffectiveTitle}"
+                                               Classes="game-card-title"
+                                               TextTrimming="CharacterEllipsis"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <!-- Platform badge -->
+                                        <Border CornerRadius="3" Padding="5,2"
+                                                Background="#1f6feb" HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding Platform}"
+                                                       FontSize="10" FontWeight="Bold"
+                                                       Foreground="White"/>
+                                        </Border>
+                                        <!-- Kind badge (Installed / Not Installed / ROM / Cloud) -->
+                                        <Border CornerRadius="3" Padding="5,2"
+                                                Background="{Binding KindBackground}"
+                                                HorizontalAlignment="Left">
+                                            <TextBlock Text="{Binding KindLabel}"
+                                                       FontSize="10" FontWeight="Bold"
+                                                       Foreground="{Binding KindForeground}"/>
+                                        </Border>
                                     </StackPanel>
                                     <!-- Playtime label (only shown when available) -->
                                     <TextBlock Text="{Binding PlaytimeLabel}"
@@ -104,9 +109,9 @@
                                                IsVisible="{Binding PlaytimeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                TextTrimming="CharacterEllipsis"/>
                                     <!-- Achievement count (only shown when available) -->
-                                    <TextBlock Text="{Binding AchievementCountLabel}"
+                                    <TextBlock Text="{Binding AchievementLabel}"
                                                FontSize="10" Foreground="#f1c40f"
-                                               IsVisible="{Binding AchievementCountLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                               IsVisible="{Binding AchievementLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
                                                TextTrimming="CharacterEllipsis"/>
                                 </StackPanel>
                             </Border>
@@ -115,89 +120,6 @@
                 </DataTemplate>
             </ItemsControl.ItemTemplate>
         </ItemsControl>
-
-        <!-- ══ My Games (LocalGames + Repacks + ROMs unified) ══ -->
-        <Border IsVisible="{Binding HasMyGames}"
-                Margin="0,32,0,0" Padding="0,0,0,12">
-            <StackPanel Spacing="14">
-                <StackPanel Orientation="Horizontal" Spacing="10">
-                    <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
-                    <TextBlock Text="My Games"
-                               FontSize="18" FontWeight="Bold"
-                               Foreground="#e6edf3" VerticalAlignment="Center"/>
-                    <Border CornerRadius="10" Padding="8,3" Background="#238636"
-                            VerticalAlignment="Center">
-                        <TextBlock Text="{Binding FilteredMyGames.Count}"
-                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
-                    </Border>
-                </StackPanel>
-
-                <ItemsControl ItemsSource="{Binding FilteredMyGames}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <WrapPanel/>
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:LocalGameCardVm">
-                            <Button Classes="game-card-btn"
-                                    Width="170" Margin="0,0,10,10"
-                                    Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
-                                    CommandParameter="{Binding}">
-                                <StackPanel>
-                                    <!-- Cover art (real image if available, gradient placeholder otherwise) -->
-                                    <Border Height="130" CornerRadius="10,10,0,0" ClipToBounds="True">
-                                        <views:CoverImage
-                                            ImageUrl="{Binding CoverUrl}"
-                                            FallbackText="{Binding EffectiveTitle}"
-                                            FallbackGradient="{Binding CoverGradient}"
-                                            SubText="{Binding Platform}"
-                                            LetterFontSize="48"
-                                            ImageCornerRadius="10,10,0,0"
-                                            Height="130"/>
-                                    </Border>
-                                    <!-- Info -->
-                                    <Border Padding="10,8,10,10">
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding EffectiveTitle}"
-                                                       Classes="game-card-title"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <StackPanel Orientation="Horizontal" Spacing="4">
-                                                <!-- Platform badge -->
-                                                <Border CornerRadius="3" Padding="5,2"
-                                                        Background="#1f6feb" HorizontalAlignment="Left">
-                                                    <TextBlock Text="{Binding Platform}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="White"/>
-                                                </Border>
-                                                <!-- Kind badge (Installed / Repack / ROM) -->
-                                                <Border CornerRadius="3" Padding="5,2"
-                                                        Background="{Binding KindBackground}"
-                                                        HorizontalAlignment="Left">
-                                                    <TextBlock Text="{Binding KindLabel}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="{Binding KindForeground}"/>
-                                                </Border>
-                                            </StackPanel>
-                                            <!-- Playtime label (only shown when available) -->
-                                            <TextBlock Text="{Binding PlaytimeLabel}"
-                                                       FontSize="10" Foreground="#0ea5e9"
-                                                       IsVisible="{Binding PlaytimeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                            <!-- Achievement count (only shown when available) -->
-                                            <TextBlock Text="{Binding AchievementLabel}"
-                                                       FontSize="10" Foreground="#f1c40f"
-                                                       IsVisible="{Binding AchievementLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </StackPanel>
-                                    </Border>
-                                </StackPanel>
-                            </Button>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </StackPanel>
-        </Border>
 
     </StackPanel>
 </UserControl>

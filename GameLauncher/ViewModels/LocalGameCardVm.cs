@@ -51,25 +51,38 @@ public partial class LocalGameCardVm : ViewModelBase
     /// <summary>Non-null when this entry represents a cloud library game with recorded playtime.</summary>
     public Game?        SourceCloudGame { get; init; }
 
+    /// <summary>
+    /// True when the game is physically installed on this PC.
+    /// Always true for SourceGame/SourceRom cards.
+    /// For SourceCloudGame PC cards: true when a matching local game was found by
+    /// SteamAppId or title; false otherwise (shows "Not Installed" badge).
+    /// For non-PC cloud entries this is also false but the badge shows "Cloud".
+    /// </summary>
+    public bool IsInstalledLocal { get; init; } = true;
+
     // ── Derived badge text / colours ──────────────────────────────────────────
 
     public string KindLabel =>
-        SourceRom         != null ? "ROM"       :
-        SourceCloudGame   != null ? "Cloud"     :
-        SourceRepack != null && SourceRepack.IsInstalledGame ? "Installed" :
-        SourceRepack != null ? "Not Installed"  : "Installed";
+        SourceRom    != null ? "ROM"         :
+        SourceGame   != null ? "Installed"   :
+        SourceRepack != null ? (SourceRepack.IsInstalledGame ? "Installed" : "Not Installed") :
+        // Cloud game: non-PC entries show "Cloud"; PC entries reflect local install status
+        !string.Equals(Platform, "PC", System.StringComparison.OrdinalIgnoreCase) ? "Cloud" :
+        IsInstalledLocal ? "Installed" : "Not Installed";
 
     public string KindBackground =>
-        SourceRom         != null ? "#1f3a6e" :
-        SourceCloudGame   != null ? "#1a3a6e" :
-        SourceRepack != null && SourceRepack.IsInstalledGame ? "#1a5e34" :
-        SourceRepack != null ? "#3d1a1a" : "#1a5e34";
+        SourceRom    != null ? "#1f3a6e" :
+        SourceGame   != null ? "#1a5e34" :
+        SourceRepack != null ? (SourceRepack.IsInstalledGame ? "#1a5e34" : "#3d1a1a") :
+        !string.Equals(Platform, "PC", System.StringComparison.OrdinalIgnoreCase) ? "#1a3a6e" :
+        IsInstalledLocal ? "#1a5e34" : "#3d1a1a";
 
     public string KindForeground =>
-        SourceRom         != null ? "#58a6ff" :
-        SourceCloudGame   != null ? "#0ea5e9" :
-        SourceRepack != null && SourceRepack.IsInstalledGame ? "#3fb950" :
-        SourceRepack != null ? "#f85149" : "#3fb950";
+        SourceRom    != null ? "#58a6ff" :
+        SourceGame   != null ? "#3fb950" :
+        SourceRepack != null ? (SourceRepack.IsInstalledGame ? "#3fb950" : "#f85149") :
+        !string.Equals(Platform, "PC", System.StringComparison.OrdinalIgnoreCase) ? "#0ea5e9" :
+        IsInstalledLocal ? "#3fb950" : "#f85149";
 
     /// <summary>Comma-separated region tags for ROM entries (e.g. "Europe, USA"). Empty for non-ROM cards.</summary>
     public string RegionsLabel =>

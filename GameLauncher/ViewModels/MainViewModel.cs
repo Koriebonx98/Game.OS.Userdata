@@ -591,11 +591,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             StartOfflineReconnectTimer();
         }
 
-        var localCards = LibraryVm.GetMyGameSources()
-            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-            .Where(c => c != null)
-            .Cast<LocalGameCardVm>()
-            .ToList();
+        var localCards = GetDashboardCards();
 
         DevLogService.Log($"[MainViewModel] Local game cards found: {localCards.Count}. Loading child view models…");
         DashboardVm.Load(profile, library, achievements, localCards);
@@ -1087,6 +1083,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (activity.Count == 0)
             {
                 DevLogService.Log("[Playtime] Cloud activity log is empty — no playtime to apply.");
+                // Still refresh the dashboard so any library changes (new games, etc.) are
+                // reflected with correct (zero) playtime rather than stale data.
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
+                });
                 return;
             }
             DevLogService.Log($"[Playtime] Cloud activity log has {activity.Count} entries.");
@@ -1121,12 +1123,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log("[Playtime] Applied cloud playtime totals to library and cache.");
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
-                var cards = LibraryVm.GetMyGameSources()
-                    .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                    .Where(c => c != null)
-                    .Cast<LocalGameCardVm>()
-                    .ToList();
-                DashboardVm.Load(_profile, library, _achievements, cards);
+                DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
                 LibraryVm.Load(library);
             });
         }
@@ -1194,11 +1191,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private void RefreshDashboardLocalGames()
     {
         if (!ShowMain) return; // not logged in yet
-        var localCards = LibraryVm.GetMyGameSources()
-            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-            .Where(c => c != null)
-            .Cast<LocalGameCardVm>()
-            .ToList();
+        var localCards = GetDashboardCards();
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             DashboardVm.Load(_profile, _library, _achievements, localCards));
     }
@@ -1224,10 +1217,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Only match local PC games when the library game is also a PC game.
         // Without this check, a cloud library entry like "God of War" (PS4) would
         // incorrectly be shown as "installed" if the user has a PC folder called "God of War".
-        LocalGame? localGame = string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase)
-            ? LibraryVm.LocalGames
-                .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase))
-            : null;
+        // Try SteamAppId first (most reliable when the local folder title differs slightly,
+        // e.g. "Call of Duty Black Ops III" vs "Call of Duty: Black Ops III").
+        LocalGame? localGame = null;
+        if (string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+        {
+            localGame = (game.SteamAppId > 0
+                ? LibraryVm.LocalGames.FirstOrDefault(lg => lg.SteamAppId == game.SteamAppId)
+                : null)
+                ?? LibraryVm.LocalGames
+                    .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+        }
         LocalRepack? repack = null;
         if (localGame == null && string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
             repack = LibraryVm.ReadyToInstall
@@ -1416,6 +1416,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Returns a snapshot of the unified My Games card list used to populate the
+    /// dashboard "Continue Playing" section and the Recent Achievements game list.
+    /// Extracted into a helper to avoid duplicating the same LINQ chain at every call site.
+    /// </summary>
+    private List<LocalGameCardVm> GetDashboardCards() =>
+        LibraryVm.GetMyGameSources()
+            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
+            .Where(c => c != null)
+            .Cast<LocalGameCardVm>()
+            .ToList();
+
+    /// <summary>
     /// Opens the detail overlay for a card from the unified "My Games" section.
     /// Routes to the correct Load* method based on the card's source type, then
     /// enriches with real cover art / description / trailer / achievements from
@@ -1473,9 +1485,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         else if (card.SourceCloudGame != null)
         {
             // Find the matching local copy (if any) so the detail VM has IsInstalled = true.
+            // Try SteamAppId first so games whose local folder title differs slightly (e.g.
+            // "Call of Duty Black Ops III" vs "Call of Duty: Black Ops III") are still found.
             var cg = card.SourceCloudGame;
-            var localGame = LibraryVm.LocalGames
-                .FirstOrDefault(lg => lg.Title.Equals(cg.Title, StringComparison.OrdinalIgnoreCase));
+            var localGame = (cg.SteamAppId > 0
+                ? LibraryVm.LocalGames.FirstOrDefault(lg => lg.SteamAppId == cg.SteamAppId)
+                : null)
+                ?? LibraryVm.LocalGames
+                    .FirstOrDefault(lg => lg.Title.Equals(cg.Title, StringComparison.OrdinalIgnoreCase));
             var repack = localGame == null
                 ? LibraryVm.ReadyToInstall
                     .FirstOrDefault(r => r.Title.Equals(cg.Title, StringComparison.OrdinalIgnoreCase))
@@ -1571,11 +1588,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         foreach (var source in LibraryVm.GetMyGameSources())
         {
-            string key = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
-            if (!unlockCounts.TryGetValue(key, out int count)) continue;
-
             var card = LibraryVm.FindMyGameCard(source.Title, source.Platform);
-            if (card != null && count > 0)
+            if (card == null) continue;
+
+            // For cloud game cards whose source Game already has enriched achievements
+            // (GameAchievements populated), use AchievementCountLabel for the X / Y format.
+            if (card.SourceCloudGame?.GameAchievements?.Count > 0)
+            {
+                card.AchievementLabel = card.SourceCloudGame.AchievementCountLabel;
+                continue;
+            }
+
+            string key = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
+            if (unlockCounts.TryGetValue(key, out int count) && count > 0)
                 card.AchievementLabel = $"🏆 {count}";
         }
     }
@@ -1824,12 +1849,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         LibraryVm.Load(_library);
                         // Pass localCards so the "Continue Playing" section rebuilds with
                         // newly-enriched cover URLs on cloud game cards.
-                        var cards = LibraryVm.GetMyGameSources()
-                            .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                            .Where(c => c != null)
-                            .Cast<LocalGameCardVm>()
-                            .ToList();
-                        DashboardVm.Load(_profile, _library, _achievements, cards);
+                        DashboardVm.Load(_profile, _library, _achievements, GetDashboardCards());
                     });
                     // Also re-run cover enrichment for any dashboard cards still missing covers
                     _ = EnrichDashboardCoversAsync();
@@ -2384,11 +2404,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 _achievements = achievements;
                 IsOfflineMode = false;
 
-                var localCards = LibraryVm.GetMyGameSources()
-                    .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                    .Where(c => c != null)
-                    .Cast<LocalGameCardVm>()
-                    .ToList();
+                var localCards = GetDashboardCards();
                 DashboardVm.Load(_profile, _library, _achievements, localCards);
                 LibraryVm.Load(_library);
                 StoreVm.Load(GameCatalog.Store, _library, _profile, _client, _client.IsAdmin);
@@ -2555,7 +2571,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             var achievements = await _client.GetAchievementsAsync().ConfigureAwait(false);
 
             bool gamesChanged = !GamesListEqual(_library, games);
-            bool achvChanged  = achievements.Count != _achievements.Count;
+            // Only treat achievements as changed when the server returned a non-empty list.
+            // An empty response (count == 0) almost always signals a transient API error;
+            // treating it as "unchanged" prevents the dashboard from resetting to "0 Achievements".
+            bool achvChanged  = achievements.Count > 0 && achievements.Count != _achievements.Count;
 
             // Also detect when another device has updated a game's playtime/lastPlayedAt
             // in games.json (written by UpdateGamePlaytimeAsync on session end).
@@ -2585,19 +2604,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // is refreshed (Steam-only titles are not stored in the cloud games.json).
                 ReapplySteamCachedGames(games);
 
-                _library      = games;
-                _achievements = achievements;
+                _library = games;
+                // Guard: never replace the in-memory achievement list with an empty server
+                // response — a zero-count result is almost always a transient API error.
+                if (achievements.Count > 0)
+                    _achievements = achievements;
 
-                _offlineCache.Save(username, _profile ?? new Models.UserProfile(), games, achievements);
+                _offlineCache.Save(username, _profile ?? new Models.UserProfile(), games,
+                    achievements.Count > 0 ? achievements : _achievements);
 
+                // Only refresh the library immediately; the dashboard will be refreshed by
+                // ApplyCloudPlaytimeAsync (called below) once cloud playtime has been applied,
+                // so the dashboard always shows the correct playtime total rather than the
+                // server-only (local-playtime-only) value that exists at this point.
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var localCards = LibraryVm.GetMyGameSources()
-                        .Select(s => LibraryVm.FindMyGameCard(s.Title, s.Platform))
-                        .Where(c => c != null)
-                        .Cast<LocalGameCardVm>()
-                        .ToList();
-                    DashboardVm.Load(_profile ?? new Models.UserProfile(), _library, _achievements, localCards);
                     LibraryVm.Load(_library);
                 });
             }
