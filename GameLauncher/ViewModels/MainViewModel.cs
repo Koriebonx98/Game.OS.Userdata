@@ -429,6 +429,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (Services.AppSettingsService.Load().AutoUpdate)
             _ = Services.GitHubDataService.CheckForUpdatesAsync();
 
+        // Keep the universal Switch translation table in sync with the remote
+        // repository so achievement detection always uses the latest mappings.
+        _ = Services.SwitchTranslateService.SyncAsync();
+
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
         _ = LoginVm.TryAutoLoginAsync();
 

@@ -374,20 +374,36 @@ public static class SwitchLogReaderService
         public string Driver        { get; init; } = "";
     }
 
+    /// <summary>
+    /// Holds the key fields extracted from a Ryujinx <c>ServicePrepo ProcessPlayReport</c>
+    /// block whose <c>Room</c> value is <c>gp_result</c>.  Fired once per Grand Prix after
+    /// all four races, carrying the player's overall cup rank.
+    /// </summary>
+    public sealed class SwitchGpResult
+    {
+        /// <summary>Internal cup code, e.g. <c>Kinoko</c> (Mushroom Cup).</summary>
+        public string Cup  { get; init; } = "";
+        /// <summary>Overall Grand Prix finishing position (1 = won the cup).</summary>
+        public int    Rank { get; init; }
+    }
+
     // Ryujinx timestamp prefix: "HH:MM:SS.mmm |L| ..."
     private static readonly Regex _tsPrefix =
         new(@"^\d{2}:\d{2}:\d{2}\.\d{3}\s*\|", RegexOptions.Compiled);
 
     /// <summary>
-    /// Reads new content appended to <paramref name="logPath"/> since the last call and
-    /// returns every <c>Room: match</c> play-report block found in that new content.
+    /// Reads new content appended to <paramref name="logPath"/> since the last call.
+    /// Returns every <c>Room: match</c> play-report block as a <see cref="SwitchRaceResult"/>
+    /// and every <c>Room: gp_result</c> block as a <see cref="SwitchGpResult"/> via
+    /// <paramref name="gpResults"/>.
     /// <paramref name="fileOffset"/> is updated to the current end-of-file position so
     /// subsequent calls only process newly appended lines.
     /// </summary>
     public static List<SwitchRaceResult> ReadRaceResultsFromNewContent(
-        string logPath, ref long fileOffset)
+        string logPath, ref long fileOffset, out List<SwitchGpResult> gpResults)
     {
         var results = new List<SwitchRaceResult>();
+        gpResults   = new List<SwitchGpResult>();
         if (string.IsNullOrEmpty(logPath) || !File.Exists(logPath)) return results;
 
         try
@@ -425,10 +441,10 @@ public static class SwitchLogReaderService
                     i = j;
                 }
 
-                // Only care about "Room: match" blocks
-                bool isMatch = block.Any(l =>
-                    l.Contains("Room: match", StringComparison.OrdinalIgnoreCase));
-                if (!isMatch) continue;
+                bool isMatch    = block.Any(l => l.Contains("Room: match",     StringComparison.OrdinalIgnoreCase));
+                bool isGpResult = block.Any(l => l.Contains("Room: gp_result", StringComparison.OrdinalIgnoreCase));
+
+                if (!isMatch && !isGpResult) continue;
 
                 // Extract the JSON report block { ... }
                 var jsonLines = new List<string>();
@@ -482,16 +498,27 @@ public static class SwitchLogReaderService
                         return 0;
                     }
 
-                    results.Add(new SwitchRaceResult
+                    if (isMatch)
                     {
-                        Course       = Str(root, "Course"),
-                        FinishReason = Str(root, "FinishReason"),
-                        Rank         = Int(root, "Rank"),
-                        Rule         = Str(root, "Rule"),
-                        Engine       = Str(root, "Engine"),
-                        CoinNum      = Int(root, "CoinNum"),
-                        Driver       = Str(root, "Driver"),
-                    });
+                        results.Add(new SwitchRaceResult
+                        {
+                            Course       = Str(root, "Course"),
+                            FinishReason = Str(root, "FinishReason"),
+                            Rank         = Int(root, "Rank"),
+                            Rule         = Str(root, "Rule"),
+                            Engine       = Str(root, "Engine"),
+                            CoinNum      = Int(root, "CoinNum"),
+                            Driver       = Str(root, "Driver"),
+                        });
+                    }
+                    else // isGpResult
+                    {
+                        gpResults.Add(new SwitchGpResult
+                        {
+                            Cup  = Str(root, "Cup"),
+                            Rank = Int(root, "Rank"),
+                        });
+                    }
                 }
                 catch { /* malformed JSON — skip this block */ }
             }
