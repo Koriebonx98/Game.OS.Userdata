@@ -787,10 +787,6 @@ async function handleSignup(event) {
                 'success'
             );
             
-            // Store username/email for convenience
-            localStorage.setItem('lastUsername', username);
-            localStorage.setItem('lastEmail', email);
-            
             // Clear form
             document.getElementById('signupForm').reset();
             
@@ -817,8 +813,6 @@ async function handleSignup(event) {
                         '✅ Account created (GitHub unavailable – saved locally). You can now login. Redirecting...',
                         'success'
                     );
-                    localStorage.setItem('lastUsername', username);
-                    localStorage.setItem('lastEmail', email);
                     document.getElementById('signupForm').reset();
                     setTimeout(() => { window.location.href = 'login.html'; }, 3000);
                 } else {
@@ -1052,6 +1046,20 @@ function enableForm(formId) {
 // ============================================================
 // SESSION MANAGEMENT
 // ============================================================
+//
+// Security note: the 'gameOSUser' session object holds only non-credential
+// display data: { username, email, loginTime }.  No password or API token is
+// ever placed in this object.  When "Remember me" is checked the object is
+// written to localStorage so the user stays logged-in across browser sessions;
+// otherwise it goes into sessionStorage and is cleared when the tab is closed.
+//
+// API tokens (bearer credentials) are stored separately in sessionStorage
+// via setStoredApiToken() / getStoredApiToken() so they are scoped to the
+// current browser session and are never written to persistent localStorage.
+//
+// HttpOnly cookies cannot be set by JavaScript running on a static GitHub Pages
+// site.  The Express backend sets security response headers (X-Frame-Options,
+// X-Content-Type-Options, etc.) on every response it handles.
 
 /**
  * Check if user is logged in
@@ -1322,10 +1330,54 @@ async function updateAccountGitHub(username, currentPassword, newEmail, newPassw
 // ============================================================
 
 /**
- * localStorage key where a newly-generated token is temporarily cached
+ * sessionStorage key where a newly-generated token is temporarily cached
  * so the account page can display it.  Cleared after the user copies it.
+ * NOTE: sessionStorage is used instead of localStorage so the token is
+ * never written to persistent browser storage — it is cleared when the
+ * tab or browser is closed, reducing XSS-based credential theft risk.
  */
 const API_TOKEN_CACHE_KEY = 'gameOS_apiToken_pending';
+
+/**
+ * Retrieve the locally-stored API token for the given username.
+ * Checks the per-user sessionStorage key first (set by setStoredApiToken when
+ * the user generates a token); falls back to the short-lived pending cache key
+ * (set by handleGenerateToken immediately after generation so the page can
+ * display the token once).  The per-user key takes precedence because it is
+ * the durable session token, whereas the pending cache is cleared after use.
+ * Uses sessionStorage so the token is scoped to the current browser session
+ * and is never written to persistent localStorage.
+ */
+function getStoredApiToken(username) {
+    if (!username) return '';
+    return (
+        sessionStorage.getItem(`gameOS_apiToken_${username.toLowerCase()}`) ||
+        sessionStorage.getItem(API_TOKEN_CACHE_KEY) || ''
+    );
+}
+
+/**
+ * Persist an API token in sessionStorage (current session only).
+ * Never stored in localStorage to avoid XSS-based theft from persistent storage.
+ */
+function setStoredApiToken(username, token) {
+    if (!username || !token) return;
+    sessionStorage.setItem(`gameOS_apiToken_${username.toLowerCase()}`, token);
+}
+
+/**
+ * Remove all locally-cached API tokens for the given username.
+ */
+function removeStoredApiToken(username) {
+    if (username) {
+        sessionStorage.removeItem(`gameOS_apiToken_${username.toLowerCase()}`);
+        // Also clean up any legacy localStorage entry that may exist from
+        // before this security improvement was made.
+        localStorage.removeItem(`gameOS_apiToken_${username.toLowerCase()}`);
+    }
+    sessionStorage.removeItem(API_TOKEN_CACHE_KEY);
+    localStorage.removeItem(API_TOKEN_CACHE_KEY);
+}
 
 /**
  * Returns a backend URL for optional backend-proxy operations.
@@ -1350,8 +1402,10 @@ async function loadApiTokenStatus() {
     const copyBtn  = document.getElementById('copyTokenBtn');
     if (!display) return;
 
-    // If there's a freshly-generated token in the cache, show it
-    const pending = localStorage.getItem(API_TOKEN_CACHE_KEY);
+    const user = getCurrentUser();
+
+    // If there's a freshly-generated token in the session cache, show it
+    const pending = sessionStorage.getItem(API_TOKEN_CACHE_KEY);
     if (pending) {
         display.value = pending;
         display.type  = 'text';
@@ -1359,12 +1413,11 @@ async function loadApiTokenStatus() {
         return;
     }
 
-    const user = getCurrentUser();
     if (!user) return;
 
     if (MODE === 'demo') {
-        // In demo mode, look up the locally-stored token
-        const stored = localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
+        // In demo mode, look up the session-scoped token
+        const stored = sessionStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
         display.value    = stored ? stored : '';
         display.placeholder = stored ? '••••••••••••••••••••' : 'No token generated yet';
         if (copyBtn) copyBtn.disabled = !stored;
@@ -1439,7 +1492,7 @@ async function handleGenerateToken() {
             const randomHex = Array.from(crypto.getRandomValues(new Uint8Array(32)))
                 .map(b => b.toString(16).padStart(2, '0')).join('');
             token = `gos_${user.username.toLowerCase()}.${randomHex}`;
-            localStorage.setItem(`gameOS_apiToken_${user.username.toLowerCase()}`, token);
+            setStoredApiToken(user.username, token);
         } else {
             const base = getBackendBase();
             if (base) {
@@ -1482,8 +1535,10 @@ async function handleGenerateToken() {
             }
         }
 
-        // Cache the token so the page can display it once
-        localStorage.setItem(API_TOKEN_CACHE_KEY, token);
+        // Cache the token in sessionStorage so the page can display it once.
+        // Using sessionStorage instead of localStorage keeps the token out of
+        // persistent browser storage and limits its exposure to the current tab.
+        sessionStorage.setItem(API_TOKEN_CACHE_KEY, token);
 
         const display = document.getElementById('apiTokenDisplay');
         const copyBtn = document.getElementById('copyTokenBtn');
@@ -1530,7 +1585,7 @@ async function handleRevokeToken() {
                 if (btn) btn.disabled = false;
                 return;
             }
-            localStorage.removeItem(`gameOS_apiToken_${user.username.toLowerCase()}`);
+            removeStoredApiToken(user.username);
         } else {
             const base = getBackendBase();
             if (base) {
@@ -1565,8 +1620,8 @@ async function handleRevokeToken() {
             }
         }
 
-        // Clear cached token
-        localStorage.removeItem(API_TOKEN_CACHE_KEY);
+        // Clear cached token from session storage
+        removeStoredApiToken(user.username);
 
         const display = document.getElementById('apiTokenDisplay');
         const copyBtn = document.getElementById('copyTokenBtn');
@@ -3323,8 +3378,7 @@ async function getActivityLogGitHub(username) {
         try {
             const user        = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
             const resp = await fetch(`${backendBase}/api/users/${encodeURIComponent(username)}/activity`, {
                 headers: storedToken ? { 'Authorization': `Bearer ${storedToken}` } : {}
@@ -4375,8 +4429,7 @@ async function handleAdminEditSave() {
             // ── Backend path: server fetches, patches, and writes to Games.Database ──
             const user = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
 
             // Build the updated entry once; send it to the backend and reuse for the cache
@@ -4505,8 +4558,7 @@ async function handleAdminEditSave() {
                 if (backendBase) {
                     const user = getCurrentUser();
                     const storedToken = user
-                        ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                           localStorage.getItem('gameOS_apiToken_pending') || '')
+                        ? getStoredApiToken(user.username)
                         : '';
                     const scrapeResp = await fetch(`${backendBase}/api/admin/scrape-exophase`, {
                         method: 'POST',
@@ -4963,8 +5015,7 @@ async function handleAddPcGameToDb() {
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
             const user = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
 
             const addResp = await fetch(`${backendBase}/api/admin/add-game`, {
@@ -5273,8 +5324,7 @@ async function _searchSteamStore() {
             // Use the server-side proxy to avoid CORS restrictions
             const user = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
             resp = await fetch(
                 `${backendBase}/api/admin/steam-search?query=${encodeURIComponent(query)}`,
@@ -5355,8 +5405,7 @@ async function _selectSteamGame(index) {
         if (backendBase) {
             const user = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
             resp = await fetch(
                 `${backendBase}/api/admin/steam-appdetails?appid=${encodeURIComponent(item.id)}`,
@@ -5485,8 +5534,7 @@ async function handleAddSteamGameToDb() {
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
             const user = getCurrentUser();
             const storedToken = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
 
             const addResp = await fetch(`${backendBase}/api/admin/add-game`, {
@@ -5727,8 +5775,7 @@ async function _adminScrapeExophaseNow() {
             // Backend path: delegate to the server-side scrape endpoint
             const user  = getCurrentUser();
             const token = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
             const resp = await fetch(`${getBackendBase()}/api/admin/scrape-exophase`, {
                 method: 'POST',
@@ -5928,8 +5975,7 @@ async function _adminScrapeSteamNow() {
         try {
             const user  = getCurrentUser();
             const token = user
-                ? (localStorage.getItem(`gameOS_apiToken_${user.username.toLowerCase()}`) ||
-                   localStorage.getItem('gameOS_apiToken_pending') || '')
+                ? getStoredApiToken(user.username)
                 : '';
             const resp = await fetch(`${backendBase}/api/admin/scrape-steam`, {
                 method: 'POST',

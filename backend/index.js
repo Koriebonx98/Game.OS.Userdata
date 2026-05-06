@@ -34,6 +34,25 @@ app.use(cors(corsOptions));
 // ── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 
+// ── Security headers ──────────────────────────────────────────────────────────
+// Apply security-related HTTP response headers to every request.
+// These headers mitigate a range of common web vulnerabilities (XSS,
+// clickjacking, MIME sniffing, information leakage) without requiring
+// an external dependency.
+app.use((_req, res, next) => {
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Deny framing (clickjacking protection)
+    res.setHeader('X-Frame-Options', 'DENY');
+    // Limit referrer information sent to third parties
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // Prevent cross-site leakage via the Referer header on cross-origin navigations
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    // Remove the Express server fingerprint
+    res.removeHeader('X-Powered-By');
+    next();
+});
+
 // ── GitHub client ─────────────────────────────────────────────────────────────
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const REPO_OWNER = process.env.REPO_OWNER;
