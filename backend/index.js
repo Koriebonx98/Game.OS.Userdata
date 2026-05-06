@@ -324,6 +324,16 @@ const ADMIN_USERNAME       = 'Admin.GameOS';
 const ADMIN_USERNAME_LOWER = ADMIN_USERNAME.toLowerCase(); // 'admin.gameos'
 const ADMIN_EMAIL          = 'admin@gameos.local';
 
+// ── Reserved usernames ────────────────────────────────────────────────────────
+// These usernames are blocked during account registration to prevent misuse of
+// commonly understood administrative or generic names.
+const RESERVED_USERNAMES = [
+    'admin', 'administrator', 'root', 'superuser', 'sysadmin',
+    'user', 'test', 'guest', 'anonymous', 'anon',
+    'system', 'support', 'mod', 'moderator', 'staff',
+    'help', 'info', 'null', 'undefined', 'nobody'
+];
+
 // ── Simple in-memory rate limiter ─────────────────────────────────────────────
 
 const _rateLimitMap = new Map(); // ip -> { count, resetAt }
@@ -847,6 +857,9 @@ app.post('/api/create-account', async (req, res) => {
         }
         if (!sanitiseUsername(username)) {
             return res.status(400).json({ success: false, message: 'Username may only contain letters, numbers, underscores, and hyphens' });
+        }
+        if (RESERVED_USERNAMES.includes(username.toLowerCase())) {
+            return res.status(400).json({ success: false, message: 'This username is reserved and cannot be registered. Please choose a different username.' });
         }
         if (!isValidEmail(email)) {
             return res.status(400).json({ success: false, message: 'Please enter a valid email address' });

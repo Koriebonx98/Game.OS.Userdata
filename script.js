@@ -65,6 +65,24 @@ const ADMIN_USERNAME       = 'Admin.GameOS';
 const ADMIN_USERNAME_LOWER = ADMIN_USERNAME.toLowerCase(); // 'admin.gameos'
 const ADMIN_EMAIL          = 'admin@gameos.local';
 
+// ── Reserved usernames ────────────────────────────────────────────────────────
+// These usernames are blocked during account registration to prevent misuse of
+// commonly understood administrative or generic names.
+const RESERVED_USERNAMES = [
+    'admin', 'administrator', 'root', 'superuser', 'sysadmin',
+    'user', 'test', 'guest', 'anonymous', 'anon',
+    'system', 'support', 'mod', 'moderator', 'staff',
+    'help', 'info', 'null', 'undefined', 'nobody'
+];
+
+/**
+ * Returns true when the given username is reserved and should not be registered.
+ * The comparison is case-insensitive.
+ */
+function isReservedUsername(username) {
+    return RESERVED_USERNAMES.includes(username.toLowerCase());
+}
+
 // ============================================================
 // SECURITY - PASSWORD HASHING FOR DEMO MODE
 // ============================================================
@@ -486,6 +504,11 @@ async function createAccountGitHub(username, email, password) {
     const emailLower    = email.toLowerCase();
     const passwordHash  = await hashPassword(password, username);
 
+    // Check for reserved usernames
+    if (isReservedUsername(username)) {
+        return { success: false, message: 'This username is reserved and cannot be registered. Please choose a different username.' };
+    }
+
     // Check for duplicate username
     const existing = await githubRead(`accounts/${usernameLower}/profile.json`);
     if (existing) {
@@ -604,6 +627,15 @@ async function createAccountDemo(username, email, password) {
                 });
                 return;
             }
+
+            // Check for reserved usernames
+            if (isReservedUsername(username)) {
+                resolve({
+                    success: false,
+                    message: 'This username is reserved and cannot be registered. Please choose a different username.'
+                });
+                return;
+            }
             
             // Check if email already exists
             if (accounts.find(acc => acc.email.toLowerCase() === email.toLowerCase())) {
@@ -703,6 +735,11 @@ async function handleSignup(event) {
     // Validation
     if (username.length < 3) {
         showMessage(messageDiv, 'Username must be at least 3 characters long', 'error');
+        return;
+    }
+
+    if (isReservedUsername(username)) {
+        showMessage(messageDiv, 'This username is reserved and cannot be registered. Please choose a different username.', 'error');
         return;
     }
     

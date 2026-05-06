@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -14,6 +15,18 @@ public partial class LoginViewModel : ViewModelBase
     private readonly GameOsClient        _client;
     private readonly SessionCacheService _cache;
     private readonly OfflineDataCacheService _offlineCache;
+
+    /// <summary>Usernames that are reserved and cannot be registered.</summary>
+    private static readonly HashSet<string> ReservedUsernames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "admin", "administrator", "root", "superuser", "sysadmin",
+        "user", "test", "guest", "anonymous", "anon",
+        "system", "support", "mod", "moderator", "staff",
+        "help", "info", "null", "undefined", "nobody"
+    };
+
+    /// <summary>Simple email format validator.</summary>
+    private static readonly Regex EmailRegex = new(@"^[^\s@]+@[^\s@]+\.[^\s@]+$", RegexOptions.Compiled);
 
     [ObservableProperty] private string _username  = "";
     [ObservableProperty] private string _password  = "";
@@ -249,6 +262,16 @@ public partial class LoginViewModel : ViewModelBase
         if (Password.Length < 8)
         {
             ErrorMessage = "Password must be at least 8 characters.";
+            return;
+        }
+        if (ReservedUsernames.Contains(Username.Trim()))
+        {
+            ErrorMessage = "This username is reserved and cannot be registered. Please choose a different username.";
+            return;
+        }
+        if (!EmailRegex.IsMatch(Email.Trim()))
+        {
+            ErrorMessage = "Please enter a valid email address.";
             return;
         }
 
