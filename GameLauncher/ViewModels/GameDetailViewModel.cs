@@ -1623,26 +1623,32 @@ public partial class GameDetailViewModel : ViewModelBase
 
         void HandleUnlock(string id, string name)
         {
-            if (!processedIds.Add(id)) return; // already seen this session
-            // Also mark by name so the same achievement doesn't toast again if
-            // Xenia uses a different ID format on the next replay.
-            processedIds.Add(name.ToLowerInvariant());
+            string nameLower = name.ToLowerInvariant();
+            // Suppress toasts for achievements already seen this session (by ID or name).
+            // Check before adding so that when id == nameLower the first Add isn't falsely
+            // treated as "already seen" by the second Contains check.
+            if (processedIds.Contains(id) || processedIds.Contains(nameLower)) return;
+            processedIds.Add(id);
+            processedIds.Add(nameLower);
 
             Services.NotificationService.ShowAchievementUnlockedNotification(name, gameTitle);
             DevLogService.Log($"[XeniaAch] Unlocked: {name} (id={id})");
 
-            // Persist unlock to the cloud so it won't re-toast on the next session
+            // Persist unlock to the cloud so it won't re-toast on the next session.
+            // Icon URL lookup requires the UI thread — do it inside a combined Post so
+            // the icon is resolved before the cloud call fires.
             if (OnRequestAchievementUnlockAsync != null)
             {
-                string? iconUrl = null;
+                var saveCallback = OnRequestAchievementUnlockAsync;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    var existing = Achievements.FirstOrDefault(a =>
-                        string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase) ||
-                        string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
-                    iconUrl = existing?.IconUrl;
+                    string? iconUrl = Achievements
+                        .FirstOrDefault(a =>
+                            string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase) ||
+                            string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase))
+                        ?.IconUrl;
+                    _ = saveCallback("Xbox 360", gameTitle, id, name, iconUrl);
                 });
-                _ = OnRequestAchievementUnlockAsync("Xbox 360", gameTitle, id, name, iconUrl);
             }
 
             // Update in-memory achievement list

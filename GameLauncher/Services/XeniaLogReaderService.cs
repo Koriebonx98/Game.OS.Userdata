@@ -80,8 +80,8 @@ public static class XeniaLogReaderService
         if (string.IsNullOrEmpty(xeniaExePath)) return;
 
         // Also delete logs written directly next to the exe (xenia.log, xenia_canary.log, …)
-        string xeniaDir = Path.GetDirectoryName(xeniaExePath) ?? "";
-        if (Directory.Exists(xeniaDir))
+        string xeniaDir = Path.GetDirectoryName(xeniaExePath) ?? string.Empty;
+        if (!string.IsNullOrEmpty(xeniaDir) && Directory.Exists(xeniaDir))
         {
             foreach (string file in Directory.EnumerateFiles(xeniaDir, "*.log"))
             {
@@ -115,11 +115,11 @@ public static class XeniaLogReaderService
     {
         if (string.IsNullOrEmpty(xeniaExePath)) return null;
 
-        string xeniaDir = Path.GetDirectoryName(xeniaExePath) ?? "";
+        string xeniaDir = Path.GetDirectoryName(xeniaExePath) ?? string.Empty;
         var candidates = new List<string>();
 
         // 1. Log files written directly next to the exe (most common Xenia behaviour)
-        if (Directory.Exists(xeniaDir))
+        if (!string.IsNullOrEmpty(xeniaDir) && Directory.Exists(xeniaDir))
             candidates.AddRange(Directory.EnumerateFiles(xeniaDir, "*.log"));
 
         // 2. Portable Logs\ sub-directory
