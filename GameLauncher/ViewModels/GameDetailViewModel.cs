@@ -1113,6 +1113,13 @@ public partial class GameDetailViewModel : ViewModelBase
                             $"Launching '{Title}' via Ryujinx — old logs cleared.");
                     }
 
+                    // ── Xenia log reader: clear stale logs BEFORE launch so the new
+                    //    session starts with a clean file (mirrors the Switch pattern).
+                    bool readXeniaLog = string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase)
+                        && emuSettings.EmulatorPath.Contains("xenia", StringComparison.OrdinalIgnoreCase);
+                    if (readXeniaLog)
+                        XeniaLogReaderService.DeleteOldLogs(emuSettings.EmulatorPath);
+
                     try
                     {
                         var psi = new System.Diagnostics.ProcessStartInfo
@@ -1143,13 +1150,8 @@ public partial class GameDetailViewModel : ViewModelBase
                         _ = WatchAndReadSwitchLogAsync(romProc, emuSettings.EmulatorPath, Title);
 
                     // ── Xenia log reader: read achievement unlocks after session ends ──
-                    bool readXeniaLog = string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase)
-                        && emuSettings.EmulatorPath.Contains("xenia", StringComparison.OrdinalIgnoreCase);
                     if (readXeniaLog)
-                    {
-                        XeniaLogReaderService.DeleteOldLogs(emuSettings.EmulatorPath);
                         _ = WatchAndReadXeniaLogAsync(romProc, emuSettings.EmulatorPath, Title);
-                    }
 
                     return;
                 }
@@ -1248,6 +1250,14 @@ public partial class GameDetailViewModel : ViewModelBase
     /// the service (keeps the VM testable).
     /// </summary>
     public Action<System.Diagnostics.Process, string, string>? OnRequestPlaytimeTracking { get; set; }
+
+    /// <summary>
+    /// Callback wired by MainViewModel to persist a newly-unlocked achievement
+    /// (from the Xenia log) to the cloud so it survives across sessions and
+    /// won't re-fire a toast notification on the next emulator restart.
+    /// Parameters: (platform, gameTitle, achievementId, achievementName, iconUrl)
+    /// </summary>
+    public Func<string, string, string, string, string?, System.Threading.Tasks.Task>? OnRequestAchievementUnlockAsync { get; set; }
 
     /// <summary>
     /// Brings the currently-running game window to the foreground.
@@ -1579,6 +1589,10 @@ public partial class GameDetailViewModel : ViewModelBase
         System.Diagnostics.Process? gameProc, string xeniaExePath, string gameTitle)
     {
         // ── Pre-load IDs already in the achievements cache ───────────────────────
+        // Xenia re-replays ALL achievement unlocks on every emulator restart, so
+        // we track both the database AchievementId and the lowercased name
+        // (which Xenia uses as the key when no numeric ID appears in the log line)
+        // to suppress toast notifications for achievements already earned.
         string? cachePath = CacheService?.GetCachedAchievementsPath("Xbox 360", null, gameTitle);
         var processedIds = new System.Collections.Generic.HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
@@ -1591,8 +1605,14 @@ public partial class GameDetailViewModel : ViewModelBase
                 var cached = System.Text.Json.JsonSerializer.Deserialize<List<Achievement>>(cachedJson);
                 if (cached != null)
                 {
-                    foreach (var a in cached.Where(a => a.IsUnlocked && !string.IsNullOrEmpty(a.AchievementId)))
-                        processedIds.Add(a.AchievementId);
+                    foreach (var a in cached.Where(a => a.IsUnlocked))
+                    {
+                        if (!string.IsNullOrEmpty(a.AchievementId))
+                            processedIds.Add(a.AchievementId);
+                        // Also add by name so Xenia's name-based IDs are matched
+                        if (!string.IsNullOrEmpty(a.Name))
+                            processedIds.Add(a.Name.ToLowerInvariant());
+                    }
                 }
             }
             catch { /* best-effort */ }
@@ -1603,15 +1623,34 @@ public partial class GameDetailViewModel : ViewModelBase
 
         void HandleUnlock(string id, string name)
         {
-            if (!processedIds.Add(id)) return; // already seen
+            if (!processedIds.Add(id)) return; // already seen this session
+            // Also mark by name so the same achievement doesn't toast again if
+            // Xenia uses a different ID format on the next replay.
+            processedIds.Add(name.ToLowerInvariant());
+
             Services.NotificationService.ShowAchievementUnlockedNotification(name, gameTitle);
             DevLogService.Log($"[XeniaAch] Unlocked: {name} (id={id})");
+
+            // Persist unlock to the cloud so it won't re-toast on the next session
+            if (OnRequestAchievementUnlockAsync != null)
+            {
+                string? iconUrl = null;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    var existing = Achievements.FirstOrDefault(a =>
+                        string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
+                    iconUrl = existing?.IconUrl;
+                });
+                _ = OnRequestAchievementUnlockAsync("Xbox 360", gameTitle, id, name, iconUrl);
+            }
 
             // Update in-memory achievement list
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 var existing = Achievements.FirstOrDefault(a =>
-                    string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase));
+                    string.Equals(a.AchievementId, id, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a.Name, name, StringComparison.OrdinalIgnoreCase));
                 if (existing != null)
                 {
                     existing.UnlockedAt = DateTime.UtcNow.ToString("o");
