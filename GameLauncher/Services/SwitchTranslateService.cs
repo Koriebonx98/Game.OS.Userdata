@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace GameLauncher.Services;
 
@@ -77,6 +80,57 @@ public static class SwitchTranslateService
 
         /// <summary>All clean cup names found in Translate.txt (e.g. "Mushroom Cup").</summary>
         public IEnumerable<string> CupNames => _cupToCourses.Keys;
+    }
+
+    // ── Remote sync ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Raw URL for the Translate.txt file in the Game.OS.Userdata repository.
+    /// This is the canonical source of truth kept in sync with the local copy.
+    /// </summary>
+    private const string RemoteUrl =
+        "https://raw.githubusercontent.com/Koriebonx98/Game.OS.Userdata/main/Switch%20Ach/Translate.txt";
+
+    // Shared client for remote sync — no auth required (public repo).
+    private static readonly HttpClient _http = CreateHttpClient();
+    private static HttpClient CreateHttpClient()
+    {
+        var c = new HttpClient();
+        c.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+        return c;
+    }
+
+    /// <summary>
+    /// Downloads the latest <c>Translate.txt</c> from the remote repository and
+    /// overwrites the local <c>Switch Ach/Translate.txt</c> next to the exe when
+    /// the content has changed.  Silently does nothing on any network error so
+    /// startup is never blocked.
+    /// </summary>
+    public static async Task SyncAsync(CancellationToken ct = default)
+    {
+        try
+        {
+            string localPath = Path.Combine(AppContext.BaseDirectory, "Switch Ach", "Translate.txt");
+            string remoteText = await _http.GetStringAsync(RemoteUrl, ct).ConfigureAwait(false);
+
+            // Only write if the content has actually changed (avoid unnecessary disk writes
+            // and, more importantly, avoid a reload when nothing is new).
+            string? localText = null;
+            if (File.Exists(localPath))
+            {
+                try { localText = await File.ReadAllTextAsync(localPath, ct).ConfigureAwait(false); }
+                catch { /* can't read local file — proceed to overwrite */ }
+            }
+
+            if (string.Equals(localText, remoteText, StringComparison.Ordinal))
+                return; // already up to date
+
+            string? dir = Path.GetDirectoryName(localPath);
+            if (!string.IsNullOrEmpty(dir))
+                Directory.CreateDirectory(dir);
+            await File.WriteAllTextAsync(localPath, remoteText, ct).ConfigureAwait(false);
+        }
+        catch { /* best-effort — do not block startup on a network error */ }
     }
 
     // ── Public entry point ─────────────────────────────────────────────────────

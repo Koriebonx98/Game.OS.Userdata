@@ -179,7 +179,7 @@ public static class SwitchAchievementDetectorService
             var m = _coinTotalRegex.Match(ach.Description);
             if (!m.Success) continue;
 
-            int threshold = int.Parse(m.Groups[1].Value);
+            if (!int.TryParse(m.Groups[1].Value, out int threshold)) continue;
             if (session.TotalCoins < threshold) continue;
 
             newUnlocks.Add(ach.Name);
