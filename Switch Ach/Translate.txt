@@ -2,7 +2,11 @@
 
 # find in log:
 "Room: match" 
+"Room: gp_result"
 "FinishReason": "Finish"  
+
+# Cup codes (gp_result "Cup" field):
+Kinoko = Mushroom Cup
 
 #Tracks:
 # Mushroom Cup:

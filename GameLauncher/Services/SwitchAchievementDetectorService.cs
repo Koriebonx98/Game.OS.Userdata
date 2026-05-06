@@ -72,36 +72,14 @@ public static class SwitchAchievementDetectorService
 
     // Maps the game's internal cup code (from "Room: gp_result" → "Cup" field) to the
     // achievement name that should be awarded when the player finishes that cup in Rank 1.
-    // "Kinoko" confirmed from Ryujinx log (Switch Ach/Mario kart 1st mushroom cup.log).
-    // Remaining codes follow Nintendo's standard Japanese/English naming conventions and
-    // should be verified against future logs.
+    //
+    // IMPORTANT: Only add entries here once the raw cup code has been confirmed from an
+    // actual Ryujinx log AND documented in Switch Ach/Translate.txt.  Do not guess.
     private static readonly Dictionary<string, string> Mk8dCupCodes =
         new(StringComparer.OrdinalIgnoreCase)
         {
-            // ── Original nitro cups ─────────────────────────────────────────────
-            ["Kinoko"]   = "Magic Mushroom's",          // confirmed from log
-            ["Hana"]     = "Flower Power",
-            ["Hoshi"]    = "You want A Gold Star?",
-            ["Special"]  = "Special Oylimpics",
-            // ── DLC cups ────────────────────────────────────────────────────────
-            ["Egg"]      = "Egg cell lent",
-            ["Cross"]    = "Animal Crossing",
-            ["Triforce"] = "Arrow Head",
-            ["Bell"]     = "Bell End",
-            // ── Retro cups ───────────────────────────────────────────────────────
-            ["Koura"]    = "Shell Shocked",
-            ["Banana"]   = "Banana Split",
-            ["Happa"]    = "Leaf Me Alone",
-            ["Kaminari"] = "Lightning Mcqueen",
-            // ── Booster Course Pass ──────────────────────────────────────────────
-            ["Turnip"]     = "Ol Mcdonald",
-            ["Propeller"]  = "Flying High",
-            ["Rock"]       = "Paper, Sissors, Rock",
-            ["Moon"]       = "First Mii On The Moon",
-            ["Fruit"]      = "A Bit of a Fruity Taste",
-            ["Boomerang"]  = "What Goes Around, Comes Around",
-            ["Feather"]    = "Light As a Feather",
-            ["Cherry"]     = "Tangfastic",
+            ["Kinoko"] = "Magic Mushroom's",   // confirmed: Mario kart 1st mushroom cup.log
+            // Additional cup codes will be added as they are confirmed from logs.
         };
 
     // Coin-threshold achievements (Name from JSON → required cumulative coins this session).
