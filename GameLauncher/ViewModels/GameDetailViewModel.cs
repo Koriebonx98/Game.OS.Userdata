@@ -1595,34 +1595,53 @@ public partial class GameDetailViewModel : ViewModelBase
     private async System.Threading.Tasks.Task WatchAndReadXeniaLogAsync(
         System.Diagnostics.Process? gameProc, string xeniaExePath, string gameTitle)
     {
-        // ── Pre-load IDs already in the achievements cache ───────────────────────
+        // ── Pre-load IDs already unlocked before this session ───────────────────
         // Xenia re-replays ALL achievement unlocks on every emulator restart, so
         // we track both the database AchievementId and the lowercased name
         // (which Xenia uses as the key when no numeric ID appears in the log line)
         // to suppress toast notifications for achievements already earned.
-        string? cachePath = CacheService?.GetCachedAchievementsPath("Xbox 360", null, gameTitle);
+        //
+        // Primary source: the in-memory Achievements collection, which is always
+        // populated before the game is launched and is not affected by the cache
+        // folder key (titleId vs sanitised title) used by GetCachedAchievementsPath.
         var processedIds = new System.Collections.Generic.HashSet<string>(
             StringComparer.OrdinalIgnoreCase);
 
-        if (!string.IsNullOrEmpty(cachePath) && System.IO.File.Exists(cachePath))
+        foreach (var a in Achievements.Where(a => a.IsUnlocked))
         {
-            try
+            if (!string.IsNullOrEmpty(a.AchievementId))
+                processedIds.Add(a.AchievementId);
+            // Also add by name so Xenia's name-based IDs are matched
+            if (!string.IsNullOrEmpty(a.Name))
+                processedIds.Add(a.Name.ToLowerInvariant());
+        }
+
+        // Fallback: read the cache file in case the in-memory list was not loaded
+        // (e.g. achievements panel was never opened).  Use the correct titleId so
+        // the cache folder is resolved reliably (Xbox 360 caches are keyed by titleId).
+        if (processedIds.Count == 0)
+        {
+            string? titleId = _currentLocalRom?.TitleId ?? _databaseTitleId;
+            string? cachePath = CacheService?.GetCachedAchievementsPath("Xbox 360", titleId, gameTitle);
+            if (!string.IsNullOrEmpty(cachePath) && System.IO.File.Exists(cachePath))
             {
-                var cachedJson = System.IO.File.ReadAllText(cachePath);
-                var cached = System.Text.Json.JsonSerializer.Deserialize<List<Achievement>>(cachedJson);
-                if (cached != null)
+                try
                 {
-                    foreach (var a in cached.Where(a => a.IsUnlocked))
+                    var cachedJson = System.IO.File.ReadAllText(cachePath);
+                    var cached = System.Text.Json.JsonSerializer.Deserialize<List<Achievement>>(cachedJson);
+                    if (cached != null)
                     {
-                        if (!string.IsNullOrEmpty(a.AchievementId))
-                            processedIds.Add(a.AchievementId);
-                        // Also add by name so Xenia's name-based IDs are matched
-                        if (!string.IsNullOrEmpty(a.Name))
-                            processedIds.Add(a.Name.ToLowerInvariant());
+                        foreach (var a in cached.Where(a => a.IsUnlocked))
+                        {
+                            if (!string.IsNullOrEmpty(a.AchievementId))
+                                processedIds.Add(a.AchievementId);
+                            if (!string.IsNullOrEmpty(a.Name))
+                                processedIds.Add(a.Name.ToLowerInvariant());
+                        }
                     }
                 }
+                catch { /* best-effort */ }
             }
-            catch { /* best-effort */ }
         }
 
         long fileOffset = 0;
