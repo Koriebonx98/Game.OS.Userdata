@@ -1439,11 +1439,11 @@ public partial class GameDetailViewModel : ViewModelBase
             logPath ??= SwitchLogReaderService.FindLatestLog(ryujinxExePath);
             if (string.IsNullOrEmpty(logPath)) return;
 
-            var newResults = SwitchLogReaderService.ReadRaceResultsFromNewContent(logPath, ref fileOffset);
-            if (newResults.Count == 0) return;
+            var newResults = SwitchLogReaderService.ReadRaceResultsFromNewContent(logPath, ref fileOffset, out var newGpResults);
+            if (newResults.Count == 0 && newGpResults.Count == 0) return;
 
             var newUnlocks = SwitchAchievementDetectorService.DetectNewUnlocks(
-                gameTitle, newResults, session, alreadyCachedNames, Achievements);
+                gameTitle, newResults, newGpResults, session, alreadyCachedNames, Achievements);
 
             foreach (string achName in newUnlocks)
             {

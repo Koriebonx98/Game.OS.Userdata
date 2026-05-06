@@ -70,6 +70,40 @@ public static class SwitchAchievementDetectorService
             // all 4 course codes listed in Translate.txt — omitted until they are known.
         };
 
+    // Maps the game's internal cup code (from "Room: gp_result" → "Cup" field) to the
+    // achievement name that should be awarded when the player finishes that cup in Rank 1.
+    // "Kinoko" confirmed from Ryujinx log (Switch Ach/Mario kart 1st mushroom cup.log).
+    // Remaining codes follow Nintendo's standard Japanese/English naming conventions and
+    // should be verified against future logs.
+    private static readonly Dictionary<string, string> Mk8dCupCodes =
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            // ── Original nitro cups ─────────────────────────────────────────────
+            ["Kinoko"]   = "Magic Mushroom's",          // confirmed from log
+            ["Hana"]     = "Flower Power",
+            ["Hoshi"]    = "You want A Gold Star?",
+            ["Special"]  = "Special Oylimpics",
+            // ── DLC cups ────────────────────────────────────────────────────────
+            ["Egg"]      = "Egg cell lent",
+            ["Cross"]    = "Animal Crossing",
+            ["Triforce"] = "Arrow Head",
+            ["Bell"]     = "Bell End",
+            // ── Retro cups ───────────────────────────────────────────────────────
+            ["Koura"]    = "Shell Shocked",
+            ["Banana"]   = "Banana Split",
+            ["Happa"]    = "Leaf Me Alone",
+            ["Kaminari"] = "Lightning Mcqueen",
+            // ── Booster Course Pass ──────────────────────────────────────────────
+            ["Turnip"]     = "Ol Mcdonald",
+            ["Propeller"]  = "Flying High",
+            ["Rock"]       = "Paper, Sissors, Rock",
+            ["Moon"]       = "First Mii On The Moon",
+            ["Fruit"]      = "A Bit of a Fruity Taste",
+            ["Boomerang"]  = "What Goes Around, Comes Around",
+            ["Feather"]    = "Light As a Feather",
+            ["Cherry"]     = "Tangfastic",
+        };
+
     // Coin-threshold achievements (Name from JSON → required cumulative coins this session).
     private static readonly Dictionary<string, int> Mk8dCoinThresholds =
         new(StringComparer.OrdinalIgnoreCase)
@@ -102,11 +136,14 @@ public static class SwitchAchievementDetectorService
     // ── Public API ─────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Processes a batch of newly parsed race results and returns the names of any
-    /// achievements that were just unlocked (not previously cached or toasted).
+    /// Processes a batch of newly parsed race and Grand Prix results and returns the names
+    /// of any achievements that were just unlocked (not previously cached or toasted).
     /// </summary>
     /// <param name="gameTitle">Title of the game currently running.</param>
     /// <param name="newResults">Race results extracted from the latest log content.</param>
+    /// <param name="newGpResults">
+    /// Grand Prix cup results extracted from the latest log content (one per completed cup).
+    /// </param>
     /// <param name="session">Mutable session state; update this object in place.</param>
     /// <param name="alreadyUnlockedNames">
     /// Achievement names that are already recorded as unlocked in the local cache.
@@ -120,15 +157,16 @@ public static class SwitchAchievementDetectorService
     public static IReadOnlyList<string> DetectNewUnlocks(
         string                   gameTitle,
         IReadOnlyList<SwitchLogReaderService.SwitchRaceResult> newResults,
+        IReadOnlyList<SwitchLogReaderService.SwitchGpResult>   newGpResults,
         SessionState             session,
         IReadOnlySet<string>?    alreadyUnlockedNames,
         IReadOnlyList<Achievement>? achievementsList)
     {
-        if (newResults.Count == 0) return [];
+        if (newResults.Count == 0 && newGpResults.Count == 0) return [];
 
         // Determine which game-specific ruleset to apply
         if (IsMarioKart8Deluxe(gameTitle))
-            return DetectMk8dUnlocks(newResults, session, alreadyUnlockedNames, achievementsList);
+            return DetectMk8dUnlocks(newResults, newGpResults, session, alreadyUnlockedNames, achievementsList);
 
         // No ruleset for this game — nothing to detect
         return [];
@@ -142,6 +180,7 @@ public static class SwitchAchievementDetectorService
 
     private static IReadOnlyList<string> DetectMk8dUnlocks(
         IReadOnlyList<SwitchLogReaderService.SwitchRaceResult> results,
+        IReadOnlyList<SwitchLogReaderService.SwitchGpResult>   gpResults,
         SessionState             session,
         IReadOnlySet<string>?    alreadyCached,
         IReadOnlyList<Achievement>? achievementsList)
@@ -155,7 +194,7 @@ public static class SwitchAchievementDetectorService
                 StringComparer.OrdinalIgnoreCase)
             : null;
 
-        // ── Step 1: accumulate session state ────────────────────────────────
+        // ── Step 1: accumulate session state from individual race results ────
         foreach (var r in results)
         {
             // Track 1st-place course wins
@@ -170,7 +209,26 @@ public static class SwitchAchievementDetectorService
             session.TotalCoins += r.CoinNum;
         }
 
-        // ── Step 2: check cup-win achievements ──────────────────────────────
+        // ── Step 2: check cup-win achievements via gp_result (primary path) ─
+        // The game fires a gp_result event with the overall cup rank after all
+        // four races are complete.  A Rank of 1 means the player won the cup.
+        foreach (var gp in gpResults)
+        {
+            if (gp.Rank != 1 || string.IsNullOrEmpty(gp.Cup)) continue;
+
+            if (!Mk8dCupCodes.TryGetValue(gp.Cup, out string? achName)) continue;
+
+            if (alreadyCached != null && alreadyCached.Contains(achName)) continue;
+            if (session.AlreadyToasted.Contains(achName)) continue;
+            if (validNames != null && !validNames.Contains(achName)) continue;
+
+            newUnlocks.Add(achName);
+            session.AlreadyToasted.Add(achName);
+        }
+
+        // ── Step 3: check cup-win achievements via individual race tracking ──
+        // Fallback: if gp_result was not captured (e.g. old log format), award
+        // the cup achievement when all 4 courses have been individually won.
         foreach (var (achName, courses) in Mk8dCups)
         {
             // Skip if already cached, already toasted this session, or not in
@@ -187,7 +245,7 @@ public static class SwitchAchievementDetectorService
             session.AlreadyToasted.Add(achName);
         }
 
-        // ── Step 3: check coin-threshold achievements ────────────────────────
+        // ── Step 4: check coin-threshold achievements ────────────────────────
         foreach (var (achName, threshold) in Mk8dCoinThresholds)
         {
             if (alreadyCached != null && alreadyCached.Contains(achName)) continue;
