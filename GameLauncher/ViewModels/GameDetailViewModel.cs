@@ -161,6 +161,12 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool _isInstalled;
     /// <summary>True when a repack archive is available to install (but game is not yet installed).</summary>
     [ObservableProperty] private bool _isRepack;
+    /// <summary>
+    /// True when this entry is a cloud library game that is not installed locally
+    /// (no matching local game, ROM, repack, or Steam installable link).
+    /// Shows a placeholder "Install" button in the UI.
+    /// </summary>
+    [ObservableProperty] private bool _isCloudOnly;
     /// <summary>File path of the repack archive/folder/setup, used by the Install command.</summary>
     [ObservableProperty] private string _repackPath = "";
     /// <summary>Display label for the repack archive size.</summary>
@@ -2137,6 +2143,9 @@ public partial class GameDetailViewModel : ViewModelBase
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
 
         PopulatePlaytime(game.Platform, game.Title, game.PlaytimeMinutes);
+        ApplyInstallState(localGame, repack, localRom);
+        // IsCloudOnly: cloud library entry with no local copy of any kind
+        IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
         _steamAppId = 0;
 
@@ -2151,6 +2160,8 @@ public partial class GameDetailViewModel : ViewModelBase
         IsSteamInstallable   = _steamAppId > 0 && !IsInstalled && !IsRepack;
         SteamInstallUrl      = _steamAppId > 0 ? $"steam://install/{_steamAppId}" : "";
         HasSteamLaunchOption = _steamAppId > 0;
+        // Recalculate IsCloudOnly after Steam check (Steam-installable games are not "cloud only")
+        if (IsSteamInstallable) IsCloudOnly = false;
         LoadReviews();
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
@@ -2188,6 +2199,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        IsCloudOnly = false;
         // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
         // so stale Switch state from a previously viewed game is always cleared.
         LoadSwitchMods();
@@ -2242,6 +2254,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled     = true;
         IsRepack        = false;
         IsSetupRepack   = false;
+        IsCloudOnly     = false;
         ShowDrivePicker = false;
         RepackPath     = "";
         RepackSizeLabel = "";
@@ -2314,6 +2327,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled          = false;
         IsRepack             = true;
         IsSetupRepack        = repack.FileType == "setup";
+        IsCloudOnly          = false;
         ShowDrivePicker      = false;
         RepackPath           = repack.FilePath;
         RepackSizeLabel      = repack.SizeLabel;
@@ -2371,6 +2385,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled          = true;   // ROM is "installed" (the file exists on disk)
         IsRepack             = false;
         IsSetupRepack        = false;
+        IsCloudOnly          = false;
         ShowDrivePicker      = false;
         RepackPath           = "";
         RepackSizeLabel      = "";
