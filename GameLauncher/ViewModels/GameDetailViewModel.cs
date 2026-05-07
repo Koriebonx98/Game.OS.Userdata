@@ -1111,8 +1111,9 @@ public partial class GameDetailViewModel : ViewModelBase
                     // Always tail the current Ryujinx log for achievement detection.
                     // Keep ReadSwitchLog as an optional toggle only for post-session
                     // full-log snippet recording.
+                    string emulatorFileName = Path.GetFileNameWithoutExtension(emuSettings.EmulatorPath) ?? "";
                     bool isSwitchRyujinx = IsSwitch
-                        && emuSettings.EmulatorPath.Contains("ryujinx", StringComparison.OrdinalIgnoreCase);
+                        && emulatorFileName.Contains("ryujinx", StringComparison.OrdinalIgnoreCase);
                     bool readSwitchLog = isSwitchRyujinx && AppSettingsService.Load().ReadSwitchLog;
 
                     if (isSwitchRyujinx)
