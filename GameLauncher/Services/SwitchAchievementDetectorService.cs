@@ -240,7 +240,7 @@ public static class SwitchAchievementDetectorService
         if (onIndex < 0)
             return false;
 
-        string driverPart = text.Substring(Prefix.Length, onIndex - Prefix.Length).Trim().Trim('"');
+        string driverPart = text[Prefix.Length..onIndex].Trim().Trim('"');
         string coursePart = text[(onIndex + " on ".Length)..].Trim().Trim('"');
 
         return driverPart.Equals(cleanDriverName, StringComparison.OrdinalIgnoreCase) &&
