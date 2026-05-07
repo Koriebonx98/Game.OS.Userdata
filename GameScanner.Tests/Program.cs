@@ -1583,6 +1583,13 @@ class Program
         bool passed = true;
         try
         {
+            string repoRoot = FindRepoRoot();
+            string sourceTranslatePath = Path.Combine(repoRoot, "Switch Ach", "Translate.txt");
+            string runtimeTranslateDir = Path.Combine(AppContext.BaseDirectory, "Switch Ach");
+            string runtimeTranslatePath = Path.Combine(runtimeTranslateDir, "Translate.txt");
+            Directory.CreateDirectory(runtimeTranslateDir);
+            File.Copy(sourceTranslatePath, runtimeTranslatePath, overwrite: true);
+
             var translations = SwitchTranslateService.Load();
             var session = new SwitchAchievementDetectorService.SessionState();
 
