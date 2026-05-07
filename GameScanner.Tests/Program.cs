@@ -446,6 +446,13 @@ class Program
         if (!nonGameFilterPassed) passed = false;
         Console.WriteLine();
 
+        // ── SWITCH ACHIEVEMENT DETECTION (Mario Kart 8 Deluxe) ───────────────
+        Console.WriteLine("🏁 Switch Achievement Detection (MK8D race condition):");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool switchAchPassed = TestSwitchMk8RaceAchievementDetection();
+        if (!switchAchPassed) passed = false;
+        Console.WriteLine();
+
         // ── SUMMARY ───────────────────────────────────────────────────────────
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
         if (passed)
@@ -1562,6 +1569,74 @@ class Program
         finally
         {
             try { if (Directory.Exists(tempRoot)) Directory.Delete(tempRoot, recursive: true); } catch { }
+        }
+
+        return passed;
+    }
+
+    /// <summary>
+    /// Verifies Switch achievement detection for a race-specific Mario Kart 8 Deluxe
+    /// achievement description that depends on Translate.txt values.
+    /// </summary>
+    private static bool TestSwitchMk8RaceAchievementDetection()
+    {
+        bool passed = true;
+        try
+        {
+            string repoRoot = FindRepoRoot();
+            string sourceTranslatePath = Path.Combine(repoRoot, "Switch Ach", "Translate.txt");
+            string runtimeTranslateDir = Path.Combine(AppContext.BaseDirectory, "Switch Ach");
+            string runtimeTranslatePath = Path.Combine(runtimeTranslateDir, "Translate.txt");
+            Directory.CreateDirectory(runtimeTranslateDir);
+            File.Copy(sourceTranslatePath, runtimeTranslatePath, overwrite: true);
+
+            var translations = SwitchTranslateService.Load();
+            var session = new SwitchAchievementDetectorService.SessionState();
+
+            var achievements = new List<Achievement>
+            {
+                new()
+                {
+                    Name = "Test",
+                    Description = "get 1st as Mario on \"Mario Kart Stadium\""
+                }
+            };
+
+            var results = new List<SwitchLogReaderService.SwitchRaceResult>
+            {
+                new()
+                {
+                    Course = "Gu_FirstCircuit",
+                    Driver = "Mario",
+                    FinishReason = "Finish",
+                    Rank = 1,
+                    CoinNum = 0
+                }
+            };
+
+            var unlocks = SwitchAchievementDetectorService.DetectNewUnlocks(
+                gameTitle: "Mario Kart 8 Deluxe",
+                newResults: results,
+                newGpResults: [],
+                session: session,
+                alreadyUnlockedNames: null,
+                achievementsList: achievements,
+                translations: translations);
+
+            if (unlocks.Contains("Test", StringComparer.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("  ✅  \"Test\" unlocked from: get 1st as Mario on \"Mario Kart Stadium\"");
+            }
+            else
+            {
+                Console.WriteLine("  ❌  \"Test\" was not unlocked for rank 1 Mario on Gu_FirstCircuit");
+                passed = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌  Switch MK8 achievement test threw: {ex.Message}");
+            passed = false;
         }
 
         return passed;

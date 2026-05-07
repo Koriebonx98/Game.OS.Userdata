@@ -126,6 +126,19 @@ public static class SwitchAchievementDetectorService
                 !string.IsNullOrEmpty(r.Course))
             {
                 session.CoursesWonFirstPlace.Add(r.Course);
+
+                // Detect race-specific achievements such as:
+                // "get 1st as Mario on \"Mario Kart Stadium\""
+                string cleanCourse = translations.Translate(r.Course);
+                string cleanDriver = string.IsNullOrEmpty(r.Driver) ? "" : translations.Translate(r.Driver);
+                foreach (var ach in candidates)
+                {
+                    if (session.AlreadyToasted.Contains(ach.Name)) continue;
+                    if (!IsFirstAsDriverOnCourseDescription(ach.Description, cleanDriver, cleanCourse)) continue;
+
+                    newUnlocks.Add(ach.Name);
+                    session.AlreadyToasted.Add(ach.Name);
+                }
             }
 
             session.TotalCoins += r.CoinNum;
@@ -202,4 +215,35 @@ public static class SwitchAchievementDetectorService
     private static bool IsWinCupDescription(string description, string cleanCupName) =>
         description.Contains("win 1st", StringComparison.OrdinalIgnoreCase) &&
         description.TrimEnd().EndsWith(cleanCupName, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Returns <see langword="true"/> when <paramref name="description"/> matches:
+    /// "get 1st as {Driver} on {Course}" (case-insensitive),
+    /// with optional double quotes around the course name.
+    /// </summary>
+    private static bool IsFirstAsDriverOnCourseDescription(
+        string description,
+        string cleanDriverName,
+        string cleanCourseName)
+    {
+        const string Prefix = "get 1st as ";
+        if (string.IsNullOrWhiteSpace(description) ||
+            string.IsNullOrWhiteSpace(cleanDriverName) ||
+            string.IsNullOrWhiteSpace(cleanCourseName))
+            return false;
+
+        string text = description.Trim();
+        if (!text.StartsWith(Prefix, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        int onIndex = text.IndexOf(" on ", Prefix.Length, StringComparison.OrdinalIgnoreCase);
+        if (onIndex < 0)
+            return false;
+
+        string driverPart = text[Prefix.Length..onIndex].Trim().Trim('"');
+        string coursePart = text[(onIndex + " on ".Length)..].Trim().Trim('"');
+
+        return driverPart.Equals(cleanDriverName, StringComparison.OrdinalIgnoreCase) &&
+               coursePart.Equals(cleanCourseName, StringComparison.OrdinalIgnoreCase);
+    }
 }
