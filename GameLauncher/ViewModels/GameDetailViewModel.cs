@@ -161,6 +161,12 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool _isInstalled;
     /// <summary>True when a repack archive is available to install (but game is not yet installed).</summary>
     [ObservableProperty] private bool _isRepack;
+    /// <summary>
+    /// True when this entry is a cloud library game that is not installed locally
+    /// (no matching local game, ROM, repack, or Steam installable link).
+    /// Shows a placeholder "Install" button in the UI.
+    /// </summary>
+    [ObservableProperty] private bool _isCloudOnly;
     /// <summary>File path of the repack archive/folder/setup, used by the Install command.</summary>
     [ObservableProperty] private string _repackPath = "";
     /// <summary>Display label for the repack archive size.</summary>
@@ -2137,6 +2143,9 @@ public partial class GameDetailViewModel : ViewModelBase
             _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
 
         PopulatePlaytime(game.Platform, game.Title, game.PlaytimeMinutes);
+        ApplyInstallState(localGame, repack, localRom);
+        // IsCloudOnly: cloud library entry with no local copy of any kind
+        IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
         _steamAppId = 0;
 
@@ -2151,6 +2160,8 @@ public partial class GameDetailViewModel : ViewModelBase
         IsSteamInstallable   = _steamAppId > 0 && !IsInstalled && !IsRepack;
         SteamInstallUrl      = _steamAppId > 0 ? $"steam://install/{_steamAppId}" : "";
         HasSteamLaunchOption = _steamAppId > 0;
+        // Recalculate IsCloudOnly after Steam check (Steam-installable games are not "cloud only")
+        if (IsSteamInstallable) IsCloudOnly = false;
         LoadReviews();
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
@@ -2188,6 +2199,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        IsCloudOnly = false;
         // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
         // so stale Switch state from a previously viewed game is always cleared.
         LoadSwitchMods();
@@ -2242,6 +2254,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled     = true;
         IsRepack        = false;
         IsSetupRepack   = false;
+        IsCloudOnly     = false;
         ShowDrivePicker = false;
         RepackPath     = "";
         RepackSizeLabel = "";
@@ -2314,6 +2327,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled          = false;
         IsRepack             = true;
         IsSetupRepack        = repack.FileType == "setup";
+        IsCloudOnly          = false;
         ShowDrivePicker      = false;
         RepackPath           = repack.FilePath;
         RepackSizeLabel      = repack.SizeLabel;
@@ -2371,6 +2385,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsInstalled          = true;   // ROM is "installed" (the file exists on disk)
         IsRepack             = false;
         IsSetupRepack        = false;
+        IsCloudOnly          = false;
         ShowDrivePicker      = false;
         RepackPath           = "";
         RepackSizeLabel      = "";
@@ -2575,25 +2590,20 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             string json;
 
-            // Prefer the locally-cached achievements.json so the detail view works
-            // offline and loads instantly without a network round-trip.
             // Resolve the best cache key: ROM titleId → database titleId → title
             string? titleId = _currentLocalRom?.TitleId ?? _databaseTitleId;
             string? cachedPath = CacheService?.GetCachedAchievementsPath(Platform, titleId, Title);
 
-            if (!string.IsNullOrEmpty(cachedPath) && System.IO.File.Exists(cachedPath))
-            {
-                DevLogService.Log($"[AchievementsCache] Loading from disk: {cachedPath}");
-                json = await System.IO.File.ReadAllTextAsync(cachedPath).ConfigureAwait(false);
-            }
-            else
+            // Always try the network first so newly added achievements appear immediately.
+            // Fall back to the locally-cached file only when the network is unavailable,
+            // so the detail view still works offline.
+            try
             {
                 using var http = new System.Net.Http.HttpClient();
                 http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
-                json = await http.GetStringAsync(url);
+                json = await http.GetStringAsync(url).ConfigureAwait(false);
 
-                // Cache the downloaded JSON so the next session works offline
-                // (and this first load is faster on re-open within the same session).
+                // Persist the fresh data so subsequent offline sessions use the latest list.
                 if (!string.IsNullOrWhiteSpace(json) && CacheService != null)
                 {
                     try
@@ -2606,10 +2616,27 @@ public partial class GameDetailViewModel : ViewModelBase
                                 System.IO.Directory.CreateDirectory(dir);
                             await System.IO.File.WriteAllTextAsync(writePath, json)
                                 .ConfigureAwait(false);
-                            DevLogService.Log($"[AchievementsCache] Saved to disk: {writePath}");
+                            DevLogService.Log($"[AchievementsCache] Updated cache: {writePath}");
                         }
                     }
                     catch { /* best-effort — cache write failure must not block display */ }
+                }
+            }
+            catch (Exception ex) when (ex is System.Net.Http.HttpRequestException ||
+                                       ex is System.Threading.Tasks.TaskCanceledException ||
+                                       ex is System.IO.IOException)
+            {
+                // Network unavailable — fall back to the locally-cached file.
+                DevLogService.Log($"[AchievementsCache] Network fetch failed ({ex.GetType().Name}): {ex.Message}");
+                if (!string.IsNullOrEmpty(cachedPath) && System.IO.File.Exists(cachedPath))
+                {
+                    DevLogService.Log($"[AchievementsCache] Offline fallback: {cachedPath}");
+                    json = await System.IO.File.ReadAllTextAsync(cachedPath).ConfigureAwait(false);
+                }
+                else
+                {
+                    DevLogService.Log($"[AchievementsCache] No cache available for {Platform}/{titleId ?? Title}");
+                    return;
                 }
             }
 
