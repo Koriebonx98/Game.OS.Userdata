@@ -122,6 +122,59 @@ const FIXTURE_PS3_HTML = (() => {
 const FIXTURE_TROPHIES_PLURAL_HTML = FIXTURE_PS3_HTML.replace('<ul class="trophy">', '<ul class="trophies">');
 
 // ---------------------------------------------------------------------------
+// PS3 Skate 2 fixture – uses <ul class="trophies"> (plural).
+// Represents a game different from Skate 3 to verify the scraper handles
+// PS3 games beyond the one that was fixed in PR #144.
+// ---------------------------------------------------------------------------
+const FIXTURE_PS3_SKATE2_TROPHIES = [
+    { name: 'Skate 2',                   pct:  3.9,  desc: 'Earn all Skate 2 Trophies.', hidden: false },
+    { name: 'Back in Black',             pct: 88.7,  desc: 'Complete the first chapter.', hidden: false },
+    { name: 'Hall of Meat',              pct: 10.2,  desc: 'Sustain 1,000,000 points of damage in Hall of Meat.', hidden: true },
+    { name: 'City Planner',              pct: 25.4,  desc: 'Move 50 objects in one session.', hidden: false },
+    { name: 'Skate 2 Legend',            pct:  2.1,  desc: 'Complete everything in the game.', hidden: true },
+];
+
+const FIXTURE_PS3_SKATE2_HTML = (() => {
+    const items = FIXTURE_PS3_SKATE2_TROPHIES.map(a => {
+        const cls = a.hidden ? ' class="secret"' : '';
+        return `  <li data-average="${a.pct}"${cls}>\n` +
+               `    <img src="https://media.exophase.com/trophies/skate2_ps3/${a.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png">\n` +
+               `    <a>${a.name}</a>\n` +
+               `    <div class="award-description"><p>${a.desc}</p></div>\n` +
+               `  </li>`;
+    }).join('\n');
+    return `<!DOCTYPE html>\n<html>\n<head><title>Skate 2 Trophies - PS3 - Exophase.com</title></head>\n<body>\n<ul class="trophies">\n${items}\n</ul>\n</body>\n</html>`;
+})();
+
+// ---------------------------------------------------------------------------
+// Xbox 360 Skate 3 fixture – uses <ul class="achievements"> (plural) with
+// <div class="title"> and <div class="description"> for name/desc rather than
+// <a> and <div class="award-description">.  This reflects the HTML structure
+// Exophase uses for some Xbox 360 achievement pages.
+// ---------------------------------------------------------------------------
+const FIXTURE_XBOX360_SKATE3_ACHIEVEMENTS = [
+    { name: 'Welcome to Port Carverton',  pct: 93.4, desc: 'Complete the tutorial.' },
+    { name: 'Ramp It Up',                 pct: 72.1, desc: 'Build a skate spot using the spot creator.' },
+    { name: 'Own the City',               pct: 11.2, desc: 'Own every spot in Port Carverton.' },
+    { name: 'Team Player',                pct: 68.5, desc: 'Create a skate team and recruit two skaters.' },
+    { name: 'Legend',                     pct:  2.3, desc: 'Achieve 100% game completion.', hidden: true },
+];
+
+const FIXTURE_XBOX360_SKATE3_HTML = (() => {
+    const items = FIXTURE_XBOX360_SKATE3_ACHIEVEMENTS.map(a => {
+        const cls = a.hidden ? ' class="achievement secret"' : ' class="achievement"';
+        return `  <li${cls} data-average="${a.pct}">\n` +
+               `    <img src="https://media.exophase.com/achievements/skate3xbox/${a.name.toLowerCase().replace(/[^a-z0-9]/g, '_')}.png">\n` +
+               `    <div class="info">\n` +
+               `      <div class="title">${a.name}</div>\n` +
+               `      <div class="description">${a.desc}</div>\n` +
+               `    </div>\n` +
+               `  </li>`;
+    }).join('\n');
+    return `<!DOCTYPE html>\n<html>\n<head><title>Skate 3 Achievements - Xbox 360 - Exophase.com</title></head>\n<body>\n<ul class="achievements">\n${items}\n</ul>\n</body>\n</html>`;
+})();
+
+// ---------------------------------------------------------------------------
 // Shared scraping function – same selector cascade as the server-side implementation.
 // ---------------------------------------------------------------------------
 function scrapeAchievements(html) {
@@ -168,9 +221,11 @@ function scrapeAchievements(html) {
 // ---------------------------------------------------------------------------
 function runFixtureTests() {
     const tests = [
-        { label: 'Xbox 360 (ul.achievement)', html: FIXTURE_HTML,                 expected: FIXTURE_ACHIEVEMENTS },
-        { label: 'PS3     (ul.trophy)',        html: FIXTURE_PS3_HTML,             expected: FIXTURE_PS3_TROPHIES },
-        { label: 'plural  (ul.trophies)',      html: FIXTURE_TROPHIES_PLURAL_HTML, expected: FIXTURE_PS3_TROPHIES },
+        { label: 'Xbox 360 (ul.achievement)',         html: FIXTURE_HTML,                  expected: FIXTURE_ACHIEVEMENTS },
+        { label: 'PS3     (ul.trophy)',               html: FIXTURE_PS3_HTML,              expected: FIXTURE_PS3_TROPHIES },
+        { label: 'plural  (ul.trophies)',             html: FIXTURE_TROPHIES_PLURAL_HTML,  expected: FIXTURE_PS3_TROPHIES },
+        { label: 'PS3 Skate 2 (ul.trophies)',         html: FIXTURE_PS3_SKATE2_HTML,       expected: FIXTURE_PS3_SKATE2_TROPHIES },
+        { label: 'Xbox 360 Skate 3 (ul.achievements + div.title)', html: FIXTURE_XBOX360_SKATE3_HTML, expected: FIXTURE_XBOX360_SKATE3_ACHIEVEMENTS },
     ];
 
     let allPassed = true;
@@ -178,7 +233,8 @@ function runFixtureTests() {
         const { scraped } = scrapeAchievements(t.html);
         const pass = scraped.length === t.expected.length &&
             scraped.every((a, i) => a.name === t.expected[i].name &&
-                (!!a.hidden === !!t.expected[i].hidden));
+                (!!a.hidden === !!t.expected[i].hidden) &&
+                (t.expected[i].pct === undefined || a.percent === t.expected[i].pct));
         if (pass) {
             console.log(`  ✅  ${t.label}: ${scraped.length} entries OK`);
         } else {
