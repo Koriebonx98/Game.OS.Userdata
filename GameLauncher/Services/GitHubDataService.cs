@@ -150,14 +150,29 @@ namespace GameLauncher.Services
         };
 
         public GitHubDataService()
+            : this(null)
         {
-            _http = new HttpClient();
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
-            _http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
-            _http.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        }
 
-            if (!string.IsNullOrEmpty(GitHubToken))
-                _http.DefaultRequestHeaders.Authorization =
+        internal GitHubDataService(HttpClient? http)
+        {
+            _http = http ?? new HttpClient();
+            ConfigureHttpClient(_http);
+        }
+
+        private static void ConfigureHttpClient(HttpClient http)
+        {
+            if (http.DefaultRequestHeaders.UserAgent.Count == 0)
+                http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+
+            if (!http.DefaultRequestHeaders.Accept.Any(h => h.MediaType == "application/vnd.github+json"))
+                http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+
+            if (!http.DefaultRequestHeaders.Contains("X-GitHub-Api-Version"))
+                http.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+
+            if (!string.IsNullOrEmpty(GitHubToken) && http.DefaultRequestHeaders.Authorization == null)
+                http.DefaultRequestHeaders.Authorization =
                     new AuthenticationHeaderValue("Bearer", GitHubToken);
         }
 
@@ -535,7 +550,13 @@ namespace GameLauncher.Services
         {
             if (newAchievements.Count == 0) return;
 
-            var key = $"accounts/{username.ToLowerInvariant()}/achievements.json";
+            string usernameLower = username.ToLowerInvariant();
+            var unlockedAchievements = newAchievements
+                .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+                .ToList();
+            if (unlockedAchievements.Count == 0) return;
+
+            var key = $"accounts/{usernameLower}/achievements.json";
 
             for (int attempt = 0; attempt < 3; attempt++)
             {
@@ -545,29 +566,17 @@ namespace GameLauncher.Services
                         .ConfigureAwait(false);
                     var list = existingAchievements ?? new List<Achievement>();
 
-                    bool changed = false;
-                    foreach (var a in newAchievements)
+                    bool changed = MergeAchievements(list, unlockedAchievements, matchByGameScope: true);
+
+                    if (changed)
                     {
-                        // Only persist achievements that are actually unlocked
-                        if (string.IsNullOrEmpty(a.UnlockedAt)) continue;
-
-                        bool found = list.Any(e =>
-                            string.Equals(e.Platform,      a.Platform,      StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(e.GameTitle,     a.GameTitle,     StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(e.AchievementId, a.AchievementId, StringComparison.OrdinalIgnoreCase));
-
-                        if (!found)
-                        {
-                            list.Add(a);
-                            changed = true;
-                        }
+                        await WriteFileAsync(key, list,
+                            $"Sync achievements for {username}",
+                            sha, ct).ConfigureAwait(false);
                     }
 
-                    if (!changed) return;
-
-                    await WriteFileAsync(key, list,
-                        $"Sync achievements for {username}",
-                        sha, ct).ConfigureAwait(false);
+                    await SyncAchievementMirrorsAsync(usernameLower, unlockedAchievements, ct)
+                        .ConfigureAwait(false);
                     return;
                 }
                 catch (GameOsException ex) when (ex.StatusCode == 409 && attempt < 2)
@@ -583,6 +592,219 @@ namespace GameLauncher.Services
                     return;
                 }
             }
+        }
+
+        private async Task SyncAchievementMirrorsAsync(
+            string usernameLower,
+            IReadOnlyList<Achievement> achievements,
+            CancellationToken ct)
+        {
+            List<Game>? games = null;
+            try
+            {
+                (games, _) = await ReadFileAsync<List<Game>>(
+                    $"accounts/{usernameLower}/games.json", ct).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[GitHubDataService] Achievement mirror games lookup failed: {ex.Message}");
+            }
+
+            var targets = BuildAchievementMirrorTargets(usernameLower, achievements, games);
+
+            foreach (var target in targets)
+            {
+                try
+                {
+                    for (int attempt = 0; attempt < 3; attempt++)
+                    {
+                        try
+                        {
+                            var (canonicalAchievements, canonicalSha) =
+                                await ReadFileAsync<List<Achievement>>(target.CanonicalPath, ct).ConfigureAwait(false);
+                            var (legacyAchievements, legacySha) =
+                                await ReadFileAsync<List<Achievement>>(target.LegacyPath, ct).ConfigureAwait(false);
+
+                            var merged = canonicalAchievements != null
+                                ? new List<Achievement>(canonicalAchievements)
+                                : legacyAchievements != null
+                                    ? new List<Achievement>(legacyAchievements)
+                                    : new List<Achievement>();
+
+                            bool changed = MergeAchievements(merged, target.Achievements, matchByGameScope: false);
+
+                            if (changed || canonicalSha == null)
+                            {
+                                await WriteFileAsync(
+                                    target.CanonicalPath,
+                                    merged,
+                                    $"Achievement mirror: {target.GameTitle} ({target.Platform})",
+                                    canonicalSha,
+                                    ct).ConfigureAwait(false);
+                            }
+
+                            if (changed || legacySha == null)
+                            {
+                                await WriteFileAsync(
+                                    target.LegacyPath,
+                                    merged,
+                                    $"Achievement mirror (legacy path): {target.GameTitle} ({target.Platform})",
+                                    legacySha,
+                                    ct).ConfigureAwait(false);
+                            }
+
+                            break;
+                        }
+                        catch (GameOsException ex) when (ex.StatusCode == 409 && attempt < 2)
+                        {
+                            await Task.Delay(200 * (attempt + 1), ct).ConfigureAwait(false);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[GitHubDataService] Achievement mirror write failed for {target.CanonicalPath}: {ex.Message}");
+                }
+            }
+        }
+
+        private static List<AchievementMirrorTarget> BuildAchievementMirrorTargets(
+            string usernameLower,
+            IReadOnlyList<Achievement> achievements,
+            List<Game>? games)
+        {
+            var targets = new Dictionary<string, AchievementMirrorTarget>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var achievement in achievements)
+            {
+                string platform = NormalizePlatform(achievement.Platform ?? string.Empty);
+                string platformKey = SanitizeAchievementPathSegment(platform, "unknown-platform");
+                string titleKey = ResolveAchievementTitleKey(games, platform, achievement.GameTitle);
+                string canonicalPath =
+                    $"accounts/{usernameLower}/Achievements/{platformKey}/{titleKey}/achievements.json";
+                string legacyPath =
+                    $"accounts/{usernameLower}/Achivements/{platformKey}/{titleKey}/achievements.json";
+
+                if (!targets.TryGetValue(canonicalPath, out var target))
+                {
+                    target = new AchievementMirrorTarget(
+                        canonicalPath,
+                        legacyPath,
+                        achievement.GameTitle,
+                        platform);
+                    targets[canonicalPath] = target;
+                }
+
+                target.Achievements.Add(achievement);
+            }
+
+            return targets.Values.ToList();
+        }
+
+        private static bool MergeAchievements(
+            List<Achievement> destination,
+            IReadOnlyList<Achievement> incoming,
+            bool matchByGameScope)
+        {
+            bool changed = false;
+
+            foreach (var achievement in incoming)
+            {
+                int existingIndex = destination.FindIndex(existing =>
+                    string.Equals(existing.AchievementId, achievement.AchievementId, StringComparison.OrdinalIgnoreCase) &&
+                    (!matchByGameScope ||
+                     (string.Equals(existing.Platform, achievement.Platform, StringComparison.OrdinalIgnoreCase) &&
+                      string.Equals(existing.GameTitle, achievement.GameTitle, StringComparison.OrdinalIgnoreCase))));
+
+                if (existingIndex == -1)
+                {
+                    destination.Add(achievement);
+                    changed = true;
+                    continue;
+                }
+
+                var existingAchievement = destination[existingIndex];
+                if (AchievementEquals(existingAchievement, achievement))
+                    continue;
+
+                destination[existingIndex] = new Achievement
+                {
+                    Platform = string.IsNullOrEmpty(achievement.Platform) ? existingAchievement.Platform : achievement.Platform,
+                    GameTitle = string.IsNullOrEmpty(achievement.GameTitle) ? existingAchievement.GameTitle : achievement.GameTitle,
+                    AchievementId = string.IsNullOrEmpty(achievement.AchievementId) ? existingAchievement.AchievementId : achievement.AchievementId,
+                    Name = string.IsNullOrEmpty(achievement.Name) ? existingAchievement.Name : achievement.Name,
+                    Description = string.IsNullOrEmpty(achievement.Description) ? existingAchievement.Description : achievement.Description,
+                    UnlockedAt = string.IsNullOrEmpty(achievement.UnlockedAt) ? existingAchievement.UnlockedAt : achievement.UnlockedAt,
+                    IconUrl = string.IsNullOrEmpty(achievement.IconUrl) ? existingAchievement.IconUrl : achievement.IconUrl,
+                };
+                changed = true;
+            }
+
+            return changed;
+        }
+
+        private static bool AchievementEquals(Achievement left, Achievement right)
+            => string.Equals(left.Platform, right.Platform, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(left.GameTitle, right.GameTitle, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(left.AchievementId, right.AchievementId, StringComparison.OrdinalIgnoreCase) &&
+               string.Equals(left.Name, right.Name, StringComparison.Ordinal) &&
+               string.Equals(left.Description, right.Description, StringComparison.Ordinal) &&
+               string.Equals(left.UnlockedAt, right.UnlockedAt, StringComparison.Ordinal) &&
+               string.Equals(left.IconUrl, right.IconUrl, StringComparison.Ordinal);
+
+        private static string ResolveAchievementTitleKey(
+            List<Game>? games,
+            string platform,
+            string gameTitle)
+        {
+            string normalisedPlatform = NormalizePlatform(platform);
+            var match = games?.FirstOrDefault(g =>
+                string.Equals(NormalizePlatform(g.Platform ?? string.Empty), normalisedPlatform, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase) &&
+                IsSafeAchievementPathSegment(g.TitleId));
+
+            if (match?.TitleId != null)
+                return match.TitleId.Trim();
+
+            return SanitizeAchievementPathSegment(gameTitle, "unknown-title");
+        }
+
+        private static bool IsSafeAchievementPathSegment(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return false;
+            return value.Trim().All(c => char.IsLetterOrDigit(c) || c == '_' || c == '-');
+        }
+
+        private static string SanitizeAchievementPathSegment(string? value, string fallback)
+        {
+            var trimmed = (value ?? string.Empty).Trim();
+            var cleaned = new string(trimmed
+                .Select(c => char.IsLetterOrDigit(c) || c == '.' || c == '_' || c == '-' ? c : '_')
+                .ToArray());
+
+            if (cleaned.Length > 80)
+                cleaned = cleaned.Substring(0, 80);
+
+            return string.IsNullOrWhiteSpace(cleaned) ? fallback : cleaned;
+        }
+
+        private sealed class AchievementMirrorTarget
+        {
+            public AchievementMirrorTarget(string canonicalPath, string legacyPath, string gameTitle, string platform)
+            {
+                CanonicalPath = canonicalPath;
+                LegacyPath = legacyPath;
+                GameTitle = gameTitle;
+                Platform = platform;
+            }
+
+            public string CanonicalPath { get; }
+            public string LegacyPath { get; }
+            public string GameTitle { get; }
+            public string Platform { get; }
+            public List<Achievement> Achievements { get; } = new();
         }
 
         // ── Activity / Playtime ───────────────────────────────────────────────
