@@ -684,6 +684,7 @@ namespace GameLauncher.Services
                 string titleKey = ResolveAchievementTitleKey(games, platform, achievement.GameTitle);
                 string canonicalPath =
                     $"accounts/{usernameLower}/Achievements/{platformKey}/{titleKey}/achievements.json";
+                // Keep the legacy misspelling for backward compatibility with older clients.
                 string legacyPath =
                     $"accounts/{usernameLower}/Achivements/{platformKey}/{titleKey}/achievements.json";
 
