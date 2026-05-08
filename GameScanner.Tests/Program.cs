@@ -1582,10 +1582,6 @@ class Program
     }
 
     /// <summary>
-    /// Verifies Switch achievement detection for a race-specific Mario Kart 8 Deluxe
-    /// achievement description that depends on Translate.txt values.
-    /// </summary>
-    /// <summary>
     /// Exercises <see cref="SwitchLogReaderService.ReadRaceResultsFromNewContent"/> against
     /// a mock Ryujinx log file written in the exact multi-line format the emulator produces.
     /// Verifies that the race result (Course, Driver, Rank, FinishReason) is extracted, and
@@ -1790,6 +1786,28 @@ class Program
             else
             {
                 Console.WriteLine("  ❌  \"Test\" was not unlocked for rank 1 Mario on Gu_FirstCircuit");
+                passed = false;
+            }
+
+            // Also verify that the title with ™ symbol is handled correctly
+            // ("Mario Kart™ 8 Deluxe" is how the title appears in the user's library)
+            var session2 = new SwitchAchievementDetectorService.SessionState();
+            var unlocksTm = SwitchAchievementDetectorService.DetectNewUnlocks(
+                gameTitle: "Mario Kart™ 8 Deluxe",
+                newResults: results,
+                newGpResults: [],
+                session: session2,
+                alreadyUnlockedNames: null,
+                achievementsList: achievements,
+                translations: translations);
+
+            if (unlocksTm.Contains("Test", StringComparer.OrdinalIgnoreCase))
+            {
+                Console.WriteLine("  ✅  \"Test\" unlocked with title \"Mario Kart™ 8 Deluxe\" (™ normalised)");
+            }
+            else
+            {
+                Console.WriteLine("  ❌  \"Test\" was NOT unlocked when title contains ™ — IsMarioKart8Deluxe failed");
                 passed = false;
             }
         }

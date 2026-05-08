@@ -457,14 +457,19 @@ public static class SwitchLogReaderService
                 {
                     if (!inJson)
                     {
+                        // "Report:" appears in the line either as the standalone prefix
+                        // " Report: {" or embedded in "ProcessPlayReport:" on the trigger
+                        // line; use IndexOf so both same-line and separate-line formats work.
                         int idx = bl.IndexOf("Report:", StringComparison.Ordinal);
                         if (idx >= 0)
                         {
                             jsonLines.Add(bl.Substring(idx + "Report:".Length).Trim());
                             inJson = true;
                         }
+                        // Haven't entered JSON yet — skip this line.
                         continue;
                     }
+                    // inJson == true: accumulate the JSON body.
                     jsonLines.Add(bl);
                 }
 
