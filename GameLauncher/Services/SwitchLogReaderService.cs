@@ -447,21 +447,25 @@ public static class SwitchLogReaderService
                 if (!isMatch && !isGpResult) continue;
 
                 // Extract the JSON report block { ... }
+                // NOTE: In Ryujinx logs "Report:" appears in the middle of the
+                // "ServicePrepo ProcessPlayReport" trigger line (not on its own
+                // continuation line), so we search the entire line rather than
+                // relying on a StartsWith check.
                 var jsonLines = new List<string>();
                 bool inJson = false;
                 foreach (string bl in block)
                 {
-                    string trimmed = bl.TrimStart();
-                    if (!inJson && trimmed.StartsWith("Report:", StringComparison.Ordinal))
+                    if (!inJson)
                     {
-                        // Grab the part after "Report:" and start collecting
                         int idx = bl.IndexOf("Report:", StringComparison.Ordinal);
-                        jsonLines.Add(bl.Substring(idx + "Report:".Length).Trim());
-                        inJson = true;
+                        if (idx >= 0)
+                        {
+                            jsonLines.Add(bl.Substring(idx + "Report:".Length).Trim());
+                            inJson = true;
+                        }
                         continue;
                     }
-                    if (inJson)
-                        jsonLines.Add(bl);
+                    jsonLines.Add(bl);
                 }
 
                 if (jsonLines.Count == 0) continue;
