@@ -2193,17 +2193,13 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
     try {
         const { usernameLower } = req.tokenUser;
         const { platform, gameTitle, titleKey, titleId, achievements } = req.body;
-        if (!platform || !gameTitle || !titleKey || !Array.isArray(achievements) || achievements.length === 0) {
-            return res.status(400).json({ success: false, message: 'platform, gameTitle, titleKey, and achievements array are required (titleId optional).' });
+        if (!platform || !gameTitle || (!titleKey && !titleId) || !Array.isArray(achievements) || achievements.length === 0) {
+            return res.status(400).json({ success: false, message: 'platform, gameTitle, one of titleKey/titleId, and achievements array are required.' });
         }
         const normalizedPlatform = normalizePlatformName(platform);
         const platformKey = sanitisePathSegment(normalizedPlatform, 'unknown-platform');
-        const requestedKey = sanitisePathSegment(String(titleKey).trim(), 'unknown-title');
-        const safeGameTitle = sanitisePathSegment(String(gameTitle).trim(), 'unknown-title');
-        const isTitleFallbackKey =
-            requestedKey.toLowerCase() === safeGameTitle.toLowerCase() ||
-            String(titleKey).trim().toLowerCase() === String(gameTitle).trim().toLowerCase();
-        const preferredKeyInput = isTitleFallbackKey ? titleId : (titleId || requestedKey);
+        const requestedKey = sanitisePathSegment(String(titleKey || titleId).trim(), 'unknown-title');
+        const preferredKeyInput = titleId || requestedKey;
         const resolvedRawKey = await resolveAchievementTitleKey(
             usernameLower,
             normalizedPlatform,
