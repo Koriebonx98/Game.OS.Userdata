@@ -2198,7 +2198,8 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
         }
         const normalizedPlatform = normalizePlatformName(platform);
         const platformKey = sanitisePathSegment(normalizedPlatform, 'unknown-platform');
-        const requestedKey = sanitisePathSegment(String(titleKey || titleId).trim(), 'unknown-title');
+        const requestKeySource = titleKey ?? titleId ?? '';
+        const requestedKey = sanitisePathSegment(String(requestKeySource).trim(), 'unknown-title');
         const preferredKeyInput = titleId || requestedKey;
         const resolvedRawKey = await resolveAchievementTitleKey(
             usernameLower,
