@@ -1,6 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using GameLauncher;
@@ -80,6 +84,9 @@ class Program
 
         // ── 12. Reconnect timer state-transition logic ──────────────────────
         allPassed &= TestReconnectStateLogic();
+
+        // ── 13. GitHub-direct achievement mirror sync ───────────────────────
+        allPassed &= await TestAchievementMirrorSyncAsync();
 
         // ── Summary ───────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -846,6 +853,165 @@ class Program
             StringComparer.Ordinal);
         return b.All(g => aSet.Contains(
             $"{g.Platform?.ToLowerInvariant()}|{g.Title?.ToLowerInvariant()}"));
+    }
+
+    static async Task<bool> TestAchievementMirrorSyncAsync()
+    {
+        Section("13. GitHub-direct Achievement Mirror Sync");
+
+        var files = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["accounts/testuser/games.json"] = JsonSerializer.Serialize(new List<Game>
+            {
+                new()
+                {
+                    Platform = "Switch",
+                    Title = "Mario Kart 8 Deluxe",
+                    TitleId = "0100152000022000"
+                }
+            }),
+            ["accounts/testuser/achievements.json"] = JsonSerializer.Serialize(new List<Achievement>
+            {
+                new()
+                {
+                    Platform = "Switch",
+                    GameTitle = "Mario Kart 8 Deluxe",
+                    AchievementId = "mk8-first",
+                    Name = "First Win",
+                    Description = "Win a race",
+                    UnlockedAt = "2026-01-01T00:00:00.0000000Z"
+                }
+            })
+        };
+
+        using var http = new HttpClient(new FakeGitHubHandler(files))
+        {
+            BaseAddress = new Uri("https://api.github.com/")
+        };
+        using var service = new GitHubDataService(http);
+
+        await service.SaveAchievementsAsync("TestUser", new List<Achievement>
+        {
+            new()
+            {
+                Platform = "Switch",
+                GameTitle = "Mario Kart 8 Deluxe",
+                AchievementId = "mk8-first",
+                Name = "First Win",
+                Description = "Win a race",
+                UnlockedAt = "2026-01-01T00:00:00.0000000Z"
+            },
+            new()
+            {
+                Platform = "Switch",
+                GameTitle = "Mario Kart 8 Deluxe",
+                AchievementId = "mk8-second",
+                Name = "Tournament Ready",
+                Description = "Finish 10 races",
+                UnlockedAt = "2026-05-08T12:34:56.0000000Z"
+            }
+        });
+
+        const string canonicalPath = "accounts/testuser/Achievements/Switch/0100152000022000/achievements.json";
+        const string legacyPath = "accounts/testuser/Achivements/Switch/0100152000022000/achievements.json";
+
+        bool canonicalExists = files.ContainsKey(canonicalPath);
+        Pass(canonicalExists, $"Canonical mirror created at titleId path: {canonicalPath}");
+
+        bool legacyExists = files.ContainsKey(legacyPath);
+        Pass(legacyExists, $"Legacy mirror created at titleId path: {legacyPath}");
+
+        var rootAchievements = DeserializeAchievements(files, "accounts/testuser/achievements.json");
+        bool rootCountOk = rootAchievements.Count == 2;
+        Pass(rootCountOk, $"Root achievements.json contains both unlocks: count={rootAchievements.Count}");
+
+        var canonicalAchievements = DeserializeAchievements(files, canonicalPath);
+        bool canonicalCountOk = canonicalAchievements.Count == 2;
+        Pass(canonicalCountOk, $"Canonical mirror contains both unlocks: count={canonicalAchievements.Count}");
+
+        bool secondAchievementPresent = canonicalAchievements.Any(a =>
+            string.Equals(a.AchievementId, "mk8-second", StringComparison.OrdinalIgnoreCase));
+        Pass(secondAchievementPresent, "Canonical mirror contains the new achievement ID");
+
+        return canonicalExists && legacyExists && rootCountOk && canonicalCountOk && secondAchievementPresent;
+    }
+
+    static List<Achievement> DeserializeAchievements(Dictionary<string, string> files, string path)
+    {
+        if (!files.TryGetValue(path, out var json))
+            return new List<Achievement>();
+
+        return JsonSerializer.Deserialize<List<Achievement>>(json, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true
+        }) ?? new List<Achievement>();
+    }
+
+    sealed class FakeGitHubHandler : HttpMessageHandler
+    {
+        private readonly Dictionary<string, string> _files;
+        private readonly Dictionary<string, string> _shas = new(StringComparer.OrdinalIgnoreCase);
+
+        public FakeGitHubHandler(Dictionary<string, string> files)
+        {
+            _files = files;
+            foreach (var path in files.Keys)
+                _shas[path] = $"sha-{path.GetHashCode():x8}";
+        }
+
+        protected override async Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            string path = ExtractRepoPath(request.RequestUri);
+
+            if (request.Method == HttpMethod.Get)
+            {
+                if (!_files.TryGetValue(path, out var json))
+                    return new HttpResponseMessage(HttpStatusCode.NotFound);
+
+                var payload = new
+                {
+                    content = Convert.ToBase64String(Encoding.UTF8.GetBytes(json)),
+                    sha = _shas[path]
+                };
+
+                return JsonResponse(HttpStatusCode.OK, payload);
+            }
+
+            if (request.Method == HttpMethod.Put)
+            {
+                using var doc = JsonDocument.Parse(
+                    await request.Content!.ReadAsStringAsync(cancellationToken));
+                string base64 = doc.RootElement.GetProperty("content").GetString() ?? "";
+                string json = Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+
+                _files[path] = json;
+                _shas[path] = $"sha-{_files.Count:x8}-{path.Length:x4}";
+
+                return JsonResponse(HttpStatusCode.OK, new { content = new { sha = _shas[path] } });
+            }
+
+            return new HttpResponseMessage(HttpStatusCode.MethodNotAllowed);
+        }
+
+        private static string ExtractRepoPath(Uri? uri)
+        {
+            string absolutePath = uri?.AbsolutePath ?? "";
+            const string marker = "/contents/";
+            int idx = absolutePath.IndexOf(marker, StringComparison.OrdinalIgnoreCase);
+            if (idx < 0) return "";
+            return Uri.UnescapeDataString(absolutePath[(idx + marker.Length)..]);
+        }
+
+        private static HttpResponseMessage JsonResponse(HttpStatusCode statusCode, object payload)
+            => new(statusCode)
+            {
+                Content = new StringContent(
+                    JsonSerializer.Serialize(payload),
+                    Encoding.UTF8,
+                    "application/json")
+            };
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
