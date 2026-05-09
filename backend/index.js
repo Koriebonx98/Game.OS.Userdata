@@ -2223,10 +2223,8 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
         const merged = [];
         const upsertAchievement = (incoming) => {
             const rawAchievementId = incoming?.achievementId;
-            const achId = rawAchievementId === null || rawAchievementId === undefined
-                ? ''
-                : String(rawAchievementId);
-            if (!achId) return;
+            if (rawAchievementId === null || rawAchievementId === undefined || rawAchievementId === '') return;
+            const achId = String(rawAchievementId);
             const idx = merged.findIndex(e => String(e.achievementId || '') === achId);
             const normalizedIncoming = { ...incoming, achievementId: achId };
             if (idx !== -1) {
