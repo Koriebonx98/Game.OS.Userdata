@@ -3089,25 +3089,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                     // Write full list to the per-game cloud folder.
                     // Fire-and-forget to avoid blocking the sync loop.
-                    var capturedFullList  = fullList;
-                    var capturedTitleKey  = titleKey;
-                    var capturedGameName  = sg.Name;
+                    // Even when 0 achievements are unlocked, we write the complete locked
+                    // template so other devices can display the full achievement list
+                    // (with all entries shown as locked) without needing the Steam API.
                     _ = Task.Run(async () =>
                     {
                         try
                         {
                             await _client.SaveFullGameAchievementsAsync(
-                                "PC", capturedTitleKey, capturedGameName, capturedFullList)
+                                "PC", titleKey, sg.Name, fullList)
                                 .ConfigureAwait(false);
                             DevLogService.Log(
-                                $"[SteamAchievements] Wrote {capturedFullList.Count} achievements " +
-                                $"({capturedFullList.Count(x => !string.IsNullOrEmpty(x.UnlockedAt))} unlocked) " +
-                                $"for '{capturedGameName}' to cloud.");
+                                $"[SteamAchievements] Wrote {fullList.Count} achievements " +
+                                $"({fullList.Count(x => !string.IsNullOrEmpty(x.UnlockedAt))} unlocked) " +
+                                $"for '{sg.Name}' to cloud.");
                         }
                         catch (Exception ex)
                         {
                             DevLogService.Log(
-                                $"[SteamAchievements] Cloud write failed for '{capturedGameName}': {ex.Message}");
+                                $"[SteamAchievements] Cloud write failed for '{sg.Name}': {ex.Message}");
                         }
                     });
 
@@ -3411,13 +3411,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (_profile == null) return;
 
+        // Process at most this many games per session to balance the initial sync speed
+        // against GitHub API rate limits (5,000 authenticated requests/hour).
+        const int MaxBackgroundSyncGames = 50;
+
         // Focus on Steam games that don't yet have a local per-game cache.
         // Process most-played games first so the detail views users are likely to
         // open next are populated before the later games in the queue.
         var steamGames = _library
             .Where(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0)
             .OrderByDescending(g => g.PlaytimeMinutes)
-            .Take(50)
+            .Take(MaxBackgroundSyncGames)
             .ToList();
 
         if (steamGames.Count == 0) return;
@@ -3453,11 +3457,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                 // Update the in-memory game record so the detail view shows the full list
                 // (locked + unlocked) without needing another network fetch.
-                var capturedAchs = cloudAchs;
-                var capturedGame = game;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
-                    capturedGame.GameAchievements = capturedAchs;
+                    game.GameAchievements = cloudAchs;
                 });
 
                 DevLogService.Log(
