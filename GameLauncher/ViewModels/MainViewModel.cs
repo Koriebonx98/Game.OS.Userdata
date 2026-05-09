@@ -443,6 +443,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Steam-synced PC games do.  A local cache file guards against redundant cloud writes.
         DetailVm.OnFullAchievementListReadyAsync = async (platform, titleKey, gameTitle, achievements) =>
         {
+            System.Threading.Interlocked.Increment(ref _cacheTaskCount);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                IsCachingGames = true;
+                CacheSyncLabel = $"Syncing {gameTitle} achievements…";
+            });
             try
             {
                 string localPath = GetLocalPerGameAchievementsPath(
@@ -463,6 +469,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     $"({nowUnlocked} unlocked) for '{gameTitle}' ({platform}) to cloud.");
             }
             catch { /* best-effort */ }
+            finally
+            {
+                if (System.Threading.Interlocked.Decrement(ref _cacheTaskCount) == 0)
+                {
+                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    {
+                        IsCachingGames = false;
+                        CacheSyncLabel = "";
+                    });
+                }
+            }
         };
 
 
@@ -3159,6 +3176,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (string.IsNullOrWhiteSpace(apiKey) || string.IsNullOrWhiteSpace(steamUserId)) return;
 
+        System.Threading.Interlocked.Increment(ref _cacheTaskCount);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsCachingGames = true;
+            CacheSyncLabel = "Syncing Steam achievements…";
+        });
+
+        try
+        {
         // Build a set of already-known unlocked keys so we skip duplicates
         var known = new HashSet<string>(
             _achievements
@@ -3172,6 +3198,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         foreach (var sg in games)
         {
             processed++;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                CacheSyncLabel = $"Syncing {sg.Name} achievements…");
 
             try
             {
@@ -3330,6 +3358,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         });
 
         DevLogService.Log($"[SteamAchievements] Synced achievements for {processed} Steam games.");
+        }
+        finally
+        {
+            if (System.Threading.Interlocked.Decrement(ref _cacheTaskCount) == 0)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsCachingGames = false;
+                    CacheSyncLabel = "";
+                });
+            }
+        }
     }
 
     // ── Per-game local achievement cache helpers ───────────────────────────────
@@ -3566,6 +3606,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         if (steamGames.Count == 0) return;
 
+        System.Threading.Interlocked.Increment(ref _cacheTaskCount);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            IsCachingGames = true;
+            CacheSyncLabel = "Syncing cloud achievements…";
+        });
+
+        try
+        {
         DevLogService.Log(
             $"[AchievementSync] Background cloud sync: checking {steamGames.Count} Steam games…");
 
@@ -3575,6 +3624,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             try
             {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    CacheSyncLabel = $"Syncing {game.Title} from cloud…");
                 string titleKey = game.SteamAppId!.Value.ToString(
                     System.Globalization.CultureInfo.InvariantCulture);
                 string localPath = GetLocalPerGameAchievementsPath(
@@ -3619,6 +3670,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 $"[AchievementSync] Synced per-game achievements from cloud for {loaded} game(s).");
             // Refresh the library view so card denominators reflect the full counts.
             Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library));
+        }
+        }
+        finally
+        {
+            if (System.Threading.Interlocked.Decrement(ref _cacheTaskCount) == 0)
+            {
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsCachingGames = false;
+                    CacheSyncLabel = "";
+                });
+            }
         }
     }
 
