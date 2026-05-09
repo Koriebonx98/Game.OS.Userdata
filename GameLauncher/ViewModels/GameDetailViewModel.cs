@@ -1280,6 +1280,14 @@ public partial class GameDetailViewModel : ViewModelBase
     public Action<string, string, int>? OnAchievementTotalLoaded { get; set; }
 
     /// <summary>
+    /// Callback wired by MainViewModel to persist the full achievement list
+    /// (locked and unlocked) for a ROM-platform game to the per-game cloud folder.
+    /// Fired from <see cref="FetchAndDisplayAchievementsAsync"/> for non-PC platforms.
+    /// Parameters: (platform, titleKey, gameTitle, allAchievements)
+    /// </summary>
+    public Func<string, string, string, System.Collections.Generic.IReadOnlyList<Achievement>, System.Threading.Tasks.Task>? OnFullAchievementListReadyAsync { get; set; }
+
+    /// <summary>
     /// Brings the currently-running game window to the foreground.
     /// Tries the main window handle first; falls back to opening the game folder.
     /// This is a best-effort operation — it may not work on all platforms.
@@ -2753,6 +2761,19 @@ public partial class GameDetailViewModel : ViewModelBase
                     // (e.g. "3 / 98" instead of "3 / 3" when only unlocked were cached)
                     OnAchievementTotalLoaded?.Invoke(snapshotPlatform, snapshotTitle, total);
                 });
+
+                // Mirror the full achievement list (locked + unlocked) to the per-game
+                // cloud folder so the private repo matches the Steam model:
+                //   Achievements/{platform}/{titleKey}/achievements.json
+                // Skip PC — Steam's own sync already handles those via AppId-keyed folders.
+                if (!string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                    OnFullAchievementListReadyAsync != null)
+                {
+                    string snapshotTitleKey = titleId ?? Title;
+                    var snapshotList = list.AsReadOnly();
+                    _ = System.Threading.Tasks.Task.Run(() => OnFullAchievementListReadyAsync(
+                        snapshotPlatform, snapshotTitleKey, snapshotTitle, snapshotList));
+                }
             }
         }
         catch { /* best-effort */ }

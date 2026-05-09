@@ -374,16 +374,23 @@ namespace GameLauncher
         /// Writes the complete achievement list (locked <b>and</b> unlocked) for a specific
         /// game to the per-game folder in the user's private cloud repo.
         /// Path: <c>accounts/{username}/Achievements/{platform}/{titleKey}/achievements.json</c>
-        /// Available in GitHub-direct mode only.  In backend mode this is a no-op (the
-        /// backend handles per-game folder writes when achievements are saved).
-        /// Non-fatal — failures are swallowed.
+        /// Works in both backend mode (via PUT /api/me/achievements/game-template) and
+        /// GitHub-direct mode.  Non-fatal — failures are swallowed.
         /// </summary>
         public async Task SaveFullGameAchievementsAsync(
             string platform, string titleKey, string gameTitle,
             IReadOnlyList<Achievement> allAchievements, CancellationToken ct = default)
         {
             if (_username == null || allAchievements.Count == 0) return;
-            // GitHub-direct mode only — backend manages its own per-game writes.
+
+            if (_backend != null)
+            {
+                await _backend.SaveFullGameAchievementsTemplateAsync(
+                    platform, titleKey, gameTitle, allAchievements, ct)
+                    .ConfigureAwait(false);
+                return;
+            }
+
             if (_github != null)
                 await _github.SaveFullGameAchievementsAsync(
                     _username, platform, titleKey, gameTitle, allAchievements, ct)

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
@@ -650,6 +651,42 @@ namespace GameLauncher.Services
                 if (!resp.IsSuccessStatusCode)
                     System.Diagnostics.Debug.WriteLine(
                         $"[BackendApiService] SaveAchievement HTTP {(int)resp.StatusCode}: {achievementId} in {gameTitle}");
+            }
+            catch { /* best-effort */ }
+        }
+
+        /// <summary>
+        /// Writes the full achievement list (locked and unlocked) for a specific game to
+        /// the per-game folder in the user's private cloud repo via
+        /// PUT /api/me/achievements/game-template.  Does not touch the global
+        /// achievements.json.  Non-fatal — failures are swallowed.
+        /// </summary>
+        public async Task SaveFullGameAchievementsTemplateAsync(
+            string platform, string titleKey, string gameTitle,
+            IReadOnlyList<Models.Achievement> achievements,
+            CancellationToken ct = default)
+        {
+            if (achievements.Count == 0) return;
+            try
+            {
+                EnsureAuthenticated();
+                var body = new
+                {
+                    platform,
+                    gameTitle,
+                    titleKey,
+                    achievements = achievements.Select(a => new
+                    {
+                        achievementId = a.AchievementId,
+                        name          = a.Name,
+                        description   = a.Description,
+                        unlockedAt    = a.UnlockedAt,
+                    }).ToArray(),
+                };
+                using var resp = await _http.PutAsJsonAsync("/api/me/achievements/game-template", body, ct);
+                if (!resp.IsSuccessStatusCode)
+                    System.Diagnostics.Debug.WriteLine(
+                        $"[BackendApiService] SaveFullGameAchievementsTemplate HTTP {(int)resp.StatusCode}: {gameTitle}");
             }
             catch { /* best-effort */ }
         }

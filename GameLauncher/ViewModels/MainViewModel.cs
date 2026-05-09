@@ -437,6 +437,34 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
         };
 
+        // Wire per-game cloud folder write for ROM-based platforms (Xbox 360, Switch, PS4 …).
+        // Called after FetchAndDisplayAchievementsAsync loads the full achievement template so
+        // the private repo gets Achievements/{platform}/{titleKey}/achievements.json just like
+        // Steam-synced PC games do.  A local cache file guards against redundant cloud writes.
+        DetailVm.OnFullAchievementListReadyAsync = async (platform, titleKey, gameTitle, achievements) =>
+        {
+            try
+            {
+                string localPath = GetLocalPerGameAchievementsPath(
+                    _profile?.Username ?? "", platform, titleKey);
+                bool localExists = File.Exists(localPath);
+                int localUnlockedCount = localExists ? CountLocalUnlockedAchievements(localPath) : 0;
+                int nowUnlocked = achievements.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
+
+                // Skip the cloud write if nothing has changed since the last write.
+                if (localExists && nowUnlocked <= localUnlockedCount) return;
+
+                await _client.SaveFullGameAchievementsAsync(
+                    platform, titleKey, gameTitle, achievements).ConfigureAwait(false);
+
+                WriteLocalPerGameAchievements(localPath, achievements.ToList());
+                DevLogService.Log(
+                    $"[PerGameAch] Wrote {achievements.Count} achievements " +
+                    $"({nowUnlocked} unlocked) for '{gameTitle}' ({platform}) to cloud.");
+            }
+            catch { /* best-effort */ }
+        };
+
 
         // so the stored playtime and status reflect the completed session.
         PlaytimeService.SessionCompleted += (platform, title) =>

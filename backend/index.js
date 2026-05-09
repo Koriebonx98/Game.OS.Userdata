@@ -2167,6 +2167,60 @@ app.post('/api/me/achievements', authenticateToken, async (req, res) => {
     }
 });
 
+// ── PUT /api/me/achievements/game-template ────────────────────────────────────
+// Writes the full achievement list (locked + unlocked) for a specific game to the
+// per-game folder in the user's private cloud repo.
+// Path: accounts/{username}/Achievements/{platform}/{titleKey}/achievements.json
+// Unlike POST /api/me/achievements this does NOT touch the global achievements.json
+// and accepts locked achievements (empty unlockedAt).
+// Body: { platform, gameTitle, titleKey, achievements: [{achievementId, name, description, unlockedAt?}] }
+app.put('/api/me/achievements/game-template', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, gameTitle, titleKey, achievements } = req.body;
+        if (!platform || !gameTitle || !titleKey || !Array.isArray(achievements) || achievements.length === 0) {
+            return res.status(400).json({ success: false, message: 'platform, gameTitle, titleKey, and achievements array are required.' });
+        }
+        const normalizedPlatform = normalizePlatformName(platform);
+        const platformKey = sanitisePathSegment(normalizedPlatform, 'unknown-platform');
+        const safeKey = sanitisePathSegment(String(titleKey).trim(), 'unknown-title');
+        const path = `accounts/${usernameLower}/Achievements/${platformKey}/${safeKey}/achievements.json`;
+
+        const file = await getFile(path);
+        const existing = Array.isArray(file?.content) ? file.content : [];
+
+        // Merge: incoming template entries are written but existing unlockedAt is preserved
+        // so cloud-tracked unlocks are never overwritten with an empty value.
+        const merged = [...existing];
+        for (const a of achievements) {
+            const achId = String(a.achievementId || '');
+            if (!achId) continue;
+            const idx = merged.findIndex(e => String(e.achievementId || '') === achId);
+            const incoming = {
+                platform: normalizedPlatform,
+                gameTitle,
+                achievementId: achId,
+                name: a.name || '',
+                description: a.description || '',
+                unlockedAt: a.unlockedAt || '',
+            };
+            if (idx !== -1) {
+                // Preserve existing unlockedAt when the incoming entry is locked (empty)
+                const keepUnlockedAt = merged[idx].unlockedAt || incoming.unlockedAt;
+                merged[idx] = { ...merged[idx], ...incoming, unlockedAt: keepUnlockedAt };
+            } else {
+                merged.push(incoming);
+            }
+        }
+
+        await putFile(path, merged, `Sync achievements: ${gameTitle} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Achievement template written.', count: merged.length });
+    } catch (err) {
+        console.error('PUT /api/me/achievements/game-template error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── GET /api/me/friends ───────────────────────────────────────────────────────
 app.get('/api/me/friends', authenticateToken, async (req, res) => {
     try {
