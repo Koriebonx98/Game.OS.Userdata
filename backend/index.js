@@ -1867,7 +1867,7 @@ app.get('/api/me/games', authenticateToken, async (req, res) => {
 app.post('/api/me/games', authenticateToken, async (req, res) => {
     try {
         const { usernameLower } = req.tokenUser;
-        const { platform, title, titleId } = req.body;
+        const { platform, title, titleId, coverUrl, steamAppId, playtimeMinutes } = req.body;
         if (!platform || !title) {
             return res.status(400).json({ success: false, message: 'platform and title are required.' });
         }
@@ -1883,10 +1883,25 @@ app.post('/api/me/games', authenticateToken, async (req, res) => {
             return res.status(400).json({ success: false, message: 'Game already in library.' });
         }
 
+        let parsedSteamAppId = null;
+        if (steamAppId !== undefined && steamAppId !== null && steamAppId !== '') {
+            const n = parseInt(steamAppId, 10);
+            if (!isNaN(n) && n > 0) parsedSteamAppId = n;
+        }
+
+        let parsedPlaytimeMinutes = 0;
+        if (playtimeMinutes !== undefined && playtimeMinutes !== null && playtimeMinutes !== '') {
+            const n = parseInt(playtimeMinutes, 10);
+            if (!isNaN(n) && n >= 0) parsedPlaytimeMinutes = n;
+        }
+
         library.push({
             platform,
             title,
             titleId: titleId || null,
+            coverUrl: typeof coverUrl === 'string' ? coverUrl.trim() || null : null,
+            steamAppId: parsedSteamAppId,
+            playtimeMinutes: parsedPlaytimeMinutes,
             addedAt: new Date().toISOString()
         });
 
@@ -2163,6 +2178,63 @@ app.post('/api/me/achievements', authenticateToken, async (req, res) => {
         res.json({ success: true, message: 'Achievement recorded.', achievement: entry });
     } catch (err) {
         console.error('POST /api/me/achievements error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── PUT /api/me/achievements/game-template ────────────────────────────────────
+// Writes the full achievement list (locked + unlocked) for a specific game to the
+// per-game folder in the user's private cloud repo.
+// Path: accounts/{username}/Achievements/{platform}/{titleKey}/achievements.json
+// Unlike POST /api/me/achievements this does NOT touch the global achievements.json
+// and accepts locked achievements (empty unlockedAt).
+// Body: { platform, gameTitle, titleKey, achievements: [{achievementId, name, description, unlockedAt?}] }
+app.put('/api/me/achievements/game-template', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, gameTitle, titleKey, achievements } = req.body;
+        if (!platform || !gameTitle || !titleKey || !Array.isArray(achievements) || achievements.length === 0) {
+            return res.status(400).json({ success: false, message: 'platform, gameTitle, titleKey, and achievements array are required.' });
+        }
+        const normalizedPlatform = normalizePlatformName(platform);
+        const platformKey = sanitisePathSegment(normalizedPlatform, 'unknown-platform');
+        const safeKey = sanitisePathSegment(String(titleKey).trim(), 'unknown-title');
+        const path = `accounts/${usernameLower}/Achievements/${platformKey}/${safeKey}/achievements.json`;
+
+        const file = await getFile(path);
+        const existing = Array.isArray(file?.content) ? file.content : [];
+
+        // Merge: incoming template entries are written but existing unlockedAt is preserved
+        // so cloud-tracked unlocks are never overwritten with an empty value.
+        const merged = [...existing];
+        for (const a of achievements) {
+            const achId = String(a.achievementId || '');
+            if (!achId) continue;
+            const idx = merged.findIndex(e => String(e.achievementId || '') === achId);
+            const incoming = {
+                platform: normalizedPlatform,
+                gameTitle,
+                achievementId: achId,
+                name: a.name || '',
+                description: a.description || '',
+                unlockedAt: a.unlockedAt || '',
+            };
+            if (idx !== -1) {
+                // Preserve an existing non-empty unlockedAt (already earned) over an
+                // empty one from the incoming template (locked state).
+                const existingUnlockedAt = typeof merged[idx].unlockedAt === 'string' ? merged[idx].unlockedAt : '';
+                const incomingUnlockedAt = typeof incoming.unlockedAt === 'string' ? incoming.unlockedAt : '';
+                const keepUnlockedAt = existingUnlockedAt !== '' ? existingUnlockedAt : incomingUnlockedAt;
+                merged[idx] = { ...merged[idx], ...incoming, unlockedAt: keepUnlockedAt };
+            } else {
+                merged.push(incoming);
+            }
+        }
+
+        await putFile(path, merged, `Sync achievements: ${gameTitle} (${platform})`, file ? file.sha : undefined);
+        res.json({ success: true, message: 'Achievement template written.', count: merged.length });
+    } catch (err) {
+        console.error('PUT /api/me/achievements/game-template error:', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 });
