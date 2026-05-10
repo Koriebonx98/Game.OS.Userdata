@@ -2231,7 +2231,7 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
             const incomingName = String(incoming?.name || '');
             const idx = merged.findIndex(e =>
                 String(e.achievementId || '') === achId ||
-                ((String(e.achievementId || '') === '' || achId === incomingName) &&
+                (String(e.achievementId || '') === '' &&
                  incomingName !== '' &&
                  String(e.name || '').toLowerCase() === incomingName.toLowerCase()));
             const normalizedIncoming = { ...incoming, achievementId: achId };
