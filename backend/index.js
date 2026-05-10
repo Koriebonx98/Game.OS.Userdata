@@ -514,6 +514,64 @@ async function putFile(path, content, message, sha) {
     await octokit.repos.createOrUpdateFileContents(params);
 }
 
+const STEAM_ID_INDEX_PATH = 'accounts/SteamID.json';
+
+function normaliseSteamUserId(value) {
+    const trimmed = String(value || '').trim();
+    return /^\d{5,32}$/.test(trimmed) ? trimmed : '';
+}
+
+async function writeProfileWithSteamBinding(usernameLower, profile, profileSha, requestedSteamUserId, messageBase) {
+    const normalisedSteamId = normaliseSteamUserId(requestedSteamUserId);
+    const previousSteamId   = normaliseSteamUserId(profile.steamUserId || '');
+    const steamIndexFile    = await getFile(STEAM_ID_INDEX_PATH);
+    const steamIndex        = steamIndexFile && steamIndexFile.content && typeof steamIndexFile.content === 'object'
+        ? { ...steamIndexFile.content }
+        : {};
+
+    if (requestedSteamUserId !== undefined && !normalisedSteamId && String(requestedSteamUserId || '').trim()) {
+        const err = new Error('Steam ID must be a numeric SteamID64.');
+        err.statusCode = 400;
+        throw err;
+    }
+
+    if (normalisedSteamId) {
+        const existingOwnerLower = typeof steamIndex[normalisedSteamId] === 'string'
+            ? steamIndex[normalisedSteamId].toLowerCase()
+            : '';
+        if (existingOwnerLower && existingOwnerLower !== usernameLower) {
+            let ownerName = steamIndex[normalisedSteamId];
+            try {
+                const ownerProfile = await getFile(`accounts/${existingOwnerLower}/profile.json`);
+                if (ownerProfile?.content?.username)
+                    ownerName = ownerProfile.content.username;
+            } catch { }
+            const err = new Error(`This Steam ID is already linked to ${ownerName}.`);
+            err.statusCode = 409;
+            throw err;
+        }
+    }
+
+    if (previousSteamId &&
+        typeof steamIndex[previousSteamId] === 'string' &&
+        steamIndex[previousSteamId].toLowerCase() === usernameLower &&
+        previousSteamId !== normalisedSteamId) {
+        delete steamIndex[previousSteamId];
+    }
+
+    if (normalisedSteamId)
+        steamIndex[normalisedSteamId] = usernameLower;
+
+    profile.steamUserId = normalisedSteamId || '';
+
+    await putFile(`accounts/${usernameLower}/profile.json`, profile,
+        `${messageBase}: ${usernameLower}`, profileSha);
+    await putFile(STEAM_ID_INDEX_PATH, steamIndex,
+        `${messageBase} steam index: ${usernameLower}`, steamIndexFile ? steamIndexFile.sha : undefined);
+
+    return profile;
+}
+
 // ── Validation helpers ────────────────────────────────────────────────────────
 
 function isValidEmail(email) {
@@ -1954,17 +2012,47 @@ app.patch('/api/me/profile', authenticateToken, async (req, res) => {
 
         const profile = { ...accountFile.content };
         if (gamerScore  !== undefined) profile.gamerScore  = Number.isFinite(Number(gamerScore))  ? Math.max(0, Math.trunc(Number(gamerScore)))  : (profile.gamerScore  ?? 0);
-        if (steamUserId !== undefined) profile.steamUserId = steamUserId || '';
         if (totalGames  !== undefined) profile.totalGames  = Number.isFinite(Number(totalGames))  ? Math.max(0, Math.trunc(Number(totalGames)))  : (profile.totalGames  ?? 0);
-
-        await putFile(`accounts/${usernameLower}/profile.json`, profile,
-            `Profile update: ${usernameLower}`, accountFile.sha);
+        if (steamUserId !== undefined) {
+            await writeProfileWithSteamBinding(
+                usernameLower,
+                profile,
+                accountFile.sha,
+                steamUserId,
+                'Profile update');
+        } else {
+            await putFile(`accounts/${usernameLower}/profile.json`, profile,
+                `Profile update: ${usernameLower}`, accountFile.sha);
+        }
 
         const { password_hash, api_token_hash, ...safeProfile } = profile;
         res.json({ success: true, profile: safeProfile });
     } catch (err) {
         console.error('PATCH /api/me/profile error:', err);
-        res.status(500).json({ success: false, message: 'Server error.' });
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Server error.' });
+    }
+});
+
+// ── POST /api/link-steam ───────────────────────────────────────────────────────
+app.post('/api/link-steam', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { steamUserId } = req.body || {};
+        const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+        if (!accountFile) return res.status(404).json({ success: false, message: 'Account not found.' });
+
+        const updatedProfile = await writeProfileWithSteamBinding(
+            usernameLower,
+            { ...accountFile.content },
+            accountFile.sha,
+            steamUserId,
+            'Steam ID link');
+
+        const { password_hash, api_token_hash, ...safeProfile } = updatedProfile;
+        res.json({ success: true, profile: safeProfile, steamUserId: updatedProfile.steamUserId || '' });
+    } catch (err) {
+        console.error('POST /api/link-steam error:', err);
+        res.status(err.statusCode || 500).json({ success: false, message: err.message || 'Server error.' });
     }
 });
 
@@ -2521,7 +2609,7 @@ app.get('/api/users/:username/activity', authenticatePublicOrUserToken, async (r
 app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, res) => {
     try {
         const { usernameLower } = req.tokenUser;
-        const { exophaseUrl, platform, gameTitle, titleId } = req.body;
+        const { exophaseUrl, platform, gameTitle, titleId, exophaseProfileId } = req.body;
 
         if (!exophaseUrl || !platform || !gameTitle) {
             return res.status(400).json({ success: false, message: 'exophaseUrl, platform, and gameTitle are required.' });
@@ -2582,7 +2670,13 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
 
             const description = ($el.find('div.award-description p').first().text() || '').trim();
             const iconUrl     = $el.find('img').first().attr('src') || undefined;
-            const isHidden    = ($el.attr('class') || '').split(/\s+/).includes('secret');
+            const classesRaw  = ($el.attr('class') || '');
+            const isHidden    = classesRaw.split(/\s+/).includes('secret');
+            const classes     = classesRaw.toLowerCase();
+            const unlocked    = /\b(unlocked|earned|achieved|completed|done)\b/.test(classes);
+            const unlockedText = ($el.find('time').first().attr('datetime')
+                || $el.find('.date, .earned, .unlock-date, .award-date').first().text()
+                || '').trim();
 
             // Rarity: data-average attribute (0–100 float, percentage of players who earned it)
             const avgRaw = $el.attr('data-average');
@@ -2595,7 +2689,9 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
                 achievementId: String(i + 1),
                 name,
                 description,
-                unlockedAt: null,
+                unlockedAt: unlocked
+                    ? ((Date.parse(unlockedText) ? new Date(unlockedText).toISOString() : new Date().toISOString()))
+                    : null,
                 source: 'exophase'
             };
             if (iconUrl)              entry.iconUrl  = iconUrl;
@@ -2625,9 +2721,17 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
                      String(a.achievementId) === String(ach.achievementId)
             );
             if (idx !== -1) {
-                list[idx] = { ...list[idx], ...ach };
+                const existingUnlockedAt = list[idx].unlockedAt || '';
+                list[idx] = {
+                    ...list[idx],
+                    ...ach,
+                    unlockedAt: ach.unlockedAt || existingUnlockedAt || '',
+                    exophaseProfileId: exophaseProfileId || list[idx].exophaseProfileId || ''
+                };
                 updated++;
             } else {
+                if (exophaseProfileId)
+                    ach.exophaseProfileId = exophaseProfileId;
                 list.push(ach);
                 added++;
             }
