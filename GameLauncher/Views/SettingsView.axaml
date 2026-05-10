@@ -161,8 +161,12 @@
                                 <StackPanel Grid.Column="0" Spacing="2">
                                     <TextBlock Text="Show intro video on startup"
                                                FontSize="13" Foreground="#e6edf3"/>
-                                    <TextBlock Text="Plays the Game.OS intro animation each time the launcher opens. Disable for a faster startup."
-                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="11" Foreground="#8b949e">
+                                        Plays a full-screen intro video each time the launcher opens.
+                                        Place your video at  Data\Intro\Intro.mp4  inside the Game.OS folder — this matches the PS5 OS reference behaviour.
+                                        Disable for a faster startup.
+                                    </TextBlock>
                                 </StackPanel>
                                 <ToggleSwitch Grid.Column="1"
                                               IsChecked="{Binding ShowIntroVideo}"
@@ -171,17 +175,20 @@
                                               Margin="16,0,0,0"/>
                             </Grid>
 
-                            <!-- Intro video path (shown when toggle is on) -->
+                            <!-- Custom intro video override (shown when toggle is on) -->
                             <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center"
                                   IsVisible="{Binding ShowIntroVideo}">
                                 <StackPanel Grid.Column="0" Spacing="2">
-                                    <TextBlock Text="Custom intro video file"
+                                    <TextBlock Text="Custom intro video (optional override)"
                                                FontSize="13" Foreground="#e6edf3"/>
-                                    <TextBlock Text="Choose a video file (.mp4, .avi, .mkv, .mov, .webm). Leave blank to disable the intro."
-                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                    <TextBlock TextWrapping="Wrap"
+                                               FontSize="11" Foreground="#8b949e">
+                                        Leave blank to use the default  Data\Intro\Intro.mp4  location.
+                                        Browse to a different file only if you want to override the default path.
+                                    </TextBlock>
                                     <TextBox Classes="form-input"
                                              Text="{Binding IntroVideoPath}"
-                                             Watermark="Path to video file…"
+                                             Watermark="Leave blank to use Data\Intro\Intro.mp4…"
                                              FontSize="11"
                                              Margin="0,4,0,0"/>
                                 </StackPanel>
