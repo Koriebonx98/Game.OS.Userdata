@@ -2922,8 +2922,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         var cts = new CancellationTokenSource();
         var previous = Interlocked.Exchange(ref _manualSyncCts, cts);
-        previous?.Cancel();
-        previous?.Dispose();
+        if (previous != null)
+        {
+            try { previous.Cancel(); }
+            catch (ObjectDisposedException) { }
+            try { previous.Dispose(); }
+            catch (ObjectDisposedException) { }
+        }
 
         if (!await _manualSyncSemaphore.WaitAsync(0).ConfigureAwait(false))
         {
@@ -2985,7 +2990,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 while (!cts.Token.IsCancellationRequested)
                 {
-                    if (proc.HasExited) break;
+                    try
+                    {
+                        if (proc.HasExited) break;
+                    }
+                    catch (InvalidOperationException)
+                    {
+                        break;
+                    }
 
                     int changes = await _client.SyncExophaseAchievementsAsync(
                         exophaseUrl,

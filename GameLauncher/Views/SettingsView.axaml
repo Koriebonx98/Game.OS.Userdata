@@ -669,7 +669,7 @@
                                               Text="{Binding ExophaseProfileId}"
                                               Watermark="#2896888"
                                               FontSize="12"/>
-                                     <TextBlock Text="Use the unique #ID shown in an Exophase game URL so Game.OS can target your per-user achievement view."
+                                     <TextBlock Text="Use the unique #ID shown in an Exophase game URL so Game.OS can target your per-user achievement view (for example: #2896888)."
                                                 FontSize="10" Foreground="#484f58"
                                                 TextWrapping="Wrap"/>
                                  </StackPanel>

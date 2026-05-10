@@ -524,12 +524,13 @@ function normaliseSteamUserId(value) {
 async function writeProfileWithSteamBinding(usernameLower, profile, profileSha, requestedSteamUserId, messageBase) {
     const normalisedSteamId = normaliseSteamUserId(requestedSteamUserId);
     const previousSteamId   = normaliseSteamUserId(profile.steamUserId || '');
+    const requestedSteamUserIdTrimmed = String(requestedSteamUserId || '').trim();
     const steamIndexFile    = await getFile(STEAM_ID_INDEX_PATH);
     const steamIndex        = steamIndexFile && steamIndexFile.content && typeof steamIndexFile.content === 'object'
         ? { ...steamIndexFile.content }
         : {};
 
-    if (requestedSteamUserId !== undefined && !normalisedSteamId && String(requestedSteamUserId || '').trim()) {
+    if (requestedSteamUserId !== undefined && !normalisedSteamId && requestedSteamUserIdTrimmed) {
         const err = new Error('Steam ID must be a numeric SteamID64.');
         err.statusCode = 400;
         throw err;
@@ -2626,6 +2627,7 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             (parsedUrl.hostname !== 'exophase.com' && !parsedUrl.hostname.endsWith('.exophase.com'))) {
             return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
         }
+        const validatedExophaseUrl = parsedUrl.toString();
 
         // Fetch the Exophase page with a 15-second timeout.
         // Exophase uses server-side rendering so a plain fetch returns the full HTML.
@@ -2634,7 +2636,7 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
         const fetchTimeout = setTimeout(() => controller.abort(), 15000);
         let html;
         try {
-            const response = await fetch(exophaseUrl, {
+            const response = await fetch(validatedExophaseUrl, {
                 signal: controller.signal,
                 headers: {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -2683,15 +2685,21 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             const percent = avgRaw !== undefined ? parseFloat(avgRaw) : undefined;
 
             // Use 1-based position as the achievement ID (no numeric ID in Exophase HTML)
+            let unlockedAt = null;
+            if (unlocked) {
+                const parsedUnlockDate = unlockedText ? Date.parse(unlockedText) : NaN;
+                unlockedAt = Number.isNaN(parsedUnlockDate)
+                    ? new Date().toISOString()
+                    : new Date(parsedUnlockDate).toISOString();
+            }
+
             const entry = {
                 platform,
                 gameTitle,
                 achievementId: String(i + 1),
                 name,
                 description,
-                unlockedAt: unlocked
-                    ? ((Date.parse(unlockedText) ? new Date(unlockedText).toISOString() : new Date().toISOString()))
-                    : null,
+                unlockedAt,
                 source: 'exophase'
             };
             if (iconUrl)              entry.iconUrl  = iconUrl;
