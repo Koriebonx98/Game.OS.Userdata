@@ -1,0 +1,103 @@
+#Skipped Intro
+
+#Played World 1 Level 1
+
+#Log of data to be used:
+
+ Room: stage 
+ Report: {
+    "session_id": {
+        "TypeCode": 0,
+        "Value": "0xF521C69906313E88"
+    },
+    "save_file_no": 1,
+    "save_file_id": "1ce676da-0589-4",
+    "total_play_sec_3dworld": 90,
+    "total_play_sec_single": 0,
+    "world_id": 1,
+    "stage_id": 1,
+    "stage_play_sec": 75,
+    "stage_out_type": 0,
+    "death_count": 0,
+    "replay_count": 0,
+    "play_mode": 0,
+    "player_num": 1,
+    "local_player_num": 1,
+    "characters": [ 0 ],
+    "green_stars": [ 0 ],
+    "stamps": [ 85, 86, 87, 88, 89, 90, 91, 92 ],
+    "flag_top_characters": [ 0 ],
+    "play_style": 0,
+    "controllers": [ 5 ],
+    "system_report_tag": 0
+}
+
+Data to use:
+"World_id": x 
+"stage_id": x
+"green_stars": [ 0 ]
+"death_count": 0
+"flag_top_characters": [ 0 ]
+
+
+# Log of World 1 Level 1, all 3 green stars, 1x stamp, Top of flag
+
+
+ Room: stage 
+ Report: {
+    "session_id": {
+        "TypeCode": 0,
+        "Value": "0xF521C69906313E88"
+    },
+    "save_file_no": 2,
+    "save_file_id": "7bf92ef9-85e7-4",
+    "total_play_sec_3dworld": 379,
+    "total_play_sec_single": 0,
+    "world_id": 1,
+    "stage_id": 1,
+    "stage_play_sec": 230,
+    "stage_out_type": 0,
+    "death_count": 0,
+    "replay_count": 0,
+    "play_mode": 0,
+    "player_num": 1,
+    "local_player_num": 1,
+    "characters": [ 2 ],
+    "green_stars": [ 0, 1, 2 ],
+    "stamps": [ 85, 86, 87, 88, 89, 90, 91, 92 ],
+    "flag_top_characters": [ 2 ],
+    "play_style": 0,
+    "controllers": [ 5 ],
+    "system_report_tag": 0
+}
+
+
+# Log of World 1 Level 2, all 3 green stars, no stamp, no top of flag pole.
+
+ Room: stage 
+ Report: {
+    "session_id": {
+        "TypeCode": 0,
+        "Value": "0xF521C69906313E88"
+    },
+    "save_file_no": 2,
+    "save_file_id": "7bf92ef9-85e7-4",
+    "total_play_sec_3dworld": 908,
+    "total_play_sec_single": 0,
+    "world_id": 1,
+    "stage_id": 2,
+    "stage_play_sec": 473,
+    "stage_out_type": 0,
+    "death_count": 2,
+    "replay_count": 0,
+    "play_mode": 0,
+    "player_num": 1,
+    "local_player_num": 1,
+    "characters": [ 2 ],
+    "green_stars": [ 0, 1, 2 ],
+    "stamps": [ 40, 85, 86, 87, 88, 89, 90, 91, 92 ],
+    "flag_top_characters": [ 2 ],
+    "play_style": 0,
+    "controllers": [ 5 ],
+    "system_report_tag": 0
+}
