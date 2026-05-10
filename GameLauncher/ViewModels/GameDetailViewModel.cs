@@ -2743,7 +2743,13 @@ public partial class GameDetailViewModel : ViewModelBase
                 string desc          = TryGetStringProp(item, "description", "Description");
                 // Switch-Achievements JSON uses "UrlUnlocked" rather than "iconUrl"
                 string icon          = TryGetStringProp(item, "iconUrl", "IconUrl", "UrlUnlocked");
-                string achievementId = TryGetStringProp(item, "achievementId", "AchievementId");
+                string achievementId = TryGetStringProp(
+                    item,
+                    "achievementId", "AchievementId",
+                    "apiName", "ApiName",
+                    "id", "Id");
+                if (string.IsNullOrWhiteSpace(achievementId))
+                    achievementId = name;
 
                 if (string.IsNullOrEmpty(name)) continue;
                 list.Add(new Achievement
