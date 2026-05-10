@@ -22,18 +22,23 @@ public partial class QuickMenuWindow : Window
     /// </summary>
     public void ShowOverGame()
     {
+        // Use the XAML-declared width as the authoritative width.
+        // Avalonia may not yet have measured the window at this point, so reading
+        // the Width property directly is more reliable than DesiredSize.
+        const double fallbackWidth = 340;
+        double windowWidth = double.IsNaN(Width) || Width <= 0 ? fallbackWidth : Width;
+
         // Anchor to the right edge of the primary screen
         var screen = Screens.Primary;
         if (screen != null)
         {
-            var wa = screen.WorkingArea;
-            // Convert device pixels to logical pixels using the screen scaling
+            var wa    = screen.WorkingArea;
             double scale   = screen.Scaling;
             double waRight = wa.X + wa.Width;
             double waTop   = wa.Y;
             // Position window so its right edge aligns with the screen's right edge
             Position = new PixelPoint(
-                (int)(waRight - Width * scale),
+                (int)(waRight - windowWidth * scale),
                 (int)waTop);
         }
 

@@ -294,9 +294,8 @@ public partial class MainWindow : Window
                 unlockedAchievements: _boundVm.DetailVm.HasAchievements ? _boundVm.DetailVm.Achievements.Count(a => a.IsUnlocked) : 0,
                 totalAchievements:    _boundVm.DetailVm.HasAchievements ? _boundVm.DetailVm.Achievements.Count : 0);
 
-            if (_quickMenuWindow == null || !_quickMenuWindow.IsVisible)
+            if (_quickMenuWindow == null)
             {
-                _quickMenuWindow?.Close();
                 _quickMenuWindow = new QuickMenuWindow { DataContext = _boundVm.QuickMenuVm };
                 // Wire dismiss so closing the overlay window is reflected in the VM
                 _boundVm.QuickMenuVm.OnDismiss = () =>
@@ -307,12 +306,16 @@ public partial class MainWindow : Window
                         _quickMenuWindow?.Hide();
                     });
                 };
-                _quickMenuWindow.ShowOverGame();
             }
-            else
+
+            if (_quickMenuWindow.IsVisible)
             {
                 _quickMenuWindow.Hide();
                 _boundVm.ShowQuickMenu = false;
+            }
+            else
+            {
+                _quickMenuWindow.ShowOverGame();
             }
             return;
         }
