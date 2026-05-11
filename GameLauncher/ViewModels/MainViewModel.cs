@@ -2591,6 +2591,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StopOfflineReconnectTimer();
         StopSyncCheckTimer();
         StopHeartbeatPoller();
+        _localCacheSemaphore.Dispose();
         _scanner.Dispose();
         (_client as IDisposable)?.Dispose();
         StoreVm.Dispose();
