@@ -58,6 +58,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private long _lastCacheLabelUpdatedAt;
     private string _lastCacheLabelText = "";
 
+    /// <summary>
+    /// Ensures only one <see cref="BackgroundCacheLocalGamesAsync"/> sweep runs at a time.
+    /// Concurrent calls (e.g. GamesUpdated + RomsUpdated firing together) skip immediately
+    /// rather than queuing up, which prevents the UI-thread post storm that caused freezes.
+    /// </summary>
+    private readonly SemaphoreSlim _localCacheSemaphore = new(1, 1);
+
     // ── Message polling ────────────────────────────────────────────────────
     /// <summary>Fires every 60 seconds after login to check for new direct messages.</summary>
     private Timer? _messagePoller;
@@ -568,8 +575,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found.");
             LibraryVm.UpdateLocalGames(games);
             RefreshDashboardLocalGames();
-            // Trigger background metadata caching for the newly found PC games
-            _ = BackgroundCacheLocalGamesAsync();
+            // Only trigger metadata caching when at least one game is missing its game.json
+            // or has stale metadata — avoids re-running the full sweep on every periodic rescan.
+            if (games.Any(g => !_metadataCache.IsGameInfoCached("PC", null, g.Title)
+                               || _metadataCache.IsGameInfoStale("PC", null, g.Title)))
+                _ = BackgroundCacheLocalGamesAsync();
         };
         _scanner.RepacksUpdated += repacks =>
         {
@@ -582,8 +592,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found.");
             LibraryVm.UpdateRoms(roms);
             RefreshDashboardLocalGames();
-            // Trigger background metadata caching for the newly found ROMs
-            _ = BackgroundCacheLocalGamesAsync();
+            // Only trigger metadata caching when at least one ROM is missing its game.json
+            // or has stale metadata — avoids re-running the full sweep on every periodic rescan.
+            if (roms.Any(r => !_metadataCache.IsGameInfoCached(r.Platform, r.TitleId, r.Title)
+                               || _metadataCache.IsGameInfoStale(r.Platform, r.TitleId, r.Title)))
+                _ = BackgroundCacheLocalGamesAsync();
         };
         DevLogService.Log("[Scanner] Starting background game scanner…");
         _ = _scanner.StartAsync();
@@ -2118,6 +2131,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(
                     () => DetailVm.EnrichFromDatabaseGame(dbGame));
+
+                // Cache game.json on-demand so the next open is instant (offline-capable).
+                // Only writes when the file is missing or stale — never overwrites fresh data.
+                bool stale = _metadataCache.IsGameInfoStale(platform, titleId, localTitle);
+                if (!_metadataCache.IsGameInfoCached(platform, titleId, localTitle) || stale)
+                {
+                    _ = _metadataCache.CacheGameInfoJsonAsync(
+                            platform, titleId ?? dbGame.TitleId, localTitle,
+                            dbGame, force: stale)
+                        .ContinueWith(t =>
+                        {
+                            if (t.Exception != null)
+                                DevLogService.Log($"[Detail] CacheGameInfoJson failed for '{localTitle}': {t.Exception.GetBaseException().Message}");
+                        }, System.Threading.Tasks.TaskContinuationOptions.OnlyOnFaulted);
+                }
             }
         }
         catch
@@ -4030,11 +4058,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         // AchievementsUrl for caching — avoids racing with
                         // EnrichLibraryFromDatabaseAsync which may be updating the same game
                         // objects concurrently on another thread.
+                        bool infoStale = _metadataCache.IsGameInfoStale(game.Platform, game.TitleId, game.Title);
                         bool fullyCached =
                             _metadataCache.GetCachedCoverPath(game.Platform, game.TitleId, game.Title) != null &&
                             _metadataCache.GetCachedAchievementsPath(game.Platform, game.TitleId, game.Title) != null &&
                             _metadataCache.IsGameInfoCached(game.Platform, game.TitleId, game.Title);
-                        if (fullyCached)
+                        if (fullyCached && !infoStale)
                             continue;
 
                         var gameForCache = new Models.Game
@@ -4049,11 +4078,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                         // Save game.json with full metadata so the launcher can display
                         // rich info (name, id, cover urls, description, etc.) offline.
-                        if (dbGame != null && !_metadataCache.IsGameInfoCached(game.Platform, game.TitleId, game.Title))
+                        // Force overwrite when the cached copy is stale.
+                        if (dbGame != null &&
+                            (!_metadataCache.IsGameInfoCached(game.Platform, game.TitleId, game.Title) || infoStale))
                         {
                             await _metadataCache.CacheGameInfoJsonAsync(
                                 game.Platform, game.TitleId ?? dbGame.TitleId, game.Title,
-                                dbGame).ConfigureAwait(false);
+                                dbGame, force: infoStale).ConfigureAwait(false);
                         }
                     }
                     catch { /* best-effort */ }
@@ -4082,10 +4113,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Background task: iterates all locally-detected games (PC games and ROMs found by the
     /// scanner) and downloads metadata + achievements.json for each one from the Games.Database
     /// — mirroring what the website shows.  Safe to call multiple times; already-cached assets
-    /// are skipped.
+    /// are skipped.  At most one sweep runs at a time — concurrent invocations return immediately.
     /// </summary>
     private async Task BackgroundCacheLocalGamesAsync()
     {
+        // Prevent concurrent sweeps: if one is already in progress, the new call is a no-op.
+        // This stops the scanner's periodic GamesUpdated / RomsUpdated events (every 2 minutes)
+        // from stacking up concurrent HTTP fetches that freeze the UI.
+        if (!await _localCacheSemaphore.WaitAsync(0).ConfigureAwait(false))
+            return;
+
         try
         {
             // Snapshot local games on the UI thread to avoid collection-modified exceptions
@@ -4099,6 +4136,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             });
 
             if (sources.Count == 0) return;
+
+            // Fast-path: if every game already has fresh metadata, skip the full sweep entirely.
+            // This avoids fetching the platform database JSON on every periodic scanner rescan.
+            bool anyPendingOrStale = sources.Any(s =>
+                !_metadataCache.IsGameInfoCached(s.Platform, s.TitleId, s.Title) ||
+                _metadataCache.IsGameInfoStale(s.Platform, s.TitleId, s.Title));
+            if (!anyPendingOrStale) return;
 
             DevLogService.Log($"[Cache] BackgroundCacheLocalGamesAsync: {sources.Count} local games to process.");
 
@@ -4124,7 +4168,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             .Where(entry =>
                                 _metadataCache.GetCachedCoverPath(platform, entry.TitleId, entry.Title) == null ||
                                 _metadataCache.GetCachedAchievementsPath(platform, entry.TitleId, entry.Title) == null ||
-                                !_metadataCache.IsGameInfoCached(platform, entry.TitleId, entry.Title))
+                                !_metadataCache.IsGameInfoCached(platform, entry.TitleId, entry.Title) ||
+                                _metadataCache.IsGameInfoStale(platform, entry.TitleId, entry.Title))
                             .ToList();
                         if (pendingEntries.Count == 0)
                             continue;
@@ -4151,12 +4196,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                                     dbGame.CoverUrl,
                                     dbGame.AchievementsUrl).ConfigureAwait(false);
 
-                                // Save game.json with full metadata (name, id, cover urls, etc.)
+                                // Save game.json — force overwrite when the cached copy is stale.
+                                bool forceRefresh = _metadataCache.IsGameInfoStale(platform, titleId, title);
                                 await _metadataCache.CacheGameInfoJsonAsync(
                                     platform,
                                     cacheKey,
                                     title,
-                                    dbGame).ConfigureAwait(false);
+                                    dbGame,
+                                    force: forceRefresh).ConfigureAwait(false);
                             }
                             catch { /* best-effort per game */ }
                         }
@@ -4180,6 +4227,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch (Exception ex)
         {
             DevLogService.Log($"[Cache] BackgroundCacheLocalGamesAsync failed: {ex.Message}");
+        }
+        finally
+        {
+            _localCacheSemaphore.Release();
         }
     }
     /// <summary>Formats the last-synced label for the Settings Sync section.</summary>

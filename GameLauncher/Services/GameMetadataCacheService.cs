@@ -78,6 +78,26 @@ namespace GameLauncher.Services
             Directory.Exists(GameFolder(platform, titleId));
 
         /// <summary>
+        /// Returns true if the cached <c>game.json</c> file for this game is older than
+        /// <paramref name="staleDays"/> days, meaning the metadata should be re-fetched.
+        /// Returns false when no cache file exists (treat as not-stale; the initial
+        /// <see cref="IsGameInfoCached"/> check handles the missing-file case).
+        /// </summary>
+        public bool IsGameInfoStale(string platform, string? titleId, string? title = null,
+                                     int staleDays = 7)
+        {
+            var key = ResolveKey(titleId, title);
+            if (string.IsNullOrEmpty(key)) return false;
+            var path = Path.Combine(GameFolder(platform, key), "game.json");
+            if (!File.Exists(path)) return false;
+            try
+            {
+                return (DateTime.UtcNow - File.GetLastWriteTimeUtc(path)).TotalDays > staleDays;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>
         /// Returns the local path to the cached cover image, or null when not cached.
         /// </summary>
         public string? GetCachedCoverPath(string platform, string? titleId, string? title = null)
