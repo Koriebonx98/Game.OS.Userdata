@@ -416,6 +416,12 @@ namespace GameLauncher.Models
         [JsonPropertyName("devLogs")] public bool DevLogs { get; set; } = false;
 
         /// <summary>
+        /// Visual theme preset for the Windows launcher shell.
+        /// Supported values: <c>Default</c> and <c>XB360</c>.
+        /// </summary>
+        [JsonPropertyName("designTheme")] public string DesignTheme { get; set; } = "Default";
+
+        /// <summary>
         /// Apps to launch automatically after the user logs in (Settings › System › Startup).
         /// Includes built-in presets (Steam, Epic, Radmin VPN) and user-defined entries.
         /// </summary>

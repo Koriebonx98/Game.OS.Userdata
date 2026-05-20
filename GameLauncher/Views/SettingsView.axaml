@@ -699,6 +699,23 @@
 
                             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                                 <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Launcher theme"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Choose the visual shell style used by the Windows app."
+                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ComboBox Grid.Column="1"
+                                          ItemsSource="{Binding DesignThemeOptions}"
+                                          SelectedItem="{Binding DesignTheme}"
+                                          Width="160"
+                                          Margin="16,0,0,0"
+                                          VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="#21262d"/>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
                                     <TextBlock Text="Enable global quick menu hotkey"
                                                FontSize="13" Foreground="#e6edf3"/>
                                     <TextBlock Text="Windows only. Polls Left Ctrl + Left Shift globally so the quick menu can be opened while a game window is focused."

@@ -96,6 +96,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _compatibilityOverlayMode = false;
     /// <summary>Prefer cached local metadata first for installed games and offline sessions.</summary>
     [ObservableProperty] private bool _preferOfflineCachedMetadata = true;
+    /// <summary>Visual theme preset for the launcher shell.</summary>
+    [ObservableProperty] private string _designTheme = "Default";
+    public IReadOnlyList<string> DesignThemeOptions { get; } = ["Default", "XB360"];
 
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
@@ -311,6 +314,9 @@ public partial class SettingsViewModel : ViewModelBase
         EnableGlobalQuickMenuHotkey = appSettings.EnableGlobalQuickMenuHotkey;
         CompatibilityOverlayMode   = appSettings.CompatibilityOverlayMode;
         PreferOfflineCachedMetadata = appSettings.PreferOfflineCachedMetadata;
+        DesignTheme                = string.Equals(appSettings.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase)
+            ? "XB360"
+            : "Default";
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
         LogRomsScanner            = appSettings.LogRomsScanner;
@@ -495,6 +501,7 @@ public partial class SettingsViewModel : ViewModelBase
             EnableGlobalQuickMenuHotkey = EnableGlobalQuickMenuHotkey,
             CompatibilityOverlayMode   = CompatibilityOverlayMode,
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
+            DesignTheme                = string.Equals(DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase) ? "XB360" : "Default",
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
             LogRomsScanner            = LogRomsScanner,

@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         {
             _boundVm.PropertyChanged -= OnMainViewModelPropertyChanged;
             _boundVm.SettingsVm.SettingsApplied -= RefreshGlobalHotkeyPolling;
+            _boundVm.SettingsVm.SettingsApplied -= ApplyDesignTheme;
         }
 
         if (DataContext is MainViewModel vm)
@@ -51,6 +52,7 @@ public partial class MainWindow : Window
             _boundVm = vm;
             vm.PropertyChanged += OnMainViewModelPropertyChanged;
             vm.SettingsVm.SettingsApplied += RefreshGlobalHotkeyPolling;
+            vm.SettingsVm.SettingsApplied += ApplyDesignTheme;
 
             // Capture the window state at the time of minimise so we can restore
             // to the same state (FullScreen, Normal, Maximized) when the game exits.
@@ -66,11 +68,13 @@ public partial class MainWindow : Window
                 WindowState = _stateBeforeMinimize;
                 Activate();
             };
+            ApplyDesignTheme();
             RefreshGlobalHotkeyPolling();
         }
         else
         {
             _boundVm = null;
+            Classes.Remove("theme-xb360");
             RefreshGlobalHotkeyPolling();
         }
     }
@@ -239,6 +243,13 @@ public partial class MainWindow : Window
             _globalHotkeyPoller.Stop();
             _globalHotkeyLatched = false;
         }
+    }
+
+    private void ApplyDesignTheme()
+    {
+        var selected = _boundVm?.SettingsVm.DesignTheme ?? "Default";
+        bool useXb360 = string.Equals(selected, "XB360", StringComparison.OrdinalIgnoreCase);
+        Classes.Set("theme-xb360", useXb360);
     }
 
     private void OnGlobalHotkeyTick(object? sender, EventArgs e)

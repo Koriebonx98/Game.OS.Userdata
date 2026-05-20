@@ -17,6 +17,11 @@
         <Setter Property="Height" Value="80"/>
     </Style>
 
+    <!-- ─── XB360 visual preset (enabled via MainWindow class "theme-xb360") ─── -->
+    <Style Selector="Window.theme-xb360 Border.nav-logo-area">
+        <Setter Property="Background" Value="#6aa84f"/>
+    </Style>
+
     <Style Selector="TextBlock.nav-logo-text">
         <Setter Property="FontSize" Value="22"/>
         <Setter Property="FontWeight" Value="Bold"/>
@@ -42,6 +47,10 @@
 
     <Style Selector="Button.nav-item.active /template/ ContentPresenter">
         <Setter Property="Background" Value="#1f6feb"/>
+    </Style>
+
+    <Style Selector="Window.theme-xb360 Button.nav-item.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#107c10"/>
     </Style>
 
     <Style Selector="Button.nav-item.active">
@@ -130,6 +139,10 @@
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="Window.theme-xb360 Button.btn-primary">
+        <Setter Property="Background" Value="#107c10"/>
     </Style>
 
     <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
