@@ -1,0 +1,86 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Xbox 360 (Kinect dashboard inspired) override theme -->
+
+    <Style Selector="Border.nav-sidebar">
+        <Setter Property="Background" Value="#0f3f1f"/>
+    </Style>
+
+    <Style Selector="Border.nav-logo-area">
+        <Setter Property="Background" Value="#6fcb3d"/>
+    </Style>
+
+    <Style Selector="TextBlock.nav-logo-text">
+        <Setter Property="Foreground" Value="#0f2f18"/>
+    </Style>
+
+    <Style Selector="Button.nav-item">
+        <Setter Property="Foreground" Value="#d8f0df"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Padding" Value="20,16"/>
+    </Style>
+
+    <Style Selector="Button.nav-item:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2a6d3f"/>
+    </Style>
+
+    <Style Selector="Button.nav-item.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#7bd142"/>
+    </Style>
+
+    <Style Selector="Button.nav-item.active">
+        <Setter Property="Foreground" Value="#112314"/>
+    </Style>
+
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="Foreground" Value="#f2fff5"/>
+    </Style>
+
+    <Style Selector="Button.btn-primary">
+        <Setter Property="Background" Value="#7bd142"/>
+        <Setter Property="Foreground" Value="#102714"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#95dc58"/>
+    </Style>
+
+    <Style Selector="Button.btn-secondary">
+        <Setter Property="Foreground" Value="#d8f0df"/>
+        <Setter Property="BorderBrush" Value="#4ca661"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.btn-secondary:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1c4e2d"/>
+    </Style>
+
+    <Style Selector="TextBox.form-input">
+        <Setter Property="Background" Value="#12341f"/>
+        <Setter Property="BorderBrush" Value="#3c8950"/>
+        <Setter Property="Foreground" Value="#f2fff5"/>
+    </Style>
+
+    <Style Selector="Button.settings-nav-item">
+        <Setter Property="Foreground" Value="#d8f0df"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Padding" Value="18,12"/>
+    </Style>
+
+    <Style Selector="Button.settings-nav-item:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2a6d3f"/>
+    </Style>
+
+    <Style Selector="Button.settings-nav-item.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#7bd142"/>
+    </Style>
+
+    <Style Selector="Button.settings-nav-item.active">
+        <Setter Property="Foreground" Value="#112314"/>
+    </Style>
+
+</Styles>

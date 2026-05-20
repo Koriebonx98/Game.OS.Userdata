@@ -66,9 +66,12 @@ public sealed class GameScannerService : IDisposable
         try
         {
             DevLogService.Log("[Scanner] StartAsync — beginning scan.");
+            bool loadedFromCache = false;
+
             // Try loading from cache first for faster startup
             if (TryLoadCache())
             {
+                loadedFromCache = true;
                 DevLogService.Log($"[Scanner] Cache loaded: {_games.Count} games, {_repacks.Count} repacks, {_roms.Count} ROMs.");
                 GamesUpdated?.Invoke(new List<LocalGame>(_games));
                 RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
@@ -79,9 +82,31 @@ public sealed class GameScannerService : IDisposable
                 DevLogService.Log("[Scanner] No cache found — starting fresh scan.");
             }
 
-            // Always do a fresh scan to stay current
-            await ScanAllDrivesAsync(ct);
             StartWatchers();
+
+            if (loadedFromCache)
+            {
+                // Startup fast-path: when cache is present, defer the full disk scan so
+                // the launcher can render immediately instead of blocking on IO-heavy scans.
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(8), _lifetimeCts.Token).ConfigureAwait(false);
+                        await ScanAllDrivesAsync(_lifetimeCts.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) { /* app shutting down */ }
+                    catch (Exception ex)
+                    {
+                        DevLogService.Log($"[Scanner] Deferred startup scan failed: {ex.Message}");
+                    }
+                });
+            }
+            else
+            {
+                // No cache available — perform an immediate full scan once.
+                await ScanAllDrivesAsync(ct).ConfigureAwait(false);
+            }
 
             // Kick off the periodic rescan loop (uses the lifetime CTS so it stops on Dispose).
             _periodicTask = PeriodicRescanAsync(_lifetimeCts.Token);
