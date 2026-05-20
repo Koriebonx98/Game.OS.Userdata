@@ -314,9 +314,7 @@ public partial class SettingsViewModel : ViewModelBase
         EnableGlobalQuickMenuHotkey = appSettings.EnableGlobalQuickMenuHotkey;
         CompatibilityOverlayMode   = appSettings.CompatibilityOverlayMode;
         PreferOfflineCachedMetadata = appSettings.PreferOfflineCachedMetadata;
-        DesignTheme                = string.Equals(appSettings.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase)
-            ? "XB360"
-            : "Default";
+        DesignTheme                = NormalizeDesignTheme(appSettings.DesignTheme);
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
         LogRomsScanner            = appSettings.LogRomsScanner;
@@ -501,7 +499,7 @@ public partial class SettingsViewModel : ViewModelBase
             EnableGlobalQuickMenuHotkey = EnableGlobalQuickMenuHotkey,
             CompatibilityOverlayMode   = CompatibilityOverlayMode,
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
-            DesignTheme                = string.Equals(DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase) ? "XB360" : "Default",
+            DesignTheme                = NormalizeDesignTheme(DesignTheme),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
             LogRomsScanner            = LogRomsScanner,
@@ -592,6 +590,9 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.IsNullOrEmpty(trimmed)) return "";
         return trimmed.StartsWith("#", StringComparison.Ordinal) ? trimmed : $"#{trimmed}";
     }
+
+    private static string NormalizeDesignTheme(string? value) =>
+        string.Equals(value, "XB360", StringComparison.OrdinalIgnoreCase) ? "XB360" : "Default";
 }
 
 /// <summary>

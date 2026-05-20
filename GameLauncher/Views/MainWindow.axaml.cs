@@ -10,6 +10,7 @@ namespace GameLauncher.Views;
 
 public partial class MainWindow : Window
 {
+    private const string ThemeXb360Class = "theme-xb360";
     private readonly DispatcherTimer _globalHotkeyPoller = new()
     {
         Interval = TimeSpan.FromMilliseconds(150)
@@ -74,7 +75,7 @@ public partial class MainWindow : Window
         else
         {
             _boundVm = null;
-            Classes.Remove("theme-xb360");
+            Classes.Remove(ThemeXb360Class);
             RefreshGlobalHotkeyPolling();
         }
     }
@@ -249,7 +250,7 @@ public partial class MainWindow : Window
     {
         var selected = _boundVm?.SettingsVm.DesignTheme ?? "Default";
         bool useXb360 = string.Equals(selected, "XB360", StringComparison.OrdinalIgnoreCase);
-        Classes.Set("theme-xb360", useXb360);
+        Classes.Set(ThemeXb360Class, useXb360);
     }
 
     private void OnGlobalHotkeyTick(object? sender, EventArgs e)
