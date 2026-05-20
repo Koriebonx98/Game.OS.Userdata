@@ -69,7 +69,7 @@ public partial class MainWindow : Window
                 WindowState = _stateBeforeMinimize;
                 Activate();
             };
-            ApplyDesignTheme();
+            ApplyDesignTheme(vm.SettingsVm.DesignTheme);
             RefreshGlobalHotkeyPolling();
         }
         else
@@ -248,8 +248,12 @@ public partial class MainWindow : Window
 
     private void ApplyDesignTheme()
     {
-        var selected = _boundVm?.SettingsVm.DesignTheme ?? "Default";
-        bool useXb360 = string.Equals(selected, "XB360", StringComparison.OrdinalIgnoreCase);
+        ApplyDesignTheme(_boundVm?.SettingsVm.DesignTheme ?? "Default");
+    }
+
+    private void ApplyDesignTheme(string selectedTheme)
+    {
+        bool useXb360 = string.Equals(selectedTheme, "XB360", StringComparison.OrdinalIgnoreCase);
         Classes.Set(ThemeXb360Class, useXb360);
     }
 
