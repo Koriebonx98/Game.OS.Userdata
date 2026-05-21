@@ -197,7 +197,7 @@
                     </Button>
 
                     <!-- Games -->
-                    <ItemsControl ItemsSource="{Binding LocalLibraryGames}">
+                    <ItemsControl ItemsSource="{Binding Ps5RecentGames}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
                                 <StackPanel Orientation="Horizontal"/>
