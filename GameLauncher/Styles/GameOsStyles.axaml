@@ -422,6 +422,14 @@
         <Setter Property="Background" Value="#0d1117"/>
     </Style>
 
+    <Style Selector="Border.dashboard-xb360-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
+    <Style Selector="StackPanel.dashboard-default-layout">
+        <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
     <Style Selector="Border.featured-hero-banner">
         <Setter Property="Background">
             <Setter.Value>

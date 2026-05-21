@@ -8,6 +8,7 @@
         <x:Double x:Key="Xb360StatTileMinHeight">126</x:Double>
         <x:Double x:Key="Xb360GameCardTileWidth">212</x:Double>
         <Thickness x:Key="Xb360GameCardTileMargin">0,0,14,14</Thickness>
+        <Thickness x:Key="Xb360BladeTabMargin">0,0,8,0</Thickness>
     </Styles.Resources>
 
     <Style Selector="Window.main-window-shell">
@@ -51,6 +52,163 @@
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <Style Selector="Border.dashboard-xb360-layout">
+        <Setter Property="IsVisible" Value="True"/>
+    </Style>
+
+    <Style Selector="StackPanel.dashboard-default-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
+    <Style Selector="Border.xb360-avatar-tile">
+        <Setter Property="Background" Value="#2a7f3a"/>
+        <Setter Property="Width" Value="52"/>
+        <Setter Property="Height" Value="52"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-header-title">
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="Foreground" Value="#edffe2"/>
+        <Setter Property="FontWeight" Value="Light"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-header-subtitle">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="#9cc79f"/>
+    </Style>
+
+    <Style Selector="StackPanel.xb360-blade-tabs">
+        <Setter Property="Background" Value="#0d2316"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-blade-tab">
+        <Setter Property="Margin" Value="{StaticResource Xb360BladeTabMargin}"/>
+        <Setter Property="Foreground" Value="#96b899"/>
+        <Setter Property="FontSize" Value="15"/>
+        <Setter Property="Padding" Value="18,9"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-blade-tab-active">
+        <Setter Property="Background" Value="#2b7f3c"/>
+        <Setter Property="Foreground" Value="#f2ffea"/>
+    </Style>
+
+    <Style Selector="Border.xb360-metro-tile">
+        <Setter Property="Background" Value="#135328"/>
+        <Setter Property="BorderBrush" Value="#68c26f"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Border.xb360-metro-stat">
+        <Setter Property="Height" Value="120"/>
+        <Setter Property="Padding" Value="16"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-metro-label">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Foreground" Value="#b7dfb8"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-metro-value">
+        <Setter Property="FontSize" Value="40"/>
+        <Setter Property="Foreground" Value="#f2ffe8"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style Selector="Border.xb360-featured-tile">
+        <Setter Property="Height" Value="260"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#1a6633" Offset="0"/>
+                    <GradientStop Color="#0f421f" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-featured-badge">
+        <Setter Property="Foreground" Value="#d8ffd7"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-featured-title">
+        <Setter Property="FontSize" Value="36"/>
+        <Setter Property="Foreground" Value="#f7fff0"/>
+        <Setter Property="FontWeight" Value="Light"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-featured-subtitle">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="Foreground" Value="#b5d5b7"/>
+    </Style>
+
+    <Style Selector="Button.xb360-featured-button">
+        <Setter Property="FontSize" Value="17"/>
+        <Setter Property="Padding" Value="14,8"/>
+    </Style>
+
+    <Style Selector="Border.xb360-featured-cover">
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="BorderBrush" Value="#79cb77"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-strip-header">
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="Foreground" Value="#e7ffe2"/>
+        <Setter Property="Margin" Value="0,4,0,8"/>
+    </Style>
+
+    <Style Selector="Button.xb360-recent-card-btn">
+        <Setter Property="Width" Value="170"/>
+        <Setter Property="Margin" Value="0,0,8,8"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-recent-title">
+        <Setter Property="Foreground" Value="#f0ffe8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="MaxLines" Value="2"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-recent-platform">
+        <Setter Property="Foreground" Value="#9fd0a1"/>
+        <Setter Property="FontSize" Value="11"/>
+    </Style>
+
+    <Style Selector="Border.xb360-achievement-tile">
+        <Setter Property="Padding" Value="2"/>
+    </Style>
+
+    <Style Selector="Border.xb360-achievement-icon">
+        <Setter Property="Background" Value="#2b7f3a"/>
+        <Setter Property="Width" Value="38"/>
+        <Setter Property="Height" Value="38"/>
+        <Setter Property="VerticalAlignment" Value="Top"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-achievement-title">
+        <Setter Property="Foreground" Value="#efffe7"/>
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="MaxLines" Value="1"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-achievement-desc">
+        <Setter Property="Foreground" Value="#a9cba9"/>
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="MaxLines" Value="2"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-achievement-meta">
+        <Setter Property="Foreground" Value="#8eb28f"/>
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="MaxLines" Value="1"/>
     </Style>
 
     <Style Selector="TextBlock.page-title">
