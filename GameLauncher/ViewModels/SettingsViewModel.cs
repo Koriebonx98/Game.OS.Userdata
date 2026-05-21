@@ -102,6 +102,11 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available launcher design themes for Settings → Design.</summary>
     public IReadOnlyList<string> AvailableDesignThemes { get; } = new[] { "Default", "XB360", "PS5" };
 
+    /// <summary>Selected quick-menu overlay style.</summary>
+    [ObservableProperty] private string _quickMenuTheme = "PS5";
+    /// <summary>Available quick-menu styles.</summary>
+    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360" };
+
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
     /// Receives (apiKey, steamUserId) and returns a status string.
@@ -319,6 +324,7 @@ public partial class SettingsViewModel : ViewModelBase
         CompatibilityOverlayMode   = appSettings.CompatibilityOverlayMode;
         PreferOfflineCachedMetadata = appSettings.PreferOfflineCachedMetadata;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
+        QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
         LogRomsScanner            = appSettings.LogRomsScanner;
@@ -504,6 +510,7 @@ public partial class SettingsViewModel : ViewModelBase
             CompatibilityOverlayMode   = CompatibilityOverlayMode,
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
+            QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
             LogRomsScanner            = LogRomsScanner,
@@ -603,6 +610,14 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(trimmed, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
         if (string.Equals(trimmed, "PS5",   StringComparison.OrdinalIgnoreCase)) return "PS5";
         return "Default";
+    }
+
+    private static string NormaliseQuickMenuTheme(string value)
+    {
+        var v = (value ?? "").Trim();
+        if (string.Equals(v, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
+        if (string.Equals(v, "GameOS", StringComparison.OrdinalIgnoreCase)) return "GameOS";
+        return "PS5";
     }
 }
 

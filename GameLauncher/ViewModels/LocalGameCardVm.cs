@@ -101,4 +101,7 @@ public partial class LocalGameCardVm : ViewModelBase
     /// matching this card against the user's unlocked achievements.
     /// </summary>
     [ObservableProperty] private string _achievementLabel = "";
+
+    /// <summary>True when this card is the keyboard-focused card on the dashboard.</summary>
+    [ObservableProperty] private bool _isFocused;
 }

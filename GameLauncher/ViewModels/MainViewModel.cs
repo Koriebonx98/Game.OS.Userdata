@@ -568,10 +568,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LoginVm.OnLoginSuccess = OnLoginSuccess;
 
         // Wire up OpenDetail from child VMs
-        DashboardVm.OnOpenDetail      = OpenDetailFromGame;
-        DashboardVm.OnOpenStoreDetail = OpenDetailFromStoreGame;
-        DashboardVm.OnOpenLocalDetail = OpenDetailFromMyGameCard;
-        DashboardVm.OnContinuePlaying = LaunchFromCard;
+        DashboardVm.OnOpenDetail        = OpenDetailFromGame;
+        DashboardVm.OnOpenStoreDetail   = OpenDetailFromStoreGame;
+        DashboardVm.OnOpenLocalDetail   = OpenDetailFromMyGameCard;
+        DashboardVm.OnContinuePlaying   = LaunchFromCard;
+        DashboardVm.OnNavigateToLibrary = () => Navigate("library");
+        DashboardVm.OnPlayFocusedCard   = LaunchFromCard;
+        DashboardVm.OnOpenFocusedCardDetail = OpenDetailFromMyGameCard;
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;

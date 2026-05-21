@@ -125,6 +125,72 @@ public partial class MainWindow : Window
             }
         }
 
+        // XB360 dashboard navigation
+        bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        {
+            switch (e.Key)
+            {
+                case Key.Left:
+                    vm.DashboardVm.MoveXb360Blade(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Right:
+                    vm.DashboardVm.MoveXb360Blade(1);
+                    e.Handled = true;
+                    return;
+                case Key.Up:
+                    vm.DashboardVm.MoveXb360GameFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Down:
+                    vm.DashboardVm.MoveXb360GameFocus(1);
+                    e.Handled = true;
+                    return;
+                case Key.Enter:
+                    vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null);
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // PS5 dashboard navigation
+        bool isPs5 = string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isPs5 && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        {
+            switch (e.Key)
+            {
+                case Key.Right:
+                    vm.DashboardVm.MoveFocus(1);
+                    e.Handled = true;
+                    return;
+                case Key.Left:
+                    if (vm.DashboardVm.HasFocusedCard)
+                    {
+                        vm.DashboardVm.MoveFocus(-1);
+                        e.Handled = true;
+                        return;
+                    }
+                    break;
+                case Key.Enter:
+                    if (vm.DashboardVm.HasFocusedCard)
+                    {
+                        vm.DashboardVm.PlayFocusedCardCommand.Execute(null);
+                        e.Handled = true;
+                        return;
+                    }
+                    break;
+                case Key.X:
+                    if (vm.DashboardVm.HasFocusedCard)
+                    {
+                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
+                        e.Handled = true;
+                        return;
+                    }
+                    break;
+            }
+        }
+
         switch (e.Key)
         {
             // Navigate back from a detail or friend-profile overlay

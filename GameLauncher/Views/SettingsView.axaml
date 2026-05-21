@@ -792,6 +792,17 @@
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Quick Menu Style"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableQuickMenuThemes}"
+                                          SelectedItem="{Binding QuickMenuTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="PS5 shows the PlayStation-style quick menu. XB360 shows Xbox 360 style. GameOS uses the default style."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
                         </StackPanel>
                     </Border>
 
