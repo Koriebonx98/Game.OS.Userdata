@@ -31,6 +31,8 @@ public partial class DashboardViewModel : ViewModelBase
     // ── Constants ────────────────────────────────────────────────────────────
     /// <summary>Maximum number of games shown in "Continue Playing" and hero last-played lookup.</summary>
     private const int MaxRecentGames = 8;
+    /// <summary>Maximum number of recent games shown in the PS5 top strip.</summary>
+    private const int MaxPs5RecentGames = 5;
     /// <summary>Maximum number of local cards shown in the XB360 "Games Library" strip.</summary>
     private const int MaxLibraryGames = 12;
     /// <summary>Default card gradient used for cloud/activity-only game cards without a cover image.</summary>
@@ -41,6 +43,7 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>True when there are recently detected local ROMs or installed games to show.</summary>
     [ObservableProperty] private bool _hasRecentLocalGames;
     public ObservableCollection<LocalGameCardVm> RecentLocalGames { get; } = new();
+    public ObservableCollection<LocalGameCardVm> Ps5RecentGames { get; } = new();
     /// <summary>True when there are local Game.OS games available for the XB360 "Games Library" strip.</summary>
     [ObservableProperty] private bool _hasLocalLibraryGames;
     public ObservableCollection<LocalGameCardVm> LocalLibraryGames { get; } = new();
@@ -280,6 +283,10 @@ public partial class DashboardViewModel : ViewModelBase
         }
 
         HasRecentLocalGames = RecentLocalGames.Count > 0;
+
+        Ps5RecentGames.Clear();
+        foreach (var card in RecentLocalGames.Take(MaxPs5RecentGames))
+            Ps5RecentGames.Add(card);
 
         LocalLibraryGames.Clear();
         if (localCards != null)
