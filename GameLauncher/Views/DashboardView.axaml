@@ -168,6 +168,219 @@
         </Grid>
     </Border>
 
+    <!-- ══ PS5 Dashboard Layout (ported from Ref.PS5.OS/Dashboard.xaml) ══ -->
+    <Border Classes="dashboard-ps5-layout">
+        <Grid RowDefinitions="Auto,180,Auto,Auto,*,Auto">
+
+            <!-- Header -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,12">
+                <TextBlock Text="Games" Classes="ps5-header-title"/>
+                <TextBlock Text="  Media" Classes="ps5-header-media"/>
+            </StackPanel>
+
+            <!-- Horizontal card row -->
+            <ScrollViewer Grid.Row="1"
+                          HorizontalScrollBarVisibility="Auto"
+                          VerticalScrollBarVisibility="Disabled"
+                          Padding="20,0">
+                <StackPanel Orientation="Horizontal">
+                    <!-- Store card -->
+                    <Button Classes="game-card-btn ps5-game-card-btn"
+                            Command="{Binding OpenFeaturedDetailCommand}">
+                        <StackPanel>
+                            <Border Height="120" ClipToBounds="True" CornerRadius="10" Background="#1F1F1F">
+                                <TextBlock Text="Store" Foreground="#ECECEC" FontSize="18"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Store" Classes="ps5-card-title" Margin="8,6,8,0"/>
+                        </StackPanel>
+                    </Button>
+
+                    <!-- Games -->
+                    <ItemsControl ItemsSource="{Binding LocalLibraryGames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LocalGameCardVm">
+                                <Button Classes="game-card-btn ps5-game-card-btn"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel>
+                                        <Border Height="120" ClipToBounds="True" CornerRadius="10">
+                                            <views:CoverImage
+                                                ImageUrl="{Binding CoverUrl}"
+                                                FallbackText="{Binding EffectiveTitle}"
+                                                FallbackGradient="{Binding CoverGradient}"
+                                                SubText="{Binding Platform}"
+                                                LetterFontSize="38"
+                                                ImageCornerRadius="10"
+                                                Height="120"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding EffectiveTitle}"
+                                                   Classes="ps5-card-title"
+                                                   Margin="8,6,8,0"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- All games card -->
+                    <Button Classes="game-card-btn ps5-game-card-btn"
+                            Command="{Binding OpenFeaturedDetailCommand}">
+                        <StackPanel>
+                            <Border Height="120" ClipToBounds="True" CornerRadius="10" Background="#1F1F1F">
+                                <TextBlock Text="All Games" Foreground="#ECECEC" FontSize="16"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="All Games" Classes="ps5-card-title" Margin="8,6,8,0"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- Action buttons -->
+            <StackPanel Grid.Row="2"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Margin="0,18,0,8"
+                        IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <Button Classes="btn-primary ps5-action-primary"
+                        Width="260" Height="46"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding ContinuePlayingCommand}"
+                        IsVisible="{Binding IsFeaturedLastPlayed}"
+                        Margin="0,0,14,0">
+                    Play Game
+                </Button>
+                <Button Classes="btn-primary ps5-action-primary"
+                        Width="260" Height="46"
+                        HorizontalContentAlignment="Center"
+                        Command="{Binding OpenFeaturedDetailCommand}"
+                        IsVisible="{Binding !IsFeaturedLastPlayed}"
+                        Margin="0,0,14,0">
+                    Play Game
+                </Button>
+                <Button Classes="btn-secondary ps5-action-more"
+                        Width="46" Height="46"
+                        HorizontalContentAlignment="Center"
+                        ToolTip.Tip="More options">
+                    ...
+                </Button>
+            </StackPanel>
+
+            <!-- Store welcome block -->
+            <StackPanel Grid.Row="3"
+                        HorizontalAlignment="Center"
+                        Margin="0,16,0,0"
+                        IsVisible="{Binding !IsFeaturedLastPlayed}">
+                <TextBlock Text="Welcome to the next generation"
+                           Foreground="White"
+                           FontSize="32"
+                           FontWeight="Bold"
+                           HorizontalAlignment="Center"/>
+                <TextBlock Text="From the freshest releases to curated collections, there's something for everyone."
+                           Foreground="#B3B3B3"
+                           FontSize="18"
+                           HorizontalAlignment="Center"
+                           Margin="0,8,0,0"/>
+                <TextBlock Text="Must see"
+                           Foreground="#00AEEF"
+                           FontSize="18"
+                           FontWeight="SemiBold"
+                           HorizontalAlignment="Left"
+                           Margin="40,28,0,0"/>
+            </StackPanel>
+
+            <!-- Achievements panel -->
+            <Border Grid.Row="4"
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Top"
+                    Margin="28,24,0,18"
+                    Padding="16,12"
+                    Classes="ps5-achievements-panel"
+                    IsVisible="{Binding RecentAchievements.Count}">
+                <StackPanel Width="380">
+                    <DockPanel Margin="0,0,0,8" LastChildFill="True">
+                        <TextBlock DockPanel.Dock="Left"
+                                   Text="{Binding AchievementsCount, StringFormat='{}{0} Trophies'}"
+                                   Foreground="#E6E6E6"
+                                   FontSize="12"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock DockPanel.Dock="Right"
+                                   Text="Achievements"
+                                   Foreground="#9E9E9E"
+                                   FontSize="11"
+                                   Margin="8,0,0,0"/>
+                    </DockPanel>
+                    <Rectangle Height="1" Fill="#2B2B2B" Margin="0,0,0,8"/>
+                    <ItemsControl ItemsSource="{Binding RecentAchievements}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:Achievement">
+                                <Grid Margin="0,4,0,4" ColumnDefinitions="28,*">
+                                    <Border Grid.Column="0"
+                                            Width="20" Height="20"
+                                            CornerRadius="10"
+                                            Background="#FFD400"
+                                            VerticalAlignment="Center"
+                                            HorizontalAlignment="Center">
+                                        <TextBlock Text="T"
+                                                   Foreground="Black"
+                                                   FontWeight="Bold"
+                                                   FontSize="12"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Foreground="#F2F2F2"
+                                                   FontSize="13"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   MaxWidth="280"/>
+                                        <TextBlock Text="{Binding GameTitle}"
+                                                   Foreground="#9E9E9E"
+                                                   FontSize="11"/>
+                                    </StackPanel>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Bottom status tiles -->
+            <StackPanel Grid.Row="5"
+                        Orientation="Horizontal"
+                        HorizontalAlignment="Left"
+                        VerticalAlignment="Bottom"
+                        Margin="20,0,0,20">
+                <Border Classes="ps5-status-tile" Width="120" Height="52" Padding="10">
+                    <StackPanel>
+                        <TextBlock Text="{Binding AchievementsCount}" Classes="ps5-status-value"/>
+                        <TextBlock Text="Trophies" Classes="ps5-status-label"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="ps5-status-tile" Width="160" Height="52" Padding="10" Margin="12,0,0,0">
+                    <StackPanel>
+                        <TextBlock Text="Friends Who Play" Classes="ps5-status-value" FontSize="13"/>
+                    </StackPanel>
+                </Border>
+                <Border Classes="ps5-status-tile" Width="140" Height="52" Padding="10" Margin="12,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding TotalPlaytimeLabel}" Classes="ps5-status-value"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
+        </Grid>
+    </Border>
+
+    <!-- ══ Default Dashboard Layout ═══════════════════════════════════════ -->
     <StackPanel Margin="32,28,32,28" Spacing="0" Classes="dashboard-default-layout">
 
         <!-- Greeting -->
