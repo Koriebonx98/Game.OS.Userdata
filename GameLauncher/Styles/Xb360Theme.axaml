@@ -35,10 +35,33 @@
     </Style>
 
     <Style Selector="UserControl.dashboard-root">
-        <Setter Property="Background" Value="#08120c"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#061109" Offset="0"/>
+                    <GradientStop Color="#040b06" Offset="0.55"/>
+                    <GradientStop Color="#020704" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="FontSize" Value="34"/>
+        <Setter Property="Foreground" Value="#f6ffef"/>
+    </Style>
+
+    <Style Selector="TextBlock.page-subtitle">
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="Foreground" Value="#9fbd9e"/>
+    </Style>
+
+    <Style Selector="TextBlock.section-header">
+        <Setter Property="Foreground" Value="#dcf9d2"/>
     </Style>
 
     <Style Selector="Border.featured-hero-banner">
+        <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -52,6 +75,7 @@
     </Style>
 
     <Style Selector="Border.hero-feature-badge">
+        <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -63,6 +87,7 @@
     </Style>
 
     <Style Selector="Border.hero-platform-badge">
+        <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="Background" Value="#163d27"/>
         <Setter Property="BorderBrush" Value="#60c87c"/>
         <Setter Property="BorderThickness" Value="1"/>
@@ -74,6 +99,35 @@
 
     <Style Selector="Border.game-platform-pill">
         <Setter Property="Background" Value="#68c53d"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="TextBlock.stat-number-achievements">
+        <Setter Property="Foreground" Value="#b6ff73"/>
+    </Style>
+
+    <Style Selector="TextBlock.stat-number-platforms">
+        <Setter Property="Foreground" Value="#88e97e"/>
+    </Style>
+
+    <Style Selector="TextBlock.stat-number-playtime">
+        <Setter Property="Foreground" Value="#8fe1ff"/>
+    </Style>
+
+    <Style Selector="TextBlock.achievement-meta">
+        <Setter Property="Foreground" Value="#acd8aa"/>
+    </Style>
+
+    <Style Selector="TextBlock.achievement-divider">
+        <Setter Property="Foreground" Value="#3b7a4c"/>
+    </Style>
+
+    <Style Selector="TextBlock.empty-state-title">
+        <Setter Property="Foreground" Value="#b7d4b5"/>
+    </Style>
+
+    <Style Selector="TextBlock.empty-state-subtitle">
+        <Setter Property="Foreground" Value="#7aa57e"/>
     </Style>
 
     <Style Selector="TextBlock.game-playtime-meta">
@@ -84,6 +138,7 @@
         <Setter Property="Background" Value="#10291a"/>
         <Setter Property="BorderBrush" Value="#3a8d53"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
     </Style>
 
     <Style Selector="Border.achievement-icon-card">
@@ -165,18 +220,30 @@
         <Setter Property="Background" Value="#102a1b"/>
         <Setter Property="BorderBrush" Value="#2a7442"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="24,22"/>
+        <Setter Property="MinWidth" Value="190"/>
+        <Setter Property="MinHeight" Value="126"/>
     </Style>
 
     <Style Selector="Border.game-card">
         <Setter Property="Background" Value="#112d1d"/>
         <Setter Property="BorderBrush" Value="#2a7442"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
     </Style>
 
     <Style Selector="Button.game-card-btn /template/ ContentPresenter">
         <Setter Property="Background" Value="#112d1d"/>
         <Setter Property="BorderBrush" Value="#2a7442"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.game-card-btn">
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Width" Value="212"/>
+        <Setter Property="Margin" Value="0,0,14,14"/>
     </Style>
 
     <Style Selector="Button.game-card-btn:pointerover /template/ ContentPresenter">
@@ -187,6 +254,14 @@
         <Setter Property="Background" Value="#112d1d"/>
         <Setter Property="BorderBrush" Value="#2a7442"/>
         <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
+    </Style>
+
+    <Style Selector="Border.achievement-card">
+        <Setter Property="Background" Value="#102619"/>
+        <Setter Property="BorderBrush" Value="#2a7442"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="0"/>
     </Style>
 
     <Style Selector="Button.btn-primary">
@@ -199,7 +274,7 @@
             </Setter.Value>
         </Setter>
         <Setter Property="Foreground" Value="#0f2614"/>
-        <Setter Property="CornerRadius" Value="3"/>
+        <Setter Property="CornerRadius" Value="0"/>
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="BorderBrush" Value="#c8ff86"/>
     </Style>

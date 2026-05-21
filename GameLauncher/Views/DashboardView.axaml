@@ -11,10 +11,11 @@
 
         <!-- Greeting -->
         <TextBlock Text="{Binding Greeting}"
-                   FontSize="30" FontWeight="Bold"
-                   Foreground="White" Margin="0,0,0,4"/>
+                   Classes="page-title"
+                   Margin="0,0,0,4"/>
         <TextBlock Text="Welcome back to Game.OS"
-                   FontSize="14" Foreground="#8b949e" Margin="0,0,0,24"/>
+                   Classes="page-subtitle"
+                   Margin="0,0,0,24"/>
 
         <!-- Stats row -->
         <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0">
@@ -27,21 +28,21 @@
             <Border Classes="stat-tile">
                 <StackPanel Spacing="2">
                     <TextBlock Text="{Binding AchievementsCount}"
-                               Classes="stat-number" Foreground="#f1c40f"/>
+                               Classes="stat-number stat-number-achievements"/>
                     <TextBlock Text="Achievements" Classes="stat-label"/>
                 </StackPanel>
             </Border>
             <Border Classes="stat-tile">
                 <StackPanel Spacing="2">
                     <TextBlock Text="{Binding PlatformsCount}"
-                               Classes="stat-number" Foreground="#3fb950"/>
+                               Classes="stat-number stat-number-platforms"/>
                     <TextBlock Text="Platforms" Classes="stat-label"/>
                 </StackPanel>
             </Border>
             <Border Classes="stat-tile">
                 <StackPanel Spacing="2">
                     <TextBlock Text="{Binding TotalPlaytimeLabel}"
-                               Classes="stat-number" Foreground="#0ea5e9"/>
+                               Classes="stat-number stat-number-playtime"/>
                     <TextBlock Text="Playtime" Classes="stat-label"/>
                 </StackPanel>
             </Border>
@@ -176,9 +177,9 @@
                     <TextBlock Text="🎮" FontSize="32" HorizontalAlignment="Center"/>
                     <TextBlock Text="No games played yet"
                                FontSize="14" FontWeight="SemiBold"
-                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                               Classes="empty-state-title" HorizontalAlignment="Center"/>
                     <TextBlock Text="Launch a game to see it here"
-                               FontSize="12" Foreground="#484f58"
+                               FontSize="12" Classes="empty-state-subtitle"
                                HorizontalAlignment="Center"/>
                 </StackPanel>
             </Border>
@@ -208,10 +209,10 @@
                                            Classes="achievement-desc"/>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                     <TextBlock Text="{Binding GameTitle}"
-                                               FontSize="10" Foreground="#8b949e"/>
-                                    <TextBlock Text="|" FontSize="10" Foreground="#30363d"/>
+                                               Classes="achievement-meta"/>
+                                    <TextBlock Text="|" Classes="achievement-divider"/>
                                     <TextBlock Text="{Binding Platform}"
-                                               FontSize="10" Foreground="#8b949e"/>
+                                               Classes="achievement-meta"/>
                                 </StackPanel>
                             </StackPanel>
                         </Grid>
