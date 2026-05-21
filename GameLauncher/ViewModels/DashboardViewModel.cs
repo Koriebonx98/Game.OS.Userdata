@@ -432,6 +432,21 @@ public partial class DashboardViewModel : ViewModelBase
             IsFeaturedLastPlayed = false;
             DevLogService.Log($"[Dashboard] FeaturedGame = store fallback '{FeaturedGame?.Title ?? "(none)"}' — no games played yet.");
         }
+
+        // ── Initialize PS5 focused card ──────────────────────────────────────
+        SelectedCardIndex = Ps5RecentGames.Count > 0 ? 0 : -1;
+        UpdateFocusedCard();
+
+        // ── Initialize XB360 blade and focus ─────────────────────────────────
+        Xb360BladeIndex = 0;
+        Xb360ActiveBlade = Xb360Blades[0];
+        if (LocalLibraryGames.Count > 0)
+        {
+            Xb360GameFocusIndex = 0;
+            Xb360FocusedGame = LocalLibraryGames[0];
+            Xb360HasFocusedGame = true;
+            Xb360FocusedGame.IsFocused = true;
+        }
     }
 
     // Keep the original 3-arg overload for backwards compatibility with existing callers.
@@ -504,5 +519,146 @@ public partial class DashboardViewModel : ViewModelBase
         if (hours > 0)
             return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
         return $"{mins}m";
+    }
+
+    // ── Dashboard card focus / keyboard nav ──────────────────────────────────
+    [ObservableProperty] private int _selectedCardIndex = -1;
+    [ObservableProperty] private LocalGameCardVm? _focusedCard;
+    [ObservableProperty] private string _focusedCardTitle = "";
+    [ObservableProperty] private string _focusedCardPlatform = "";
+    [ObservableProperty] private string _focusedCardPlaytime = "";
+    [ObservableProperty] private bool _hasFocusedCard;
+    public ObservableCollection<Achievement> FocusedCardAchievements { get; } = new();
+
+    /// <summary>Invoked by MainWindow when Play is pressed for the focused card.</summary>
+    public Action<LocalGameCardVm>? OnPlayFocusedCard { get; set; }
+    /// <summary>Invoked by MainWindow when "..." is pressed for the focused card (open detail page).</summary>
+    public Action<LocalGameCardVm>? OnOpenFocusedCardDetail { get; set; }
+    /// <summary>Invoked when the user navigates to the All Games / Library page.</summary>
+    public Action? OnNavigateToLibrary { get; set; }
+
+    public void MoveFocus(int delta)
+    {
+        if (Ps5RecentGames.Count == 0) return;
+        int next = SelectedCardIndex + delta;
+        next = Math.Clamp(next, 0, Ps5RecentGames.Count - 1);
+        SelectedCardIndex = next;
+        UpdateFocusedCard();
+    }
+
+    private void UpdateFocusedCard()
+    {
+        // Clear old focus
+        foreach (var c in Ps5RecentGames)
+            c.IsFocused = false;
+
+        if (SelectedCardIndex < 0 || SelectedCardIndex >= Ps5RecentGames.Count)
+        {
+            FocusedCard     = null;
+            FocusedCardTitle    = "";
+            FocusedCardPlatform = "";
+            FocusedCardPlaytime = "";
+            HasFocusedCard  = false;
+            FocusedCardAchievements.Clear();
+            return;
+        }
+
+        var card = Ps5RecentGames[SelectedCardIndex];
+        card.IsFocused      = true;
+        FocusedCard         = card;
+        FocusedCardTitle    = card.EffectiveTitle;
+        FocusedCardPlatform = card.Platform;
+        FocusedCardPlaytime = card.PlaytimeLabel;
+        HasFocusedCard      = true;
+
+        FocusedCardAchievements.Clear();
+        var related = RecentAchievements
+            .Where(a => string.Equals(a.GameTitle, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        var toShow = related.Count > 0 ? related : RecentAchievements.Take(3).ToList();
+        foreach (var a in toShow)
+            FocusedCardAchievements.Add(a);
+    }
+
+    [RelayCommand]
+    private void PlayFocusedCard()
+    {
+        if (FocusedCard != null)
+            OnPlayFocusedCard?.Invoke(FocusedCard);
+        else if (_heroLocalCard != null)
+            OnContinuePlaying?.Invoke(_heroLocalCard);
+    }
+
+    [RelayCommand]
+    private void OpenFocusedCardDetail()
+    {
+        if (FocusedCard != null)
+            OnOpenFocusedCardDetail?.Invoke(FocusedCard);
+        else
+            OpenFeaturedDetail();
+    }
+
+    [RelayCommand]
+    private void NavigateToAllGames() => OnNavigateToLibrary?.Invoke();
+
+    // ── XB360 blade navigation ────────────────────────────────────────────────
+    private static readonly string[] Xb360Blades = { "mygames", "social", "games", "settings" };
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsXb360MyGamesBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360SocialBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360GamesBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360SettingsBlade))]
+    private int _xb360BladeIndex;
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsXb360MyGamesBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360SocialBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360GamesBlade))]
+    [NotifyPropertyChangedFor(nameof(IsXb360SettingsBlade))]
+    private string _xb360ActiveBlade = "mygames";
+
+    [ObservableProperty] private int _xb360GameFocusIndex;
+    [ObservableProperty] private LocalGameCardVm? _xb360FocusedGame;
+    [ObservableProperty] private bool _xb360HasFocusedGame;
+
+    public bool IsXb360MyGamesBlade  => Xb360ActiveBlade == "mygames";
+    public bool IsXb360SocialBlade   => Xb360ActiveBlade == "social";
+    public bool IsXb360GamesBlade    => Xb360ActiveBlade == "games";
+    public bool IsXb360SettingsBlade => Xb360ActiveBlade == "settings";
+
+    partial void OnXb360BladeIndexChanged(int value)
+    {
+        int idx = Math.Clamp(value, 0, Xb360Blades.Length - 1);
+        Xb360ActiveBlade = Xb360Blades[idx];
+    }
+
+    public void MoveXb360Blade(int delta)
+    {
+        int next = Math.Clamp(Xb360BladeIndex + delta, 0, Xb360Blades.Length - 1);
+        Xb360BladeIndex = next;
+    }
+
+    public void MoveXb360GameFocus(int delta)
+    {
+        if (LocalLibraryGames.Count == 0) return;
+        int next = Math.Clamp(Xb360GameFocusIndex + delta, 0, LocalLibraryGames.Count - 1);
+        Xb360GameFocusIndex = next;
+        foreach (var c in LocalLibraryGames) c.IsFocused = false;
+        Xb360FocusedGame = LocalLibraryGames[next];
+        Xb360HasFocusedGame = true;
+        Xb360FocusedGame.IsFocused = true;
+    }
+
+    [RelayCommand]
+    private void PlayXb360FocusedGame()
+    {
+        if (Xb360FocusedGame != null) OnContinuePlaying?.Invoke(Xb360FocusedGame);
+    }
+
+    [RelayCommand]
+    private void OpenXb360FocusedGameDetail()
+    {
+        if (Xb360FocusedGame != null) OnOpenLocalDetail?.Invoke(Xb360FocusedGame);
     }
 }

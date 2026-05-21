@@ -498,4 +498,69 @@
         <Setter Property="BorderBrush" Value="#c7ff7d"/>
     </Style>
 
+    <!-- ── XB360 list view game button ── -->
+    <Style Selector="Button.xb360-list-game-btn">
+        <Setter Property="HorizontalAlignment" Value="Stretch"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Margin" Value="0,1"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.xb360-list-game-btn /template/ ContentPresenter">
+        <Setter Property="Background" Value="#0d2817"/>
+        <Setter Property="CornerRadius" Value="0"/>
+        <Setter Property="Padding" Value="0"/>
+    </Style>
+
+    <Style Selector="Button.xb360-list-game-btn:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#1a4f2b"/>
+    </Style>
+
+    <Style Selector="Button.xb360-list-game-btn.focused /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2a7f3a"/>
+    </Style>
+
+    <Style Selector="Button.xb360-list-game-btn.focused">
+        <Setter Property="BorderBrush" Value="#9eee58"/>
+        <Setter Property="BorderThickness" Value="0,0,0,2"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-listgame-title">
+        <Setter Property="Foreground" Value="#f0ffe8"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="MaxLines" Value="1"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-listgame-platform">
+        <Setter Property="Foreground" Value="#9fd0a1"/>
+        <Setter Property="FontSize" Value="12"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-listgame-playtime">
+        <Setter Property="Foreground" Value="#8fe1ff"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Margin" Value="0,0,8,0"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-stat-num">
+        <Setter Property="FontSize" Value="26"/>
+        <Setter Property="Foreground" Value="#f2ffe8"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-stat-lbl">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="#9cc79f"/>
+    </Style>
+
+    <Style Selector="TextBlock.xb360-blade-tab-active">
+        <Setter Property="Background" Value="#2b7f3c"/>
+        <Setter Property="Foreground" Value="#f2ffea"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+    </Style>
+
 </Styles>

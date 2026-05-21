@@ -407,6 +407,9 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("designTheme")] public string DesignTheme { get; set; } = "Default";
 
+        /// <summary>Style of quick menu overlay: "GameOS", "PS5", or "XB360".</summary>
+        [JsonPropertyName("quickMenuTheme")] public string QuickMenuTheme { get; set; } = "PS5";
+
         /// <summary>
         /// When <see langword="true"/>, Game.OS reads the Ryujinx log file after each
         /// Switch game session and displays any relevant output in the launcher.

@@ -383,4 +383,29 @@
         <Setter Property="FontSize" Value="11"/>
     </Style>
 
+    <!-- ── Quick Menu hub buttons ── -->
+    <Style Selector="Button.qm-hub-btn">
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+        <Setter Property="BorderBrush" Value="Transparent"/>
+    </Style>
+
+    <Style Selector="Button.qm-hub-btn.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#44FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.qm-hub-btn.active">
+        <Setter Property="BorderBrush" Value="White"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+    </Style>
+
+    <!-- ── PS5 game card focused state ── -->
+    <Style Selector="Button.ps5-game-card-btn.focused /template/ ContentPresenter">
+        <Setter Property="Background" Value="#33FFFFFF"/>
+    </Style>
+
+    <Style Selector="Button.ps5-game-card-btn.focused">
+        <Setter Property="BorderBrush" Value="White"/>
+        <Setter Property="BorderThickness" Value="3"/>
+    </Style>
+
 </Styles>
