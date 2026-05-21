@@ -3,6 +3,8 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
+using Avalonia.Media.Imaging;
+using Avalonia.Threading;
 using AvaloniaWebView;
 using GameLauncher.Models;
 using GameLauncher.Services;
@@ -10,6 +12,7 @@ using GameLauncher.ViewModels;
 using GameLauncher.Views;
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace GameLauncher;
 
@@ -48,7 +51,18 @@ public partial class App : Application
                 mainVm.LoadDemo();
             }
 
-            var mainWindow = new MainWindow { DataContext = mainVm };
+            DevLogService.Log("[App] Constructing MainWindow…");
+            MainWindow mainWindow;
+            try
+            {
+                mainWindow = new MainWindow { DataContext = mainVm };
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[App] FATAL — MainWindow constructor threw: {ex}");
+                throw;
+            }
+            DevLogService.Log("[App] MainWindow constructed OK.");
             desktop.MainWindow = mainWindow;
 
             // Resolve the intro video path:
@@ -84,6 +98,34 @@ public partial class App : Application
 
                 mainWindow.Show();
                 DevLogService.Log("[App] Main window shown.");
+
+                // Screenshot mode: after a short delay, render the window to a PNG and exit.
+                if (DemoMode.ScreenshotPath is not null)
+                {
+                    var outPath = DemoMode.ScreenshotPath;
+                    _ = Task.Run(async () =>
+                    {
+                        await Task.Delay(4000);
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                        {
+                            try
+                            {
+                                var size = new Avalonia.Size(mainWindow.Width, mainWindow.Height);
+                                var pixelSize = new PixelSize((int)size.Width, (int)size.Height);
+                                using var rtb = new RenderTargetBitmap(pixelSize, new Vector(96, 96));
+                                rtb.Render(mainWindow);
+                                Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+                                rtb.Save(outPath);
+                                DevLogService.Log($"[Screenshot] Saved to '{outPath}'");
+                            }
+                            catch (Exception ex)
+                            {
+                                DevLogService.Log($"[Screenshot] Failed: {ex.Message}");
+                            }
+                            desktop.Shutdown();
+                        });
+                    });
+                }
             }
         }
         else
