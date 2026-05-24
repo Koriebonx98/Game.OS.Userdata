@@ -305,6 +305,7 @@
                     <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="18,0">
                         <TextBlock Grid.Column="0" Text="Xbox Guide" Classes="xb360-guide-top-label" VerticalAlignment="Center"/>
                         <Border Grid.Column="2" Width="52" Height="52" Background="#6BB208" BorderBrush="#A7D85B" BorderThickness="2"
+                                AutomationProperties.Name="Current profile avatar"
                                 HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="👤" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="28"/>
                         </Border>

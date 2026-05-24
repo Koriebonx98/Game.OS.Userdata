@@ -1,8 +1,10 @@
 using System;
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -13,8 +15,10 @@ namespace GameLauncher.ViewModels;
 /// PS5-style quick menu view model. Provides module pages and actions:
 /// Home / Switcher / Recent / Notifications / Downloads / Friends / Inbox / Achievements / Media / Browser / Power.
 /// </summary>
-public partial class QuickMenuViewModel : ViewModelBase
+public partial class QuickMenuViewModel : ViewModelBase, IDisposable
 {
+    private const string GuideClockFormat = "h:mm tt";
+    private readonly DispatcherTimer _guideClockTimer;
     private const int MaxRecentGames = 5;
     private static readonly string[] HubOrder =
     {
@@ -117,6 +121,13 @@ public partial class QuickMenuViewModel : ViewModelBase
 
     public QuickMenuViewModel()
     {
+        _guideClockTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _guideClockTimer.Tick += (_, _) => UpdateGuideClockLabel();
+        _guideClockTimer.Start();
+        UpdateGuideClockLabel();
         RecentGames.CollectionChanged += OnCollectionsChanged;
         SwitcherItems.CollectionChanged += OnCollectionsChanged;
     }
@@ -488,7 +499,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         string quickMenuTheme)
     {
         QuickMenuTheme = NormaliseQuickMenuTheme(quickMenuTheme);
-        GuideClockLabel = DateTime.Now.ToString("h:mm tt");
+        UpdateGuideClockLabel();
         CurrentUsername = currentUsername ?? "";
         IsPlayingGame = !string.IsNullOrEmpty(currentGameTitle);
         CurrentGameTitle = currentGameTitle ?? "";
@@ -580,6 +591,16 @@ public partial class QuickMenuViewModel : ViewModelBase
             Subtitle = subtitle,
             IsActive = string.Equals(pageKey, activePageKey, StringComparison.OrdinalIgnoreCase),
         });
+    }
+
+    private void UpdateGuideClockLabel()
+    {
+        GuideClockLabel = DateTime.Now.ToString(GuideClockFormat, CultureInfo.CurrentCulture);
+    }
+
+    public void Dispose()
+    {
+        _guideClockTimer.Stop();
     }
 }
 
