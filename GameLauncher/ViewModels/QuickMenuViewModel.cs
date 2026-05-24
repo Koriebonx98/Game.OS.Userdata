@@ -40,7 +40,12 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsWiiTheme => string.Equals(QuickMenuTheme, "Wii", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchTheme => string.Equals(QuickMenuTheme, "Switch", StringComparison.OrdinalIgnoreCase);
     public bool IsSteamBpmTheme => string.Equals(QuickMenuTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
-    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme;
+    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme && !IsXb360Theme;
+    public string GuideProfileLabel => string.IsNullOrWhiteSpace(CurrentUsername) ? "Player" : CurrentUsername;
+    [ObservableProperty] private string _guideClockLabel = "";
+    public string GuideResumeLabel => IsPlayingGame && !string.IsNullOrWhiteSpace(CurrentGameTitle)
+        ? $"Play {CurrentGameTitle}"
+        : "Return to Xbox Dashboard";
 
     // ── Hub page state ──────────────────────────────────────────────────────
     [ObservableProperty] private string _activePage = "home";
@@ -123,6 +128,9 @@ public partial class QuickMenuViewModel : ViewModelBase
     }
 
     partial void OnPendingDownloadCountChanged(int value) => OnPropertyChanged(nameof(HasPendingDownloads));
+    partial void OnCurrentUsernameChanged(string value) => OnPropertyChanged(nameof(GuideProfileLabel));
+    partial void OnCurrentGameTitleChanged(string value) => OnPropertyChanged(nameof(GuideResumeLabel));
+    partial void OnIsPlayingGameChanged(bool value) => OnPropertyChanged(nameof(GuideResumeLabel));
     partial void OnQuickMenuThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5Theme));
@@ -480,6 +488,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         string quickMenuTheme)
     {
         QuickMenuTheme = NormaliseQuickMenuTheme(quickMenuTheme);
+        GuideClockLabel = DateTime.Now.ToString("h:mm tt");
         CurrentUsername = currentUsername ?? "";
         IsPlayingGame = !string.IsNullOrEmpty(currentGameTitle);
         CurrentGameTitle = currentGameTitle ?? "";

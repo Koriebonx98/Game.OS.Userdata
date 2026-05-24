@@ -59,6 +59,69 @@
         <Style Selector="UserControl.qm-theme-xb360 Border.qm-center-panel">
             <Setter Property="MinWidth" Value="620"/>
         </Style>
+        <Style Selector="Border.xb360-guide-shell">
+            <Setter Property="Background" Value="#F0DFE2E6"/>
+            <Setter Property="BorderBrush" Value="#808895"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Border.xb360-guide-topbar">
+            <Setter Property="Background" Value="#CC05070a"/>
+        </Style>
+        <Style Selector="TextBlock.xb360-guide-top-label">
+            <Setter Property="Foreground" Value="#F4F7FA"/>
+            <Setter Property="FontSize" Value="46"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="TextBlock.xb360-guide-time">
+            <Setter Property="Foreground" Value="#F4F7FA"/>
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-blade">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Foreground" Value="#eff3f7"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-blade /template/ ContentPresenter">
+            <Setter Property="Background" Value="#566474"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-blade.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#C9CFD6"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-blade.active">
+            <Setter Property="Foreground" Value="#1d242f"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-list-item">
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="20,10"/>
+            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="Foreground" Value="#202733"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-list-item /template/ ContentPresenter">
+            <Setter Property="Background" Value="#F4F6F9"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-list-item:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#E6EBF0"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-list-item.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#6BB208"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-list-item.active">
+            <Setter Property="Foreground" Value="#F6FFF2"/>
+        </Style>
+        <Style Selector="TextBlock.xb360-guide-legend-btn">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="TextBlock.xb360-guide-legend-text">
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Foreground" Value="#E8EDF2"/>
+        </Style>
         <Style Selector="UserControl.qm-theme-wii Border.qm-overlay-backdrop">
             <Setter Property="Background" Value="#88dff6ff"/>
         </Style>
@@ -230,7 +293,118 @@
             </Grid>
         </Border>
 
-        <!-- PS5/XB360/Switch/SteamBPM hub layout -->
+        <!-- XB360 guide layout -->
+        <Border Classes="xb360-guide-shell"
+                IsVisible="{Binding IsXb360Theme}"
+                Width="1020"
+                Height="560"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center">
+            <Grid RowDefinitions="68,*,48">
+                <Border Grid.Row="0" Classes="xb360-guide-topbar">
+                    <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="18,0">
+                        <TextBlock Grid.Column="0" Text="Xbox Guide" Classes="xb360-guide-top-label" VerticalAlignment="Center"/>
+                        <Border Grid.Column="2" Width="52" Height="52" Background="#6BB208" BorderBrush="#A7D85B" BorderThickness="2"
+                                HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="👤" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="28"/>
+                        </Border>
+                        <TextBlock Grid.Column="3" Text="{Binding GuideClockLabel}" Classes="xb360-guide-time" Margin="20,0,0,0"
+                                   VerticalAlignment="Center"/>
+                    </Grid>
+                </Border>
+
+                <Grid Grid.Row="1" ColumnDefinitions="86,74,116,*,74,86">
+                    <Button Grid.Column="0" Classes="xb360-guide-blade"
+                            Command="{Binding SelectDownloadsCommand}">
+                        <TextBlock Text="Marketplace" FontSize="16" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="90"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
+                    <Button Grid.Column="1" Classes="xb360-guide-blade" Classes.active="{Binding IsRecentGamesPage}"
+                            Command="{Binding SelectRecentGamesCommand}">
+                        <TextBlock Text="Games" FontSize="16" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="90"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
+                    <Button Grid.Column="2" Classes="xb360-guide-blade" Classes.active="{Binding IsHomePage}"
+                            Command="{Binding SelectHomeCommand}">
+                        <TextBlock Text="{Binding GuideProfileLabel}" FontSize="19" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="90"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
+
+                    <Border Grid.Column="3" Background="#F4F6F9">
+                        <StackPanel Spacing="1">
+                            <Button Classes="xb360-guide-list-item"
+                                    Classes.active="{Binding IsHomePage}"
+                                    Command="{Binding SelectHomeCommand}">
+                                Xbox Dashboard
+                            </Button>
+                            <Button Classes="xb360-guide-list-item"
+                                    Classes.active="{Binding IsFriendsPage}"
+                                    Command="{Binding SelectFriendsCommand}">
+                                Join Xbox LIVE
+                            </Button>
+                            <Button Classes="xb360-guide-list-item"
+                                    Command="{Binding DismissCommand}">
+                                <TextBlock Text="{Binding GuideResumeLabel}" TextTrimming="CharacterEllipsis"/>
+                            </Button>
+                            <Button Classes="xb360-guide-list-item"
+                                    Classes.active="{Binding IsMediaPage}"
+                                    Command="{Binding SelectMediaCommand}">
+                                Kinect Tuner
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Button Grid.Column="4" Classes="xb360-guide-blade" Classes.active="{Binding IsMediaPage}"
+                            Command="{Binding SelectMediaCommand}">
+                        <TextBlock Text="Media" FontSize="16" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="-90"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
+                    <Button Grid.Column="5" Classes="xb360-guide-blade" Classes.active="{Binding IsPowerPage}"
+                            Command="{Binding SelectPowerCommand}">
+                        <TextBlock Text="Settings" FontSize="16" RenderTransformOrigin="0.5,0.5">
+                            <TextBlock.RenderTransform>
+                                <RotateTransform Angle="-90"/>
+                            </TextBlock.RenderTransform>
+                        </TextBlock>
+                    </Button>
+                </Grid>
+
+                <Border Grid.Row="2" Classes="xb360-guide-topbar">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="18">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#4BAF1E"><TextBlock Text="A" Classes="xb360-guide-legend-btn" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Select" Classes="xb360-guide-legend-text"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#D64537"><TextBlock Text="B" Classes="xb360-guide-legend-btn" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Back" Classes="xb360-guide-legend-text"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#2E87DB"><TextBlock Text="X" Classes="xb360-guide-legend-btn" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Sign Out" Classes="xb360-guide-legend-text"/>
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Spacing="6">
+                            <Border Width="20" Height="20" CornerRadius="10" Background="#D2A100"><TextBlock Text="Y" Classes="xb360-guide-legend-btn" HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+                            <TextBlock Text="Xbox Dashboard" Classes="xb360-guide-legend-text"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+        </Border>
+
+        <!-- PS5/Switch/SteamBPM hub layout -->
         <Grid RowDefinitions="*,Auto" IsVisible="{Binding UsesHubLayout}">
             <!-- Center overlays -->
             <Grid Grid.Row="0" Margin="24,24,24,12">
