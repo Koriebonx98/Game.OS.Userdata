@@ -430,6 +430,10 @@
         <Setter Property="IsVisible" Value="False"/>
     </Style>
 
+    <Style Selector="Border.dashboard-wii-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
     <Style Selector="StackPanel.dashboard-default-layout">
         <Setter Property="IsVisible" Value="True"/>
     </Style>

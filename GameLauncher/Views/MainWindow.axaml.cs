@@ -154,9 +154,11 @@ public partial class MainWindow : Window
             }
         }
 
-        // PS5 dashboard navigation
-        bool isPs5 = string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase);
-        if (vm.IsHome && isPs5 && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        // PS5/Switch dashboard navigation
+        bool isPs5OrSwitch =
+            string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isPs5OrSwitch && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {

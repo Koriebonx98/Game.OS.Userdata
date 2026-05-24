@@ -100,12 +100,12 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Selected launcher design theme.</summary>
     [ObservableProperty] private string _designTheme = "Default";
     /// <summary>Available launcher design themes for Settings → Design.</summary>
-    public IReadOnlyList<string> AvailableDesignThemes { get; } = new[] { "Default", "XB360", "PS5" };
+    public IReadOnlyList<string> AvailableDesignThemes { get; } = new[] { "Default", "XB360", "PS5", "Wii", "Switch", "SteamBPM" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
     /// <summary>Available quick-menu styles.</summary>
-    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360" };
+    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM" };
 
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
@@ -609,6 +609,9 @@ public partial class SettingsViewModel : ViewModelBase
         var trimmed = (value ?? "").Trim();
         if (string.Equals(trimmed, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
         if (string.Equals(trimmed, "PS5",   StringComparison.OrdinalIgnoreCase)) return "PS5";
+        if (string.Equals(trimmed, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
+        if (string.Equals(trimmed, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        if (string.Equals(trimmed, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return "Default";
     }
 
@@ -617,6 +620,9 @@ public partial class SettingsViewModel : ViewModelBase
         var v = (value ?? "").Trim();
         if (string.Equals(v, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
         if (string.Equals(v, "GameOS", StringComparison.OrdinalIgnoreCase)) return "GameOS";
+        if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
+        if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return "PS5";
     }
 }
