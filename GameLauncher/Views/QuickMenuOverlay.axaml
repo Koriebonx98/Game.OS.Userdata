@@ -58,6 +58,7 @@
         </Style>
         <Style Selector="UserControl.qm-theme-xb360 Border.qm-center-panel">
             <Setter Property="MinWidth" Value="620"/>
+        </Style>
         <Style Selector="UserControl.qm-theme-wii Border.qm-overlay-backdrop">
             <Setter Property="Background" Value="#88dff6ff"/>
         </Style>
