@@ -498,6 +498,106 @@
         </Grid>
     </Border>
 
+    <!-- ══ Wii Dashboard Layout ═══════════════════════════════════════════ -->
+    <Border Classes="dashboard-wii-layout">
+        <Grid RowDefinitions="Auto,*,Auto" Margin="18,16,18,14">
+            <TextBlock Grid.Row="0" Text="Wii Menu" Classes="wii-menu-title" HorizontalAlignment="Center"/>
+
+            <UniformGrid Grid.Row="1" Rows="3" Columns="4" Margin="0,16,0,18">
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Disc Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Play installed games" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Forecast Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Weather" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding OpenFeaturedDetailCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Photo Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Featured game" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Game Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="{Binding GamesCount, StringFormat='{}{0} games'}" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="wii-channel-tile" Command="{Binding ContinuePlayingCommand}" IsVisible="{Binding IsFeaturedLastPlayed}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Recent Game" Classes="wii-channel-title"/>
+                        <TextBlock Text="{Binding FeaturedGame.Title}" Classes="wii-channel-subtitle"
+                                   IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="News Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Library updates" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding OpenFeaturedDetailCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Internet Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Store + web" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Mii Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="{Binding Greeting}" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Photo 2" Classes="wii-channel-title"/>
+                        <TextBlock Text="Achievements" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Virtual Console" Classes="wii-channel-title"/>
+                        <TextBlock Text="{Binding PlatformsCount, StringFormat='{}{0} platforms'}" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Messages" Classes="wii-channel-title"/>
+                        <TextBlock Text="{Binding AchievementsCount, StringFormat='{}{0} achievements'}" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="wii-channel-tile" Command="{Binding OpenFeaturedDetailCommand}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Text="Shop Channel" Classes="wii-channel-title"/>
+                        <TextBlock Text="Open store" Classes="wii-channel-subtitle"/>
+                    </StackPanel>
+                </Button>
+            </UniformGrid>
+
+            <Border Grid.Row="2" Classes="wii-bottom-bar">
+                <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                    <Border Grid.Column="0" Classes="wii-bottom-orb">
+                        <TextBlock Text="Wii" Classes="wii-bottom-orb-text"/>
+                    </Border>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding WiiClockTime}" Classes="wii-clock-time" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding WiiClockDate}" Classes="wii-clock-date" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <Border Grid.Column="2" Classes="wii-bottom-orb">
+                        <TextBlock Text="✉" Classes="wii-bottom-orb-text"/>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+
     <!-- ══ Default Dashboard Layout ═══════════════════════════════════════ -->
     <StackPanel Margin="32,28,32,28" Spacing="0" Classes="dashboard-default-layout">
 

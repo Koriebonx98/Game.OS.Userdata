@@ -738,6 +738,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         InboxVm.LoadDemo(_profile.Username);
         SettingsVm.LoadAccount(_profile, _library);
 
+        // Optional screenshot helper:
+        //   GAMEOS_DEMO_QUICKMENU_THEME=<theme>  (e.g. Wii, Switch, SteamBPM)
+        //   GAMEOS_DEMO_SHOW_QUICKMENU=1         (auto-open quick menu in demo mode)
+        var demoQuickMenuTheme = Environment.GetEnvironmentVariable("GAMEOS_DEMO_QUICKMENU_THEME");
+        if (!string.IsNullOrWhiteSpace(demoQuickMenuTheme))
+            SettingsVm.QuickMenuTheme = demoQuickMenuTheme.Trim();
+
         // Pre-fetch cover art for the unified My Games cards
         _ = EnrichMyGamesListAsync();
         _ = EnrichDashboardCoversAsync();
@@ -749,6 +756,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         ShowLogin = false;
         ShowMain  = true;
         ActivePage = "dashboard";
+
+        if (string.Equals(Environment.GetEnvironmentVariable("GAMEOS_DEMO_SHOW_QUICKMENU"), "1", StringComparison.Ordinal))
+            ToggleQuickMenu();
     }
 
     private void OnLoginSuccess(UserProfile profile, List<Game> library,

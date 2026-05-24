@@ -21,8 +21,14 @@ public partial class App : Application
     private const string DefaultDesignTheme = "Default";
     private const string Xb360DesignTheme   = "XB360";
     private const string Ps5DesignTheme     = "PS5";
+    private const string WiiDesignTheme     = "Wii";
+    private const string SwitchDesignTheme  = "Switch";
+    private const string SteamBpmDesignTheme = "SteamBPM";
     private const string Xb360ThemeSource   = "avares://GameLauncher/Styles/Xb360Theme.axaml";
     private const string Ps5ThemeSource     = "avares://GameLauncher/Styles/Ps5Theme.axaml";
+    private const string WiiThemeSource     = "avares://GameLauncher/Styles/WiiTheme.axaml";
+    private const string SwitchThemeSource  = "avares://GameLauncher/Styles/SwitchTheme.axaml";
+    private const string SteamBpmThemeSource = "avares://GameLauncher/Styles/SteamBpmTheme.axaml";
     private StyleInclude? _designThemeStyle;
 
     // Default intro video location — mirrors the PS5 OS reference:
@@ -180,6 +186,12 @@ public partial class App : Application
             normalised = Xb360DesignTheme;
         else if (string.Equals(trimmed, Ps5DesignTheme, StringComparison.OrdinalIgnoreCase))
             normalised = Ps5DesignTheme;
+        else if (string.Equals(trimmed, WiiDesignTheme, StringComparison.OrdinalIgnoreCase))
+            normalised = WiiDesignTheme;
+        else if (string.Equals(trimmed, SwitchDesignTheme, StringComparison.OrdinalIgnoreCase))
+            normalised = SwitchDesignTheme;
+        else if (string.Equals(trimmed, SteamBpmDesignTheme, StringComparison.OrdinalIgnoreCase))
+            normalised = SteamBpmDesignTheme;
         else
             normalised = DefaultDesignTheme;
 
@@ -193,6 +205,9 @@ public partial class App : Application
         {
             Xb360DesignTheme => Xb360ThemeSource,
             Ps5DesignTheme   => Ps5ThemeSource,
+            WiiDesignTheme   => WiiThemeSource,
+            SwitchDesignTheme => SwitchThemeSource,
+            SteamBpmDesignTheme => SteamBpmThemeSource,
             _                => null,
         };
 

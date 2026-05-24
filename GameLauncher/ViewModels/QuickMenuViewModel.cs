@@ -37,6 +37,10 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsPs5Theme => string.Equals(QuickMenuTheme, "PS5", StringComparison.OrdinalIgnoreCase);
     public bool IsXb360Theme => string.Equals(QuickMenuTheme, "XB360", StringComparison.OrdinalIgnoreCase);
     public bool IsGameOsTheme => string.Equals(QuickMenuTheme, "GameOS", StringComparison.OrdinalIgnoreCase);
+    public bool IsWiiTheme => string.Equals(QuickMenuTheme, "Wii", StringComparison.OrdinalIgnoreCase);
+    public bool IsSwitchTheme => string.Equals(QuickMenuTheme, "Switch", StringComparison.OrdinalIgnoreCase);
+    public bool IsSteamBpmTheme => string.Equals(QuickMenuTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
+    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme;
 
     // ── Hub page state ──────────────────────────────────────────────────────
     [ObservableProperty] private string _activePage = "home";
@@ -124,6 +128,10 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsPs5Theme));
         OnPropertyChanged(nameof(IsXb360Theme));
         OnPropertyChanged(nameof(IsGameOsTheme));
+        OnPropertyChanged(nameof(IsWiiTheme));
+        OnPropertyChanged(nameof(IsSwitchTheme));
+        OnPropertyChanged(nameof(IsSteamBpmTheme));
+        OnPropertyChanged(nameof(UsesHubLayout));
     }
 
     partial void OnActivePageChanged(string value)
@@ -548,6 +556,9 @@ public partial class QuickMenuViewModel : ViewModelBase
         var v = (value ?? "").Trim();
         if (string.Equals(v, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
         if (string.Equals(v, "GameOS", StringComparison.OrdinalIgnoreCase)) return "GameOS";
+        if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
+        if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return "PS5";
     }
 
