@@ -19,7 +19,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     private static readonly string[] HubOrder =
     {
         "home", "switcher", "recent", "notifications", "downloads",
-        "friends", "inbox", "media", "browser", "power"
+        "friends", "inbox", "achievements", "media", "browser", "power"
     };
 
     // ── Current game/session ────────────────────────────────────────────────
@@ -50,6 +50,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsFriendsPage       => ActivePage == "friends";
     public bool IsInboxPage         => ActivePage == "inbox";
     public bool IsMediaPage         => ActivePage == "media";
+    public bool IsBrowserPage       => ActivePage == "browser";
     public bool IsPowerPage         => ActivePage == "power";
     public bool IsAchievementsPage  => ActivePage == "achievements";
 
@@ -135,6 +136,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsFriendsPage));
         OnPropertyChanged(nameof(IsInboxPage));
         OnPropertyChanged(nameof(IsMediaPage));
+        OnPropertyChanged(nameof(IsBrowserPage));
         OnPropertyChanged(nameof(IsPowerPage));
         OnPropertyChanged(nameof(IsAchievementsPage));
         UpdateMenuHeader(value);
@@ -229,6 +231,10 @@ public partial class QuickMenuViewModel : ViewModelBase
                 MenuTitle = "Media";
                 MenuSubtitle = "Control global media playback.";
                 break;
+            case "browser":
+                MenuTitle = "Browser";
+                MenuSubtitle = "Open your default web browser.";
+                break;
             case "power":
                 MenuTitle = "Power";
                 MenuSubtitle = "Sign out, switch account, or exit Game.OS.";
@@ -261,6 +267,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     [RelayCommand] private void SelectDownloads() => ActivePage = "downloads";
     [RelayCommand] private void SelectFriends() => ActivePage = "friends";
     [RelayCommand] private void SelectInbox() => ActivePage = "inbox";
+    [RelayCommand] private void SelectBrowser() => ActivePage = "browser";
     [RelayCommand] private void SelectMedia() => ActivePage = "media";
     [RelayCommand] private void SelectPower() => ActivePage = "power";
     [RelayCommand] private void OpenAchievements() => ActivePage = "achievements";

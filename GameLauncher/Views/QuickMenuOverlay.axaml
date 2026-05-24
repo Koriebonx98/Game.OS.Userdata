@@ -53,6 +53,9 @@
         <Style Selector="UserControl.qm-theme-xb360 Button.qm-hub-btn">
             <Setter Property="BorderBrush" Value="#5fce7d"/>
         </Style>
+        <Style Selector="UserControl.qm-theme-xb360 Border.qm-center-panel">
+            <Setter Property="MinWidth" Value="620"/>
+        </Style>
 
         <!-- GameOS compact panel -->
         <Style Selector="Border.qm-gameos-panel">
@@ -331,6 +334,19 @@
                 </Border>
 
                 <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsBrowserPage}"
+                        Width="520"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Browser" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="Open your default web browser." Foreground="#9E9E9E"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenBrowserCommand}">Open Browser</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
                         IsVisible="{Binding IsPowerPage}"
                         Width="420"
                         HorizontalAlignment="Center"
@@ -400,9 +416,11 @@
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}" Width="72" Height="56">⬇</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" Width="72" Height="56">👥</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" Width="72" Height="56">📬</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" Width="72" Height="56">🏆</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}" Width="72" Height="56">🎵</Button>
-                        <Button Classes="btn-secondary qm-hub-btn" Command="{Binding OpenBrowserCommand}" Width="72" Height="56">🌐</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}" Width="72" Height="56">🌐</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}" Width="72" Height="56">⏻</Button>
+                        <Button Classes="btn-danger qm-hub-btn" Command="{Binding ExitGameCommand}" IsVisible="{Binding IsPlayingGame}" Width="90" Height="56">⏹ Exit</Button>
                     </StackPanel>
                 </Grid>
             </Border>

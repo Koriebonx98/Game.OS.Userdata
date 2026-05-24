@@ -1,7 +1,9 @@
 using System;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using GameLauncher.Services;
+using GameLauncher.ViewModels;
 
 namespace GameLauncher.Views;
 
@@ -16,6 +18,7 @@ public partial class QuickMenuWindow : Window
     public QuickMenuWindow()
     {
         InitializeComponent();
+        KeyDown += OnQuickMenuKeyDown;
     }
 
     /// <summary>
@@ -36,6 +39,7 @@ public partial class QuickMenuWindow : Window
         }
 
         Show();
+        Focus();
 
         // On Windows, reinforce the topmost Z-order at the Win32 level.
         // Avalonia's Topmost=true sets WS_EX_TOPMOST but Activate() from a background
@@ -57,6 +61,42 @@ public partial class QuickMenuWindow : Window
         else
         {
             Activate();
+        }
+    }
+
+    private void OnQuickMenuKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (DataContext is not QuickMenuViewModel vm)
+            return;
+
+        var focusedElement = FocusManager is null ? null : FocusManager.GetFocusedElement();
+        bool textInputFocused = focusedElement is TextBox;
+        if (textInputFocused && e.Key is not Key.Escape and not Key.BrowserBack)
+            return;
+
+        switch (e.Key)
+        {
+            case Key.Left:
+                vm.MoveHubSelection(-1);
+                e.Handled = true;
+                return;
+            case Key.Right:
+                vm.MoveHubSelection(1);
+                e.Handled = true;
+                return;
+            case Key.Enter:
+            case Key.Space:
+                vm.ActivateSelectedHub();
+                e.Handled = true;
+                return;
+            case Key.Escape:
+            case Key.BrowserBack:
+                if (!vm.HandleBackNavigation())
+                    vm.DismissCommand.Execute(null);
+                e.Handled = true;
+                return;
+            default:
+                return;
         }
     }
 }
