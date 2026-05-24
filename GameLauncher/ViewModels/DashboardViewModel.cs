@@ -17,6 +17,8 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _achievementsCount;
     [ObservableProperty] private int _platformsCount;
     [ObservableProperty] private string _totalPlaytimeLabel = "";
+    public string WiiClockTime => DateTime.Now.ToString("H:mm");
+    public string WiiClockDate => DateTime.Now.ToString("ddd M/d");
 
     // Hero featured / last-played game
     [ObservableProperty] private StoreGame? _featuredGame;
@@ -133,6 +135,8 @@ public partial class DashboardViewModel : ViewModelBase
             _    => "Good evening"
         };
         Greeting = $"{hour}, {profile.Username}!";
+        OnPropertyChanged(nameof(WiiClockTime));
+        OnPropertyChanged(nameof(WiiClockDate));
 
         // Recently Played — only games that have actually been played (have LastPlayedAt set)
         // Parse ISO 8601 strings to DateTime for correct chronological comparison.

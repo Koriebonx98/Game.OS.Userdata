@@ -77,6 +77,22 @@
         <Style Selector="UserControl.qm-theme-wii Button.qm-hub-btn /template/ ContentPresenter">
             <Setter Property="Background" Value="#ffffff"/>
         </Style>
+        <Style Selector="Border.qm-wii-shell">
+            <Setter Property="Background" Value="#E6f6fcff"/>
+            <Setter Property="BorderBrush" Value="#8bd3ee"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="30"/>
+            <Setter Property="Padding" Value="18,14"/>
+        </Style>
+        <Style Selector="Button.qm-wii-bubble">
+            <Setter Property="Background" Value="#ffffff"/>
+            <Setter Property="Foreground" Value="#1d6b8f"/>
+            <Setter Property="BorderBrush" Value="#8bd3ee"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="28"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+        </Style>
         <Style Selector="UserControl.qm-theme-switch Border.qm-overlay-backdrop">
             <Setter Property="Background" Value="#AA0f1117"/>
         </Style>
@@ -183,8 +199,36 @@
             </StackPanel>
         </Border>
 
-        <!-- PS5 hub layout (hidden for GameOS theme) -->
-        <Grid RowDefinitions="*,Auto" IsVisible="{Binding !IsGameOsTheme}">
+        <!-- Wii quick menu strip -->
+        <Border Classes="qm-wii-shell"
+                IsVisible="{Binding IsWiiTheme}"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Margin="24,0,24,24"
+                Width="980">
+            <Grid RowDefinitions="Auto,Auto" RowSpacing="12">
+                <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto">
+                    <TextBlock Grid.Column="0" Text="Wii Quick Menu" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="1" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding CurrentSessionLabel}" FontSize="13" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding CurrentGameTitle}" FontSize="11" HorizontalAlignment="Center"
+                                   IsVisible="{Binding IsPlayingGame}"/>
+                    </StackPanel>
+                    <Button Grid.Column="2" Classes="qm-wii-bubble" Command="{Binding DismissCommand}" Width="86">Close</Button>
+                </Grid>
+                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="10">
+                    <Button Grid.Column="0" Classes="qm-wii-bubble" Command="{Binding SelectHomeCommand}">Home</Button>
+                    <Button Grid.Column="1" Classes="qm-wii-bubble" Command="{Binding SelectRecentGamesCommand}">Recent</Button>
+                    <Button Grid.Column="2" Classes="qm-wii-bubble" Command="{Binding SelectFriendsCommand}">Friends</Button>
+                    <Button Grid.Column="3" Classes="qm-wii-bubble" Command="{Binding SelectInboxCommand}">Inbox</Button>
+                    <Button Grid.Column="4" Classes="qm-wii-bubble" Command="{Binding OpenBrowserCommand}">Browser</Button>
+                    <Button Grid.Column="5" Classes="qm-wii-bubble" Command="{Binding ExitGameCommand}" IsVisible="{Binding IsPlayingGame}">Exit Game</Button>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- PS5/XB360/Switch/SteamBPM hub layout -->
+        <Grid RowDefinitions="*,Auto" IsVisible="{Binding UsesHubLayout}">
             <!-- Center overlays -->
             <Grid Grid.Row="0" Margin="24,24,24,12">
                 <Border Classes="qm-center-panel"

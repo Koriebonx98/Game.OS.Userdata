@@ -40,6 +40,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsWiiTheme => string.Equals(QuickMenuTheme, "Wii", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchTheme => string.Equals(QuickMenuTheme, "Switch", StringComparison.OrdinalIgnoreCase);
     public bool IsSteamBpmTheme => string.Equals(QuickMenuTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
+    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme;
 
     // ── Hub page state ──────────────────────────────────────────────────────
     [ObservableProperty] private string _activePage = "home";
@@ -129,6 +130,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsWiiTheme));
         OnPropertyChanged(nameof(IsSwitchTheme));
         OnPropertyChanged(nameof(IsSteamBpmTheme));
+        OnPropertyChanged(nameof(UsesHubLayout));
     }
 
     partial void OnActivePageChanged(string value)

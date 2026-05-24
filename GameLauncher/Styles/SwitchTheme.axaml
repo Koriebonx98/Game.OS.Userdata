@@ -8,6 +8,9 @@
     <Style Selector="Border.dashboard-xb360-layout">
         <Setter Property="IsVisible" Value="False"/>
     </Style>
+    <Style Selector="Border.dashboard-wii-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
     <Style Selector="StackPanel.dashboard-default-layout">
         <Setter Property="IsVisible" Value="False"/>
     </Style>
@@ -33,6 +36,16 @@
     </Style>
     <Style Selector="Button.nav-item.active /template/ ContentPresenter">
         <Setter Property="Background" Value="#e60012"/>
+    </Style>
+    <Style Selector="Border.dashboard-ps5-layout">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                    <GradientStop Color="#12151d" Offset="0"/>
+                    <GradientStop Color="#1a1f2a" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
     </Style>
 
     <!-- Switch dashboard colors (uses PS5 layout structure) -->
