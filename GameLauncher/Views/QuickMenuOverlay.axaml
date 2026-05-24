@@ -7,7 +7,10 @@
              x:DataType="vm:QuickMenuViewModel"
              Classes.qm-theme-ps5="{Binding IsPs5Theme}"
              Classes.qm-theme-gameos="{Binding IsGameOsTheme}"
-             Classes.qm-theme-xb360="{Binding IsXb360Theme}">
+             Classes.qm-theme-xb360="{Binding IsXb360Theme}"
+             Classes.qm-theme-wii="{Binding IsWiiTheme}"
+             Classes.qm-theme-switch="{Binding IsSwitchTheme}"
+             Classes.qm-theme-steambpm="{Binding IsSteamBpmTheme}">
 
     <UserControl.Styles>
         <Style Selector="Border.qm-overlay-backdrop">
@@ -52,6 +55,60 @@
         </Style>
         <Style Selector="UserControl.qm-theme-xb360 Button.qm-hub-btn">
             <Setter Property="BorderBrush" Value="#5fce7d"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-wii Border.qm-overlay-backdrop">
+            <Setter Property="Background" Value="#88dff6ff"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-wii Border.qm-center-panel">
+            <Setter Property="Background" Value="#E6f6fcff"/>
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="BorderBrush" Value="#8bd3ee"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-wii Border.qm-bottom-shell">
+            <Setter Property="Background" Value="#E6f6fcff"/>
+            <Setter Property="CornerRadius" Value="30"/>
+            <Setter Property="BorderBrush" Value="#8bd3ee"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-wii TextBlock">
+            <Setter Property="Foreground" Value="#165b80"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-wii Button.qm-hub-btn /template/ ContentPresenter">
+            <Setter Property="Background" Value="#ffffff"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-switch Border.qm-overlay-backdrop">
+            <Setter Property="Background" Value="#AA0f1117"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-switch Border.qm-center-panel">
+            <Setter Property="Background" Value="#EE1a1d24"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="#e60012"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-switch Border.qm-bottom-shell">
+            <Setter Property="Background" Value="#EE1a1d24"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="BorderBrush" Value="#e60012"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-switch Button.qm-hub-btn.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#e60012"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-steambpm Border.qm-overlay-backdrop">
+            <Setter Property="Background" Value="#B0000000"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-steambpm Border.qm-center-panel">
+            <Setter Property="Background" Value="#EE101822"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderBrush" Value="#4c8abf"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="UserControl.qm-theme-steambpm Border.qm-bottom-shell">
+            <Setter Property="Background" Value="#EE101822"/>
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderBrush" Value="#4c8abf"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
 
         <!-- GameOS compact panel -->

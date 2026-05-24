@@ -407,7 +407,7 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("designTheme")] public string DesignTheme { get; set; } = "Default";
 
-        /// <summary>Style of quick menu overlay: "GameOS", "PS5", or "XB360".</summary>
+        /// <summary>Style of quick menu overlay: "GameOS", "PS5", "XB360", "Wii", "Switch", or "SteamBPM".</summary>
         [JsonPropertyName("quickMenuTheme")] public string QuickMenuTheme { get; set; } = "PS5";
 
         /// <summary>
