@@ -1,0 +1,432 @@
+  Determining projects to restore...
+  All projects are up-to-date for restore.
+  GameLauncher -> /tmp/workspace/Koriebonx98/Game.OS.Userdata/GameLauncher/bin/Debug/net8.0/GameLauncher.dll
+
+Build succeeded.
+    0 Warning(s)
+    0 Error(s)
+
+Time Elapsed 00:00:01.19
+build_exit=0
+═══════════════════════════════════════════════════════════════════
+  Game.OS — Login Authentication Tests (C# Launcher)
+  Verifies: C# auth ≡ JavaScript web frontend auth
+═══════════════════════════════════════════════════════════════════
+
+
+  ── 1. PBKDF2 Hash Parity  (C# ≡ JavaScript hashPassword())
+  ─────────────────────────────────────────────────────────────────
+  ✅  username=testuser     → hash matches reference vector ✓
+  ✅  username=Admin.GameOS → hash matches reference vector ✓
+  ✅  username=Koriebonx98 → len=64 deterministic=True
+
+  ── 1b. Koriebonx98 Real-Account Hash Parity  (C# hash = Node.js reference)
+  ─────────────────────────────────────────────────────────────────
+  ✅  Reference hash is valid 64-char hex: True
+  ⚠  GAMEOS_TEST_PASSWORD not set — skipping live hash-match check.
+       To verify: GAMEOS_TEST_PASSWORD=<password> dotnet run
+
+  ── 2. PBKDF2 Salt Case-Insensitivity  (username lowercased for salt)
+  ─────────────────────────────────────────────────────────────────
+  ✅  hash(Koriebonx98) == hash(koriebonx98) == hash(KORIEBONX98): True
+
+  ── 3. Bcrypt Hash Detection  (accounts created via Node.js backend)
+  ─────────────────────────────────────────────────────────────────
+  ✅  BCrypt.Verify(correct password) = True
+  ✅  BCrypt.Verify(wrong password)   = False (expect false)
+  ✅  bcrypt hash starts with $2      = True
+
+  ── 4. Dual-Hash Login Flow  (PBKDF2 and bcrypt paths exercised)
+  ─────────────────────────────────────────────────────────────────
+  ✅  PBKDF2 path — correct password accepted: True
+  ✅  PBKDF2 path — wrong password rejected: True
+  ✅  bcrypt path — correct password accepted: True
+  ✅  bcrypt path — wrong password rejected:   True
+  ✅  PBKDF2 hash correctly identified as NOT bcrypt: True
+  ✅  bcrypt hash correctly identified as bcrypt:     True
+
+  ── 5. Live Backend Test  (requires GAMEOS_GITHUB_TOKEN)
+  ─────────────────────────────────────────────────────────────────
+  ⚠  Skipped — GAMEOS_GITHUB_TOKEN not set.
+       To run: GAMEOS_GITHUB_TOKEN=<pat> GAMEOS_TEST_USERNAME=<user> GAMEOS_TEST_PASSWORD=<pass> dotnet run
+
+  ── 6. Live Backend REST API Test  (requires GAMEOS_BACKEND_URL)
+  ─────────────────────────────────────────────────────────────────
+  ⚠  Skipped — GAMEOS_BACKEND_URL not set.
+       To run: GAMEOS_BACKEND_URL=<url> GAMEOS_TEST_USERNAME=<user> GAMEOS_TEST_PASSWORD=<pass> dotnet run
+       This test exercises the same REST API path the web frontend uses.
+       No GitHub PAT required — just point to the deployed backend server.
+
+  ── 7. Backend API Login — Admin.GameOS  (requires GAMEOS_BACKEND_URL)
+  ─────────────────────────────────────────────────────────────────
+  ⚠  Skipped — GAMEOS_BACKEND_URL not set.
+       Start the backend server and set GAMEOS_BACKEND_URL to run this test.
+       Example: GAMEOS_BACKEND_URL=http://localhost:3000 dotnet run
+
+  ── 8. OfflineDataCacheService  (save → load round-trip)
+  ─────────────────────────────────────────────────────────────────
+  ✅  No cache before first save: True
+  ✅  Cache exists after save: True
+  ✅  Load returns non-null: True
+  ✅  Profile.Username matches: True
+  ✅  Games count = 2: True
+  ✅  Achievements count = 1: True
+  ✅  CachedAt is set: True
+  ✅  IsFresh = true immediately after save: True
+  ✅  Cache cleared after test: True
+
+  ── 9. PendingChangesService  (offline changes queue)
+  ─────────────────────────────────────────────────────────────────
+  ✅  No pending changes initially: True
+  ✅  HasPending = true after AddGame: True
+  ✅  Queue has 2 pending changes: True
+  ✅  First change is AddGame: True
+  ✅  Second change is RemoveGame: True
+  ✅  AddGame has correct title: True
+  ✅  RemoveGame has correct title: True
+  ✅  Queue cleared after test: True
+
+  ── 10. PlatformHelper.NormalizePlatform  (abbreviated and full names)
+  ─────────────────────────────────────────────────────────────────
+  ✅  NormalizePlatform("S                           ") → "Switch"
+  ✅  NormalizePlatform("2                           ") → "PS2"
+  ✅  NormalizePlatform("3                           ") → "PS3"
+  ✅  NormalizePlatform("4                           ") → "PS4"
+  ✅  NormalizePlatform("5                           ") → "PS5"
+  ✅  NormalizePlatform("PC                          ") → "PC"
+  ✅  NormalizePlatform("Switch                      ") → "Switch"
+  ✅  NormalizePlatform("PS1                         ") → "PS1"
+  ✅  NormalizePlatform("PS2                         ") → "PS2"
+  ✅  NormalizePlatform("PS3                         ") → "PS3"
+  ✅  NormalizePlatform("PS4                         ") → "PS4"
+  ✅  NormalizePlatform("PS5                         ") → "PS5"
+  ✅  NormalizePlatform("PSP                         ") → "PSP"
+  ✅  NormalizePlatform("PS Vita                     ") → "PS Vita"
+  ✅  NormalizePlatform("Xbox 360                    ") → "Xbox 360"
+  ✅  NormalizePlatform("Xbox One                    ") → "Xbox One"
+  ✅  NormalizePlatform("vita                        ") → "PS Vita"
+  ✅  NormalizePlatform("xbox360                     ") → "Xbox 360"
+  ✅  NormalizePlatform("xbone                       ") → "Xbox One"
+  ✅  NormalizePlatform("Microsoft - Xbox 360        ") → "Xbox 360"
+  ✅  NormalizePlatform("Nintendo - Switch           ") → "Switch"
+  ✅  NormalizePlatform("Sony - PlayStation 4        ") → "PS4"
+  ✅  NormalizePlatform("Sony - PlayStation 3        ") → "PS3"
+  ✅  NormalizePlatform("Sony - PSP                  ") → "PSP"
+  ✅  NormalizePlatform("Unknown Platform            ") → "Unknown Platform"
+
+  ── 11. OfflineDataCacheService.EnumerateAllCachedUsers  (multi-profile discovery)
+  ─────────────────────────────────────────────────────────────────
+  ✅  User1 not present before save: True
+  ✅  User2 not present before save: True
+  ✅  User1 found in enumeration after save: True
+  ✅  User2 found in enumeration after save: True
+  ✅  User1 gone after clear: True
+  ✅  User2 still present after clearing User1: True
+
+  ── 12. Reconnect Logic  (GamesListEqual change-detection helper)
+  ─────────────────────────────────────────────────────────────────
+  ✅  Identical game lists are equal: True
+  ✅  Lists with different counts are not equal: True
+  ✅  Same-count lists with different content are not equal: True
+  ✅  Two empty lists are equal: True
+  ✅  Game list comparison is case-insensitive: True
+
+  ── 13. GitHub-direct Achievement Mirror Sync
+  ─────────────────────────────────────────────────────────────────
+  ✅  Canonical mirror created at titleId path: accounts/testuser/Achievements/Switch/0100152000022000/achievements.json
+  ✅  Root achievements.json contains both unlocks: count=2
+  ✅  Canonical mirror contains both unlocks: count=2
+  ✅  Canonical mirror contains the new achievement ID
+
+═══════════════════════════════════════════════════════════════════
+  ✅  ALL TESTS PASSED — C# login logic matches web frontend exactly!
+═══════════════════════════════════════════════════════════════════
+login_exit=0
+═══════════════════════════════════════════════════════════════
+  Game.OS — GameScannerService Detection Test
+═══════════════════════════════════════════════════════════════
+  Scanning TestData root: /tmp/workspace/Koriebonx98/Game.OS.Userdata/TestData
+
+📀 Detected Games (5):
+───────────────────────────────────────────────────────────────
+  ✅  FakeGame1             [exe]  ../../../../../home/runner/Games/FakeGame1/FakeGame.exe
+  ✅  FakeGame2             [app]  ../../../../../home/runner/Games/FakeGame2/FakeGame2.app
+  ✅  FakeGame3             [elf]  ../../../../../home/runner/Games/FakeGame3/FakeGame
+  ✅  FakeGame4             [exe]  ../../../../../home/runner/Games/FakeGame4/FakeGame4.exe
+  ✅  FakeGame5             [elf]  ../../../../../home/runner/Games/FakeGame5/FakeGame5
+
+📦 Detected Repacks (7):
+───────────────────────────────────────────────────────────────
+  ✅  A Way Out                            [zip   ]  5 B
+  ✅  FakeGame1                            [zip   ]  5 B
+  ✅  FakeGame3WithUpdate / setup.zip      [zip   ]  5 B
+  ✅  FakeRepack                           [rar   ]  7 B
+  ✅  FakeRepack                           [zip   ]  10 B
+  ✅  FakeRepack1 / FakeRepack1.zip        [zip   ]  3 B
+  ✅  FakeRepack2 / FakeRepack2.7z         [7z    ]  8 B
+
+🕹️  Detected ROMs (11):
+───────────────────────────────────────────────────────────────
+  ✅  [GBA       ]  FakeGBAGame                [gba  ]  13 B
+  ✅  [PS2       ]  FakePS2Flat                [iso  ]  18 B
+  ✅  [PS2       ]  FakePS2Sub                 [iso  ]  17 B
+  ✅  [PS3       ]  FakePS3Game                [iso  ]  13 B
+  ✅  [PS4       ]  Blood Borne                [bin  ]  14 B
+  ✅  [SNES      ]  FakeSNESGame               [snes ]  24 B  regions=[Europe,USA]  +2 more
+  ✅  [Switch    ]  Nintendo - Switch          [nca  ]  0 B
+  ✅  [Switch    ]  Super Mario Odyssey        [nca  ]  0 B  regions=[USA]  +1 more
+  ✅  [Xbox 360  ]  Halo 2                     [iso  ]  0 B  regions=[USA]
+  ✅  [Xbox 360  ]  Halo 3                     [iso  ]  0 B  regions=[USA]
+  ✅  [Xbox 360  ]  Shadow the Hedgehog        [chd  ]  0 B  regions=[USA,En,Ja,Fr,De,Es,It]
+
+🌐 ROM Comma-Separated Language Tag Parsing:
+───────────────────────────────────────────────────────────────
+  ✅  'Shadow the Hedgehog (USA) (En,Ja,Fr,De,Es,It).chd' → title="Shadow the Hedgehog"  regions=[USA,En,Ja,Fr,De,Es,It]
+
+🗂️  Platform Name Normalisation:
+───────────────────────────────────────────────────────────────
+  ✅  Roms/Microsoft - Xbox 360/ → Platform="Xbox 360"
+  ✅  Roms/Nintendo - Switch/ → Platform="Switch"
+  ✅  Switch .nca ROM detected: "Nintendo - Switch" (TitleId=01007EF00011E000)
+
+™  Trademark Symbol Stripping (ParseRomTitle):
+───────────────────────────────────────────────────────────────
+  ✅  "Super Mario Odyssey™" → "Super Mario Odyssey" (™ stripped)
+  ✅  No detected ROM title contains a trademark/copyright symbol
+
+🔧 Archive Title Normalisation:
+───────────────────────────────────────────────────────────────
+  ✅  A-Way-Out-SteamRIP.zip → "A Way Out"
+
+📂 Repack + Update Detection:
+───────────────────────────────────────────────────────────────
+  ✅  FakeGame3WithUpdate has Update: /home/runner/Repacks/FakeGame3WithUpdate/Update
+
+🏷️  IsInstalledGame Detection:
+───────────────────────────────────────────────────────────────
+  ✅  FakeGame1.zip is marked IsInstalledGame=true (also in Games/)
+
+🎮 PS2 Platform Normalisation (Sony - PlayStation 2 → PS2):
+───────────────────────────────────────────────────────────────
+  ✅  FakePS2Flat (flat in Games/)  → Platform="PS2"
+  ✅  FakePS2Sub (in Games/FakePS2Sub/) → Platform="PS2"
+
+📋 ROM Copy/Move Destination Pattern (Roms/{Platform}/Games/...):
+───────────────────────────────────────────────────────────────
+  ✅  [SNES      ] FakeSNESGame              → .../SNES/Games/FakeSNESGame (Europe).snes
+  ✅  [Xbox 360  ] Halo 2                    → .../Microsoft - Xbox 360/Games/Halo 2 (USA).iso
+  ✅  [Switch    ] Nintendo - Switch         → .../Nintendo - Switch/Games/The Legend of Zelda Tears of the Kingdom [01007EF00011E000][v0].nca
+  ✅  [Switch    ] Super Mario Odyssey       → .../Nintendo - Switch/Games/Super Mario Odyssey™.nca
+  ✅  [GBA       ] FakeGBAGame               → .../GBA/Games/FakeGBAGame/FakeGBAGame.gba
+  ✅  [Xbox 360  ] Halo 3                    → .../Xbox 360/Games/Halo 3 (USA).iso
+  ✅  [Xbox 360  ] Shadow the Hedgehog       → .../Xbox 360/Games/Shadow the Hedgehog (USA) (En,Ja,Fr,De,Es,It).chd
+  ✅  [PS2       ] FakePS2Flat               → .../Sony - PlayStation 2/Games/FakePS2Flat.iso
+  ✅  [PS2       ] FakePS2Sub                → .../Sony - PlayStation 2/Games/FakePS2Sub/FakePS2Sub.iso
+  ✅  [PS3       ] FakePS3Game               → .../PS3/Games/FakePS3Game/FakePS3Game.iso
+  ✅  [PS4       ] Blood Borne               → .../Sony - Playstation 4/Games/Blood Borne/CUSA00207/game.bin
+  ✅  All ROM copy/move destinations are in the correct scanner layout.
+
+🏪 Storefront Scanner (Steam/Epic/GOG/EA/Ubisoft/Xbox):
+───────────────────────────────────────────────────────────────
+  ℹ  SteamGameLinux not detected (ELF exec bit may not be set in tmp — non-fatal)
+  ✅  ScanStorefrontDirs and ParseSteamLibraryFolders ran without exception
+
+🎮 Epic Games Manifest (.item file) Detection:
+───────────────────────────────────────────────────────────────
+  ✅  Game 1 (root exe):  DisplayName="Epic Game From Manifest 1"  Source=Epic  exe=EpicGameFromManifest1.exe
+  ✅  Game 2 (nested exe): DisplayName="Epic Game Sub Dir"  Source=Epic  exe=Binaries/Win64/EpicGameFromManifest2.exe
+  ✅  Incomplete install manifest correctly skipped
+  ✅  Non-existent InstallLocation manifest correctly skipped
+  ✅  All 2 manifest-detected games have Source="Epic"
+
+🎮 Steam ACF Manifest Detection:
+───────────────────────────────────────────────────────────────
+  ✅  Game 1 (top-level exe):  Title="Steam ACF Game One"  Source=Steam  exe=game1.exe
+  ✅  Game 2 (nested exe):    Title="Steam ACF Game Two"  Source=Steam  exe=...older/Binaries/Win64/game2.exe
+  ✅  Partial download (StateFlags=2) correctly skipped
+  ✅  Game 4 (StateFlags=6, installed+update required): included
+  ✅  Game 5 (StateFlags=516, installed+update paused): included
+  ✅  All 4 ACF-detected game(s) have Source="Steam"
+
+🎮 Steam VDF Library Folder Detection:
+───────────────────────────────────────────────────────────────
+  ✅  Steam VDF: library 1 parsed → /tmp/GameOS_SteamVdfTest_f2h05ihi.ais/SteamLib1
+  ✅  Steam VDF: library 2 parsed → /tmp/GameOS_SteamVdfTest_f2h05ihi.ais/SteamLib2
+  ✅  Steam VDF parser returned 2 library path(s)
+
+📝 Game Title Normalization (" - " → ":"):
+───────────────────────────────────────────────────────────────
+  ✅  "Call of Duty - Ghosts" → "Call of Duty: Ghosts"
+  ✅  "Mass Effect - Andromeda" → "Mass Effect: Andromeda"
+  ✅  "The Elder Scrolls V - Skyrim" → "The Elder Scrolls V: Skyrim"
+  ✅  "Deadpool" → "Deadpool"
+  ✅  "LEGO® Harry Potter™ Collection" → "LEGO® Harry Potter™ Collection"
+  ✅  "God of War - Ragnarok" → "God of War: Ragnarok"
+
+🏷️  Steam ACF Name Priority (ACF name overrides folder name):
+───────────────────────────────────────────────────────────────
+  ✅  [StateFlags=516] Exactly 1 entry (no duplicate): "LEGO Harry Potter Collection"
+  ✅  [StateFlags=516] Title from ACF manifest: "LEGO Harry Potter Collection" (not raw "LHPCR")
+  ✅  [StateFlags=2] ACF scan correctly skipped game (bit 4 not set)
+  ✅  [StateFlags=2] BuildAcfInstallDirNames returns proper name: "LEGO Harry Potter Collection"
+  ✅  [StateFlags=2] Folder-scan fallback uses ACF name: "LEGO Harry Potter Collection" (not raw "LHPCR")
+
+🔍 Games Folder Deep Exe Detection (exe in subdirectory):
+───────────────────────────────────────────────────────────────
+  ✅  DeadpoolGame detected with exe in subdirectory: exe/Deadpool.exe
+
+🔄 Repack Dedup with Fuzzy Title Matching:
+───────────────────────────────────────────────────────────────
+  ✅  "LEGO® Harry Potter™ Collection [FitGirl Repack]" correctly matches installed "LEGO Harry Potter Collection"
+  ✅  "Call of Duty - Ghosts [DODI Repack]" correctly matches installed "Call of Duty: Ghosts"
+  ✅  "Deadpool" correctly matches installed "Deadpool"
+  ✅  "Grand Theft Auto V [Repack]" correctly matches installed "Grand Theft Auto V"
+  ✅  "Forza Horizon 4 [ElAmigos Repack]" correctly not matched "Forza Horizon 5"
+
+📄 .gameos-title metadata file (ReadGameOsTitle):
+───────────────────────────────────────────────────────────────
+  ✅  Folder with .gameos-title: title read correctly as real display name
+  ✅  Folder without .gameos-title: returns null (falls back to folder name)
+  ✅  Folder with whitespace-only .gameos-title: returns null
+
+🚫 Steam Non-Game Folder Filter (acfNamesOnly blocks utility folders):
+───────────────────────────────────────────────────────────────
+  ✅  Real game detected: "God of War Ragnarök"
+  ✅  "Steamworks Common Redistributables" correctly excluded (no ACF entry)
+  ✅  "SteamVR" correctly excluded (no ACF entry)
+  ✅  "steam_settings" correctly excluded (no ACF entry)
+  ✅  Exactly 1 game in results (utility folders filtered out)
+
+🏁 Switch Achievement Detection (MK8D race condition):
+───────────────────────────────────────────────────────────────
+  ✅  "Test" unlocked from: get 1st as Mario on "Mario Kart Stadium"
+  ✅  "Test" unlocked with title "Mario Kart™ 8 Deluxe" (™ normalised)
+
+📋 Switch Log Parsing (ReadRaceResultsFromNewContent):
+───────────────────────────────────────────────────────────────
+  ✅  Race result parsed: Course=Gu_FirstCircuit Driver=Mario Rank=1 FinishReason=Finish CoinNum=10
+  ✅  No GP results (as expected — no gp_result block in log)
+  ✅  End-to-end: "Test" achievement unlocked from parsed log
+
+═══════════════════════════════════════════════════════════════
+  ✅  ALL CHECKS PASSED — Game detection is working correctly!
+═══════════════════════════════════════════════════════════════
+scanner_exit=0
+
+> gameos-backend@1.0.0 test
+> node test-exophase.js --fixture
+
+🔧 Running fixture tests (no network request)
+
+  ✅  Xbox 360 (ul.achievement): 50 entries OK
+  ✅  PS3     (ul.trophy): 5 entries OK
+  ✅  plural  (ul.trophies): 5 entries OK
+
+✅  All fixture tests passed.
+
+✅ Scraped 50 achievements:
+
+    1. Welcome to Port Carverton (93.4% earned)
+       Complete the tutorial.
+    2. Ramp It Up (72.1% earned)
+       Build a skate spot using the spot creator.
+    3. Own the City (11.2% earned)
+       Own every spot in Port Carverton.
+    4. Team Player (68.5% earned)
+       Create a skate team and recruit two skaters.
+    5. Spreading the Stoke (55.3% earned)
+       Film and upload a skate video.
+    6. Board Breaking (41.7% earned)
+       Destroy 100 boards.
+    7. Hall of Meat Gold [HIDDEN] (18.9% earned)
+       Earn a gold medal in any Hall of Meat competition.
+    8. Monster Mash (33.6% earned)
+       Win a team event with your skate team.
+    9. Campus Life (61% earned)
+       Find and skate all the on-campus gaps.
+   10. Port Carverton Locals Only (28.4% earned)
+       Play a game of S.K.A.T.E. against a local skater.
+   11. Beastly (9.7% earned)
+       Land a manual combo over 500,000 points.
+   12. Film Director (44.2% earned)
+       Upload 10 videos to the Skate.Reel.
+   13. Best In Show (22.8% earned)
+       Win any best trick competition.
+   14. Road to Nowhere (82.5% earned)
+       Skate 5 miles total.
+   15. Big Air (61% earned)
+       Land a jump of at least 50 feet.
+   16. Hall of Meat [HIDDEN] (12.3% earned)
+       Wreck yourself for 1,000,000 points of pain.
+   17. Spot Wrecker (36.9% earned)
+       Destroy every destructible object in the school.
+   18. Filmbot (53.1% earned)
+       Earn a photo sponsorship.
+   19. Skate Nation (15.4% earned)
+       Have 20 people join your skate team.
+   20. Hometown Hero (48.7% earned)
+       Complete all amateur events in your hometown.
+   21. Go Big or Go Home (31.2% earned)
+       Pull off a mega grab over 75 feet.
+   22. Photogenic (57.8% earned)
+       Get your photo taken for a magazine cover.
+   23. Street Credible (39.4% earned)
+       Own 10 street spots.
+   24. Style Points (25.6% earned)
+       Score over 750,000 points in a best trick event.
+   25. Team Build (62.3% earned)
+       Fully upgrade your team's skate park.
+   26. Mogul (7.8% earned)
+       Earn $1,000,000 in the in-game economy.
+   27. Transition King (20.1% earned)
+       Win every vert competition in Port Carverton.
+   28. Sick Lines (17.6% earned)
+       Link 10 grinds in a single combo.
+   29. Wrecking Crew (43.5% earned)
+       Team-destroy 500 objects.
+   30. Community Service (66.9% earned)
+       Complete 20 community missions.
+   31. Drop In (78.4% earned)
+       Successfully drop in from the highest point in each district.
+   32. Legendary [HIDDEN] (4.2% earned)
+       Complete the entire pro career.
+   33. Backyard Bliss (50% earned)
+       Complete all challenges in the school skate park.
+   34. Gapped (35.8% earned)
+       Find and land 50 unique gaps.
+   35. Night Rider (29.3% earned)
+       Skate for one full in-game night without stopping.
+   36. Popped Off (46.1% earned)
+       Get kicked out of 10 locations.
+   37. Viral [HIDDEN] (14.7% earned)
+       Have your video viewed 10,000 times in the game.
+   38. Slappy's Legacy (58.2% earned)
+       Grind the rail at the Slappy's memorial.
+   39. Concrete Jungle (23.5% earned)
+       Own all spots in the downtown district.
+   40. Half Pipe Hero (19% earned)
+       Score over 200,000 points on any half-pipe.
+   41. Bail Artist (37.6% earned)
+       Rack up 50 bails in Hall of Meat mode.
+   42. Spot Builder (54.4% earned)
+       Build 5 custom skate spots.
+   43. Grind King (48.9% earned)
+       Grind a total of 10 miles.
+   44. The Ripper (32.1% earned)
+       Complete all the demo crew challenges.
+   45. Old School Cool (27.8% earned)
+       Land an old-school combo worth 500,000 points.
+   46. Sponsor Me (71.3% earned)
+       Earn your first skateboard sponsorship.
+   47. Frequent Flyer (42.6% earned)
+       Complete 30 airline challenges.
+   48. Top of the World [HIDDEN] (6.5% earned)
+       Reach the highest accessible point in every district.
+   49. Photo Op (64.7% earned)
+       Take 25 screenshots of your skater in action.
+   50. Legend [HIDDEN] (2.3% earned)
+       Achieve 100% game completion.
+
+📄 Full JSON written to: /tmp/exophase-test-output.json
+📊 HTML results page written to: /tmp/exophase-test-results.html
+backend_exit=0
