@@ -107,20 +107,32 @@ public partial class MainWindow : Window
         // While quick menu is open, prioritize PS5-style hub navigation.
         if (vm.ShowQuickMenu)
         {
+            bool textInputFocused = IsTextInputFocused();
             switch (e.Key)
             {
                 case Key.Left:
+                    if (textInputFocused) return;
                     vm.QuickMenuVm.MoveHubSelection(-1);
                     e.Handled = true;
                     return;
                 case Key.Right:
+                    if (textInputFocused) return;
                     vm.QuickMenuVm.MoveHubSelection(1);
                     e.Handled = true;
                     return;
                 case Key.Enter:
                 case Key.Space:
+                    if (textInputFocused) return;
                     vm.QuickMenuVm.ActivateSelectedHub();
                     e.Handled = true;
+                    return;
+                case Key.Escape:
+                case Key.BrowserBack:
+                    if (!vm.QuickMenuVm.HandleBackNavigation())
+                        vm.ShowQuickMenu = false;
+                    e.Handled = true;
+                    return;
+                default:
                     return;
             }
         }
