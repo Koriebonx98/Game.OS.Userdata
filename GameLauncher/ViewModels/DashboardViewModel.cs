@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
@@ -11,6 +12,22 @@ namespace GameLauncher.ViewModels;
 
 public partial class DashboardViewModel : ViewModelBase
 {
+    private readonly DispatcherTimer _wiiClockTimer;
+
+    public DashboardViewModel()
+    {
+        _wiiClockTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(30)
+        };
+        _wiiClockTimer.Tick += (_, _) =>
+        {
+            OnPropertyChanged(nameof(WiiClockTime));
+            OnPropertyChanged(nameof(WiiClockDate));
+        };
+        _wiiClockTimer.Start();
+    }
+
     [ObservableProperty] private UserProfile _profile = new();
     [ObservableProperty] private string _greeting = "";
     [ObservableProperty] private int _gamesCount;
