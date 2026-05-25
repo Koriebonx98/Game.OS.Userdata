@@ -267,6 +267,9 @@ public partial class QuickMenuViewModel : ViewModelBase
                 case "notifications":
                     OpenNotificationsPageCommand.Execute(null);
                     return;
+                case "recent":
+                    SelectRecentGamesCommand.Execute(null);
+                    return;
                 case "downloads":
                     OpenDownloadsPageCommand.Execute(null);
                     return;
