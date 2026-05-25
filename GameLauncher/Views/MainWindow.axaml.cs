@@ -16,6 +16,13 @@ public partial class MainWindow : Window
     };
     private MainViewModel? _boundVm;
     private bool _globalHotkeyLatched;
+    private bool _overlayUpLatched;
+    private bool _overlayDownLatched;
+    private bool _overlayLeftLatched;
+    private bool _overlayRightLatched;
+    private bool _overlayEnterLatched;
+    private bool _overlaySpaceLatched;
+    private bool _overlayEscapeLatched;
 
     // Separate overlay window for the global Quick Menu (shown over games without
     // restoring the full launcher — mirrors the Steam/NVIDIA overlay pattern).
@@ -374,6 +381,74 @@ public partial class MainWindow : Window
         {
             _globalHotkeyLatched = false;
         }
+
+        ForwardOverlayQuickMenuKeys();
+    }
+
+    private void ForwardOverlayQuickMenuKeys()
+    {
+        if (!OperatingSystem.IsWindows() || _boundVm == null || _quickMenuWindow?.IsVisible != true)
+        {
+            ResetOverlayKeyLatches();
+            return;
+        }
+
+        var vm = _boundVm.QuickMenuVm;
+        HandleOverlayKeyState(Services.NativeMethods.VK_LEFT, ref _overlayLeftLatched, () =>
+        {
+            if (!vm.IsXb360Theme)
+                vm.MoveHubSelection(-1);
+        });
+        HandleOverlayKeyState(Services.NativeMethods.VK_RIGHT, ref _overlayRightLatched, () =>
+        {
+            if (!vm.IsXb360Theme)
+                vm.MoveHubSelection(1);
+        });
+        HandleOverlayKeyState(Services.NativeMethods.VK_UP, ref _overlayUpLatched, () =>
+        {
+            if (vm.IsXb360Theme)
+                vm.MoveHubSelection(-1);
+        });
+        HandleOverlayKeyState(Services.NativeMethods.VK_DOWN, ref _overlayDownLatched, () =>
+        {
+            if (vm.IsXb360Theme)
+                vm.MoveHubSelection(1);
+        });
+        HandleOverlayKeyState(Services.NativeMethods.VK_RETURN, ref _overlayEnterLatched, vm.ActivateSelectedHub);
+        HandleOverlayKeyState(Services.NativeMethods.VK_SPACE, ref _overlaySpaceLatched, vm.ActivateSelectedHub);
+        HandleOverlayKeyState(Services.NativeMethods.VK_ESCAPE, ref _overlayEscapeLatched, () =>
+        {
+            if (!vm.HandleBackNavigation())
+                vm.DismissCommand.Execute(null);
+        });
+    }
+
+    private static void HandleOverlayKeyState(int virtualKey, ref bool latched, Action onPressed)
+    {
+        bool isDown = (Services.NativeMethods.GetAsyncKeyState(virtualKey) & 0x8000) != 0;
+        if (isDown)
+        {
+            if (!latched)
+            {
+                latched = true;
+                onPressed();
+            }
+        }
+        else
+        {
+            latched = false;
+        }
+    }
+
+    private void ResetOverlayKeyLatches()
+    {
+        _overlayUpLatched = false;
+        _overlayDownLatched = false;
+        _overlayLeftLatched = false;
+        _overlayRightLatched = false;
+        _overlayEnterLatched = false;
+        _overlaySpaceLatched = false;
+        _overlayEscapeLatched = false;
     }
 
     /// <summary>
@@ -420,7 +495,7 @@ public partial class MainWindow : Window
                         Status = f.Status
                     })
                     .ToList(),
-                unreadCount:          _boundVm.InboxVm.PendingInvites.Count,
+                unreadCount:          _boundVm.InboxVm.PendingInvites.Count + _boundVm.InboxVm.Conversations.Count,
                 lastMessage:          _boundVm.InboxVm.Conversations
                     .OrderByDescending(c => c.LastMessageAt)
                     .Select(c => c.LastMessage)

@@ -249,6 +249,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.OnSignOut = () => SignOutCommand.Execute(null);
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
         QuickMenuVm.OnExitApplication = () => ExitAppCommand.Execute(null);
+        QuickMenuVm.OnRequestLauncherForeground = () => RestoreWindowRequested?.Invoke();
         QuickMenuVm.OnMediaPrevious = SendMediaPrevious;
         QuickMenuVm.OnMediaPlayPause = SendMediaPlayPause;
         QuickMenuVm.OnMediaNext = SendMediaNext;
@@ -1657,7 +1658,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             total    = DetailVm.Achievements.Count;
         }
 
-        int unreadCount = InboxVm.PendingInvites.Count;
+        int unreadCount = InboxVm.PendingInvites.Count + InboxVm.Conversations.Count;
         string? lastMessage = InboxVm.Conversations
             .OrderByDescending(c => c.LastMessageAt)
             .Select(c => c.LastMessage)

@@ -202,6 +202,12 @@
         <Style Selector="Button.qm-xb360-side-btn:pointerover /template/ ContentPresenter">
             <Setter Property="Background" Value="#555"/>
         </Style>
+        <Style Selector="Button.qm-xb360-side-btn.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#118714"/>
+        </Style>
+        <Style Selector="Button.qm-xb360-side-btn.active TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -359,7 +365,7 @@
                         <StackPanel Spacing="0">
                             <Button Classes="xb360-guide-item"
                                     Classes.active="{Binding IsHomePage}"
-                                    Command="{Binding SelectHomeCommand}">
+                                    Command="{Binding GoToGameOsHomeCommand}">
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Game OS Home" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
                                     <TextBlock Grid.Column="2" Text="⌂" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
@@ -372,7 +378,7 @@
                                     Command="{Binding SelectFriendsCommand}">
                                 <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                                     <TextBlock Grid.Column="0" Text="Friends" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Xb360OnlineFriendsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding Xb360FriendsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
                                     <TextBlock Grid.Column="2" Text="👥" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
                                 </Grid>
                             </Button>
@@ -434,14 +440,14 @@
 
                     <Border Grid.Column="3" Classes="qm-xb360-side-rail">
                         <Grid RowDefinitions="*,*">
-                            <Button Grid.Row="0" Classes="qm-xb360-side-btn" Command="{Binding SelectMediaCommand}">
+                            <Button Grid.Row="0" Classes="qm-xb360-side-btn" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}">
                                 <TextBlock Text="Media" Classes="xb360-guide-side-text" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform Angle="-90"/>
                                     </TextBlock.RenderTransform>
                                 </TextBlock>
                             </Button>
-                            <Button Grid.Row="1" Classes="qm-xb360-side-btn" Command="{Binding OpenSettingsPageCommand}">
+                            <Button Grid.Row="1" Classes="qm-xb360-side-btn" Classes.active="{Binding IsSettingsPage}" Command="{Binding OpenSettingsPageCommand}">
                                 <TextBlock Text="Settings" Classes="xb360-guide-side-text" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform Angle="-90"/>

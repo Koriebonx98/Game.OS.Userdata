@@ -13,6 +13,13 @@ internal static class NativeMethods
     internal const int SW_RESTORE = 9;
     internal const int VK_LCONTROL = 0xA2;
     internal const int VK_LSHIFT = 0xA0;
+    internal const int VK_LEFT = 0x25;
+    internal const int VK_UP = 0x26;
+    internal const int VK_RIGHT = 0x27;
+    internal const int VK_DOWN = 0x28;
+    internal const int VK_RETURN = 0x0D;
+    internal const int VK_SPACE = 0x20;
+    internal const int VK_ESCAPE = 0x1B;
     internal const ushort VK_MEDIA_NEXT_TRACK = 0xB0;
     internal const ushort VK_MEDIA_PREV_TRACK = 0xB1;
     internal const ushort VK_MEDIA_PLAY_PAUSE = 0xB3;
