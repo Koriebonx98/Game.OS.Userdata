@@ -70,7 +70,11 @@ public partial class MainWindow : Window
             };
             vm.RestoreWindowRequested  = () =>
             {
-                WindowState = _stateBeforeMinimize;
+                // Only restore the saved state when actually minimized — if the window
+                // is already visible (FullScreen, Normal, Maximized) just bring it to
+                // the foreground without clobbering the current WindowState.
+                if (WindowState == WindowState.Minimized)
+                    WindowState = _stateBeforeMinimize;
                 Activate();
             };
             RefreshGlobalHotkeyPolling();
@@ -448,6 +452,24 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// Pre-latches overlay key states to their current physical state so that any
+    /// key that is still held from the guide-button press (e.g. Enter / A-button)
+    /// is not immediately forwarded as a navigation action on the next timer tick.
+    /// The user must release and re-press a key before it triggers a command.
+    /// </summary>
+    private void PrimeOverlayKeyLatches()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        _overlayLeftLatched   = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_LEFT)   & 0x8000) != 0;
+        _overlayRightLatched  = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_RIGHT)  & 0x8000) != 0;
+        _overlayUpLatched     = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_UP)     & 0x8000) != 0;
+        _overlayDownLatched   = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_DOWN)   & 0x8000) != 0;
+        _overlayEnterLatched  = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_RETURN) & 0x8000) != 0;
+        _overlaySpaceLatched  = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_SPACE)  & 0x8000) != 0;
+        _overlayEscapeLatched = (Services.NativeMethods.GetAsyncKeyState(Services.NativeMethods.VK_ESCAPE) & 0x8000) != 0;
+    }
+
+    /// <summary>
     /// Opens the Quick Menu overlay without restoring or focusing the main launcher window.
     /// When a game is running and the launcher is minimised, shows a separate always-on-top
     /// borderless window positioned at the right edge of the screen — matching the Steam /
@@ -526,6 +548,10 @@ public partial class MainWindow : Window
             else
             {
                 _quickMenuWindow.ShowOverGame();
+                // Pre-latch current key states so that the guide-button press itself
+                // (which may still be held) is not immediately forwarded as a
+                // navigation action on the next 150 ms poller tick.
+                PrimeOverlayKeyLatches();
             }
             return;
         }
