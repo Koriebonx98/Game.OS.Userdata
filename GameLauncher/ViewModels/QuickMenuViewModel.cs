@@ -25,7 +25,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     };
     private static readonly string[] Xb360GuideOrder =
     {
-        "home", "friends", "inbox", "notifications", "recent", "downloads", "power", "media"
+        "home", "friends", "inbox", "notifications", "recent", "downloads", "power", "media", "settings"
     };
 
     // ── Current game/session ────────────────────────────────────────────────
@@ -62,6 +62,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsFriendsPage       => ActivePage == "friends";
     public bool IsInboxPage         => ActivePage == "inbox";
     public bool IsMediaPage         => ActivePage == "media";
+    public bool IsSettingsPage      => ActivePage == "settings";
     public bool IsBrowserPage       => ActivePage == "browser";
     public bool IsPowerPage         => ActivePage == "power";
     public bool IsAchievementsPage  => ActivePage == "achievements";
@@ -84,6 +85,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool HasPendingDownloads => PendingDownloadCount > 0;
     public int Xb360RecentGamesCount => RecentGames.Count;
     public int Xb360OnlineFriendsCount => OnlineFriends.Count;
+    public int Xb360FriendsCount => Friends.Count;
     public int Xb360MessagesCount => UnreadMessageCount;
     public int Xb360DownloadsCount => PendingDownloadCount;
     public string Xb360UserInitial
@@ -126,6 +128,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Action? OnSignOut { get; set; }
     public Action? OnSwitchAccount { get; set; }
     public Action? OnExitApplication { get; set; }
+    public Action? OnRequestLauncherForeground { get; set; }
     public Action? OnMediaPrevious { get; set; }
     public Action? OnMediaPlayPause { get; set; }
     public Action? OnMediaNext { get; set; }
@@ -145,6 +148,8 @@ public partial class QuickMenuViewModel : ViewModelBase
 
         RecentGames.CollectionChanged += OnCollectionsChanged;
         SwitcherItems.CollectionChanged += OnCollectionsChanged;
+        OnlineFriends.CollectionChanged += OnCollectionsChanged;
+        Friends.CollectionChanged += OnCollectionsChanged;
     }
 
     private void OnCollectionsChanged(object? sender, NotifyCollectionChangedEventArgs e)
@@ -153,6 +158,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasSwitcherItems));
         OnPropertyChanged(nameof(Xb360RecentGamesCount));
         OnPropertyChanged(nameof(Xb360OnlineFriendsCount));
+        OnPropertyChanged(nameof(Xb360FriendsCount));
     }
 
     partial void OnPendingDownloadCountChanged(int value)
@@ -185,6 +191,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsFriendsPage));
         OnPropertyChanged(nameof(IsInboxPage));
         OnPropertyChanged(nameof(IsMediaPage));
+        OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsBrowserPage));
         OnPropertyChanged(nameof(IsPowerPage));
         OnPropertyChanged(nameof(IsAchievementsPage));
@@ -244,10 +251,35 @@ public partial class QuickMenuViewModel : ViewModelBase
         var navigationOrder = GetCurrentNavigationOrder();
         if (SelectedHubIndex < 0 || SelectedHubIndex >= navigationOrder.Length) return;
         var page = navigationOrder[SelectedHubIndex];
-        if (IsXb360Theme && string.Equals(page, "power", StringComparison.Ordinal))
+        if (IsXb360Theme)
         {
-            PowerSignOutCommand.Execute(null);
-            return;
+            switch (page)
+            {
+                case "home":
+                    GoToGameOsHomeCommand.Execute(null);
+                    return;
+                case "friends":
+                    OpenFriendsPageCommand.Execute(null);
+                    return;
+                case "inbox":
+                    OpenInboxPageCommand.Execute(null);
+                    return;
+                case "notifications":
+                    OpenNotificationsPageCommand.Execute(null);
+                    return;
+                case "downloads":
+                    OpenDownloadsPageCommand.Execute(null);
+                    return;
+                case "power":
+                    PowerSignOutCommand.Execute(null);
+                    return;
+                case "media":
+                    SelectMediaCommand.Execute(null);
+                    return;
+                case "settings":
+                    OpenSettingsPageCommand.Execute(null);
+                    return;
+            }
         }
         ActivePage = page;
     }
@@ -287,6 +319,10 @@ public partial class QuickMenuViewModel : ViewModelBase
             case "media":
                 MenuTitle = "Media";
                 MenuSubtitle = "Control global media playback.";
+                break;
+            case "settings":
+                MenuTitle = "Settings";
+                MenuSubtitle = "Open launcher settings.";
                 break;
             case "browser":
                 MenuTitle = "Browser";
@@ -330,7 +366,12 @@ public partial class QuickMenuViewModel : ViewModelBase
     [RelayCommand] private void OpenAchievements() => ActivePage = "achievements";
     [RelayCommand] private void BackToHome() => ActivePage = "home";
     [RelayCommand] private void OpenSettingsPage() { OnNavigatePage?.Invoke("settings"); OnDismiss?.Invoke(); }
-    [RelayCommand] private void GoToGameOsHome() { OnNavigatePage?.Invoke("dashboard"); OnDismiss?.Invoke(); }
+    [RelayCommand] private void GoToGameOsHome()
+    {
+        OnNavigatePage?.Invoke("dashboard");
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
+    }
 
     [RelayCommand]
     private void OpenPageFromSwitcher(QuickMenuSwitcherItemVm? item)
