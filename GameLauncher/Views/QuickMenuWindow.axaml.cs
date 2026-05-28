@@ -69,6 +69,9 @@ public partial class QuickMenuWindow : Window
         if (DataContext is not QuickMenuViewModel vm)
             return;
 
+        // Always block key events from passing through to whatever is behind the overlay.
+        e.Handled = true;
+
         var focusedElement = FocusManager is null ? null : FocusManager.GetFocusedElement();
         bool textInputFocused = focusedElement is TextBox;
         if (textInputFocused && e.Key is not Key.Escape and not Key.BrowserBack)
@@ -77,35 +80,27 @@ public partial class QuickMenuWindow : Window
         switch (e.Key)
         {
             case Key.Left:
-                vm.MoveHubSelection(-1);
-                e.Handled = true;
+                if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+                else vm.MoveHubSelection(-1);
                 return;
             case Key.Right:
-                vm.MoveHubSelection(1);
-                e.Handled = true;
+                if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+                else vm.MoveHubSelection(1);
                 return;
             case Key.Up:
-                if (!vm.IsXb360Theme) return;
-                vm.MoveHubSelection(-1);
-                e.Handled = true;
+                if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);
                 return;
             case Key.Down:
-                if (!vm.IsXb360Theme) return;
-                vm.MoveHubSelection(1);
-                e.Handled = true;
+                if (vm.IsXb360Theme) vm.MoveXb360CenterItem(1);
                 return;
             case Key.Enter:
             case Key.Space:
                 vm.ActivateSelectedHub();
-                e.Handled = true;
                 return;
             case Key.Escape:
             case Key.BrowserBack:
                 if (!vm.HandleBackNavigation())
                     vm.DismissCommand.Execute(null);
-                e.Handled = true;
-                return;
-            default:
                 return;
         }
     }

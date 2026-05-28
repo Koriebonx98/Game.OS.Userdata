@@ -208,6 +208,46 @@
         <Style Selector="Button.qm-xb360-side-btn.active TextBlock">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+        <Style Selector="Button.xb360-guide-item.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1d7625"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-item.cursor TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn /template/ ContentPresenter">
+            <Setter Property="Background" Value="#118714"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1d9a1a"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-danger-btn">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="14,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-danger-btn /template/ ContentPresenter">
+            <Setter Property="Background" Value="#c0392b"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-danger-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#e74c3c"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-danger-btn TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -339,7 +379,14 @@
                 </Border>
 
                 <Grid Grid.Row="1" ColumnDefinitions="88,66,*,88">
-                    <Border Grid.Column="0" Classes="qm-xb360-side-rail">
+                    <!-- Col 0: Games & Apps blade tab -->
+                    <Button Grid.Column="0"
+                            Classes="qm-xb360-side-btn"
+                            Classes.active="{Binding Xb360GamesBladeActive}"
+                            Command="{Binding SwitchToXb360BladeCommand}"
+                            CommandParameter="games"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch">
                         <TextBlock Text="Games &amp; Apps"
                                    Classes="xb360-guide-side-text"
                                    HorizontalAlignment="Center"
@@ -348,9 +395,18 @@
                                 <RotateTransform Angle="-90"/>
                             </TextBlock.RenderTransform>
                         </TextBlock>
-                    </Border>
+                    </Button>
 
-                    <Border Grid.Column="1" Classes="qm-xb360-side-rail" BorderBrush="#575757" BorderThickness="1,0,1,0">
+                    <!-- Col 1: Profile blade tab -->
+                    <Button Grid.Column="1"
+                            Classes="qm-xb360-side-btn"
+                            Classes.active="{Binding Xb360ProfileBladeActive}"
+                            Command="{Binding SwitchToXb360BladeCommand}"
+                            CommandParameter="profile"
+                            HorizontalAlignment="Stretch"
+                            VerticalAlignment="Stretch"
+                            BorderBrush="#575757"
+                            BorderThickness="1,0,1,0">
                         <TextBlock Text="{Binding CurrentUsername}"
                                    Classes="xb360-guide-side-text"
                                    HorizontalAlignment="Center"
@@ -359,95 +415,192 @@
                                 <RotateTransform Angle="-90"/>
                             </TextBlock.RenderTransform>
                         </TextBlock>
-                    </Border>
+                    </Button>
 
+                    <!-- Col 2: Center content area (blade panels) -->
                     <Border Grid.Column="2" Classes="qm-xb360-center-sheet">
-                        <StackPanel Spacing="0">
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsHomePage}"
-                                    Command="{Binding GoToGameOsHomeCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Game OS Home" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="⌂" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                        <Panel>
+                            <!-- Main blade: item list + detail sub-panel -->
+                            <Grid IsVisible="{Binding Xb360MainBladeActive}" ColumnDefinitions="260,*">
+                                <StackPanel Grid.Column="0" Spacing="0">
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorHome}"
+                                            Command="{Binding GoToGameOsHomeCommand}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Home" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="⌂" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsFriendsPage}"
-                                    Command="{Binding OpenFriendsPageCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Friends" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Xb360FriendsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="👥" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorFriends}"
+                                            Command="{Binding OpenFriendsPageCommand}">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Friends" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Xb360FriendsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="👥" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsInboxPage}"
-                                    Command="{Binding OpenInboxPageCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Messages" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Xb360MessagesCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="✉" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorInbox}"
+                                            Command="{Binding OpenInboxPageCommand}">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Messages" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Xb360MessagesCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="✉" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsNotificationsPage}"
-                                    Command="{Binding OpenNotificationsPageCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Activity" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="⚡" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorNotifications}"
+                                            Command="{Binding OpenNotificationsPageCommand}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Activity" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="⚡" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsRecentGamesPage}"
-                                    Command="{Binding SelectRecentGamesCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Recent Games" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Xb360RecentGamesCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="🎮" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorRecent}"
+                                            Command="{Binding OpenLibraryPageCommand}">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Recent Games" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Xb360RecentGamesCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="🎮" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsDownloadsPage}"
-                                    Command="{Binding OpenDownloadsPageCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Downloads" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="1" Text="{Binding Xb360DownloadsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="⬇" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                            <Rectangle Height="1" Fill="#d7d7d7"/>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorDownloads}"
+                                            Command="{Binding OpenDownloadsPageCommand}">
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Downloads" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="{Binding Xb360DownloadsCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="2" Text="⬇" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
 
-                            <Button Classes="xb360-guide-item"
-                                    Classes.active="{Binding IsPowerPage}"
-                                    Command="{Binding PowerSignOutCommand}">
-                                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
-                                    <TextBlock Grid.Column="0" Text="Sign Out" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                    <TextBlock Grid.Column="2" Text="☰" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
-                                </Grid>
-                            </Button>
-                        </StackPanel>
+                                    <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorExit}"
+                                            Command="{Binding PowerSignOutCommand}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Exit" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="⏻" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                </StackPanel>
+
+                                <!-- Detail sub-panel, one per cursor item -->
+                                <Border Grid.Column="1" Background="#e6e6e6" BorderBrush="#d0d0d0" BorderThickness="1,0,0,0">
+                                    <Panel VerticalAlignment="Center" Margin="18">
+                                        <StackPanel IsVisible="{Binding Xb360CursorHome}" Spacing="10">
+                                            <TextBlock Text="Home" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding GoToGameOsHomeCommand}">Go to Home</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorFriends}" Spacing="10">
+                                            <TextBlock Text="Friends" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <TextBlock Text="{Binding Xb360FriendsCount, StringFormat='{}{0} online'}" FontSize="13" Foreground="#444"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenFriendsPageCommand}">View Friends</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorInbox}" Spacing="10">
+                                            <TextBlock Text="Messages" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <TextBlock Text="{Binding Xb360MessagesCount, StringFormat='{}{0} unread'}" FontSize="13" Foreground="#444"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenInboxPageCommand}">Open Inbox</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorNotifications}" Spacing="10">
+                                            <TextBlock Text="Activity" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenNotificationsPageCommand}">View Activity</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorRecent}" Spacing="10">
+                                            <TextBlock Text="Recent Games" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <TextBlock Text="{Binding Xb360RecentGamesCount, StringFormat='{}{0} played'}" FontSize="13" Foreground="#444"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenLibraryPageCommand}">Browse Library</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorDownloads}" Spacing="10">
+                                            <TextBlock Text="Downloads" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <TextBlock Text="{Binding Xb360DownloadsCount, StringFormat='{}{0} pending'}" FontSize="13" Foreground="#444"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenDownloadsPageCommand}">View Downloads</Button>
+                                        </StackPanel>
+                                        <StackPanel IsVisible="{Binding Xb360CursorExit}" Spacing="10">
+                                            <TextBlock Text="Exit" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <Button Classes="xb360-sub-danger-btn" Command="{Binding PowerSignOutCommand}">Sign Out</Button>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding PowerExitApplicationCommand}" Margin="0,4,0,0">Exit App</Button>
+                                        </StackPanel>
+                                    </Panel>
+                                </Border>
+                            </Grid>
+
+                            <!-- Media blade panel -->
+                            <StackPanel IsVisible="{Binding Xb360MediaBladeActive}"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+                                <TextBlock Text="Media" FontWeight="SemiBold" FontSize="20" Foreground="#1a1a1a" HorizontalAlignment="Center"/>
+                                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                                    <Button Classes="xb360-sub-action-btn" Command="{Binding MediaPreviousCommand}">⏮ Prev</Button>
+                                    <Button Classes="xb360-sub-action-btn" Command="{Binding MediaPlayPauseCommand}">⏯ Play / Pause</Button>
+                                    <Button Classes="xb360-sub-action-btn" Command="{Binding MediaNextCommand}">⏭ Next</Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding MediaStatusLabel}" FontSize="13" Foreground="#444" HorizontalAlignment="Center"/>
+                            </StackPanel>
+
+                            <!-- Settings blade panel -->
+                            <StackPanel IsVisible="{Binding Xb360SettingsBladeActive}"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+                                <TextBlock Text="Settings" FontWeight="SemiBold" FontSize="20" Foreground="#1a1a1a" HorizontalAlignment="Center"/>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenSettingsPageCommand}">Open Settings</Button>
+                            </StackPanel>
+
+                            <!-- Profile blade panel -->
+                            <StackPanel IsVisible="{Binding Xb360ProfileBladeActive}"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="14">
+                                <Border Width="64" Height="64" CornerRadius="32" Background="#7d7d7d" HorizontalAlignment="Center">
+                                    <TextBlock Text="{Binding Xb360UserInitial}"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               Foreground="White" FontWeight="Bold" FontSize="26"/>
+                                </Border>
+                                <TextBlock Text="{Binding CurrentUsername}"
+                                           FontWeight="SemiBold" FontSize="18" Foreground="#1a1a1a"
+                                           HorizontalAlignment="Center"/>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenProfilePageCommand}">View Profile</Button>
+                            </StackPanel>
+
+                            <!-- Games &amp; Apps blade panel -->
+                            <StackPanel IsVisible="{Binding Xb360GamesBladeActive}"
+                                        VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
+                                <TextBlock Text="Games &amp; Apps" FontWeight="SemiBold" FontSize="20" Foreground="#1a1a1a" HorizontalAlignment="Center"/>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenLibraryPageCommand}">Browse Library</Button>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenStorePageCommand}" Margin="0,4,0,0">Store</Button>
+                            </StackPanel>
+                        </Panel>
                     </Border>
 
+                    <!-- Col 3: Media / Settings blade tabs -->
                     <Border Grid.Column="3" Classes="qm-xb360-side-rail">
                         <Grid RowDefinitions="*,*">
-                            <Button Grid.Row="0" Classes="qm-xb360-side-btn" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}">
+                            <Button Grid.Row="0" Classes="qm-xb360-side-btn"
+                                    Classes.active="{Binding Xb360MediaBladeActive}"
+                                    Command="{Binding SwitchToXb360BladeCommand}"
+                                    CommandParameter="media"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch">
                                 <TextBlock Text="Media" Classes="xb360-guide-side-text" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform Angle="-90"/>
                                     </TextBlock.RenderTransform>
                                 </TextBlock>
                             </Button>
-                            <Button Grid.Row="1" Classes="qm-xb360-side-btn" Classes.active="{Binding IsSettingsPage}" Command="{Binding OpenSettingsPageCommand}">
+                            <Button Grid.Row="1" Classes="qm-xb360-side-btn"
+                                    Classes.active="{Binding Xb360SettingsBladeActive}"
+                                    Command="{Binding SwitchToXb360BladeCommand}"
+                                    CommandParameter="settings"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch">
                                 <TextBlock Text="Settings" Classes="xb360-guide-side-text" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <TextBlock.RenderTransform>
                                         <RotateTransform Angle="-90"/>

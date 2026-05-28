@@ -23,10 +23,13 @@ public partial class QuickMenuViewModel : ViewModelBase
         "home", "switcher", "recent", "notifications", "downloads",
         "friends", "inbox", "achievements", "media", "browser", "power"
     };
-    private static readonly string[] Xb360GuideOrder =
-    {
-        "home", "media", "settings", "friends", "inbox", "notifications", "recent", "downloads", "power"
-    };
+    // XB360 two-axis navigation arrays
+    // Up/Down navigates the center list; Left/Right navigates between blade tabs.
+    private static readonly string[] Xb360CenterItemKeys =
+        { "home", "friends", "inbox", "notifications", "recent", "downloads", "exit" };
+
+    private static readonly string[] Xb360BladeOrder =
+        { "games", "profile", "main", "media", "settings" };
 
     // ── Current game/session ────────────────────────────────────────────────
     [ObservableProperty] private string _currentGameTitle = "";
@@ -66,6 +69,28 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsBrowserPage       => ActivePage == "browser";
     public bool IsPowerPage         => ActivePage == "power";
     public bool IsAchievementsPage  => ActivePage == "achievements";
+
+    // ── XB360 two-axis navigation state ────────────────────────────────────
+    // Xb360CenterIndex  = Up/Down cursor within the center item list (0–6).
+    // Xb360BladeId      = Left/Right blade tab: "games"|"profile"|"main"|"media"|"settings".
+    [ObservableProperty] private int _xb360CenterIndex;
+    [ObservableProperty] private string _xb360BladeId = "main";
+
+    // Cursor booleans — used by XAML to highlight the Up/Down position.
+    public bool Xb360CursorHome          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 0;
+    public bool Xb360CursorFriends       => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 1;
+    public bool Xb360CursorInbox         => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 2;
+    public bool Xb360CursorNotifications => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 3;
+    public bool Xb360CursorRecent        => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 4;
+    public bool Xb360CursorDownloads     => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 5;
+    public bool Xb360CursorExit          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 6;
+
+    // Blade-active booleans — used by XAML to highlight the Left/Right blade tab.
+    public bool Xb360GamesBladeActive    => IsXb360Theme && Xb360BladeId == "games";
+    public bool Xb360ProfileBladeActive  => IsXb360Theme && Xb360BladeId == "profile";
+    public bool Xb360MainBladeActive     => IsXb360Theme && (Xb360BladeId == "main" || !IsXb360Theme);
+    public bool Xb360MediaBladeActive    => IsXb360Theme && Xb360BladeId == "media";
+    public bool Xb360SettingsBladeActive => IsXb360Theme && Xb360BladeId == "settings";
 
     // ── Friends / Inbox ─────────────────────────────────────────────────────
     public ObservableCollection<FriendPresenceVm> OnlineFriends { get; } = new();
@@ -179,6 +204,35 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSteamBpmTheme));
         OnPropertyChanged(nameof(UsesHubLayout));
         OnPropertyChanged(nameof(UsesXb360GuideLayout));
+        NotifyXb360BladeProps();
+        NotifyXb360CursorProps();
+    }
+
+    partial void OnXb360CenterIndexChanged(int value) => NotifyXb360CursorProps();
+    partial void OnXb360BladeIdChanged(string value)
+    {
+        NotifyXb360BladeProps();
+        NotifyXb360CursorProps();
+    }
+
+    private void NotifyXb360CursorProps()
+    {
+        OnPropertyChanged(nameof(Xb360CursorHome));
+        OnPropertyChanged(nameof(Xb360CursorFriends));
+        OnPropertyChanged(nameof(Xb360CursorInbox));
+        OnPropertyChanged(nameof(Xb360CursorNotifications));
+        OnPropertyChanged(nameof(Xb360CursorRecent));
+        OnPropertyChanged(nameof(Xb360CursorDownloads));
+        OnPropertyChanged(nameof(Xb360CursorExit));
+    }
+
+    private void NotifyXb360BladeProps()
+    {
+        OnPropertyChanged(nameof(Xb360GamesBladeActive));
+        OnPropertyChanged(nameof(Xb360ProfileBladeActive));
+        OnPropertyChanged(nameof(Xb360MainBladeActive));
+        OnPropertyChanged(nameof(Xb360MediaBladeActive));
+        OnPropertyChanged(nameof(Xb360SettingsBladeActive));
     }
 
     partial void OnActivePageChanged(string value)
@@ -197,6 +251,9 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsAchievementsPage));
         UpdateMenuHeader(value);
 
+        // XB360 uses Xb360CenterIndex/BladeId for navigation — do not sync ActivePage ↔ SelectedHubIndex.
+        if (IsXb360Theme) return;
+
         var navigationOrder = GetCurrentNavigationOrder();
         int idx = Array.IndexOf(navigationOrder, value);
         if (idx >= 0 && idx != SelectedHubIndex)
@@ -205,6 +262,9 @@ public partial class QuickMenuViewModel : ViewModelBase
 
     partial void OnSelectedHubIndexChanged(int value)
     {
+        // XB360 uses Xb360CenterIndex/BladeId — SelectedHubIndex is not relevant there.
+        if (IsXb360Theme) return;
+
         var navigationOrder = GetCurrentNavigationOrder();
         if (navigationOrder.Length == 0) return;
 
@@ -228,6 +288,13 @@ public partial class QuickMenuViewModel : ViewModelBase
             return true;
         }
 
+        // XB360: if a side blade is active, return to the main center list.
+        if (IsXb360Theme && Xb360BladeId != "main")
+        {
+            Xb360BladeId = "main";
+            return true;
+        }
+
         if (!IsHomePage)
         {
             ActivePage = "home";
@@ -239,6 +306,9 @@ public partial class QuickMenuViewModel : ViewModelBase
 
     public void MoveHubSelection(int delta)
     {
+        // XB360 uses MoveXb360Blade / MoveXb360CenterItem instead.
+        if (IsXb360Theme) return;
+
         var navigationOrder = GetCurrentNavigationOrder();
         if (navigationOrder.Length == 0) return;
         // Wrap in both directions so negative deltas cycle from first -> last.
@@ -246,45 +316,83 @@ public partial class QuickMenuViewModel : ViewModelBase
         SelectedHubIndex = next;
     }
 
+    /// <summary>Moves the Up/Down cursor within the XB360 center item list.</summary>
+    public void MoveXb360CenterItem(int delta)
+    {
+        if (!IsXb360Theme || Xb360BladeId != "main") return;
+        Xb360CenterIndex = Math.Clamp(Xb360CenterIndex + delta, 0, Xb360CenterItemKeys.Length - 1);
+    }
+
+    /// <summary>Moves the Left/Right selection between XB360 blade tabs.</summary>
+    public void MoveXb360Blade(int delta)
+    {
+        if (!IsXb360Theme) return;
+        int idx = Array.IndexOf(Xb360BladeOrder, Xb360BladeId);
+        if (idx < 0) idx = 2; // default: "main"
+        Xb360BladeId = Xb360BladeOrder[Math.Clamp(idx + delta, 0, Xb360BladeOrder.Length - 1)];
+    }
+
     public void ActivateSelectedHub()
     {
+        if (IsXb360Theme)
+        {
+            ActivateXb360Current();
+            return;
+        }
+
         var navigationOrder = GetCurrentNavigationOrder();
         if (SelectedHubIndex < 0 || SelectedHubIndex >= navigationOrder.Length) return;
         var page = navigationOrder[SelectedHubIndex];
-        if (IsXb360Theme)
-        {
-            switch (page)
-            {
-                case "home":
-                    GoToGameOsHomeCommand.Execute(null);
-                    return;
-                case "friends":
-                    OpenFriendsPageCommand.Execute(null);
-                    return;
-                case "inbox":
-                    OpenInboxPageCommand.Execute(null);
-                    return;
-                case "notifications":
-                    OpenNotificationsPageCommand.Execute(null);
-                    return;
-                case "recent":
-                    SelectRecentGamesCommand.Execute(null);
-                    return;
-                case "downloads":
-                    OpenDownloadsPageCommand.Execute(null);
-                    return;
-                case "power":
-                    PowerSignOutCommand.Execute(null);
-                    return;
-                case "media":
-                    SelectMediaCommand.Execute(null);
-                    return;
-                case "settings":
-                    OpenSettingsPageCommand.Execute(null);
-                    return;
-            }
-        }
         ActivePage = page;
+    }
+
+    /// <summary>Activates the current XB360 selection (Enter / A-button).</summary>
+    private void ActivateXb360Current()
+    {
+        switch (Xb360BladeId)
+        {
+            case "media":
+                MediaPlayPauseCommand.Execute(null);
+                return;
+            case "settings":
+                OpenSettingsPageCommand.Execute(null);
+                return;
+            case "profile":
+                OpenProfilePageCommand.Execute(null);
+                return;
+            case "games":
+                OpenLibraryPageCommand.Execute(null);
+                return;
+        }
+
+        // Center list: primary action for cursor item.
+        if (Xb360CenterIndex < 0 || Xb360CenterIndex >= Xb360CenterItemKeys.Length) return;
+        switch (Xb360CenterItemKeys[Xb360CenterIndex])
+        {
+            case "home":
+                GoToGameOsHomeCommand.Execute(null);
+                break;
+            case "friends":
+                OpenFriendsPageCommand.Execute(null);
+                break;
+            case "inbox":
+                OpenInboxPageCommand.Execute(null);
+                break;
+            case "notifications":
+                OpenNotificationsPageCommand.Execute(null);
+                break;
+            case "recent":
+                OnNavigatePage?.Invoke("library");
+                OnRequestLauncherForeground?.Invoke();
+                OnDismiss?.Invoke();
+                break;
+            case "downloads":
+                OpenDownloadsPageCommand.Execute(null);
+                break;
+            case "exit":
+                PowerSignOutCommand.Execute(null);
+                break;
+        }
     }
 
     private void UpdateMenuHeader(string page)
@@ -428,6 +536,37 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnNavigatePage?.Invoke("friends");
         OnRequestLauncherForeground?.Invoke();
         OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void OpenProfilePage()
+    {
+        OnNavigatePage?.Invoke("profile");
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void OpenLibraryPage()
+    {
+        OnNavigatePage?.Invoke("library");
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void OpenStorePage()
+    {
+        OnNavigatePage?.Invoke("store");
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void SwitchToXb360Blade(string? bladeId)
+    {
+        if (IsXb360Theme && bladeId != null)
+            Xb360BladeId = bladeId;
     }
 
     [RelayCommand]
@@ -595,6 +734,8 @@ public partial class QuickMenuViewModel : ViewModelBase
         CurrentGameTitle = currentGameTitle ?? "";
         ActivePage = "home";
         SelectedHubIndex = 0;
+        Xb360CenterIndex = 0;
+        Xb360BladeId = "main";
         CloseChatWindow();
 
         if (IsPlayingGame && sessionStartedAt.HasValue)
@@ -661,7 +802,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         MediaStatusLabel = "Media controls are ready.";
     }
 
-    private string[] GetCurrentNavigationOrder() => IsXb360Theme ? Xb360GuideOrder : HubOrder;
+    private string[] GetCurrentNavigationOrder() => HubOrder;
 
     private static string NormaliseQuickMenuTheme(string value)
     {

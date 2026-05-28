@@ -119,29 +119,38 @@ public partial class MainWindow : Window
             switch (e.Key)
             {
                 case Key.Left:
-                    if (textInputFocused) return;
-                    vm.QuickMenuVm.MoveHubSelection(-1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                        else vm.QuickMenuVm.MoveHubSelection(-1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.Right:
-                    if (textInputFocused) return;
-                    vm.QuickMenuVm.MoveHubSelection(1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                        else vm.QuickMenuVm.MoveHubSelection(1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.Up:
-                    if (textInputFocused || !isXb360QuickMenu) return;
-                    vm.QuickMenuVm.MoveHubSelection(-1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(-1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.Down:
-                    if (textInputFocused || !isXb360QuickMenu) return;
-                    vm.QuickMenuVm.MoveHubSelection(1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.Enter:
                 case Key.Space:
-                    if (textInputFocused) return;
-                    vm.QuickMenuVm.ActivateSelectedHub();
+                    if (!textInputFocused) vm.QuickMenuVm.ActivateSelectedHub();
                     e.Handled = true;
                     return;
                 case Key.Escape:
@@ -151,6 +160,8 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 default:
+                    // Block all remaining key events from reaching the background Game OS.
+                    e.Handled = true;
                     return;
             }
         }
@@ -394,21 +405,21 @@ public partial class MainWindow : Window
         var vm = _boundVm.QuickMenuVm;
         HandleOverlayKeyState(Services.NativeMethods.VK_LEFT, ref _overlayLeftLatched, () =>
         {
-            vm.MoveHubSelection(-1);
+            if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+            else vm.MoveHubSelection(-1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_RIGHT, ref _overlayRightLatched, () =>
         {
-            vm.MoveHubSelection(1);
+            if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+            else vm.MoveHubSelection(1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_UP, ref _overlayUpLatched, () =>
         {
-            if (vm.IsXb360Theme)
-                vm.MoveHubSelection(-1);
+            if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_DOWN, ref _overlayDownLatched, () =>
         {
-            if (vm.IsXb360Theme)
-                vm.MoveHubSelection(1);
+            if (vm.IsXb360Theme) vm.MoveXb360CenterItem(1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_RETURN, ref _overlayEnterLatched, vm.ActivateSelectedHub);
         HandleOverlayKeyState(Services.NativeMethods.VK_SPACE, ref _overlaySpaceLatched, vm.ActivateSelectedHub);
