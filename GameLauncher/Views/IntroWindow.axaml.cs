@@ -206,6 +206,8 @@ public partial class IntroWindow : Window
         foreach (var runtimeId in GetLibVlcRuntimeIds())
             candidates.Add(Path.Combine(baseDir, "runtimes", runtimeId, "native"));
 
+        candidates.AddRange(GetSystemLibVlcDirectories());
+
         foreach (var candidate in candidates)
         {
             if (Directory.Exists(candidate) && DirectoryContainsLibVlc(candidate))
@@ -223,6 +225,34 @@ public partial class IntroWindow : Window
             return new[] { "linux-x64", "linux-arm64" };
         if (OperatingSystem.IsMacOS())
             return new[] { "osx-x64", "osx-arm64" };
+        return Array.Empty<string>();
+    }
+
+    private static IEnumerable<string> GetSystemLibVlcDirectories()
+    {
+        if (OperatingSystem.IsLinux())
+        {
+            return
+            [
+                "/usr/lib",
+                "/usr/lib64",
+                "/usr/lib/vlc",
+                "/usr/lib/x86_64-linux-gnu",
+                "/usr/lib/aarch64-linux-gnu",
+                "/snap/vlc/current/usr/lib",
+            ];
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            return
+            [
+                "/Applications/VLC.app/Contents/MacOS/lib",
+                Path.Combine(userHome, "Applications", "VLC.app", "Contents", "MacOS", "lib"),
+            ];
+        }
+
         return Array.Empty<string>();
     }
 
