@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -207,8 +208,18 @@ public partial class IntroWindow : Window
         if (OperatingSystem.IsWindows())
             candidates.Add(baseDir);
 
+        string? preferredRuntimeId = GetPreferredLibVlcRuntimeId();
+        if (!string.IsNullOrEmpty(preferredRuntimeId))
+        {
+            candidates.Add(Path.Combine(baseDir, "libvlc", preferredRuntimeId));
+            candidates.Add(Path.Combine(baseDir, "runtimes", preferredRuntimeId, "native"));
+        }
+
         foreach (var runtimeId in GetLibVlcRuntimeIds())
+        {
+            candidates.Add(Path.Combine(baseDir, "libvlc", runtimeId));
             candidates.Add(Path.Combine(baseDir, "runtimes", runtimeId, "native"));
+        }
 
         candidates.AddRange(GetSystemLibVlcDirectories());
 
@@ -216,6 +227,42 @@ public partial class IntroWindow : Window
         {
             if (Directory.Exists(candidate) && DirectoryContainsLibVlc(candidate))
                 return candidate;
+        }
+
+        return null;
+    }
+
+    private static string? GetPreferredLibVlcRuntimeId()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64   => "win-x64",
+                Architecture.X86   => "win-x86",
+                Architecture.Arm64 => "win-arm64",
+                _                  => null
+            };
+        }
+
+        if (OperatingSystem.IsLinux())
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64   => "linux-x64",
+                Architecture.Arm64 => "linux-arm64",
+                _                  => null
+            };
+        }
+
+        if (OperatingSystem.IsMacOS())
+        {
+            return RuntimeInformation.ProcessArchitecture switch
+            {
+                Architecture.X64   => "osx-x64",
+                Architecture.Arm64 => "osx-arm64",
+                _                  => null
+            };
         }
 
         return null;
