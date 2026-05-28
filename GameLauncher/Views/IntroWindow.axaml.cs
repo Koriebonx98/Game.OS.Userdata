@@ -34,8 +34,8 @@ public partial class IntroWindow : Window
     private CancellationTokenSource? _timeoutCts;
 
     /// <summary>
-    /// Parameterless constructor kept so Avalonia's XAML compiler/runtime can resolve
-    /// the view type without emitting the missing-public-constructor warning.
+    /// Parameterless constructor required so Avalonia's XAML compiler/runtime can
+    /// resolve the view type; runtime playback still uses <see cref="IntroWindow(string)"/>.
     /// </summary>
     public IntroWindow() : this(string.Empty) { }
 
