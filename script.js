@@ -3455,7 +3455,7 @@ function _gamesDbHeaders() {
         'X-GitHub-Api-Version': '2022-11-28',
         'Content-Type':        'application/json'
     };
-    if (GAMES_DB_TOKEN) h['Authorization'] = `******{GAMES_DB_TOKEN}`;
+    if (GAMES_DB_TOKEN) h['Authorization'] = `Bearer ${GAMES_DB_TOKEN}`;
     return h;
 }
 
