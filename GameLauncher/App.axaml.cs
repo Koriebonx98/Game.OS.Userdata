@@ -50,7 +50,11 @@ public partial class App : Application
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
-            var mainVm = new MainViewModel();
+            var settings = AppSettingsService.Load();
+            string? introPath = ResolveIntroPath(settings);
+            bool shouldShowIntro = settings.ShowIntroVideo && introPath != null;
+
+            var mainVm = new MainViewModel(enableAutoLogin: !shouldShowIntro);
             if (DemoMode.IsEnabled)
             {
                 DevLogService.Log("[App] Demo mode active — loading demo data.");
@@ -69,27 +73,23 @@ public partial class App : Application
                 throw;
             }
             DevLogService.Log("[App] MainWindow constructed OK.");
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = mainWindow;
 
-            // Resolve the intro video path:
-            //   1. Default fixed location  — Data/Intro/Intro.mp4 (matches PS5 OS reference)
-            //   2. User override           — IntroVideoPath from settings (if set and exists)
-            var settings   = AppSettingsService.Load();
             ApplyDesignTheme(settings.DesignTheme);
-            string? introPath = ResolveIntroPath(settings);
 
             DevLogService.Log($"[App] ShowIntroVideo={settings.ShowIntroVideo}  " +
                               $"DefaultIntroPath='{DefaultIntroPath}'  " +
                               $"IntroVideoPath='{settings.IntroVideoPath}'  " +
                               $"Resolved='{introPath ?? "(none)"}'");
 
-            if (settings.ShowIntroVideo && introPath != null)
+            if (shouldShowIntro)
             {
                 DevLogService.Log($"[App] Intro video found at '{introPath}' — showing IntroWindow.");
 
                 // Hide the main window until the intro finishes; IntroWindow calls
                 // ShowMainWindow() to reveal it fullscreen once playback ends.
-                mainWindow.IsVisible = false;
+                mainWindow.Hide();
 
                 var intro = new IntroWindow(introPath);
                 intro.Show();
