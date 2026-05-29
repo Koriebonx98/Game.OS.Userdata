@@ -185,7 +185,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsFriendsOrInbox));
     }
 
-    public MainViewModel(bool enableAutoLogin = true)
+    public MainViewModel(bool enableAutoLogin)
     {
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
@@ -633,7 +633,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _ = Services.SwitchTranslateService.SyncAsync();
 
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
-        // only when startup flow enables it.
+        // Only when startup flow enables it.
         if (enableAutoLogin)
             _ = LoginVm.TryAutoLoginAsync();
 

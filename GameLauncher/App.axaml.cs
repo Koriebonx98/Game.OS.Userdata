@@ -73,8 +73,8 @@ public partial class App : Application
                 throw;
             }
             DevLogService.Log("[App] MainWindow constructed OK.");
-            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
             desktop.MainWindow = mainWindow;
+            desktop.ShutdownMode = ShutdownMode.OnMainWindowClose;
 
             ApplyDesignTheme(settings.DesignTheme);
 
@@ -91,7 +91,7 @@ public partial class App : Application
                 // ShowMainWindow() to reveal it fullscreen once playback ends.
                 mainWindow.Hide();
 
-                var intro = new IntroWindow(introPath);
+                var intro = new IntroWindow(introPath!);
                 intro.Show();
             }
             else
