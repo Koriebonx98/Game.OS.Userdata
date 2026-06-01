@@ -632,9 +632,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // repository so achievement detection always uses the latest mappings.
         _ = Services.SwitchTranslateService.SyncAsync();
 
-        // Attempt silent auto-login from cached session (mirrors web localStorage restore)
-        _ = LoginVm.TryAutoLoginAsync();
+    }
 
+    /// <summary>
+    /// Starts the authentication flow: attempts silent auto-login from the cached
+    /// session, or shows the login screen if no cached session exists.
+    /// <para>
+    /// Called by <see cref="App"/> immediately on startup when no intro video is
+    /// shown, or after the intro video has finished so that login never races
+    /// against the intro player.
+    /// </para>
+    /// </summary>
+    public void BeginStartup()
+    {
+        DevLogService.Log("[MainViewModel] BeginStartup — attempting auto-login.");
+        _ = LoginVm.TryAutoLoginAsync();
     }
 
     /// <summary>

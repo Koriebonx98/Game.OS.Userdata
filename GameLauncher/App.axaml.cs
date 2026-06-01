@@ -31,6 +31,8 @@ public partial class App : Application
     private const string SteamBpmThemeSource = "avares://GameLauncher/Styles/SteamBpmTheme.axaml";
     private StyleInclude? _designThemeStyle;
 
+    private MainViewModel? _mainVm;
+
     // Default intro video location — mirrors the PS5 OS reference:
     // the user places Intro.mp4 in {AppDir}/Data/Intro/Intro.mp4.
     private static readonly string DefaultIntroPath =
@@ -51,6 +53,7 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainVm = new MainViewModel();
+            _mainVm = mainVm;
             if (DemoMode.IsEnabled)
             {
                 DevLogService.Log("[App] Demo mode active — loading demo data.");
@@ -88,7 +91,9 @@ public partial class App : Application
                 DevLogService.Log($"[App] Intro video found at '{introPath}' — showing IntroWindow.");
 
                 // Hide the main window until the intro finishes; IntroWindow calls
-                // ShowMainWindow() to reveal it fullscreen once playback ends.
+                // ShowMainWindow() to reveal it fullscreen once playback ends, and
+                // ShowMainWindow() then calls BeginStartup() to start the auth flow.
+                // This ensures intro plays fully before login is ever attempted.
                 mainWindow.IsVisible = false;
 
                 var intro = new IntroWindow(introPath);
@@ -104,6 +109,7 @@ public partial class App : Application
 
                 mainWindow.Show();
                 DevLogService.Log("[App] Main window shown.");
+                mainVm.BeginStartup();
 
                 // Screenshot mode: after a short delay, render the window to a PNG and exit.
                 if (DemoMode.ScreenshotPath is not null)
@@ -143,7 +149,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Shows the main window fullscreen and brings it to the foreground.
+    /// Shows the main window fullscreen and brings it to the foreground, then
+    /// starts the authentication flow (auto-login or login screen).
     /// Called by <see cref="IntroWindow"/> after playback ends or fails —
     /// mirroring <c>app.ShowMainWindow()</c> in the PS5 OS reference.
     /// </summary>
@@ -156,6 +163,9 @@ public partial class App : Application
             main.Show();
             main.Activate();
             DevLogService.Log("[App] ShowMainWindow — main window shown fullscreen.");
+
+            // Start auth flow now that the intro has finished and the window is visible.
+            _mainVm?.BeginStartup();
         }
     }
 
