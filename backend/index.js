@@ -2591,6 +2591,39 @@ app.get('/api/users/:username/activity', authenticatePublicOrUserToken, async (r
     }
 });
 
+function normaliseExophaseProfileId(profileId) {
+    const trimmed = String(profileId || '').trim();
+    if (!trimmed) return '';
+    return trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+}
+
+function resolveExophaseUrlTemplate(exophaseUrl, profileId) {
+    const urlText = String(exophaseUrl || '').trim();
+    if (!urlText) return '';
+
+    const normalisedProfileId = normaliseExophaseProfileId(profileId);
+    if (!normalisedProfileId) return urlText;
+
+    const profileDigits = normalisedProfileId.replace(/^#/, '');
+    let resolved = urlText
+        .replace(/#\$UserID/gi, normalisedProfileId)
+        .replace(/\$UserID/gi, profileDigits)
+        .replace(/\{#UserID\}/gi, normalisedProfileId)
+        .replace(/\{UserID\}/gi, profileDigits);
+
+    try {
+        const parsed = new URL(resolved);
+        if ((parsed.hostname === 'exophase.com' || parsed.hostname.endsWith('.exophase.com')) && !parsed.hash) {
+            parsed.hash = profileDigits;
+            resolved = parsed.toString();
+        }
+    } catch {
+        // Keep resolved as-is; URL validation runs later in the route.
+    }
+
+    return resolved;
+}
+
 // ── POST /api/me/achievements/sync-exophase ───────────────────────────────────
 // Fetch an Exophase game achievements/trophies page, scrape the list, and merge
 // the results into the authenticated user's achievements.json file.
@@ -2616,10 +2649,13 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             return res.status(400).json({ success: false, message: 'exophaseUrl, platform, and gameTitle are required.' });
         }
 
+        const normalisedProfileId = normaliseExophaseProfileId(exophaseProfileId);
+        const resolvedExophaseUrl = resolveExophaseUrlTemplate(exophaseUrl, normalisedProfileId);
+
         // SSRF protection: only allow https://exophase.com URLs
         let parsedUrl;
         try {
-            parsedUrl = new URL(exophaseUrl);
+            parsedUrl = new URL(resolvedExophaseUrl);
         } catch {
             return res.status(400).json({ success: false, message: 'Invalid URL.' });
         }
@@ -2628,11 +2664,13 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
             return res.status(400).json({ success: false, message: 'Only https://exophase.com URLs are allowed.' });
         }
         const hadFragment = Boolean(parsedUrl.hash);
+        const fragmentProvidedByInput = String(exophaseUrl || '').includes('#');
         if (hadFragment) {
             // URL fragments (e.g. #4447906) are client-side only and are never sent in
             // the actual HTTP request. Keep profile ID separately; do not rely on hash.
             parsedUrl.hash = '';
-            console.warn('sync-exophase: URL fragment supplied and ignored; using exophaseProfileId/body data instead.');
+            if (fragmentProvidedByInput)
+                console.warn('sync-exophase: URL fragment supplied and ignored; using exophaseProfileId/body data instead.');
         }
         const validatedExophaseUrl = parsedUrl.toString();
 
@@ -2741,12 +2779,12 @@ app.post('/api/me/achievements/sync-exophase', authenticateToken, async (req, re
                     ...list[idx],
                     ...ach,
                     unlockedAt: ach.unlockedAt || existingUnlockedAt || '',
-                    exophaseProfileId: exophaseProfileId || list[idx].exophaseProfileId || ''
+                    exophaseProfileId: normalisedProfileId || list[idx].exophaseProfileId || ''
                 };
                 updated++;
             } else {
-                if (exophaseProfileId)
-                    ach.exophaseProfileId = exophaseProfileId;
+                if (normalisedProfileId)
+                    ach.exophaseProfileId = normalisedProfileId;
                 list.push(ach);
                 added++;
             }

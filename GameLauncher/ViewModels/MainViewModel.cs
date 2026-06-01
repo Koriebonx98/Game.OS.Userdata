@@ -3194,12 +3194,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var settings = AppSettingsService.Load();
-            string profileId = (settings.ExophaseProfileId ?? "").Trim();
+            string profileId = NormaliseExophaseProfileId(settings.ExophaseProfileId ?? "");
             if (string.IsNullOrEmpty(profileId))
             {
                 DevLogService.Log($"[Exophase] Skipped sync ({reason}) for {title} ({platform}) — profile ID not configured.");
                 return 0;
             }
+            string resolvedExophaseUrl = ResolveExophaseUrlForProfile(exophaseUrl, profileId);
 
             string resolvedTitleId = titleId
                 ?? _library.FirstOrDefault(g =>
@@ -3209,7 +3210,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 ?? "";
 
             int changes = await _client.SyncExophaseAchievementsAsync(
-                exophaseUrl,
+                resolvedExophaseUrl,
                 platform,
                 title,
                 string.IsNullOrWhiteSpace(resolvedTitleId) ? null : resolvedTitleId,
@@ -3231,6 +3232,54 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             DevLogService.Log($"[Exophase] Sync failed ({reason}) for {title} ({platform}): {ex.Message}");
             return 0;
+        }
+    }
+
+    private static string NormaliseExophaseProfileId(string profileId)
+    {
+        var trimmed = (profileId ?? "").Trim();
+        if (string.IsNullOrEmpty(trimmed))
+            return "";
+        return trimmed.StartsWith("#", StringComparison.Ordinal) ? trimmed : $"#{trimmed}";
+    }
+
+    private static string ResolveExophaseUrlForProfile(string exophaseUrl, string profileId)
+    {
+        if (string.IsNullOrWhiteSpace(exophaseUrl))
+            return exophaseUrl;
+
+        var normalisedProfileId = NormaliseExophaseProfileId(profileId);
+        if (string.IsNullOrEmpty(normalisedProfileId))
+            return exophaseUrl;
+
+        var profileDigits = normalisedProfileId.TrimStart('#');
+        var resolved = exophaseUrl
+            .Replace("#$UserID", normalisedProfileId, StringComparison.OrdinalIgnoreCase)
+            .Replace("$UserID", profileDigits, StringComparison.OrdinalIgnoreCase)
+            .Replace("{#UserID}", normalisedProfileId, StringComparison.OrdinalIgnoreCase)
+            .Replace("{UserID}", profileDigits, StringComparison.OrdinalIgnoreCase);
+
+        if (!Uri.TryCreate(resolved, UriKind.Absolute, out var parsedUrl))
+            return resolved;
+
+        if (!(string.Equals(parsedUrl.Host, "exophase.com", StringComparison.OrdinalIgnoreCase) ||
+              parsedUrl.Host.EndsWith(".exophase.com", StringComparison.OrdinalIgnoreCase)))
+            return resolved;
+
+        if (!string.IsNullOrEmpty(parsedUrl.Fragment))
+            return resolved;
+
+        try
+        {
+            var builder = new UriBuilder(parsedUrl)
+            {
+                Fragment = profileDigits
+            };
+            return builder.Uri.ToString();
+        }
+        catch
+        {
+            return resolved;
         }
     }
 
@@ -4230,8 +4279,37 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 }
             }
 
-            // Prune games that are no longer in the library
-            try { _metadataCache.PruneMissingGames(library); }
+            // Prune stale cache entries while retaining anything still present in
+            // either cloud library or local scan results.
+            try
+            {
+                var currentEntries = new List<(string Platform, string Key)>();
+                foreach (var game in library)
+                {
+                    var key = ResolveCacheKey(game.TitleId, game.Title);
+                    if (!string.IsNullOrEmpty(key))
+                        currentEntries.Add((game.Platform, key));
+                }
+
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+                {
+                    foreach (var localGame in LibraryVm.LocalGames)
+                    {
+                        var key = ResolveCacheKey(null, localGame.Title);
+                        if (!string.IsNullOrEmpty(key))
+                            currentEntries.Add(("PC", key));
+                    }
+
+                    foreach (var localRom in LibraryVm.LocalRoms)
+                    {
+                        var key = ResolveCacheKey(localRom.TitleId, localRom.Title);
+                        if (!string.IsNullOrEmpty(key))
+                            currentEntries.Add((localRom.Platform, key));
+                    }
+                });
+
+                _metadataCache.PruneMissingGames(currentEntries);
+            }
             catch { /* best-effort */ }
         }
         finally
@@ -4351,6 +4429,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             DevLogService.Log($"[Cache] BackgroundCacheLocalGamesAsync failed: {ex.Message}");
         }
+    }
+
+    private static string ResolveCacheKey(string? titleId, string? title)
+    {
+        if (!string.IsNullOrWhiteSpace(titleId))
+            return titleId;
+        return title ?? "";
     }
     /// <summary>Formats the last-synced label for the Settings Sync section.</summary>
     private static string FormatLastSyncedLabel(DateTime lastSyncedAt)
