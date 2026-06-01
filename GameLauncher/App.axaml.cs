@@ -105,6 +105,8 @@ public partial class App : Application
                 mainWindow.Show();
                 DevLogService.Log("[App] Main window shown.");
 
+                // Intro is not playing — start background services and auto-login immediately.
+                mainVm.BeginStartup();
                 // Screenshot mode: after a short delay, render the window to a PNG and exit.
                 if (DemoMode.ScreenshotPath is not null)
                 {
@@ -156,6 +158,10 @@ public partial class App : Application
             main.Show();
             main.Activate();
             DevLogService.Log("[App] ShowMainWindow — main window shown fullscreen.");
+
+            // Intro has finished — now start background services and attempt auto-login.
+            if (main.DataContext is MainViewModel mainVm)
+                mainVm.BeginStartup();
         }
     }
 
