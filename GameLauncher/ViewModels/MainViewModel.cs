@@ -605,6 +605,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     public void BeginStartup()
     {
+        // Guard against accidental double-invocation (e.g. intro + no-intro paths both firing).
+        if (_scanner != null) return;
+
         // Wire the rebuild-complete callback so cover enrichment always runs after
         // _allMyGames is fully populated — eliminates the race condition where
         // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
