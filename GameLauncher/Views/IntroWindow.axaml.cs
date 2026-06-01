@@ -177,7 +177,7 @@ public partial class IntroWindow : Window
         // be destroyed.  On Windows this prevents the AccessViolationException that
         // can occur when VLC makes a final paint call during teardown.
         try { IntroVideoView.MediaPlayer = null; }
-        catch { }
+        catch (ObjectDisposedException) { }
 
         try { _mediaPlayer?.Stop(); }
         catch (ObjectDisposedException) { }
