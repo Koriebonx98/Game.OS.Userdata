@@ -1335,6 +1335,9 @@ public partial class GameDetailViewModel : ViewModelBase
                     PlayButtonIsResume = false;
                     // Track playtime for PC games
                     OnRequestPlaytimeTracking?.Invoke(gameProc, Title, Platform);
+
+                    if (string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase))
+                        _ = WatchAndReadPcAchievementFilesAsync(gameProc, exePath, Title);
                 }
                 else if (nonFileLaunchTarget)
                 {
@@ -1540,6 +1543,8 @@ public partial class GameDetailViewModel : ViewModelBase
     private const int XeniaPollIntervalMs = 2000;
     /// <summary>Milliseconds between Ryujinx achievement-poll intervals while the game is running.</summary>
     private const int SwitchPollIntervalMs = 3000;
+    /// <summary>Milliseconds between Steam emulator achievement polls while the game is running.</summary>
+    private const int SteamEmuPollIntervalMs = 3000;
 
     private static async System.Threading.Tasks.Task WatchAndRunPostLaunchAsync(
         System.Diagnostics.Process? gameProc, List<LaunchEntry> postEntries)
@@ -1941,6 +1946,321 @@ public partial class GameDetailViewModel : ViewModelBase
             }
         }
         catch { /* best-effort */ }
+    }
+
+
+    /// <summary>
+    /// Watches known Steam emulator achievement files during a PC session and
+    /// reports only achievements that appear after launch.
+    /// </summary>
+    private async System.Threading.Tasks.Task WatchAndReadPcAchievementFilesAsync(
+        System.Diagnostics.Process? gameProc, string exePath, string gameTitle)
+    {
+        if (gameProc == null || string.IsNullOrWhiteSpace(exePath))
+            return;
+
+        var knownUnlocks = ReadSteamEmuUnlockedIds(exePath, _steamAppId);
+        var sessionUnlocks = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        async System.Threading.Tasks.Task PollOnceAsync()
+        {
+            var current = ReadSteamEmuUnlockedIds(exePath, _steamAppId);
+            foreach (var unlockId in current)
+            {
+                if (knownUnlocks.Contains(unlockId))
+                    continue;
+
+                knownUnlocks.Add(unlockId);
+                if (!sessionUnlocks.Add(unlockId))
+                    continue;
+
+                Services.NotificationService.ShowAchievementUnlockedNotification(unlockId, gameTitle);
+                DevLogService.Log($"[PcAch] Steam emu unlock detected: {unlockId} ({gameTitle})");
+
+                if (OnRequestAchievementUnlockAsync != null)
+                    _ = OnRequestAchievementUnlockAsync("PC", gameTitle, unlockId, unlockId, null);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    var existing = Achievements.FirstOrDefault(a =>
+                        string.Equals(a.AchievementId, unlockId, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(a.Name, unlockId, StringComparison.OrdinalIgnoreCase));
+                    if (existing != null && string.IsNullOrEmpty(existing.UnlockedAt))
+                    {
+                        existing.UnlockedAt = DateTime.UtcNow.ToString("o");
+                        RefreshVisibleAchievements();
+                    }
+                });
+            }
+            await System.Threading.Tasks.Task.CompletedTask;
+        }
+
+        try
+        {
+            using var cts = new System.Threading.CancellationTokenSource(
+                System.TimeSpan.FromHours(MaxEmulatorWaitHours));
+
+            while (!gameProc.HasExited && !cts.IsCancellationRequested)
+            {
+                try { await System.Threading.Tasks.Task.Delay(SteamEmuPollIntervalMs, cts.Token); }
+                catch (OperationCanceledException) { break; }
+
+                try { await PollOnceAsync(); }
+                catch { /* best-effort per poll */ }
+            }
+        }
+        catch { /* best-effort */ }
+        finally
+        {
+            try { gameProc.Dispose(); } catch { }
+        }
+
+        // Final pass for writes flushed right after exit.
+        try
+        {
+            await System.Threading.Tasks.Task.Delay(LogFlushDelayMs);
+            await PollOnceAsync();
+        }
+        catch { /* best-effort */ }
+    }
+
+    private static HashSet<string> ReadSteamEmuUnlockedIds(string exePath, int steamAppId)
+    {
+        var unlocked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in EnumerateSteamEmuAchievementFiles(exePath, steamAppId))
+        {
+            try
+            {
+                var ext = Path.GetExtension(file);
+                IEnumerable<string> ids = string.Equals(ext, ".ini", StringComparison.OrdinalIgnoreCase)
+                    ? ParseUnlockedAchievementIdsFromIni(file)
+                    : ParseUnlockedAchievementIdsFromJson(file);
+
+                foreach (var id in ids)
+                {
+                    if (!string.IsNullOrWhiteSpace(id))
+                        unlocked.Add(id.Trim());
+                }
+            }
+            catch { /* best-effort per file */ }
+        }
+        return unlocked;
+    }
+
+    private static IEnumerable<string> EnumerateSteamEmuAchievementFiles(string exePath, int steamAppId)
+    {
+        var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            string? gameDir = Path.GetDirectoryName(exePath);
+            if (!string.IsNullOrEmpty(gameDir))
+            {
+                roots.Add(Path.Combine(gameDir, "steam_settings"));
+                roots.Add(Path.Combine(gameDir, "SteamSettings"));
+
+                string? parent = Directory.GetParent(gameDir)?.FullName;
+                if (!string.IsNullOrEmpty(parent))
+                {
+                    roots.Add(Path.Combine(parent, "steam_settings"));
+                    roots.Add(Path.Combine(parent, "SteamSettings"));
+                }
+            }
+        }
+        catch { }
+
+        string roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+        string local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        string docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+        string commonDocs = Environment.GetFolderPath(Environment.SpecialFolder.CommonDocuments);
+        string programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+
+        if (!string.IsNullOrEmpty(roaming))
+        {
+            roots.Add(Path.Combine(roaming, "Goldberg SteamEmu Saves"));
+            roots.Add(Path.Combine(roaming, "GSE Saves"));
+        }
+        if (!string.IsNullOrEmpty(local))
+            roots.Add(Path.Combine(local, "Goldberg SteamEmu Saves"));
+        if (!string.IsNullOrEmpty(commonDocs))
+            roots.Add(Path.Combine(commonDocs, "Steam"));
+        if (!string.IsNullOrEmpty(docs))
+        {
+            roots.Add(Path.Combine(docs, "CPY_SAVES"));
+            roots.Add(Path.Combine(docs, "Steam"));
+        }
+        if (!string.IsNullOrEmpty(programData))
+            roots.Add(Path.Combine(programData, "SteamEmu"));
+
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "achievements.json",
+            "achievement.json",
+            "stats.json",
+            "achievements.ini",
+            "stats.ini"
+        };
+
+        foreach (var root in roots)
+        {
+            if (string.IsNullOrWhiteSpace(root) || !Directory.Exists(root))
+                continue;
+
+            IEnumerable<string> files;
+            try
+            {
+                files = Directory.EnumerateFiles(root, "*.*", SearchOption.AllDirectories);
+            }
+            catch
+            {
+                continue;
+            }
+
+            foreach (var file in files)
+            {
+                string fileName = Path.GetFileName(file);
+                if (names.Contains(fileName))
+                {
+                    yield return file;
+                    continue;
+                }
+
+                if (steamAppId > 0 &&
+                    (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
+                     file.EndsWith(".ini", StringComparison.OrdinalIgnoreCase)) &&
+                    file.Contains(steamAppId.ToString(), StringComparison.OrdinalIgnoreCase))
+                {
+                    yield return file;
+                }
+            }
+        }
+    }
+
+    private static IEnumerable<string> ParseUnlockedAchievementIdsFromJson(string path)
+    {
+        using var stream = File.OpenRead(path);
+        using var doc = System.Text.Json.JsonDocument.Parse(stream);
+        var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        VisitJsonForUnlocks(doc.RootElement, null, results);
+        return results;
+    }
+
+    private static void VisitJsonForUnlocks(
+        System.Text.Json.JsonElement element,
+        string? contextId,
+        HashSet<string> results)
+    {
+        if (element.ValueKind == System.Text.Json.JsonValueKind.Object)
+        {
+            string? idCandidate = contextId;
+            bool unlocked = false;
+            bool sawUnlockField = false;
+
+            foreach (var prop in element.EnumerateObject())
+            {
+                var key = prop.Name;
+                var value = prop.Value;
+
+                if (string.Equals(key, "id", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(key, "name", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(key, "apiName", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(key, "achievement", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(key, "stat", StringComparison.OrdinalIgnoreCase))
+                {
+                    if (value.ValueKind == System.Text.Json.JsonValueKind.String)
+                        idCandidate = value.GetString();
+                }
+
+                if (IsUnlockFieldName(key))
+                {
+                    sawUnlockField = true;
+                    if (IsUnlockedJsonValue(value))
+                        unlocked = true;
+                }
+            }
+
+            if (sawUnlockField && unlocked && !string.IsNullOrWhiteSpace(idCandidate))
+                results.Add(idCandidate);
+
+            foreach (var prop in element.EnumerateObject())
+                VisitJsonForUnlocks(prop.Value, prop.Name, results);
+        }
+        else if (element.ValueKind == System.Text.Json.JsonValueKind.Array)
+        {
+            foreach (var item in element.EnumerateArray())
+                VisitJsonForUnlocks(item, contextId, results);
+        }
+    }
+
+    private static bool IsUnlockFieldName(string key) =>
+        string.Equals(key, "achieved", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "unlocked", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "unlock", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "unlocktime", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(key, "earned", StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsUnlockedJsonValue(System.Text.Json.JsonElement value)
+    {
+        switch (value.ValueKind)
+        {
+            case System.Text.Json.JsonValueKind.True:
+                return true;
+            case System.Text.Json.JsonValueKind.False:
+            case System.Text.Json.JsonValueKind.Null:
+            case System.Text.Json.JsonValueKind.Undefined:
+                return false;
+            case System.Text.Json.JsonValueKind.Number:
+                return value.TryGetInt64(out var n) && n > 0;
+            case System.Text.Json.JsonValueKind.String:
+                var s = value.GetString();
+                if (string.IsNullOrWhiteSpace(s)) return false;
+                if (long.TryParse(s, out var parsed)) return parsed > 0;
+                return s.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                       s.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                       s.Equals("unlocked", StringComparison.OrdinalIgnoreCase);
+            default:
+                return false;
+        }
+    }
+
+    private static IEnumerable<string> ParseUnlockedAchievementIdsFromIni(string path)
+    {
+        var results = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        string? section = null;
+        foreach (var raw in File.ReadLines(path))
+        {
+            var line = raw.Trim();
+            if (string.IsNullOrEmpty(line) || line.StartsWith(";") || line.StartsWith("#"))
+                continue;
+
+            if (line.StartsWith("[") && line.EndsWith("]"))
+            {
+                section = line[1..^1].Trim();
+                continue;
+            }
+
+            int eq = line.IndexOf('=');
+            if (eq <= 0) continue;
+
+            string key = line[..eq].Trim();
+            string val = line[(eq + 1)..].Trim();
+            bool unlocked = val.Equals("1", StringComparison.OrdinalIgnoreCase) ||
+                            val.Equals("true", StringComparison.OrdinalIgnoreCase) ||
+                            val.Equals("yes", StringComparison.OrdinalIgnoreCase) ||
+                            val.Equals("unlocked", StringComparison.OrdinalIgnoreCase);
+            if (!unlocked) continue;
+
+            if (IsUnlockFieldName(key))
+            {
+                if (!string.IsNullOrWhiteSpace(section))
+                    results.Add(section);
+            }
+            else if (key.StartsWith("ach", StringComparison.OrdinalIgnoreCase) ||
+                     key.Contains("achievement", StringComparison.OrdinalIgnoreCase))
+            {
+                results.Add(key);
+            }
+        }
+        return results;
     }
 
 
