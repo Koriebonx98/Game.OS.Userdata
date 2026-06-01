@@ -1116,7 +1116,7 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private async Task SyncExophaseNowAsync()
+    private async System.Threading.Tasks.Task SyncExophaseNowAsync()
     {
         if (string.IsNullOrWhiteSpace(ExophaseUrl) || IsExophaseSyncing) return;
         ExophaseSyncStatus = "Syncing Exophase…";
@@ -1127,7 +1127,7 @@ public partial class GameDetailViewModel : ViewModelBase
             if (OnRequestManualExophaseSyncAsync != null)
             {
                 await OnRequestManualExophaseSyncAsync(
-                    ExophaseUrl!,
+                    ExophaseUrl,
                     Platform,
                     Title,
                     CurrentTitleId);

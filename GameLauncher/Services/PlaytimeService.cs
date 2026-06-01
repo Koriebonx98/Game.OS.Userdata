@@ -448,136 +448,6 @@ namespace GameLauncher.Services
                     {
                         if (!_activeSessions.ContainsKey(key)) return;
                     }
-
-                    private static void WatchProcessesFromSnapshot(
-                        string key,
-                        string title,
-                        string platform,
-                        string launchTarget,
-                        HashSet<int> baselinePids,
-                        DateTime startedAt,
-                        List<Game>? libraryToUpdate)
-                    {
-                        try
-                        {
-                            var trackedPids = new HashSet<int>();
-                            string[] hints = BuildLaunchHints(launchTarget, title);
-                            DateTime detectDeadline = DateTime.UtcNow.AddSeconds(45);
-                            bool detectedAny = false;
-
-                            var checkpoint = new Timer(_ =>
-                            {
-                                lock (_activeSessionsLock)
-                                {
-                                    if (!_activeSessions.ContainsKey(key)) return;
-                                }
-                                SaveCheckpoint(new PlaySession
-                                {
-                                    Platform     = platform,
-                                    Title        = title,
-                                    StartedAt    = startedAt.ToString("o"),
-                                    EndedAt      = DateTime.UtcNow.ToString("o"),
-                                    Minutes      = Math.Max(1, (int)(DateTime.UtcNow - startedAt).TotalMinutes),
-                                    IsCheckpoint = true,
-                                });
-                            }, null,
-                            TimeSpan.FromMinutes(CheckpointIntervalMinutes),
-                            TimeSpan.FromMinutes(CheckpointIntervalMinutes));
-
-                            while (true)
-                            {
-                                Thread.Sleep(2000);
-
-                                lock (_activeSessionsLock)
-                                {
-                                    if (!_activeSessions.ContainsKey(key)) break;
-                                }
-
-                                foreach (var p in Process.GetProcesses())
-                                {
-                                    try
-                                    {
-                                        if (p.HasExited) continue;
-                                        if (baselinePids.Contains(p.Id)) continue;
-                                        if (trackedPids.Contains(p.Id)) continue;
-                                        if (!IsCandidateProcess(p, hints)) continue;
-                                        trackedPids.Add(p.Id);
-                                        detectedAny = true;
-                                    }
-                                    catch { }
-                                    finally { p.Dispose(); }
-                                }
-
-                                if (!detectedAny)
-                                {
-                                    if (DateTime.UtcNow >= detectDeadline)
-                                        break;
-                                    continue;
-                                }
-
-                                bool anyTrackedRunning = false;
-                                foreach (int pid in trackedPids.ToList())
-                                {
-                                    try
-                                    {
-                                        var tracked = Process.GetProcessById(pid);
-                                        if (!tracked.HasExited)
-                                            anyTrackedRunning = true;
-                                        tracked.Dispose();
-                                    }
-                                    catch
-                                    {
-                                        // process exited
-                                    }
-                                }
-
-                                if (!anyTrackedRunning)
-                                    break;
-                            }
-
-                            checkpoint.Change(Timeout.Infinite, Timeout.Infinite);
-                            checkpoint.Dispose();
-                        }
-                        catch { /* best-effort */ }
-                        finally
-                        {
-                            FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
-                        }
-                    }
-
-                    private static string[] BuildLaunchHints(string launchTarget, string title)
-                    {
-                        var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                        foreach (var token in (launchTarget ?? "").Split(new[] { '\\', '/', ':', '!', '.', '-', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            if (token.Length >= 3)
-                                hints.Add(token.ToLowerInvariant());
-                        }
-                        foreach (var token in (title ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                        {
-                            if (token.Length >= 3)
-                                hints.Add(token.ToLowerInvariant());
-                        }
-                        return hints.ToArray();
-                    }
-
-                    private static bool IsCandidateProcess(Process process, string[] hints)
-                    {
-                        string name = "";
-                        try { name = process.ProcessName ?? ""; } catch { }
-                        if (string.IsNullOrWhiteSpace(name)) return false;
-
-                        if (name.Equals("GameLauncher", StringComparison.OrdinalIgnoreCase) ||
-                            name.Equals("explorer", StringComparison.OrdinalIgnoreCase) ||
-                            name.Equals("cmd", StringComparison.OrdinalIgnoreCase) ||
-                            name.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
-                            name.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
-                            return false;
-
-                        if (hints.Length == 0) return true;
-                        string lower = name.ToLowerInvariant();
-                        return hints.Any(h => lower.Contains(h, StringComparison.OrdinalIgnoreCase));
-                    }
                     SaveCheckpoint(new PlaySession
                     {
                         Platform     = platform,
@@ -681,6 +551,136 @@ namespace GameLauncher.Services
                     _activeSessions.Remove(key);
                 FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
             }
+        }
+
+        private static void WatchProcessesFromSnapshot(
+            string key,
+            string title,
+            string platform,
+            string launchTarget,
+            HashSet<int> baselinePids,
+            DateTime startedAt,
+            List<Game>? libraryToUpdate)
+        {
+            try
+            {
+                var trackedPids = new HashSet<int>();
+                string[] hints = BuildLaunchHints(launchTarget, title);
+                DateTime detectDeadline = DateTime.UtcNow.AddSeconds(45);
+                bool detectedAny = false;
+
+                var checkpoint = new Timer(_ =>
+                {
+                    lock (_activeSessionsLock)
+                    {
+                        if (!_activeSessions.ContainsKey(key)) return;
+                    }
+                    SaveCheckpoint(new PlaySession
+                    {
+                        Platform     = platform,
+                        Title        = title,
+                        StartedAt    = startedAt.ToString("o"),
+                        EndedAt      = DateTime.UtcNow.ToString("o"),
+                        Minutes      = Math.Max(1, (int)(DateTime.UtcNow - startedAt).TotalMinutes),
+                        IsCheckpoint = true,
+                    });
+                }, null,
+                TimeSpan.FromMinutes(CheckpointIntervalMinutes),
+                TimeSpan.FromMinutes(CheckpointIntervalMinutes));
+
+                while (true)
+                {
+                    Thread.Sleep(2000);
+
+                    lock (_activeSessionsLock)
+                    {
+                        if (!_activeSessions.ContainsKey(key)) break;
+                    }
+
+                    foreach (var p in Process.GetProcesses())
+                    {
+                        try
+                        {
+                            if (p.HasExited) continue;
+                            if (baselinePids.Contains(p.Id)) continue;
+                            if (trackedPids.Contains(p.Id)) continue;
+                            if (!IsCandidateProcess(p, hints)) continue;
+                            trackedPids.Add(p.Id);
+                            detectedAny = true;
+                        }
+                        catch { }
+                        finally { p.Dispose(); }
+                    }
+
+                    if (!detectedAny)
+                    {
+                        if (DateTime.UtcNow >= detectDeadline)
+                            break;
+                        continue;
+                    }
+
+                    bool anyTrackedRunning = false;
+                    foreach (int pid in trackedPids.ToList())
+                    {
+                        try
+                        {
+                            var tracked = Process.GetProcessById(pid);
+                            if (!tracked.HasExited)
+                                anyTrackedRunning = true;
+                            tracked.Dispose();
+                        }
+                        catch
+                        {
+                            // process exited
+                        }
+                    }
+
+                    if (!anyTrackedRunning)
+                        break;
+                }
+
+                checkpoint.Change(Timeout.Infinite, Timeout.Infinite);
+                checkpoint.Dispose();
+            }
+            catch { /* best-effort */ }
+            finally
+            {
+                FinaliseSession(key, platform, title, startedAt, libraryToUpdate);
+            }
+        }
+
+        private static string[] BuildLaunchHints(string launchTarget, string title)
+        {
+            var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var token in (launchTarget ?? "").Split(new[] { '\\', '/', ':', '!', '.', '-', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token.Length >= 3)
+                    hints.Add(token.ToLowerInvariant());
+            }
+            foreach (var token in (title ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (token.Length >= 3)
+                    hints.Add(token.ToLowerInvariant());
+            }
+            return hints.ToArray();
+        }
+
+        private static bool IsCandidateProcess(Process process, string[] hints)
+        {
+            string name = "";
+            try { name = process.ProcessName ?? ""; } catch { }
+            if (string.IsNullOrWhiteSpace(name)) return false;
+
+            if (name.Equals("GameLauncher", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("explorer", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("cmd", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
+                name.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            if (hints.Length == 0) return false;
+            string lower = name.ToLowerInvariant();
+            return hints.Any(h => lower.Contains(h));
         }
 
         /// <summary>
