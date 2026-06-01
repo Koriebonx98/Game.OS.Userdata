@@ -70,7 +70,12 @@ public partial class MainWindow : Window
             };
             vm.RestoreWindowRequested  = () =>
             {
-                WindowState = _stateBeforeMinimize;
+                // Only restore the saved state when the window is actually minimised;
+                // if it is already visible (e.g. fullscreen) leave the size alone and
+                // just bring it to the foreground so guide actions cannot unexpectedly
+                // resize the window.
+                if (WindowState == WindowState.Minimized)
+                    WindowState = _stateBeforeMinimize;
                 Activate();
             };
             RefreshGlobalHotkeyPolling();

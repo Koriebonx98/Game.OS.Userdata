@@ -172,6 +172,13 @@ public partial class IntroWindow : Window
         _timeoutCts?.Dispose();
         _timeoutCts = null;
 
+        // Detach the VideoView from the media player BEFORE stopping so that
+        // LibVLC does not attempt to render into a window handle that is about to
+        // be destroyed.  On Windows this prevents the AccessViolationException that
+        // can occur when VLC makes a final paint call during teardown.
+        try { IntroVideoView.MediaPlayer = null; }
+        catch { }
+
         try { _mediaPlayer?.Stop(); }
         catch (ObjectDisposedException) { }
 
