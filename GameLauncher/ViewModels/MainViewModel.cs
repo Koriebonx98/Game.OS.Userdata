@@ -21,7 +21,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 {
     private const string DefaultBrowserUrl = "https://www.google.com";
     private readonly GameOsClient            _client;
-    private readonly GameScannerService      _scanner;
+    private GameScannerService?              _scanner;
     private readonly SessionCacheService     _sessionCache;
     private readonly OfflineDataCacheService _offlineCache   = new();
     private readonly PendingChangesService   _pendingChanges = new();
@@ -592,8 +592,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         InboxVm.OnViewFriendProfile   = OpenFriendProfile;
 
-        // Start background scanner regardless of login state
-        _scanner = new GameScannerService();
+    }
+
+    /// <summary>
+    /// Starts all background services and attempts silent auto-login.
+    /// Must be called only after the intro video (if any) has finished and the
+    /// main window is visible — ensures the scanner and login do not race with
+    /// intro playback.
+    /// Called by <see cref="GameLauncher.App.ShowMainWindow"/> (intro path) and
+    /// directly from <see cref="GameLauncher.App.OnFrameworkInitializationCompleted"/>
+    /// (no-intro path).
+    /// </summary>
+    public void BeginStartup()
+    {
+        // Guard against accidental double-invocation (e.g. intro + no-intro paths both firing).
+        if (_scanner != null) return;
+
         // Wire the rebuild-complete callback so cover enrichment always runs after
         // _allMyGames is fully populated — eliminates the race condition where
         // EnrichMyGamesListAsync ran before ScheduleRebuild had finished.
@@ -603,6 +617,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Populate achievement labels on My Games cards from the in-memory achievements list
             EnrichMyGamesAchievementLabels();
         };
+
+        // Start background scanner regardless of login state
+        _scanner = new GameScannerService();
         _scanner.GamesUpdated += games =>
         {
             DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found.");
@@ -641,7 +658,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Attempt silent auto-login from cached session (mirrors web localStorage restore)
         _ = LoginVm.TryAutoLoginAsync();
-
     }
 
     /// <summary>
@@ -2656,7 +2672,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StopOfflineReconnectTimer();
         StopSyncCheckTimer();
         StopHeartbeatPoller();
-        _scanner.Dispose();
+        _scanner?.Dispose();
         (_client as IDisposable)?.Dispose();
         StoreVm.Dispose();
         _playtimeSvc.Dispose();
