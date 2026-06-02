@@ -60,12 +60,12 @@
                     <StackPanel Grid.Column="0" Spacing="12">
                         <!-- Featured / last played game -->
                         <Border Classes="xb360-metro-tile xb360-featured-tile"
-                                IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                IsVisible="{Binding HasFeaturedGame}">
                             <Grid ColumnDefinitions="*,Auto" Margin="20,16">
                                 <StackPanel Spacing="10" VerticalAlignment="Center">
                                     <TextBlock Text="{Binding FeaturedBadgeText}" Classes="xb360-featured-badge"/>
-                                    <TextBlock Text="{Binding FeaturedGame.Title}" Classes="xb360-featured-title"/>
-                                    <TextBlock Text="{Binding FeaturedGame.Platform}" Classes="xb360-featured-subtitle"/>
+                                    <TextBlock Text="{Binding FeaturedTitleText}" Classes="xb360-featured-title"/>
+                                    <TextBlock Text="{Binding FeaturedPlatformText}" Classes="xb360-featured-subtitle"/>
                                     <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
                                         <Button Classes="btn-primary xb360-featured-button"
                                                 Command="{Binding ContinuePlayingCommand}">
@@ -80,10 +80,10 @@
                                 <Border Grid.Column="1" Width="150" Height="150"
                                         Margin="16,0,0,0" Classes="xb360-featured-cover">
                                     <views:CoverImage
-                                        ImageUrl="{Binding FeaturedGame.CoverUrl}"
-                                        FallbackText="{Binding FeaturedGame.Title}"
-                                        FallbackGradient="{Binding FeaturedGame.CoverGradient}"
-                                        SubText="{Binding FeaturedGame.Genre}"
+                                        ImageUrl="{Binding FeaturedCoverUrl}"
+                                        FallbackText="{Binding FeaturedTitleText}"
+                                        FallbackGradient="{Binding FeaturedCoverGradient}"
+                                        SubText="{Binding FeaturedGenreText}"
                                         LetterFontSize="60"
                                         ImageCornerRadius="0"
                                         Width="150" Height="150"/>
@@ -218,17 +218,17 @@
                                 IsVisible="{Binding Xb360HasFocusedGame}">
                         <Border Width="200" Height="200" Classes="xb360-featured-cover" Margin="0,0,0,8">
                             <views:CoverImage
-                                ImageUrl="{Binding Xb360FocusedGame.CoverUrl}"
-                                FallbackText="{Binding Xb360FocusedGame.EffectiveTitle}"
-                                FallbackGradient="{Binding Xb360FocusedGame.CoverGradient}"
-                                SubText="{Binding Xb360FocusedGame.Platform}"
+                                ImageUrl="{Binding Xb360FocusedGameCoverUrl}"
+                                FallbackText="{Binding Xb360FocusedGameTitle}"
+                                FallbackGradient="{Binding Xb360FocusedGameGradient}"
+                                SubText="{Binding Xb360FocusedGamePlatform}"
                                 LetterFontSize="64"
                                 ImageCornerRadius="0"
                                 Width="200" Height="200"/>
                         </Border>
-                        <TextBlock Text="{Binding Xb360FocusedGame.EffectiveTitle}" Classes="xb360-featured-title" FontSize="22" TextWrapping="Wrap"/>
-                        <TextBlock Text="{Binding Xb360FocusedGame.Platform}" Classes="xb360-featured-subtitle"/>
-                        <TextBlock Text="{Binding Xb360FocusedGame.PlaytimeLabel}" Classes="xb360-achievement-desc"/>
+                        <TextBlock Text="{Binding Xb360FocusedGameTitle}" Classes="xb360-featured-title" FontSize="22" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding Xb360FocusedGamePlatform}" Classes="xb360-featured-subtitle"/>
+                        <TextBlock Text="{Binding Xb360FocusedGamePlaytime}" Classes="xb360-achievement-desc"/>
                         <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,8,0,0">
                             <Button Classes="btn-primary" Width="120"
                                     Command="{Binding PlayXb360FocusedGameCommand}">
@@ -532,8 +532,8 @@
                 <Button Classes="wii-channel-tile" Command="{Binding ContinuePlayingCommand}" IsVisible="{Binding IsFeaturedLastPlayed}">
                     <StackPanel Spacing="6">
                         <TextBlock Text="Recent Game" Classes="wii-channel-title"/>
-                        <TextBlock Text="{Binding FeaturedGame.Title}" Classes="wii-channel-subtitle"
-                                   IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}"/>
+                        <TextBlock Text="{Binding FeaturedTitleText}" Classes="wii-channel-subtitle"
+                                   IsVisible="{Binding HasFeaturedGame}"/>
                     </StackPanel>
                 </Button>
                 <Button Classes="wii-channel-tile" Command="{Binding NavigateToAllGamesCommand}">
@@ -642,7 +642,7 @@
 
         <!-- Hero Featured Game / Last Played -->
         <Border Classes="hero-banner featured-hero-banner" Margin="0,0,0,24" Cursor="Hand"
-                IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
+                IsVisible="{Binding HasFeaturedGame}">
             <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,28">
                 <StackPanel Grid.Column="0" Spacing="10" VerticalAlignment="Center">
                     <Border Classes="hero-feature-badge" CornerRadius="4"
@@ -650,25 +650,24 @@
                         <TextBlock Text="{Binding FeaturedBadgeText}" FontSize="11"
                                    FontWeight="Bold" Foreground="White"/>
                     </Border>
-                    <TextBlock Text="{Binding FeaturedGame.Title}" Classes="hero-title"/>
-                    <TextBlock Text="{Binding FeaturedGame.Description}" Classes="hero-desc"
-                               IsVisible="{Binding FeaturedGame.Description,
-                                   Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="{Binding FeaturedTitleText}" Classes="hero-title"/>
+                    <TextBlock Text="{Binding FeaturedDescriptionText}" Classes="hero-desc"
+                               IsVisible="{Binding HasFeaturedDescription}"/>
                     <!-- Show platform badge for last-played game (no description/price) -->
                     <Border Classes="hero-platform-badge" CornerRadius="4" Padding="8,3"
                             HorizontalAlignment="Left"
                             IsVisible="{Binding IsFeaturedLastPlayed}">
-                        <TextBlock Text="{Binding FeaturedGame.Platform}"
+                        <TextBlock Text="{Binding FeaturedPlatformText}"
                                    Classes="hero-platform-badge-text"
                                    FontSize="11"/>
                     </Border>
                     <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,8,0,0"
                                 IsVisible="{Binding !IsFeaturedLastPlayed}">
-                        <TextBlock Text="{Binding FeaturedGame.Price}" Classes="hero-price"/>
-                        <TextBlock Text="{Binding FeaturedGame.RatingStars}"
+                        <TextBlock Text="{Binding FeaturedPriceText}" Classes="hero-price"/>
+                        <TextBlock Text="{Binding FeaturedRatingStarsText}"
                                    FontSize="16" Foreground="#f1c40f"
                                    VerticalAlignment="Center"/>
-                        <TextBlock Text="{Binding FeaturedGame.Genre}"
+                        <TextBlock Text="{Binding FeaturedGenreText}"
                                    FontSize="13" Foreground="#8b949e"
                                    VerticalAlignment="Center"/>
                     </StackPanel>
@@ -690,10 +689,10 @@
                 <Border Grid.Column="1" Width="160" Height="160"
                         CornerRadius="12" Margin="24,0,0,0" ClipToBounds="True">
                     <views:CoverImage
-                        ImageUrl="{Binding FeaturedGame.CoverUrl}"
-                        FallbackText="{Binding FeaturedGame.Title}"
-                        FallbackGradient="{Binding FeaturedGame.CoverGradient}"
-                        SubText="{Binding FeaturedGame.Genre}"
+                        ImageUrl="{Binding FeaturedCoverUrl}"
+                        FallbackText="{Binding FeaturedTitleText}"
+                        FallbackGradient="{Binding FeaturedCoverGradient}"
+                        SubText="{Binding FeaturedGenreText}"
                         LetterFontSize="72"
                         ImageCornerRadius="12"
                         Width="160" Height="160"/>

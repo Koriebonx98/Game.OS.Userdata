@@ -42,6 +42,16 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private string     _featuredGradient  = "#1a1a2e,#16213e";
     [ObservableProperty] private string     _featuredBadgeText = "⭐  FEATURED";
     [ObservableProperty] private bool       _isFeaturedLastPlayed;
+    public bool HasFeaturedGame => FeaturedGame != null;
+    public string FeaturedTitleText => FeaturedGame?.Title ?? "";
+    public string FeaturedPlatformText => FeaturedGame?.Platform ?? "";
+    public string FeaturedDescriptionText => FeaturedGame?.Description ?? "";
+    public bool HasFeaturedDescription => !string.IsNullOrWhiteSpace(FeaturedGame?.Description);
+    public string FeaturedPriceText => FeaturedGame?.Price ?? "";
+    public string FeaturedRatingStarsText => FeaturedGame?.RatingStars ?? "";
+    public string FeaturedGenreText => FeaturedGame?.Genre ?? "";
+    public string FeaturedCoverUrl => FeaturedGame?.CoverUrl ?? "";
+    public string FeaturedCoverGradient => FeaturedGame?.CoverGradient ?? FeaturedGradient;
 
     // References used to route the hero button click to the correct detail view
     private Game?            _heroCloudGame;
@@ -468,6 +478,12 @@ public partial class DashboardViewModel : ViewModelBase
             Xb360HasFocusedGame = true;
             Xb360FocusedGame.IsFocused = true;
         }
+        else
+        {
+            Xb360GameFocusIndex = -1;
+            Xb360FocusedGame = null;
+            Xb360HasFocusedGame = false;
+        }
     }
 
     // Keep the original 3-arg overload for backwards compatibility with existing callers.
@@ -642,6 +658,11 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _xb360GameFocusIndex;
     [ObservableProperty] private LocalGameCardVm? _xb360FocusedGame;
     [ObservableProperty] private bool _xb360HasFocusedGame;
+    public string Xb360FocusedGameCoverUrl => Xb360FocusedGame?.CoverUrl ?? "";
+    public string Xb360FocusedGameTitle => Xb360FocusedGame?.EffectiveTitle ?? "";
+    public string Xb360FocusedGameGradient => Xb360FocusedGame?.CoverGradient ?? DefaultCloudCardGradient;
+    public string Xb360FocusedGamePlatform => Xb360FocusedGame?.Platform ?? "";
+    public string Xb360FocusedGamePlaytime => Xb360FocusedGame?.PlaytimeLabel ?? "";
 
     public bool IsXb360MyGamesBlade  => Xb360ActiveBlade == "mygames";
     public bool IsXb360SocialBlade   => Xb360ActiveBlade == "social";
@@ -652,6 +673,34 @@ public partial class DashboardViewModel : ViewModelBase
     {
         int idx = Math.Clamp(value, 0, Xb360Blades.Length - 1);
         Xb360ActiveBlade = Xb360Blades[idx];
+    }
+
+    partial void OnFeaturedGameChanged(StoreGame? value)
+    {
+        OnPropertyChanged(nameof(HasFeaturedGame));
+        OnPropertyChanged(nameof(FeaturedTitleText));
+        OnPropertyChanged(nameof(FeaturedPlatformText));
+        OnPropertyChanged(nameof(FeaturedDescriptionText));
+        OnPropertyChanged(nameof(HasFeaturedDescription));
+        OnPropertyChanged(nameof(FeaturedPriceText));
+        OnPropertyChanged(nameof(FeaturedRatingStarsText));
+        OnPropertyChanged(nameof(FeaturedGenreText));
+        OnPropertyChanged(nameof(FeaturedCoverUrl));
+        OnPropertyChanged(nameof(FeaturedCoverGradient));
+    }
+
+    partial void OnFeaturedGradientChanged(string value)
+    {
+        OnPropertyChanged(nameof(FeaturedCoverGradient));
+    }
+
+    partial void OnXb360FocusedGameChanged(LocalGameCardVm? value)
+    {
+        OnPropertyChanged(nameof(Xb360FocusedGameCoverUrl));
+        OnPropertyChanged(nameof(Xb360FocusedGameTitle));
+        OnPropertyChanged(nameof(Xb360FocusedGameGradient));
+        OnPropertyChanged(nameof(Xb360FocusedGamePlatform));
+        OnPropertyChanged(nameof(Xb360FocusedGamePlaytime));
     }
 
     public void MoveXb360Blade(int delta)
