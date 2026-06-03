@@ -1564,7 +1564,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 ? LibraryVm.LocalGames.FirstOrDefault(lg => lg.SteamAppId == game.SteamAppId)
                 : null)
                 ?? LibraryVm.LocalGames
-                    .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase));
+                    .FirstOrDefault(lg => TitlesLikelyMatch(lg.Title, game.Title));
         }
         LocalRepack? repack = null;
         if (localGame == null && string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
@@ -1608,7 +1608,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Non-PC store games should never show a PC local game as "installed".
         LocalGame? localGame = string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase)
             ? LibraryVm.LocalGames
-                .FirstOrDefault(lg => lg.Title.Equals(game.Title, StringComparison.OrdinalIgnoreCase))
+                .FirstOrDefault(lg => TitlesLikelyMatch(lg.Title, game.Title))
             : null;
         LocalRepack? repack = null;
         if (localGame == null && string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
@@ -1623,6 +1623,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         DetailVm.LoadFromStoreGame(game, localGame, repack, localRom);
         ShowDetail = true;
+    }
+
+    private static bool TitlesLikelyMatch(string left, string right)
+    {
+        if (string.Equals(left, right, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string leftStripped  = Models.PlatformHelper.StripSpecialSymbols(left);
+        string rightStripped = Models.PlatformHelper.StripSpecialSymbols(right);
+        if (string.Equals(leftStripped, rightStripped, StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        string leftNormalized  = NormalizeGameTitle(leftStripped);
+        string rightNormalized = NormalizeGameTitle(rightStripped);
+        return string.Equals(leftNormalized, rightNormalized, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
