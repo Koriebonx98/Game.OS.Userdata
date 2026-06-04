@@ -1110,7 +1110,7 @@ class Program
 
         var equivalentPairs = new[]
         {
-            ("Call of Duty: Vangaurd (1.16.0.12345)", "Call of Duty: Vangaurd"),
+            ("Call of Duty: Vanguard (1.16.0.12345)", "Call of Duty: Vanguard"),
             ("Call of Duty: Black Ops (MP,Zm,SP)",    "Call of Duty: Black Ops"),
             ("LEGO® Batman™ 3: Beyond Gotham",        "LEGO Batman 3 Beyond Gotham"),
         };
@@ -1366,7 +1366,7 @@ class Program
             // Bracketed repack marker stripped before comparing
             ("Grand Theft Auto V [Repack]",                      "Grand Theft Auto V",            true),
             // Parenthetical version suffix should not create a duplicate title
-            ("Call of Duty: Vangaurd (1.16.0.12345)",            "Call of Duty: Vangaurd",        true),
+            ("Call of Duty: Vanguard (1.16.0.12345)",            "Call of Duty: Vanguard",        true),
             // Parenthetical mode list should not create a duplicate title
             ("Call of Duty: Black Ops (MP,Zm,SP)",               "Call of Duty: Black Ops",       true),
             // Punctuation and symbols should still match canonical DB title
