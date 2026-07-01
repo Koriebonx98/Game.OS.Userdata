@@ -107,15 +107,17 @@ namespace GameLauncher.Services
             if (needsProfile && string.IsNullOrWhiteSpace(profileId)) return null;
 
             // Build the path by substituting {titleId} and {profileId} in each segment
-            string safeRoot = saveDataPath.Trim();
+            string safeRoot       = saveDataPath.Trim();
+            string safeTitleId    = titleId.Trim();
+            string safeProfileId  = profileId?.Trim() ?? "";
             var parts = new string[segments.Length + 1];
             parts[0] = safeRoot;
             for (int i = 0; i < segments.Length; i++)
             {
                 if (string.Equals(segments[i], "{titleId}", StringComparison.OrdinalIgnoreCase))
-                    parts[i + 1] = titleId.Trim();
+                    parts[i + 1] = safeTitleId;
                 else if (string.Equals(segments[i], "{profileId}", StringComparison.OrdinalIgnoreCase))
-                    parts[i + 1] = profileId!.Trim();
+                    parts[i + 1] = safeProfileId;
                 else
                     parts[i + 1] = segments[i];
             }
