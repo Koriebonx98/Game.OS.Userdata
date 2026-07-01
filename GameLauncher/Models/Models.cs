@@ -151,6 +151,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("inviteId")]    public string  InviteId    { get; set; } = "";
         [JsonPropertyName("from")]        public string  From        { get; set; } = "";
         [JsonPropertyName("gameName")]    public string  GameName    { get; set; } = "";
+        [JsonPropertyName("platform")]    public string  Platform    { get; set; } = "";
+        [JsonPropertyName("connectionType")] public string ConnectionType { get; set; } = "";
         [JsonPropertyName("sentAt")]      public string  SentAt      { get; set; } = "";
         [JsonPropertyName("status")]      public string  Status      { get; set; } = "";
         [JsonPropertyName("respondedAt")] public string? RespondedAt { get; set; }

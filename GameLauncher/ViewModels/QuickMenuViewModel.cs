@@ -95,11 +95,15 @@ public partial class QuickMenuViewModel : ViewModelBase
     // ── Friends / Inbox ─────────────────────────────────────────────────────
     public ObservableCollection<FriendPresenceVm> OnlineFriends { get; } = new();
     public ObservableCollection<FriendPresenceVm> Friends { get; } = new();
+    public System.Collections.Generic.IReadOnlyList<FriendPresenceVm> QuickFriends
+        => Friends.Take(6).ToList();
     [ObservableProperty] private bool _hasOnlineFriends;
     [ObservableProperty] private bool _hasFriends;
     [ObservableProperty] private int _unreadMessageCount;
     [ObservableProperty] private string _lastMessagePreview = "";
     [ObservableProperty] private bool _hasUnreadMessages;
+    [ObservableProperty] private string _currentGamePlatform = "";
+    [ObservableProperty] private string _inviteStatusMessage = "";
 
     // ── Recent games / switcher / downloads ────────────────────────────────
     public ObservableCollection<LocalGameCardVm> RecentGames { get; } = new();
@@ -147,6 +151,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Action<string>? OnViewFriendProfile { get; set; }
     public Func<string, Task<System.Collections.Generic.IReadOnlyList<Message>>>? OnLoadConversation { get; set; }
     public Func<string, string, Task<bool>>? OnSendMessage { get; set; }
+    public Func<string, string, string, string, Task<bool>>? OnInviteFriend { get; set; }
     public Action<string>? OnNavigatePage { get; set; }
     public Action<LocalGameCardVm>? OnLaunchRecentGame { get; set; }
     public Action? OnOpenBrowser { get; set; }
@@ -184,6 +189,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(Xb360RecentGamesCount));
         OnPropertyChanged(nameof(Xb360OnlineFriendsCount));
         OnPropertyChanged(nameof(Xb360FriendsCount));
+        OnPropertyChanged(nameof(QuickFriends));
     }
 
     partial void OnPendingDownloadCountChanged(int value)
@@ -618,10 +624,55 @@ public partial class QuickMenuViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void InviteFriend(string friendUsername)
+    private async Task InviteFriend(string friendUsername)
     {
         if (string.IsNullOrWhiteSpace(friendUsername)) return;
-        // Intentionally no-op for now: invite flow depends on per-game integrations.
+        await InviteFriendWithConnection(friendUsername, "Crossplay");
+    }
+
+    [RelayCommand]
+    private async Task InviteFriendViaConnection(string payload)
+    {
+        if (string.IsNullOrWhiteSpace(payload)) return;
+
+        string[] parts = payload.Split('|', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length != 2) return;
+
+        await InviteFriendWithConnection(parts[0], parts[1]);
+    }
+
+    private async Task InviteFriendWithConnection(string friendUsername, string connectionType)
+    {
+        if (string.IsNullOrWhiteSpace(friendUsername) ||
+            string.IsNullOrWhiteSpace(connectionType))
+            return;
+
+        string gameName = (CurrentGameTitle ?? "").Trim();
+        string platform = string.IsNullOrWhiteSpace(CurrentGamePlatform) ? "PC" : CurrentGamePlatform.Trim();
+        if (string.IsNullOrWhiteSpace(gameName))
+        {
+            InviteStatusMessage = "Start a game first, then send an invite from Quick Menu.";
+            return;
+        }
+
+        if (OnInviteFriend == null)
+        {
+            InviteStatusMessage = "Invite service is unavailable right now.";
+            return;
+        }
+
+        InviteStatusMessage = "";
+        try
+        {
+            bool sent = await OnInviteFriend(friendUsername, gameName, platform, connectionType);
+            InviteStatusMessage = sent
+                ? $"Invite sent: {friendUsername} → {gameName} ({platform}, {connectionType})"
+                : "Invite was not sent.";
+        }
+        catch (Exception ex)
+        {
+            InviteStatusMessage = $"Invite failed: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -714,6 +765,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public void Refresh(
         string? currentUsername,
         string? currentGameTitle,
+        string? currentGamePlatform,
         DateTime? sessionStartedAt,
         System.Collections.Generic.IReadOnlyList<FriendPresenceVm> onlineFriends,
         System.Collections.Generic.IReadOnlyList<FriendPresenceVm> allFriends,
@@ -729,6 +781,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     {
         QuickMenuTheme = NormaliseQuickMenuTheme(quickMenuTheme);
         CurrentUsername = currentUsername ?? "";
+        CurrentGamePlatform = currentGamePlatform ?? "";
         Xb360CurrentTimeLabel = DateTime.Now.ToString("h:mm tt");
         IsPlayingGame = !string.IsNullOrEmpty(currentGameTitle);
         CurrentGameTitle = currentGameTitle ?? "";
