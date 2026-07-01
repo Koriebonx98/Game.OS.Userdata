@@ -18,6 +18,7 @@ public partial class QuickMenuViewModel : ViewModelBase
 {
     private readonly DispatcherTimer _xb360ClockTimer;
     private const int MaxRecentGames = 5;
+    private const string InvitePayloadSeparator = "|";
     private static readonly string[] HubOrder =
     {
         "home", "switcher", "recent", "notifications", "downloads",
@@ -635,7 +636,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     {
         if (string.IsNullOrWhiteSpace(payload)) return;
 
-        string[] parts = payload.Split('|', 2, StringSplitOptions.TrimEntries);
+        string[] parts = payload.Split(InvitePayloadSeparator, 2, StringSplitOptions.TrimEntries);
         if (parts.Length != 2) return;
 
         await InviteFriendWithConnection(parts[0], parts[1]);
