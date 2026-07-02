@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using GameLauncher.Models;
@@ -30,6 +32,7 @@ namespace GameLauncher.Services
 
         /// <summary>Maximum time to wait for a single ludusavi backup operation.</summary>
         private static readonly TimeSpan BackupTimeout = TimeSpan.FromMinutes(5);
+        // Keep fallback window short so accidental second presses do not auto-approve much later.
         private static readonly TimeSpan ApprovalFallbackWindow = TimeSpan.FromSeconds(20);
         private static readonly ConcurrentDictionary<string, DateTimeOffset> PendingApprovalTokens = new();
 
@@ -255,7 +258,7 @@ namespace GameLauncher.Services
                 int    exitCode = proc.ExitCode;
 
                 DevLogService.Log(
-                    $"[Ludusavi] command=\"{psi.FileName}\" args=\"{string.Join(" ", psi.ArgumentList)}\" cwd=\"{psi.WorkingDirectory}\"");
+                    $"[Ludusavi] command=\"{SanitiseForLog(psi.FileName)}\" args=\"{BuildSafeArgsForLog(psi)}\" cwd=\"{SanitiseForLog(psi.WorkingDirectory)}\"");
                 DevLogService.Log(
                     $"[Ludusavi] backup exit={exitCode} game=\"{gameTitle}\" path=\"{gameSavePath}\"" +
                     (string.IsNullOrWhiteSpace(stdout) ? "" : $"\n  stdout: {SummarizeOutput(stdout)}") +
@@ -338,7 +341,7 @@ namespace GameLauncher.Services
                 int    exitCode = proc.ExitCode;
 
                 DevLogService.Log(
-                    $"[Ludusavi] command=\"{psi.FileName}\" args=\"{string.Join(" ", psi.ArgumentList)}\" cwd=\"{psi.WorkingDirectory}\"");
+                    $"[Ludusavi] command=\"{SanitiseForLog(psi.FileName)}\" args=\"{BuildSafeArgsForLog(psi)}\" cwd=\"{SanitiseForLog(psi.WorkingDirectory)}\"");
                 DevLogService.Log(
                     $"[Ludusavi] restore exit={exitCode} game=\"{gameTitle}\" path=\"{gameSavePath}\"" +
                     (string.IsNullOrWhiteSpace(stdout) ? "" : $"\n  stdout: {SummarizeOutput(stdout)}") +
@@ -428,6 +431,7 @@ namespace GameLauncher.Services
             string gameTitle,
             string username)
         {
+            CleanupExpiredApprovalTokens();
             string label = operation.Equals("restore", StringComparison.OrdinalIgnoreCase) ? "restore" : "backup";
             string key = $"{username}|{platform}|{gameTitle}|{label}".ToLowerInvariant();
             string title = label == "restore" ? "Restore cloud save" : "Backup cloud save";
@@ -481,6 +485,16 @@ namespace GameLauncher.Services
             return (false, $"Confirm {label}: run the action again within {ApprovalFallbackWindow.TotalSeconds:0} seconds.");
         }
 
+        private static void CleanupExpiredApprovalTokens()
+        {
+            var now = DateTimeOffset.UtcNow;
+            foreach (var item in PendingApprovalTokens.ToList())
+            {
+                if (item.Value < now)
+                    PendingApprovalTokens.TryRemove(item.Key, out _);
+            }
+        }
+
         private static string ClassifyFailure(string detail)
         {
             if (string.IsNullOrWhiteSpace(detail)) return "unknown";
@@ -501,6 +515,26 @@ namespace GameLauncher.Services
             if (string.IsNullOrWhiteSpace(output)) return "";
             string trimmed = output.Trim();
             return trimmed.Length <= 300 ? trimmed : trimmed[..300] + "…";
+        }
+
+        private static string SanitiseForLog(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value;
+            return Path.GetFileName(value.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+        }
+
+        private static string BuildSafeArgsForLog(ProcessStartInfo psi)
+        {
+            var args = new List<string>();
+            foreach (string arg in psi.ArgumentList)
+            {
+                bool looksLikePath =
+                    Path.IsPathRooted(arg) ||
+                    arg.Contains(Path.DirectorySeparatorChar) ||
+                    arg.Contains(Path.AltDirectorySeparatorChar);
+                args.Add(looksLikePath ? SanitiseForLog(arg) : arg);
+            }
+            return string.Join(" ", args);
         }
 
         /// <summary>

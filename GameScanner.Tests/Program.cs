@@ -1925,9 +1925,13 @@ class Program
 
             // 2) Native confirm unavailable: in-app fallback should require retry, then approve
             LudusaviService.RequestNativeConfirmationAsync = (_, _) => Task.FromResult<bool?>(null);
+            // Two immediate calls intentionally model "press once to arm fallback confirm,
+            // press again to approve" in the in-app flow.
             var fallbackStep1 = await LudusaviService.SyncAsync(platform, gameTitle, username, sourceOverridePath: tempRoot);
             var fallbackStep2 = await LudusaviService.SyncAsync(platform, gameTitle, username, sourceOverridePath: tempRoot);
-            if (fallbackStep1.Kind == LudusaviService.ResultKind.Cancelled && fallbackStep2.Kind == LudusaviService.ResultKind.Synced)
+            if (fallbackStep1.Kind == LudusaviService.ResultKind.Cancelled &&
+                fallbackStep1.Message.Contains("Confirm backup", StringComparison.OrdinalIgnoreCase) &&
+                fallbackStep2.Kind == LudusaviService.ResultKind.Synced)
                 Console.WriteLine("  ✅  Native unavailable fallback requires second confirmation and then proceeds");
             else
             {
