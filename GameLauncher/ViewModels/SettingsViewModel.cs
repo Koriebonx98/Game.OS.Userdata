@@ -98,7 +98,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Full path to the ludusavi executable used for per-game save sync.</summary>
     [ObservableProperty] private string _ludusaviPath = "";
     /// <summary>Preserved advanced flag for cloud-save confirmation requirement.</summary>
-    [ObservableProperty] private bool _requireCloudSaveConfirmation = true;
+    [ObservableProperty] private bool _requireCloudSaveConfirmation = false;
     /// <summary>Preserved advanced flag for in-app cloud-save confirmation fallback.</summary>
     [ObservableProperty] private bool _allowCloudSaveInAppFallbackConfirmation = true;
     /// <summary>Enable a system-wide quick-menu hotkey on Windows.</summary>

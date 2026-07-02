@@ -228,7 +228,7 @@ namespace GameLauncher.Services
             string gameTitle, string gameSavePath)
         {
             string ludusaviExe = GetLudusaviExePath();
-            var psi = CreateLudusaviStartInfo(ludusaviExe, "backup", gameSavePath, gameTitle, force: false);
+            var psi = CreateLudusaviStartInfo(ludusaviExe, "backup", gameSavePath, gameTitle, force: true);
 
             try
             {

@@ -613,11 +613,13 @@ namespace GameLauncher.Models
         [JsonPropertyName("ludusaviPath")] public string LudusaviPath { get; set; } = "";
 
         /// <summary>
-        /// When <see langword="true"/> (default), backup/restore operations require
-        /// an explicit user confirmation (native prompt when available, otherwise
-        /// an in-app fallback confirmation).
+        /// When <see langword="true"/>, backup/restore operations require an explicit
+        /// user confirmation (native prompt when available, otherwise an in-app
+        /// fallback confirmation).  Defaults to <see langword="false"/> because
+        /// ludusavi is invoked with <c>--force</c>, which is the same approach used
+        /// in the PS5 OS reference implementation.
         /// </summary>
-        [JsonPropertyName("requireCloudSaveConfirmation")] public bool RequireCloudSaveConfirmation { get; set; } = true;
+        [JsonPropertyName("requireCloudSaveConfirmation")] public bool RequireCloudSaveConfirmation { get; set; } = false;
 
         /// <summary>
         /// When <see langword="true"/> (default), Game.OS falls back to an in-app
