@@ -208,6 +208,7 @@ public partial class FriendsViewModel : ViewModelBase
     private async Task InviteFriendViaConnection(string payload)
     {
         if (string.IsNullOrWhiteSpace(payload)) return;
+        if (!payload.Contains(InvitePayloadSeparator, StringComparison.Ordinal)) return;
 
         string[] parts = payload.Split(InvitePayloadSeparator, 2, StringSplitOptions.TrimEntries);
         if (parts.Length != 2) return;
@@ -244,6 +245,7 @@ public partial class FriendsViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            DevLogService.Log($"[Friends] invite failed for {friendUsername}: {ex.Message}");
             InviteStatusMessage = $"Invite failed: {ex.Message}";
         }
     }

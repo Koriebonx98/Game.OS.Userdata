@@ -108,13 +108,14 @@ namespace GameLauncher.Services
             //  - {saveRoot}/content/{profileId}/{titleId}/
             //  - legacy: .../{titleId}/00000001 or .../000100000/{profileId}
             // Prefer existing folders, then fall back to best guess.
+            string platformKey = (platform ?? "").Replace(" ", "", StringComparison.Ordinal).Trim();
             if ((emulatorName ?? "").Contains("xenia", StringComparison.OrdinalIgnoreCase) ||
-                (platform ?? "").Contains("xbox 360", StringComparison.OrdinalIgnoreCase))
+                platformKey.Equals("xbox360", StringComparison.OrdinalIgnoreCase))
             {
                 return ResolveXeniaPath(safeRoot, safeTitleId, profileId);
             }
 
-            string[] segments = ResolvePattern(platform, emulatorName);
+            string[] segments = ResolvePattern(platform ?? "", emulatorName);
             if (segments.Length == 0) return null;
 
             // If the pattern requires a profileId but none was supplied, attempt
@@ -163,7 +164,7 @@ namespace GameLauncher.Services
 
         private static bool LooksLikeExecutablePath(string path)
         {
-            string ext = Path.GetExtension(path) ?? "";
+            string ext = (Path.GetExtension(path) ?? "").Trim();
             return ext.Equals(".exe", StringComparison.OrdinalIgnoreCase)
                    || ext.Equals(".bat", StringComparison.OrdinalIgnoreCase)
                    || ext.Equals(".cmd", StringComparison.OrdinalIgnoreCase)
