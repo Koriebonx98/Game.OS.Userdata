@@ -97,6 +97,10 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _exophaseProfileId = "";
     /// <summary>Full path to the ludusavi executable used for per-game save sync.</summary>
     [ObservableProperty] private string _ludusaviPath = "";
+    /// <summary>Preserved advanced flag for cloud-save confirmation requirement.</summary>
+    [ObservableProperty] private bool _requireCloudSaveConfirmation = true;
+    /// <summary>Preserved advanced flag for in-app cloud-save confirmation fallback.</summary>
+    [ObservableProperty] private bool _allowCloudSaveInAppFallbackConfirmation = true;
     /// <summary>Enable a system-wide quick-menu hotkey on Windows.</summary>
     [ObservableProperty] private bool _enableGlobalQuickMenuHotkey = false;
     /// <summary>Use the older activating quick-menu overlay behaviour.</summary>
@@ -328,6 +332,8 @@ public partial class SettingsViewModel : ViewModelBase
         SteamUserId            = appSettings.SteamUserId;
         ExophaseProfileId      = appSettings.ExophaseProfileId;
         LudusaviPath           = appSettings.LudusaviPath;
+        RequireCloudSaveConfirmation = appSettings.RequireCloudSaveConfirmation;
+        AllowCloudSaveInAppFallbackConfirmation = appSettings.AllowCloudSaveInAppFallbackConfirmation;
         EnableSteamSync        = appSettings.EnableSteamSync;
         EnableAchievementAutoSync = appSettings.EnableAchievementAutoSync;
         NotifyRyujinxLogStatus    = appSettings.NotifyRyujinxLogStatus;
@@ -537,6 +543,8 @@ public partial class SettingsViewModel : ViewModelBase
             LogRepacksScannerAdvanced = LogRepacksScannerAdvanced,
             LogLocalSteamScanner      = LogLocalSteamScanner,
             LogSteamApiScanner        = LogSteamApiScanner,
+            RequireCloudSaveConfirmation = RequireCloudSaveConfirmation,
+            AllowCloudSaveInAppFallbackConfirmation = AllowCloudSaveInAppFallbackConfirmation,
             StartupApps           = StartupApps.Select(r => new Models.StartupAppEntry
             {
                 Label     = r.Label,
