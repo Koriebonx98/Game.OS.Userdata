@@ -430,17 +430,9 @@ namespace GameLauncher.Services
         {
             if (string.IsNullOrWhiteSpace(title)) return title;
 
-            // Remove registered/trademark/copyright glyphs and their ASCII look-alikes.
-            string cleaned = title
-                .Replace("®", "")
-                .Replace("©", "")
-                .Replace("™", "")
-                .Replace("\u00AE", "")   // ® (latin-1)
-                .Replace("\u00A9", "")   // ©
-                .Replace("\u2122", "")   // ™
-                .Replace("\u2120", ""); // ℠ (service mark)
-
-            // Collapse any double-spaces left after removal and trim.
+            // Remove registered/trademark/copyright glyphs in a single pass,
+            // then collapse any double-spaces left after removal and trim.
+            string cleaned = Regex.Replace(title, @"[®©™\u00AE\u00A9\u2122\u2120]", "");
             cleaned = Regex.Replace(cleaned, @"  +", " ").Trim();
             return cleaned;
         }

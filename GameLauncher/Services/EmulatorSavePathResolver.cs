@@ -98,6 +98,10 @@ namespace GameLauncher.Services
             if (string.IsNullOrWhiteSpace(saveDataPath)) return null;
             if (string.IsNullOrWhiteSpace(titleId))      return null;
 
+            // Trim once and reuse throughout the method.
+            string safeRoot    = saveDataPath.Trim();
+            string safeTitleId = titleId.Trim();
+
             string[] segments = ResolvePattern(platform, emulatorName);
             if (segments.Length == 0) return null;
 
@@ -108,13 +112,11 @@ namespace GameLauncher.Services
                 string.Equals(s, "{profileId}", StringComparison.OrdinalIgnoreCase));
             if (needsProfile && string.IsNullOrWhiteSpace(profileId))
             {
-                profileId = TryDetectXeniaProfileId(saveDataPath.Trim(), titleId.Trim());
+                profileId = TryDetectXeniaProfileId(safeRoot, safeTitleId);
                 if (string.IsNullOrWhiteSpace(profileId)) return null;
             }
 
             // Build the path by substituting {titleId} and {profileId} in each segment
-            string safeRoot       = saveDataPath.Trim();
-            string safeTitleId    = titleId.Trim();
             string safeProfileId  = profileId?.Trim() ?? "";
             var parts = new string[segments.Length + 1];
             parts[0] = safeRoot;
