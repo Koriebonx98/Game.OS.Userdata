@@ -215,8 +215,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         if (card == null)
         {
-            Navigate("library");
+            // Game is not installed — inform the user and navigate to the store
+            string connInfo = string.IsNullOrWhiteSpace(invite.ConnectionType)
+                ? ""
+                : $" via {invite.ConnectionType}";
+            NotificationService.ShowDeveloperNotification(
+                $"Please install {invite.GameName} first",
+                $"Invited by {invite.From} to play {invite.GameName} ({invite.Platform}){connInfo}");
+
+            // Pre-populate the store search so the user can find the game quickly
+            StoreVm.SearchText = invite.GameName;
+            Navigate("store");
             return;
+        }
+
+        // Game found — notify the user about the connection method then launch
+        if (!string.IsNullOrWhiteSpace(invite.ConnectionType))
+        {
+            NotificationService.ShowDeveloperNotification(
+                $"Joining {invite.From}'s game",
+                $"{invite.GameName} · {invite.Platform} · {invite.ConnectionType}");
         }
 
         LaunchFromCard(card);

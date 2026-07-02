@@ -78,8 +78,8 @@ namespace GameLauncher.Services
         /// <param name="saveDataPath">Root save folder from <see cref="Models.EmulatorSettings.SaveDataPath"/>; may be empty.</param>
         /// <param name="titleId">Platform-specific title ID for the game (e.g. "0100ADC022586000" for Switch).</param>
         /// <param name="profileId">
-        /// Emulator user profile ID; required for Xenia where the save path is
-        /// <c>content/{profileId}/{titleId}/000100000/{profileId}/</c>
+        /// Emulator user profile ID; required for Xenia where the canonical save path is
+        /// <c>content/{profileId}/{titleId}/00000001/</c>
         /// (e.g. "E03000003D7E0695").  Pass <see langword="null"/> or empty for
         /// emulators that do not use a profile ID.
         /// </param>
@@ -172,39 +172,45 @@ namespace GameLauncher.Services
                    || ext.Equals(".appimage", StringComparison.OrdinalIgnoreCase);
         }
 
-        private static string ResolveXeniaPath(string saveRoot, string titleId, string? profileId)
+        // The standard Xenia save subfolder for user game saves (content type 1).
+        private const string XeniaSaveSubfolder = "00000001";
+
+        // Returns null when no profile ID is available and one cannot be auto-detected,
+        // since Xenia saves always live under content/{profileId}/{titleId}/{saveType}.
+        private static string? ResolveXeniaPath(string saveRoot, string titleId, string? profileId)
         {
             string safeProfileId = (profileId ?? "").Trim();
-            string directTitlePath = Path.Combine(saveRoot, titleId);
-            if (Directory.Exists(directTitlePath))
-                return directTitlePath;
 
             string contentRoot = Path.Combine(saveRoot, "content");
-            if (!Directory.Exists(contentRoot))
-                return directTitlePath;
 
             if (!string.IsNullOrWhiteSpace(safeProfileId))
             {
                 string profileTitlePath = Path.Combine(contentRoot, safeProfileId, titleId);
-                if (Directory.Exists(profileTitlePath))
-                    return profileTitlePath;
 
-                string legacy00000001 = Path.Combine(profileTitlePath, "00000001");
-                if (Directory.Exists(legacy00000001))
-                    return legacy00000001;
+                // Canonical save location: content/{profileId}/{titleId}/00000001/
+                string canonicalSavePath = Path.Combine(profileTitlePath, XeniaSaveSubfolder);
+                if (Directory.Exists(canonicalSavePath))
+                    return canonicalSavePath;
 
+                // Legacy layout: content/{profileId}/{titleId}/000100000/{profileId}/
                 string legacy000100000 = Path.Combine(profileTitlePath, "000100000", safeProfileId);
                 if (Directory.Exists(legacy000100000))
                     return legacy000100000;
 
-                return profileTitlePath;
+                // Default to canonical path even if it doesn't exist yet (first backup will create it)
+                return canonicalSavePath;
             }
 
-            string? detectedProfile = TryDetectXeniaProfileId(saveRoot, titleId);
-            if (!string.IsNullOrWhiteSpace(detectedProfile))
-                return Path.Combine(contentRoot, detectedProfile, titleId);
+            // Auto-detect profile from existing content folder
+            if (Directory.Exists(contentRoot))
+            {
+                string? detectedProfile = TryDetectXeniaProfileId(saveRoot, titleId);
+                if (!string.IsNullOrWhiteSpace(detectedProfile))
+                    return Path.Combine(contentRoot, detectedProfile, titleId, XeniaSaveSubfolder);
+            }
 
-            return directTitlePath;
+            // No profile known and none detected — cannot resolve a reliable Xenia save path.
+            return null;
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────

@@ -142,13 +142,17 @@ namespace GameLauncher.Services
             // ── TitleID-based direct copy ──────────────────────────────────────
             // When the caller has already resolved the exact emulator save folder,
             // copy files directly rather than relying on ludusavi's manifest lookup.
-            if (!string.IsNullOrWhiteSpace(sourceOverridePath)
-                && Directory.Exists(sourceOverridePath))
+            if (!string.IsNullOrWhiteSpace(sourceOverridePath))
             {
-                return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
+                if (Directory.Exists(sourceOverridePath))
+                    return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
+
+                // Path was resolved for a non-PC emulator game but doesn't exist yet —
+                // no saves to back up; do NOT fall through to ludusavi for emulator games.
+                return LudusaviResult.NoSaveFound;
             }
 
-            // ── Ludusavi fallback ──────────────────────────────────────────────
+            // ── Ludusavi fallback (PC games without a resolved emulator path) ──
             return await RunLudusaviBackupAsync(gameTitle, gameSavePath);
         }
 
