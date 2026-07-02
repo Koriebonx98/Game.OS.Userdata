@@ -2730,6 +2730,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        LudusaviSyncStatus  = "";
+        IsLudusaviSyncing   = false;
+        IsLudusaviRestoring = false;
         _currentLocalRom = localRom;
         Title         = game.Title;
         Platform      = game.Platform;
@@ -2781,6 +2784,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        LudusaviSyncStatus  = "";
+        IsLudusaviSyncing   = false;
+        IsLudusaviRestoring = false;
         _currentLocalRom = localRom;
         Title         = game.Title;
         Platform      = game.Platform;
@@ -2834,6 +2840,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        LudusaviSyncStatus  = "";
+        IsLudusaviSyncing   = false;
+        IsLudusaviRestoring = false;
         // Reset Switch/Ryujinx state so the Mods button is not incorrectly visible
         // when navigating from a Switch game to a PC game.
         IsSwitch             = false;
@@ -2916,6 +2925,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowSettings    = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        LudusaviSyncStatus  = "";
+        IsLudusaviSyncing   = false;
+        IsLudusaviRestoring = false;
         Title             = repack.Title;
         Platform          = "PC";
         Genre             = "";
@@ -2974,6 +2986,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        LudusaviSyncStatus  = "";
+        IsLudusaviSyncing   = false;
+        IsLudusaviRestoring = false;
         Title             = rom.Title;
         Platform          = rom.Platform;
         Genre             = "";

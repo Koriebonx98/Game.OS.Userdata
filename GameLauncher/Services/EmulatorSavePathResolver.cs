@@ -59,8 +59,8 @@ namespace GameLauncher.Services
             // RPCS3: same as PS3 platform default
             ["rpcs3"]          = new[] { "dev_hdd0", "home", "00000001", "savedata", "{titleId}" },
 
-            // Xenia: <saveRoot>/content/<profileId>/<titleId>/000100000/<profileId>/
-            ["xenia"]          = new[] { "content", "{profileId}", "{titleId}", "000100000", "{profileId}" },
+            // Xenia has multiple layouts (canary / legacy). Resolved via special-case logic.
+            ["xenia"]          = new[] { "{titleId}" },
 
             // Vita3K: same as PS Vita platform default
             ["vita3k"]         = new[] { "ux0", "user", "00", "savedata", "{titleId}" },
@@ -78,8 +78,8 @@ namespace GameLauncher.Services
         /// <param name="saveDataPath">Root save folder from <see cref="Models.EmulatorSettings.SaveDataPath"/>; may be empty.</param>
         /// <param name="titleId">Platform-specific title ID for the game (e.g. "0100ADC022586000" for Switch).</param>
         /// <param name="profileId">
-        /// Emulator user profile ID; required for Xenia where the save path is
-        /// <c>content/{profileId}/{titleId}/000100000/{profileId}/</c>
+        /// Emulator user profile ID; required for Xenia where the canonical save path is
+        /// <c>content/{profileId}/{titleId}/00000001/</c>
         /// (e.g. "E03000003D7E0695").  Pass <see langword="null"/> or empty for
         /// emulators that do not use a profile ID.
         /// </param>
@@ -99,10 +99,23 @@ namespace GameLauncher.Services
             if (string.IsNullOrWhiteSpace(titleId))      return null;
 
             // Trim once and reuse throughout the method.
-            string safeRoot    = saveDataPath.Trim();
+            string safeRoot    = NormalizeSaveRoot(saveDataPath);
             string safeTitleId = titleId.Trim();
+            if (string.IsNullOrWhiteSpace(safeRoot)) return null;
 
-            string[] segments = ResolvePattern(platform, emulatorName);
+            // Xenia layouts vary by version/configuration:
+            //  - {saveRoot}/{titleId}/
+            //  - {saveRoot}/content/{profileId}/{titleId}/
+            //  - legacy: .../{titleId}/00000001 or .../000100000/{profileId}
+            // Prefer existing folders, then fall back to best guess.
+            string platformKey = (platform ?? "").Replace(" ", "", StringComparison.Ordinal).Trim();
+            if ((emulatorName ?? "").Contains("xenia", StringComparison.OrdinalIgnoreCase) ||
+                platformKey.Equals("xbox360", StringComparison.OrdinalIgnoreCase))
+            {
+                return ResolveXeniaPath(safeRoot, safeTitleId, profileId);
+            }
+
+            string[] segments = ResolvePattern(platform ?? "", emulatorName);
             if (segments.Length == 0) return null;
 
             // If the pattern requires a profileId but none was supplied, attempt
@@ -131,6 +144,73 @@ namespace GameLauncher.Services
             }
 
             return Path.Combine(parts);
+        }
+
+        private static string NormalizeSaveRoot(string saveDataPath)
+        {
+            string root = (saveDataPath ?? "").Trim().Trim('"');
+            if (string.IsNullOrWhiteSpace(root)) return "";
+
+            // Users sometimes paste/select the emulator executable; use its folder instead.
+            if (LooksLikeExecutablePath(root))
+            {
+                string? dir = Path.GetDirectoryName(root);
+                if (!string.IsNullOrWhiteSpace(dir))
+                    return dir.Trim();
+            }
+
+            return root;
+        }
+
+        private static bool LooksLikeExecutablePath(string path)
+        {
+            string ext = (Path.GetExtension(path) ?? "").Trim();
+            return ext.Equals(".exe", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".bat", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".cmd", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".sh", StringComparison.OrdinalIgnoreCase)
+                   || ext.Equals(".appimage", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // The standard Xenia save subfolder for user game saves (content type 1).
+        private const string XeniaSaveSubfolder = "00000001";
+
+        // Returns null when no profile ID is available and one cannot be auto-detected,
+        // since Xenia saves always live under content/{profileId}/{titleId}/{saveType}.
+        private static string? ResolveXeniaPath(string saveRoot, string titleId, string? profileId)
+        {
+            string safeProfileId = (profileId ?? "").Trim();
+
+            string contentRoot = Path.Combine(saveRoot, "content");
+
+            if (!string.IsNullOrWhiteSpace(safeProfileId))
+            {
+                string profileTitlePath = Path.Combine(contentRoot, safeProfileId, titleId);
+
+                // Canonical save location: content/{profileId}/{titleId}/00000001/
+                string canonicalSavePath = Path.Combine(profileTitlePath, XeniaSaveSubfolder);
+                if (Directory.Exists(canonicalSavePath))
+                    return canonicalSavePath;
+
+                // Legacy layout: content/{profileId}/{titleId}/000100000/{profileId}/
+                string legacy000100000 = Path.Combine(profileTitlePath, "000100000", safeProfileId);
+                if (Directory.Exists(legacy000100000))
+                    return legacy000100000;
+
+                // Default to canonical path even if it doesn't exist yet (first backup will create it)
+                return canonicalSavePath;
+            }
+
+            // Auto-detect profile from existing content folder
+            if (Directory.Exists(contentRoot))
+            {
+                string? detectedProfile = TryDetectXeniaProfileId(saveRoot, titleId);
+                if (!string.IsNullOrWhiteSpace(detectedProfile))
+                    return Path.Combine(contentRoot, detectedProfile, titleId, XeniaSaveSubfolder);
+            }
+
+            // No profile known and none detected — cannot resolve a reliable Xenia save path.
+            return null;
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────

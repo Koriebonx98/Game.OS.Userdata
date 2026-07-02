@@ -2059,10 +2059,11 @@ class Program
         try
         {
             // Build a fake Xenia save layout:
-            //   <tempRoot>/content/<profileId>/<titleId>/
+            //   <tempRoot>/content/<profileId>/<titleId>/00000001/  (canonical)
             string profileId = "E03000003D7E0695";
             string titleId   = "4D530004";
-            string saveDir   = Path.Combine(tempRoot, "content", profileId, titleId);
+            // Create the canonical save subfolder so auto-detection succeeds
+            string saveDir   = Path.Combine(tempRoot, "content", profileId, titleId, "00000001");
             Directory.CreateDirectory(saveDir);
             File.WriteAllText(Path.Combine(saveDir, "save.dat"), "test");
 
@@ -2074,8 +2075,8 @@ class Program
                 titleId: titleId,
                 profileId: null);
 
-            // Expected: <tempRoot>/content/<profileId>/<titleId>/000100000/<profileId>/
-            string expected = Path.Combine(tempRoot, "content", profileId, titleId, "000100000", profileId);
+            // Expected: <tempRoot>/content/<profileId>/<titleId>/00000001/
+            string expected = Path.Combine(tempRoot, "content", profileId, titleId, "00000001");
 
             if (resolved == expected)
             {
