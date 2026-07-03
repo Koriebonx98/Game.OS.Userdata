@@ -303,6 +303,10 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Switch TitleID pattern: exactly 16 hexadecimal characters (e.g. "0100152000022000").</summary>
     private static readonly Regex _switchTitleIdValidationRegex =
         new(@"^[0-9A-Fa-f]{16}$", RegexOptions.Compiled);
+    private static readonly Regex _achievementLookupPrefixRegex =
+        new(@"^(achievement|ach|stat)[\s_.:-]*", RegexOptions.Compiled);
+    private static readonly Regex _achievementLookupNonAlnumRegex =
+        new(@"[^a-z0-9]+", RegexOptions.Compiled);
 
     public ObservableCollection<string> DriveLabels { get; } = new();
 
@@ -1222,15 +1226,7 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             // Attempt to resolve the emulator save folder via TitleID so we can
             // copy saves directly instead of relying on ludusavi's manifest lookup.
-            string? titleId = CurrentTitleId;
-            string? sourceOverridePath = null;
-            if (!string.IsNullOrWhiteSpace(titleId))
-            {
-                var emuSettings = EmulatorSettingsService.Load(Platform);
-                sourceOverridePath = EmulatorSavePathResolver.Resolve(
-                    Platform, emuSettings.EmulatorName, emuSettings.SaveDataPath, titleId,
-                    emuSettings.XeniaProfileId);
-            }
+            string? sourceOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.SyncAsync(
                 Platform, Title, _currentUsername, sourceOverridePath);
@@ -1277,15 +1273,7 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             // Resolve the emulator save folder so we can copy back directly
             // (works for Xenia, RPCS3, Ryujinx, etc. without a ludusavi manifest entry).
-            string? titleId = CurrentTitleId;
-            string? targetOverridePath = null;
-            if (!string.IsNullOrWhiteSpace(titleId))
-            {
-                var emuSettings = EmulatorSettingsService.Load(Platform);
-                targetOverridePath = EmulatorSavePathResolver.Resolve(
-                    Platform, emuSettings.EmulatorName, emuSettings.SaveDataPath, titleId,
-                    emuSettings.XeniaProfileId);
-            }
+            string? targetOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.RestoreAsync(
                 Platform, Title, _currentUsername, targetOverridePath);
@@ -2275,19 +2263,37 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (knownUnlocks.Contains(unlockId))
                     continue;
 
-                knownUnlocks.Add(unlockId);
-                if (!sessionUnlocks.Add(unlockId))
+                var resolved = ResolvePcAchievementForUnlock(unlockId);
+                string resolvedId = !string.IsNullOrWhiteSpace(resolved?.AchievementId)
+                    ? resolved!.AchievementId
+                    : unlockId;
+                string resolvedName = !string.IsNullOrWhiteSpace(resolved?.Name)
+                    ? resolved!.Name
+                    : unlockId;
+                string? iconUrl = resolved?.IconUrl;
+
+                if (sessionUnlocks.Contains(unlockId) ||
+                    sessionUnlocks.Contains(resolvedId) ||
+                    sessionUnlocks.Contains(resolvedName))
                     continue;
 
-                Services.NotificationService.ShowAchievementUnlockedNotification(unlockId, gameTitle);
-                DevLogService.Log($"[PcAch] Steam emu unlock detected: {unlockId} ({gameTitle})");
+                foreach (var key in EnumerateDistinctAchievementKeys(unlockId, resolvedId, resolvedName))
+                {
+                    knownUnlocks.Add(key);
+                    sessionUnlocks.Add(key);
+                }
+
+                Services.NotificationService.ShowAchievementUnlockedNotification(resolvedName, gameTitle);
+                DevLogService.Log($"[PcAch] Steam emu unlock detected: {resolvedName} (id={resolvedId}, raw={unlockId}) ({gameTitle})");
 
                 if (OnRequestAchievementUnlockAsync != null)
-                    _ = OnRequestAchievementUnlockAsync("PC", gameTitle, unlockId, unlockId, null);
+                    _ = OnRequestAchievementUnlockAsync("PC", gameTitle, resolvedId, resolvedName, iconUrl);
 
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var existing = Achievements.FirstOrDefault(a =>
+                        string.Equals(a.AchievementId, resolvedId, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(a.Name, resolvedName, StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(a.AchievementId, unlockId, StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(a.Name, unlockId, StringComparison.OrdinalIgnoreCase));
                     if (existing != null && string.IsNullOrEmpty(existing.UnlockedAt))
@@ -2327,6 +2333,26 @@ public partial class GameDetailViewModel : ViewModelBase
             await PollOnceAsync();
         }
         catch { /* best-effort */ }
+    }
+
+    private Achievement? ResolvePcAchievementForUnlock(string unlockId)
+    {
+        if (string.IsNullOrWhiteSpace(unlockId) || Achievements.Count == 0)
+            return null;
+
+        var exact = Achievements.FirstOrDefault(a =>
+            string.Equals(a.AchievementId, unlockId, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(a.Name, unlockId, StringComparison.OrdinalIgnoreCase));
+        if (exact != null)
+            return exact;
+
+        string normalizedUnlock = NormalizeAchievementLookupKey(unlockId);
+        if (string.IsNullOrEmpty(normalizedUnlock))
+            return null;
+
+        return Achievements.FirstOrDefault(a =>
+            string.Equals(NormalizeAchievementLookupKey(a.AchievementId), normalizedUnlock, StringComparison.Ordinal) ||
+            string.Equals(NormalizeAchievementLookupKey(a.Name), normalizedUnlock, StringComparison.Ordinal));
     }
 
     /// <summary>
@@ -3716,6 +3742,50 @@ public partial class GameDetailViewModel : ViewModelBase
                 return val.GetString() ?? "";
         }
         return "";
+    }
+
+    private static string NormalizeAchievementLookupKey(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "";
+
+        string normalized = value.Trim().ToLowerInvariant();
+        normalized = _achievementLookupPrefixRegex.Replace(normalized, "");
+        normalized = _achievementLookupNonAlnumRegex.Replace(normalized, "");
+        return normalized;
+    }
+
+    private static IEnumerable<string> EnumerateDistinctAchievementKeys(params string?[] values)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+            if (seen.Add(value))
+                yield return value;
+        }
+    }
+
+    private string? ResolveEmulatorSavePathOverride(string? titleId)
+    {
+        if (string.IsNullOrWhiteSpace(titleId))
+            return null;
+
+        var emuSettings = EmulatorSettingsService.Load(Platform);
+        string saveRoot = !string.IsNullOrWhiteSpace(emuSettings.SaveDataPath)
+            ? emuSettings.SaveDataPath
+            // Xbox 360 setups often only configure the emulator executable path.
+            // See EmulatorSavePathResolver.NormalizeSaveRoot (called by Resolve),
+            // which converts executable paths to their containing directory.
+            : emuSettings.EmulatorPath;
+
+        return EmulatorSavePathResolver.Resolve(
+            Platform,
+            emuSettings.EmulatorName,
+            saveRoot,
+            titleId,
+            emuSettings.XeniaProfileId);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
