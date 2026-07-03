@@ -93,14 +93,17 @@ namespace GameLauncher.Services
                     if (candidates.Contains(file)) continue; // already emitted above
 
                     string fname = Path.GetFileName(file);
+                    bool matchesAppId = steamAppId <= 0 || PathContainsSegment(file, steamAppId.ToString());
+
                     if (AchievementFileNames.Contains(fname))
                     {
+                        if (!matchesAppId) continue;
                         yield return file;
                         continue;
                     }
 
                     // Also match any .json/.ini that contains the AppID in its path
-                    if (steamAppId > 0 &&
+                    if (steamAppId > 0 && matchesAppId &&
                         (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
                          file.EndsWith(".ini",  StringComparison.OrdinalIgnoreCase)) &&
                         file.Contains(steamAppId.ToString(), StringComparison.OrdinalIgnoreCase))
@@ -502,6 +505,21 @@ namespace GameLauncher.Services
                      (long.TryParse(s, out var p) && p > 0)),
                 _ => false,
             };
+        }
+
+        private static bool PathContainsSegment(string path, string segment)
+        {
+            if (string.IsNullOrWhiteSpace(path) || string.IsNullOrWhiteSpace(segment))
+                return false;
+
+            var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (var part in parts)
+            {
+                if (part.Equals(segment, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
     }
 }
