@@ -205,6 +205,8 @@ namespace GameLauncher.Services
             if (Directory.Exists(titleRoot))
                 return titleRoot;
 
+            // No existing save folder yet. Return the canonical leaf so restore
+            // operations can create the full Xenia save path on demand.
             return canonicalSaveLeaf;
         }
 
