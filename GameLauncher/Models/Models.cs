@@ -1001,7 +1001,7 @@ namespace GameLauncher.Models
         /// <summary>
         /// Xenia user profile ID (e.g. "E03000003D7E0695").
         /// Used by <c>EmulatorSavePathResolver</c> to locate Xbox 360 saves under
-        /// common Xenia layouts (typically <c>{saveDataPath}/content/{xeniaProfileId}/{titleId}/</c>).
+        /// the canonical Xenia layout (typically <c>{saveDataPath}/Content/{xeniaProfileId}/{titleId}/</c>).
         /// </summary>
         [JsonPropertyName("xeniaProfileId")] public string  XeniaProfileId { get; set; } = "";
     }
