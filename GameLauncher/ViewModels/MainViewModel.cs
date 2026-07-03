@@ -682,7 +682,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnPlayFocusedCard   = LaunchFromCard;
         DashboardVm.OnOpenFocusedCardDetail = OpenDetailFromMyGameCard;
         DashboardVm.OnViewFriendProfile  = OpenFriendProfile;
-        DashboardVm.OnMessageFriend      = friendUsername => Navigate("inbox");
+        DashboardVm.OnMessageFriend      = friendUsername =>
+        {
+            Navigate("inbox");
+            if (!string.IsNullOrWhiteSpace(friendUsername))
+                InboxVm.OpenConversationCommand.Execute(friendUsername);
+        };
         DashboardVm.OnResolveCurrentGameContext = () => (
             DetailVm.IsGameRunning ? DetailVm.Title : null,
             DetailVm.IsGameRunning ? DetailVm.Platform : null
