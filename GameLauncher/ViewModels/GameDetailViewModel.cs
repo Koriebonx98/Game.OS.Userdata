@@ -2279,17 +2279,24 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (!sessionUnlocks.Add(unlockId))
                     continue;
 
-                Services.NotificationService.ShowAchievementUnlockedNotification(unlockId, gameTitle);
                 DevLogService.Log($"[PcAch] Steam emu unlock detected: {unlockId} ({gameTitle})");
-
-                if (OnRequestAchievementUnlockAsync != null)
-                    _ = OnRequestAchievementUnlockAsync("PC", gameTitle, unlockId, unlockId, null);
 
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     var existing = Achievements.FirstOrDefault(a =>
                         string.Equals(a.AchievementId, unlockId, StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(a.Name, unlockId, StringComparison.OrdinalIgnoreCase));
+
+                    // Resolve the human-readable display name and icon from the loaded
+                    // achievement template; fall back to the raw emu ID if not found yet.
+                    string displayName = existing?.Name is { Length: > 0 } n ? n : unlockId;
+                    string? iconUrl    = existing?.IconUrl;
+
+                    Services.NotificationService.ShowAchievementUnlockedNotification(displayName, gameTitle);
+
+                    if (OnRequestAchievementUnlockAsync != null)
+                        _ = OnRequestAchievementUnlockAsync("PC", gameTitle, unlockId, displayName, iconUrl);
+
                     if (existing != null && string.IsNullOrEmpty(existing.UnlockedAt))
                     {
                         existing.UnlockedAt = DateTime.UtcNow.ToString("o");
