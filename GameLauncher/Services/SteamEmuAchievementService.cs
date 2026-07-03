@@ -93,20 +93,21 @@ namespace GameLauncher.Services
                     if (candidates.Contains(file)) continue; // already emitted above
 
                     string fname = Path.GetFileName(file);
-                    bool matchesAppId = steamAppId <= 0 || PathContainsSegment(file, steamAppId.ToString());
 
                     if (AchievementFileNames.Contains(fname))
                     {
+                        bool matchesAppId = steamAppId <= 0 || PathContainsSegment(file, steamAppId.ToString());
                         if (!matchesAppId) continue;
                         yield return file;
                         continue;
                     }
 
                     // Also match any .json/.ini that contains the AppID in its path
-                    if (steamAppId > 0 && matchesAppId &&
+                    if (steamAppId > 0 &&
                         (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
                          file.EndsWith(".ini",  StringComparison.OrdinalIgnoreCase)))
                     {
+                        if (!PathContainsSegment(file, steamAppId.ToString())) continue;
                         yield return file;
                     }
                 }

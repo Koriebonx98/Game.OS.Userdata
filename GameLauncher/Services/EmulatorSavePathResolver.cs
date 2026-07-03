@@ -202,6 +202,8 @@ namespace GameLauncher.Services
             string rootName = Path.GetFileName(
                 saveRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
 
+            // Users may set SaveDataPath directly to ".../Content". In that case,
+            // treat the provided path as the content root and do not append again.
             if (rootName.Equals("content", StringComparison.OrdinalIgnoreCase))
                 return saveRoot;
 
