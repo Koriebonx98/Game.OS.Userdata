@@ -105,8 +105,7 @@ namespace GameLauncher.Services
                     // Also match any .json/.ini that contains the AppID in its path
                     if (steamAppId > 0 && matchesAppId &&
                         (file.EndsWith(".json", StringComparison.OrdinalIgnoreCase) ||
-                         file.EndsWith(".ini",  StringComparison.OrdinalIgnoreCase)) &&
-                        file.Contains(steamAppId.ToString(), StringComparison.OrdinalIgnoreCase))
+                         file.EndsWith(".ini",  StringComparison.OrdinalIgnoreCase)))
                     {
                         yield return file;
                     }
