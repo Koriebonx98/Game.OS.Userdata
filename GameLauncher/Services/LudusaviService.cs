@@ -152,6 +152,16 @@ namespace GameLauncher.Services
                 return LudusaviResult.NoSaveFound;
             }
 
+            // ── Non-PC emulator games without a resolved save path ─────────────
+            // Ludusavi's manifest only covers PC game saves.  For emulator games
+            // (Xbox 360, PS3, Switch, etc.) with no TitleID or save-data root
+            // configured, calling ludusavi would produce a useless "No info for
+            // these games" error.  Direct the user to configure the emulator
+            // settings instead.
+            if (IsEmulatorPlatform(platform))
+                return LudusaviResult.Error(
+                    "Set the emulator save folder in ⚙ Settings to back up saves for this game.");
+
             // ── Ludusavi fallback (PC games without a resolved emulator path) ──
             return await RunLudusaviBackupAsync(gameTitle, gameSavePath);
         }
@@ -218,6 +228,13 @@ namespace GameLauncher.Services
 
                 return await CopyDirectoryAsync(gameSavePath, targetOverridePath, gameTitle);
             }
+
+            // ── Non-PC emulator games without a resolved save path ─────────────
+            // Ludusavi only knows about PC saves; for emulator games with no save
+            // root configured, direct the user to set up the emulator settings.
+            if (IsEmulatorPlatform(platform))
+                return LudusaviResult.Error(
+                    "Set the emulator save folder in ⚙ Settings to restore saves for this game.");
 
             // ── Ludusavi restore fallback (PC games) ───────────────────────────
             return await RunLudusaviRestoreAsync(gameTitle, gameSavePath);
@@ -555,6 +572,17 @@ namespace GameLauncher.Services
                 if (item.Value < now)
                     PendingApprovalTokens.TryRemove(item.Key, out _);
             }
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> for platforms that are backed by an emulator
+        /// (e.g. "Xbox 360", "PS3", "Switch") and therefore cannot use ludusavi's
+        /// PC-game manifest as a fallback.
+        /// </summary>
+        private static bool IsEmulatorPlatform(string platform)
+        {
+            if (string.IsNullOrWhiteSpace(platform)) return false;
+            return !string.Equals(platform.Trim(), "PC", StringComparison.OrdinalIgnoreCase);
         }
 
         private static string ClassifyFailure(string detail)
