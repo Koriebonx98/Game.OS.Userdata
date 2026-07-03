@@ -1222,15 +1222,7 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             // Attempt to resolve the emulator save folder via TitleID so we can
             // copy saves directly instead of relying on ludusavi's manifest lookup.
-            string? titleId = CurrentTitleId;
-            string? sourceOverridePath = null;
-            if (!string.IsNullOrWhiteSpace(titleId))
-            {
-                var emuSettings = EmulatorSettingsService.Load(Platform);
-                sourceOverridePath = EmulatorSavePathResolver.Resolve(
-                    Platform, emuSettings.EmulatorName, emuSettings.SaveDataPath, titleId,
-                    emuSettings.XeniaProfileId);
-            }
+            string? sourceOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.SyncAsync(
                 Platform, Title, _currentUsername, sourceOverridePath);
@@ -1277,15 +1269,7 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             // Resolve the emulator save folder so we can copy back directly
             // (works for Xenia, RPCS3, Ryujinx, etc. without a ludusavi manifest entry).
-            string? titleId = CurrentTitleId;
-            string? targetOverridePath = null;
-            if (!string.IsNullOrWhiteSpace(titleId))
-            {
-                var emuSettings = EmulatorSettingsService.Load(Platform);
-                targetOverridePath = EmulatorSavePathResolver.Resolve(
-                    Platform, emuSettings.EmulatorName, emuSettings.SaveDataPath, titleId,
-                    emuSettings.XeniaProfileId);
-            }
+            string? targetOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.RestoreAsync(
                 Platform, Title, _currentUsername, targetOverridePath);
@@ -3766,6 +3750,24 @@ public partial class GameDetailViewModel : ViewModelBase
         normalized = Regex.Replace(normalized, @"^(achievement|ach|stat)[\s_.:-]*", "");
         normalized = Regex.Replace(normalized, @"[^a-z0-9]+", "");
         return normalized;
+    }
+
+    private string? ResolveEmulatorSavePathOverride(string? titleId)
+    {
+        if (string.IsNullOrWhiteSpace(titleId))
+            return null;
+
+        var emuSettings = EmulatorSettingsService.Load(Platform);
+        string saveRoot = !string.IsNullOrWhiteSpace(emuSettings.SaveDataPath)
+            ? emuSettings.SaveDataPath
+            : emuSettings.EmulatorPath;
+
+        return EmulatorSavePathResolver.Resolve(
+            Platform,
+            emuSettings.EmulatorName,
+            saveRoot,
+            titleId,
+            emuSettings.XeniaProfileId);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
