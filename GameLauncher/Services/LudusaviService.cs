@@ -156,13 +156,21 @@ namespace GameLauncher.Services
                     // Let ludusavi perform the backup (it now has a manifest entry).
                     var result = await RunLudusaviBackupAsync(gameTitle, gameSavePath);
 
-                    // If ludusavi succeeded or reported a definitive failure, return.
-                    if (result.Kind != ResultKind.NotInstalled)
+                    // Prefer ludusavi when it succeeds.
+                    if (result.Kind == ResultKind.Synced)
                         return result;
 
-                    // Ludusavi not installed — fall back to a direct file copy.
-                    DevLogService.Log("[Ludusavi] not installed; falling back to direct copy.");
-                    return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
+                    // If ludusavi is unavailable or cannot identify the game by title,
+                    // copy directly from the resolved emulator save folder.
+                    if (result.Kind is ResultKind.NotInstalled or ResultKind.NoSaveFound)
+                    {
+                        DevLogService.Log(
+                            $"[Ludusavi] backup returned {result.Kind}; falling back to direct copy.");
+                        return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
+                    }
+
+                    // For other failures (permission/path/process), surface the error.
+                    return result;
                 }
 
                 // Path was resolved but the folder doesn't exist yet —
@@ -714,7 +722,9 @@ namespace GameLauncher.Services
                 || lower.Contains("0 games")
                 || lower.Contains("0 files")
                 || lower.Contains("found 0")
-                || lower.Contains("no known game saves");
+                || lower.Contains("no known game saves")
+                || lower.Contains("no info for these games")
+                || lower.Contains("no info found for this game");
         }
 
     }
