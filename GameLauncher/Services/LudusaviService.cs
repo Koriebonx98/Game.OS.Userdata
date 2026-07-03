@@ -140,30 +140,17 @@ namespace GameLauncher.Services
                 return LudusaviResult.Error($"Cannot create save directory: {ex.Message}");
             }
 
-            // ── TitleID-based emulator save registration ───────────────────────
-            // When the caller has resolved the exact emulator save folder,
-            // register the game in ludusavi's secondary manifest so that ludusavi
-            // can find the saves on its own — enabling its cloud-sync features.
-            // Then let ludusavi run normally.  If ludusavi is not installed we
-            // fall back to a plain directory copy.
+            // ── Direct emulator save backup ────────────────────────────────────
+            // When the caller has already resolved the exact emulator save folder
+            // (Xenia/RPCS3/Ryujinx/etc.), copy that folder directly into the
+            // per-user Game.OS backup directory.  This avoids relying on
+            // ludusavi's title lookup / manifest registration for emulator games,
+            // which can still report "no info for these games" even when the
+            // save folder exists on disk.
             if (!string.IsNullOrWhiteSpace(sourceOverridePath))
             {
                 if (Directory.Exists(sourceOverridePath))
-                {
-                    // Register so ludusavi knows where this emulator game's saves live.
-                    LudusaviConfigService.TryRegisterGameSave(gameTitle, sourceOverridePath);
-
-                    // Let ludusavi perform the backup (it now has a manifest entry).
-                    var result = await RunLudusaviBackupAsync(gameTitle, gameSavePath);
-
-                    // If ludusavi succeeded or reported a definitive failure, return.
-                    if (result.Kind != ResultKind.NotInstalled)
-                        return result;
-
-                    // Ludusavi not installed — fall back to a direct file copy.
-                    DevLogService.Log("[Ludusavi] not installed; falling back to direct copy.");
                     return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
-                }
 
                 // Path was resolved but the folder doesn't exist yet —
                 // no saves to back up; do NOT fall through to ludusavi for emulator games.
@@ -230,10 +217,9 @@ namespace GameLauncher.Services
             if (!Directory.Exists(gameSavePath))
                 return LudusaviResult.NoSaveFound;
 
-            // ── TitleID-based emulator save registration ───────────────────────
-            // Register the game in the secondary manifest so ludusavi knows where
-            // the live save folder is, then let ludusavi perform the restore.
-            // If ludusavi is not installed we fall back to a plain directory copy.
+            // ── Direct emulator save restore ───────────────────────────────────
+            // Restore directly into the resolved emulator save folder so emulator
+            // platforms do not depend on ludusavi's manifest / title lookup.
             if (!string.IsNullOrWhiteSpace(targetOverridePath))
             {
                 try
@@ -245,17 +231,6 @@ namespace GameLauncher.Services
                     return LudusaviResult.Error($"Cannot create restore target: {ex.Message}");
                 }
 
-                // Register so ludusavi knows where this emulator game's saves live.
-                LudusaviConfigService.TryRegisterGameSave(gameTitle, targetOverridePath);
-
-                // Let ludusavi perform the restore (it now has a manifest entry).
-                var result = await RunLudusaviRestoreAsync(gameTitle, gameSavePath);
-
-                if (result.Kind != ResultKind.NotInstalled)
-                    return result;
-
-                // Ludusavi not installed — fall back to a direct file copy.
-                DevLogService.Log("[Ludusavi] not installed; falling back to direct copy for restore.");
                 return await CopyDirectoryAsync(gameSavePath, targetOverridePath, gameTitle);
             }
 

@@ -79,7 +79,7 @@ namespace GameLauncher.Services
         /// <param name="titleId">Platform-specific title ID for the game (e.g. "0100ADC022586000" for Switch).</param>
         /// <param name="profileId">
         /// Emulator user profile ID; required for Xenia where the canonical save path is
-        /// <c>Content/{profileId}/{titleId}/</c>
+        /// <c>Content/{profileId}/{titleId}/00000001/</c>
         /// (e.g. "E03000003D7E0695").  Pass <see langword="null"/> or empty for
         /// emulators that do not use a profile ID.
         /// </param>
@@ -104,7 +104,7 @@ namespace GameLauncher.Services
             if (string.IsNullOrWhiteSpace(safeRoot)) return null;
 
             // Xenia canonical layout:
-            //  - {saveRoot}/Content/{profileId}/{titleId}/
+            //  - {saveRoot}/Content/{profileId}/{titleId}/00000001/
             // Also tolerate lower-case "content".
             string platformKey = (platform ?? "").Replace(" ", "", StringComparison.Ordinal).Trim();
             if ((emulatorName ?? "").Contains("xenia", StringComparison.OrdinalIgnoreCase) ||
@@ -171,7 +171,7 @@ namespace GameLauncher.Services
         }
 
         // Returns null when no profile ID is available and one cannot be auto-detected,
-        // since Xenia saves live under Content/{profileId}/{titleId}/.
+        // since Xenia saves live under Content/{profileId}/{titleId}/00000001/.
         private static string? ResolveXeniaPath(string saveRoot, string titleId, string? profileId)
         {
             string safeProfileId = (profileId ?? "").Trim();
@@ -179,8 +179,7 @@ namespace GameLauncher.Services
 
             if (!string.IsNullOrWhiteSpace(safeProfileId))
             {
-                // Canonical save location: Content/{profileId}/{titleId}/
-                return Path.Combine(contentRoot, safeProfileId, titleId);
+                return BuildPreferredXeniaSavePath(contentRoot, safeProfileId, titleId);
             }
 
             // Auto-detect profile from existing content folder
@@ -188,11 +187,27 @@ namespace GameLauncher.Services
             {
                 string? detectedProfile = TryDetectXeniaProfileId(saveRoot, titleId);
                 if (!string.IsNullOrWhiteSpace(detectedProfile))
-                    return Path.Combine(contentRoot, detectedProfile, titleId);
+                    return BuildPreferredXeniaSavePath(contentRoot, detectedProfile, titleId);
             }
 
             // No profile known and none detected — cannot resolve a reliable Xenia save path.
             return null;
+        }
+
+        private static string BuildPreferredXeniaSavePath(string contentRoot, string profileId, string titleId)
+        {
+            string titleRoot = Path.Combine(contentRoot, profileId, titleId);
+            string canonicalSaveLeaf = Path.Combine(titleRoot, "00000001");
+
+            if (Directory.Exists(canonicalSaveLeaf))
+                return canonicalSaveLeaf;
+
+            if (Directory.Exists(titleRoot))
+                return titleRoot;
+
+            // No existing save folder yet. Return the canonical leaf so restore
+            // operations can create the full Xenia save path on demand.
+            return canonicalSaveLeaf;
         }
 
         // ── Helpers ────────────────────────────────────────────────────────────
