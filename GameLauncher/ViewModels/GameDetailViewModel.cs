@@ -2277,12 +2277,11 @@ public partial class GameDetailViewModel : ViewModelBase
                     sessionUnlocks.Contains(resolvedName))
                     continue;
 
-                knownUnlocks.Add(unlockId);
-                knownUnlocks.Add(resolvedId);
-                knownUnlocks.Add(resolvedName);
-                sessionUnlocks.Add(unlockId);
-                sessionUnlocks.Add(resolvedId);
-                sessionUnlocks.Add(resolvedName);
+                foreach (var key in EnumerateDistinctAchievementKeys(unlockId, resolvedId, resolvedName))
+                {
+                    knownUnlocks.Add(key);
+                    sessionUnlocks.Add(key);
+                }
 
                 Services.NotificationService.ShowAchievementUnlockedNotification(resolvedName, gameTitle);
                 DevLogService.Log($"[PcAch] Steam emu unlock detected: {resolvedName} (id={resolvedId}, raw={unlockId}) ({gameTitle})");
@@ -3756,6 +3755,18 @@ public partial class GameDetailViewModel : ViewModelBase
         return normalized;
     }
 
+    private static IEnumerable<string> EnumerateDistinctAchievementKeys(params string?[] values)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in values)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+                continue;
+            if (seen.Add(value))
+                yield return value;
+        }
+    }
+
     private string? ResolveEmulatorSavePathOverride(string? titleId)
     {
         if (string.IsNullOrWhiteSpace(titleId))
@@ -3765,7 +3776,8 @@ public partial class GameDetailViewModel : ViewModelBase
         string saveRoot = !string.IsNullOrWhiteSpace(emuSettings.SaveDataPath)
             ? emuSettings.SaveDataPath
             // Xbox 360 setups often only configure the emulator executable path.
-            // EmulatorSavePathResolver will normalize executable paths to their directory.
+            // See EmulatorSavePathResolver.NormalizeSaveRoot (called by Resolve),
+            // which converts executable paths to their containing directory.
             : emuSettings.EmulatorPath;
 
         return EmulatorSavePathResolver.Resolve(
