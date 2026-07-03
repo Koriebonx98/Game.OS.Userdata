@@ -1960,7 +1960,30 @@ class Program
                 passed = false;
             }
 
-            // 3) Process success/failure mapping (no confirmation gate)
+            // 3) Emulator override path should copy directly even when the
+            // configured ludusavi executable would fail with "no game info".
+            string xeniaSaveRoot = Path.Combine(tempRoot, "xenia-save");
+            Directory.CreateDirectory(xeniaSaveRoot);
+            File.WriteAllText(Path.Combine(xeniaSaveRoot, "save.dat"), "xbox-save");
+
+            AppSettingsService.Save(new AppSettings
+            {
+                LudusaviPath = failScript,
+                RequireCloudSaveConfirmation = false,
+                AllowCloudSaveInAppFallbackConfirmation = true
+            });
+            var emulatorBackup = await LudusaviService.SyncAsync("Xbox 360", "Halo 3", username, sourceOverridePath: xeniaSaveRoot);
+            string emulatorBackupRoot = Path.Combine(UserDataService.GetGameSavesPath(username, "Xbox 360"), "Halo 3");
+            string copiedSaveFile = Path.Combine(emulatorBackupRoot, "save.dat");
+            if (emulatorBackup.Kind == LudusaviService.ResultKind.Synced && File.Exists(copiedSaveFile))
+                Console.WriteLine("  ✅  Emulator override backup copies saves directly without ludusavi lookup");
+            else
+            {
+                Console.WriteLine($"  ❌  Expected direct emulator backup copy, got {emulatorBackup.Kind}: {emulatorBackup.Message}");
+                passed = false;
+            }
+
+            // 4) Process success/failure mapping (no confirmation gate)
             AppSettingsService.Save(new AppSettings
             {
                 LudusaviPath = okScript,
@@ -2009,6 +2032,23 @@ class Program
             else
             {
                 Console.WriteLine($"  ❌  Expected Synced for successful restore process, got {restoreSuccess.Kind}: {restoreSuccess.Message}");
+                passed = false;
+            }
+
+            string xeniaRestoreTarget = Path.Combine(tempRoot, "xenia-restore");
+            AppSettingsService.Save(new AppSettings
+            {
+                LudusaviPath = failScript,
+                RequireCloudSaveConfirmation = false,
+                AllowCloudSaveInAppFallbackConfirmation = true
+            });
+            var emulatorRestore = await LudusaviService.RestoreAsync("Xbox 360", "Halo 3", username, targetOverridePath: xeniaRestoreTarget);
+            string restoredSaveFile = Path.Combine(xeniaRestoreTarget, "save.dat");
+            if (emulatorRestore.Kind == LudusaviService.ResultKind.Synced && File.Exists(restoredSaveFile))
+                Console.WriteLine("  ✅  Emulator override restore copies saves directly without ludusavi lookup");
+            else
+            {
+                Console.WriteLine($"  ❌  Expected direct emulator restore copy, got {emulatorRestore.Kind}: {emulatorRestore.Message}");
                 passed = false;
             }
         }
