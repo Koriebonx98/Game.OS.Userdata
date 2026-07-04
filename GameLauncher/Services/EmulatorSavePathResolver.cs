@@ -277,7 +277,10 @@ namespace GameLauncher.Services
                         return name;
                 }
             }
-            catch { /* best-effort */ }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[EmulatorSavePathResolver] TryDetectAnyXeniaProfileId failed for '{contentRoot}': {ex.Message}");
+            }
 
             return null;
         }

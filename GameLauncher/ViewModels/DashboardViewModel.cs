@@ -677,7 +677,10 @@ public partial class DashboardViewModel : ViewModelBase
                 UseShellExecute = true
             });
         }
-        catch { /* best-effort: silently ignore if the shell cannot open the folder */ }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[DashboardViewModel] OpenMediaFolder failed for '{folderPath}': {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // ── Dashboard friend actions ───────────────────────────────────────────────

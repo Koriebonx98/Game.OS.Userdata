@@ -1147,7 +1147,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 UseShellExecute = true
             });
         }
-        catch { /* best-effort */ }
+        catch (Exception ex) { DevLogService.Log($"[GameDetailViewModel] OpenTrailer failed for URL '{TrailerUrl}': {ex.GetType().Name}: {ex.Message}"); }
     }
 
     /// <summary>

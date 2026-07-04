@@ -160,7 +160,7 @@ public partial class GameDetailView : UserControl
         {
             _mediaPlayer.EndReached       -= OnVlcEndReached;
             _mediaPlayer.EncounteredError -= OnVlcError;
-            try { _mediaPlayer.Stop(); } catch { }
+            try { _mediaPlayer.Stop(); } catch (Exception ex) { DevLogService.Log($"[GameDetailView] VLC stop: {ex.Message}"); }
             _mediaPlayer.Dispose();
             _mediaPlayer = null;
         }

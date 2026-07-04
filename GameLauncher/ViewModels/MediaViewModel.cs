@@ -50,7 +50,10 @@ public partial class MediaViewModel : ObservableObject
                 UseShellExecute = true,
             });
         }
-        catch { /* best-effort */ }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[MediaViewModel] OpenMediaFolder failed for '{folderPath}': {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // ── VLC commands ─────────────────────────────────────────────────────────
