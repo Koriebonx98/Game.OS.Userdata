@@ -183,12 +183,19 @@ namespace GameLauncher.Services
                 return Path.Combine(contentRoot, safeProfileId, titleId, "00000001");
             }
 
-            // Auto-detect profile from existing content folder
+            // Auto-detect profile from existing content folder: first try to find a
+            // profile that already has a folder for this specific titleId.
             if (Directory.Exists(contentRoot))
             {
                 string? detectedProfile = TryDetectXeniaProfileId(saveRoot, titleId);
                 if (!string.IsNullOrWhiteSpace(detectedProfile))
                     return Path.Combine(contentRoot, detectedProfile, titleId, "00000001");
+
+                // Fallback: use the first profile folder found even if it does not yet
+                // contain this game's titleId (e.g. backing up a freshly-installed game).
+                string? anyProfile = TryDetectAnyXeniaProfileId(contentRoot);
+                if (!string.IsNullOrWhiteSpace(anyProfile))
+                    return Path.Combine(contentRoot, anyProfile, titleId, "00000001");
             }
 
             // No profile known and none detected — cannot resolve a reliable Xenia save path.
@@ -242,6 +249,34 @@ namespace GameLauncher.Services
             return null;
         }
 
+        /// <summary>
+        /// Scans <paramref name="contentRoot"/> for the first sub-directory that looks
+        /// like a Xenia profile folder (any directory whose name is a hex string of
+        /// 8–16 characters, matching the typical Xenia profile ID format).
+        /// Used as a last-resort fallback when the game-specific detection fails.
+        /// </summary>
+        private static string? TryDetectAnyXeniaProfileId(string contentRoot)
+        {
+            try
+            {
+                if (!Directory.Exists(contentRoot)) return null;
+
+                foreach (string profileDir in Directory.EnumerateDirectories(contentRoot))
+                {
+                    string name = Path.GetFileName(profileDir);
+                    // Xenia profile IDs are uppercase hex strings, e.g. "E03000003D7E0695"
+                    if (name.Length >= 8 && name.Length <= 16 &&
+                        IsHexString(name))
+                    {
+                        return name;
+                    }
+                }
+            }
+            catch { /* best-effort */ }
+
+            return null;
+        }
+
         private static string[] ResolvePattern(string platform, string? emulatorName)
         {
             // 1. Try emulator-name override (substring, case-insensitive)
@@ -259,6 +294,16 @@ namespace GameLauncher.Services
                 return pattern;
 
             return Array.Empty<string>();
+        }
+
+        private static bool IsHexString(string value)
+        {
+            foreach (char c in value)
+            {
+                if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
+                    return false;
+            }
+            return value.Length > 0;
         }
     }
 }
