@@ -843,7 +843,7 @@ public partial class DashboardViewModel : ViewModelBase
         var categories = new[]
         {
             new { Name = "Movies", FolderName = "Movies", AlternateFolderName = (string?)null, Description = "Feature films and video files." },
-            new { Name = "TV Shows", FolderName = "TV Shows", AlternateFolderName = "Tv Shows", Description = "Episodes and series folders." },
+            new { Name = "TV Shows", FolderName = "TV Shows", AlternateFolderName = (string?)"Tv Shows", Description = "Episodes and series folders." },
             new { Name = "Music", FolderName = "Music", AlternateFolderName = (string?)null, Description = "Albums, tracks, and playlists." },
         };
 
