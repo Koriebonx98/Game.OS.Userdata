@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Services;
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
@@ -11,8 +12,10 @@ namespace GameLauncher.ViewModels;
 public partial class MediaViewModel : ObservableObject
 {
     // ── Supported extensions ──────────────────────────────────────────────────
-    private static readonly string[] VideoExts = { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts", ".m2ts" };
-    private static readonly string[] AudioExts = { ".mp3", ".flac", ".aac", ".ogg", ".wav", ".m4a", ".wma" };
+    private static readonly HashSet<string> VideoExts = new(StringComparer.OrdinalIgnoreCase)
+        { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts", ".m2ts" };
+    private static readonly HashSet<string> AudioExts = new(StringComparer.OrdinalIgnoreCase)
+        { ".mp3", ".flac", ".aac", ".ogg", ".wav", ".m4a", ".wma" };
 
     // ── Media file collections ────────────────────────────────────────────────
     public ObservableCollection<MediaFileCardVm> MovieFiles  { get; } = new();
@@ -86,7 +89,7 @@ public partial class MediaViewModel : ObservableObject
     private static void LoadCategory(
         ObservableCollection<MediaFileCardVm> target,
         string folder,
-        string[] extensions,
+        HashSet<string> extensions,
         string category,
         string emoji,
         string label,

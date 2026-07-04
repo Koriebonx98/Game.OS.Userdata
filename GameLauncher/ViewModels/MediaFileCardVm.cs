@@ -34,10 +34,4 @@ public partial class MediaFileCardVm : ObservableObject
         Category == "Movies"  ? "#58a6ff" :
         Category == "TvShows" ? "#3fb950" :
                                 "#f0883e";  // Music
-
-    /// <summary>Icon area background gradient per category.</summary>
-    public string IconGradient =>
-        Category == "Movies"  ? "#0d1b2a,#1a3a6e" :
-        Category == "TvShows" ? "#0d1f17,#1a4a2e" :
-                                "#1a1000,#3d2a0a";  // Music
 }
