@@ -249,6 +249,10 @@ namespace GameLauncher.Services
             return null;
         }
 
+        // Xenia profile IDs are 8–16 character uppercase hex strings, e.g. "E03000003D7E0695".
+        private const int MinProfileIdLength = 8;
+        private const int MaxProfileIdLength = 16;
+
         /// <summary>
         /// Scans <paramref name="contentRoot"/> for the first sub-directory that looks
         /// like a Xenia profile folder (any directory whose name is a hex string of
@@ -264,8 +268,7 @@ namespace GameLauncher.Services
                 foreach (string profileDir in Directory.EnumerateDirectories(contentRoot))
                 {
                     string name = Path.GetFileName(profileDir);
-                    // Xenia profile IDs are uppercase hex strings, e.g. "E03000003D7E0695"
-                    if (name.Length >= 8 && name.Length <= 16 &&
+                    if (name.Length >= MinProfileIdLength && name.Length <= MaxProfileIdLength &&
                         IsHexString(name))
                     {
                         return name;
@@ -300,7 +303,7 @@ namespace GameLauncher.Services
         {
             foreach (char c in value)
             {
-                if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
+                if (!Uri.IsHexDigit(c))
                     return false;
             }
             return value.Length > 0;
