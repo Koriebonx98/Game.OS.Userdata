@@ -13,108 +13,204 @@
             <StackPanel Margin="32,28,32,28" Spacing="24">
 
                 <!-- Page title -->
-                <TextBlock Text="Media" Classes="page-title"/>
-                <TextBlock Text="Browse your media library or play a file in-app with VLC."
-                           Classes="page-subtitle" Margin="0,-20,0,0"/>
-
-                <!-- Play File button -->
-                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
-                    <Button Classes="btn-primary"
-                            Command="{Binding PlayLocalVideoCommand}"
-                            Padding="16,8">
-                        🎬  Play File…
-                    </Button>
-                </StackPanel>
-
-                <!-- Folders section -->
-                <TextBlock Text="Media Folders" Classes="section-header"/>
-
-                <!-- Movies tile -->
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
-                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="🎬  Movies" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Browse your movie collection." FontSize="12" Foreground="#8b949e"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Classes="btn-secondary"
-                                Padding="12,6"
-                                VerticalAlignment="Center"
-                                Command="{Binding OpenMoviesFolderCommand}">
-                            Open
+                <Grid ColumnDefinitions="*,Auto">
+                    <StackPanel Grid.Column="0">
+                        <TextBlock Text="Media" Classes="page-title"/>
+                        <TextBlock Text="Your movies, TV shows, and music library."
+                                   Classes="page-subtitle" Margin="0,-20,0,0"/>
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                        <Button Classes="btn-secondary"
+                                Command="{Binding ScanMediaFoldersCommand}"
+                                Padding="12,8">
+                            🔄  Refresh
                         </Button>
-                    </Grid>
+                        <Button Classes="btn-primary"
+                                Command="{Binding PlayLocalVideoCommand}"
+                                Padding="14,8">
+                            🎬  Play File…
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <!-- ── Movies ──────────────────────────────────────────────── -->
+                <TextBlock Text="🎬  Movies" Classes="section-header"/>
+
+                <!-- Movie cards grid -->
+                <ItemsControl ItemsSource="{Binding MovieFiles}"
+                              IsVisible="{Binding HasMovies}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MediaFileCardVm">
+                            <Button Classes="game-card-btn"
+                                    Width="170" Margin="0,0,10,10"
+                                    Command="{Binding $parent[UserControl].DataContext.PlayMediaFileCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <!-- Icon area -->
+                                    <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                <GradientStop Color="#0d1b2a" Offset="0"/>
+                                                <GradientStop Color="#1a3a6e" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding TypeEmoji}"
+                                                   FontSize="42"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <!-- Info -->
+                                    <Border Padding="10,8,10,10">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Classes="game-card-title"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Border CornerRadius="3" Padding="5,2"
+                                                    Background="{Binding BadgeBackground}"
+                                                    HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding TypeLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="{Binding BadgeForeground}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Empty state for Movies -->
+                <Border Classes="xb360-metro-tile" CornerRadius="10" Padding="20,16"
+                        IsVisible="{Binding !HasMovies}">
+                    <TextBlock Text="No movies found in your Videos folder."
+                               FontSize="13" Foreground="#484f58"
+                               HorizontalAlignment="Center"/>
                 </Border>
 
-                <!-- Music tile -->
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
-                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="🎵  Music" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Play your music library." FontSize="12" Foreground="#8b949e"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Classes="btn-secondary"
-                                Padding="12,6"
-                                VerticalAlignment="Center"
-                                Command="{Binding OpenMusicFolderCommand}">
-                            Open
-                        </Button>
-                    </Grid>
+                <!-- ── TV Shows ─────────────────────────────────────────────── -->
+                <TextBlock Text="📺  TV Shows" Classes="section-header"/>
+
+                <!-- TV Show cards grid -->
+                <ItemsControl ItemsSource="{Binding TvShowFiles}"
+                              IsVisible="{Binding HasTvShows}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MediaFileCardVm">
+                            <Button Classes="game-card-btn"
+                                    Width="170" Margin="0,0,10,10"
+                                    Command="{Binding $parent[UserControl].DataContext.PlayMediaFileCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <!-- Icon area -->
+                                    <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                <GradientStop Color="#0d1f17" Offset="0"/>
+                                                <GradientStop Color="#1a4a2e" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding TypeEmoji}"
+                                                   FontSize="42"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <!-- Info -->
+                                    <Border Padding="10,8,10,10">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Classes="game-card-title"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Border CornerRadius="3" Padding="5,2"
+                                                    Background="{Binding BadgeBackground}"
+                                                    HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding TypeLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="{Binding BadgeForeground}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- Empty state for TV Shows -->
+                <Border Classes="xb360-metro-tile" CornerRadius="10" Padding="20,16"
+                        IsVisible="{Binding !HasTvShows}">
+                    <TextBlock Text="No TV shows found in Videos\TV Shows."
+                               FontSize="13" Foreground="#484f58"
+                               HorizontalAlignment="Center"/>
                 </Border>
 
-                <!-- TV Shows tile -->
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
-                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="📺  TV Shows" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Browse your TV show collection." FontSize="12" Foreground="#8b949e"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Classes="btn-secondary"
-                                Padding="12,6"
-                                VerticalAlignment="Center"
-                                Command="{Binding OpenTvShowsFolderCommand}">
-                            Open
-                        </Button>
-                    </Grid>
-                </Border>
+                <!-- ── Music ───────────────────────────────────────────────── -->
+                <TextBlock Text="🎵  Music" Classes="section-header"/>
 
-                <!-- Games section -->
-                <TextBlock Text="Game Library" Classes="section-header"/>
+                <!-- Music cards grid -->
+                <ItemsControl ItemsSource="{Binding MusicFiles}"
+                              IsVisible="{Binding HasMusic}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:MediaFileCardVm">
+                            <Button Classes="game-card-btn"
+                                    Width="170" Margin="0,0,10,10"
+                                    Command="{Binding $parent[UserControl].DataContext.PlayMediaFileCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <!-- Icon area -->
+                                    <Border Height="110" CornerRadius="10,10,0,0" ClipToBounds="True">
+                                        <Border.Background>
+                                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                                <GradientStop Color="#1a1000" Offset="0"/>
+                                                <GradientStop Color="#3d2a0a" Offset="1"/>
+                                            </LinearGradientBrush>
+                                        </Border.Background>
+                                        <TextBlock Text="{Binding TypeEmoji}"
+                                                   FontSize="42"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <!-- Info -->
+                                    <Border Padding="10,8,10,10">
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="{Binding Title}"
+                                                       Classes="game-card-title"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <Border CornerRadius="3" Padding="5,2"
+                                                    Background="{Binding BadgeBackground}"
+                                                    HorizontalAlignment="Left">
+                                                <TextBlock Text="{Binding TypeLabel}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="{Binding BadgeForeground}"/>
+                                            </Border>
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
 
-                <!-- Games folder tile -->
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
-                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="🎮  Games" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Browse your installed games folder." FontSize="12" Foreground="#8b949e"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Classes="btn-secondary"
-                                Padding="12,6"
-                                VerticalAlignment="Center"
-                                Command="{Binding OpenGamesFolderCommand}">
-                            Open
-                        </Button>
-                    </Grid>
-                </Border>
-
-                <!-- ROMs tile -->
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
-                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                            <TextBlock Text="🕹  ROMs" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                            <TextBlock Text="Browse your emulator ROM library." FontSize="12" Foreground="#8b949e"/>
-                        </StackPanel>
-                        <Button Grid.Column="1"
-                                Classes="btn-secondary"
-                                Padding="12,6"
-                                VerticalAlignment="Center"
-                                Command="{Binding OpenRomsFolderCommand}">
-                            Open
-                        </Button>
-                    </Grid>
+                <!-- Empty state for Music -->
+                <Border Classes="xb360-metro-tile" CornerRadius="10" Padding="20,16"
+                        IsVisible="{Binding !HasMusic}">
+                    <TextBlock Text="No music found in your Music folder."
+                               FontSize="13" Foreground="#484f58"
+                               HorizontalAlignment="Center"/>
                 </Border>
 
             </StackPanel>

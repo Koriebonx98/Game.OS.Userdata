@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Services;
 using System;
-using System.Diagnostics;
+using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
 
@@ -10,6 +10,19 @@ namespace GameLauncher.ViewModels;
 
 public partial class MediaViewModel : ObservableObject
 {
+    // ── Supported extensions ──────────────────────────────────────────────────
+    private static readonly string[] VideoExts = { ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".flv", ".webm", ".m4v", ".ts", ".m2ts" };
+    private static readonly string[] AudioExts = { ".mp3", ".flac", ".aac", ".ogg", ".wav", ".m4a", ".wma" };
+
+    // ── Media file collections ────────────────────────────────────────────────
+    public ObservableCollection<MediaFileCardVm> MovieFiles  { get; } = new();
+    public ObservableCollection<MediaFileCardVm> TvShowFiles { get; } = new();
+    public ObservableCollection<MediaFileCardVm> MusicFiles  { get; } = new();
+
+    [ObservableProperty] private bool _hasMovies;
+    [ObservableProperty] private bool _hasTvShows;
+    [ObservableProperty] private bool _hasMusic;
+
     // ── VLC local file player ─────────────────────────────────────────────────
     /// <summary>True when the in-app VLC file-player overlay is visible.</summary>
     [ObservableProperty] private bool   _isVlcPlayerOpen;
@@ -22,69 +35,114 @@ public partial class MediaViewModel : ObservableObject
     /// </summary>
     public Action? PlayLocalVideoRequested { get; set; }
 
-    // ── Media folder shortcuts ────────────────────────────────────────────────
-
-    [RelayCommand]
-    private void OpenMoviesFolder() => OpenMediaFolder(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyVideos));
-
-    [RelayCommand]
-    private void OpenMusicFolder() => OpenMediaFolder(
-        Environment.GetFolderPath(Environment.SpecialFolder.MyMusic));
-
-    [RelayCommand]
-    private void OpenTvShowsFolder() => OpenMediaFolder(
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
-            "TV Shows"));
-
-    [RelayCommand]
-    private void OpenGamesFolder() => OpenMediaFolder(ResolveNamedFolder("Games"));
-
-    [RelayCommand]
-    private void OpenRomsFolder() => OpenMediaFolder(ResolveNamedFolder("Roms"));
-
     /// <summary>
-    /// Returns the path of the first existing <c>{driveRoot}/{folderName}</c>
-    /// directory found across all drives.  Falls back to
-    /// <c>{MyDocuments}/{folderName}</c> when none exists, creating it if needed.
+    /// Delegate set by the View code-behind. When invoked with a file path, the
+    /// View starts VLC playback for that specific file without showing a picker.
     /// </summary>
-    private static string ResolveNamedFolder(string folderName)
+    public Action<string>? PlaySpecificFileRequested { get; set; }
+
+    public MediaViewModel()
     {
-        // Check all drive roots (same logic used by GameScannerService)
-        var existing = GameScannerService.GetDriveRoots()
-            .Select(root => Path.Combine(root, folderName))
-            .FirstOrDefault(Directory.Exists);
-
-        if (existing != null) return existing;
-
-        // Fall back to a folder in My Documents so the user can see where to put files
-        return Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments),
-            folderName);
+        ScanMediaFolders();
     }
 
-    private static void OpenMediaFolder(string folderPath)
+    // ── Scanning ──────────────────────────────────────────────────────────────
+
+    [RelayCommand]
+    private void ScanMediaFolders()
     {
+        LoadCategory(
+            MovieFiles,
+            folder: Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+            extensions: VideoExts,
+            category: "Movies",
+            emoji: "🎬",
+            label: "Movie",
+            excludeSubfolder: "TV Shows");
+
+        LoadCategory(
+            TvShowFiles,
+            folder: Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+                "TV Shows"),
+            extensions: VideoExts,
+            category: "TvShows",
+            emoji: "📺",
+            label: "TV Show");
+
+        LoadCategory(
+            MusicFiles,
+            folder: Environment.GetFolderPath(Environment.SpecialFolder.MyMusic),
+            extensions: AudioExts,
+            category: "Music",
+            emoji: "🎵",
+            label: "Music");
+
+        HasMovies  = MovieFiles.Count  > 0;
+        HasTvShows = TvShowFiles.Count > 0;
+        HasMusic   = MusicFiles.Count  > 0;
+    }
+
+    private static void LoadCategory(
+        ObservableCollection<MediaFileCardVm> target,
+        string folder,
+        string[] extensions,
+        string category,
+        string emoji,
+        string label,
+        string? excludeSubfolder = null)
+    {
+        target.Clear();
+        if (!Directory.Exists(folder)) return;
+
         try
         {
-            if (!Directory.Exists(folderPath))
-                Directory.CreateDirectory(folderPath);
+            var files = Directory
+                .EnumerateFiles(folder, "*.*", SearchOption.AllDirectories)
+                .Where(f =>
+                {
+                    if (excludeSubfolder != null)
+                    {
+                        var rel = Path.GetRelativePath(folder, f);
+                        if (rel.StartsWith(excludeSubfolder, StringComparison.OrdinalIgnoreCase))
+                            return false;
+                    }
+                    return extensions.Contains(
+                        Path.GetExtension(f), StringComparer.OrdinalIgnoreCase);
+                })
+                .OrderBy(f => Path.GetFileNameWithoutExtension(f),
+                         StringComparer.OrdinalIgnoreCase);
 
-            Process.Start(new ProcessStartInfo
+            foreach (var path in files)
             {
-                FileName        = folderPath,
-                UseShellExecute = true,
-            });
+                target.Add(new MediaFileCardVm
+                {
+                    Title     = Path.GetFileNameWithoutExtension(path),
+                    FilePath  = path,
+                    Category  = category,
+                    TypeEmoji = emoji,
+                    TypeLabel = label,
+                });
+            }
         }
         catch (Exception ex)
         {
-            DevLogService.Log($"[MediaViewModel] OpenMediaFolder failed for '{folderPath}': {ex.GetType().Name}: {ex.Message}");
+            DevLogService.Log($"[MediaViewModel] Scan '{folder}' failed: {ex.GetType().Name}: {ex.Message}");
         }
     }
 
-    // ── VLC commands ─────────────────────────────────────────────────────────
+    // ── Play commands ─────────────────────────────────────────────────────────
 
+    /// <summary>Play a specific media file card via the VLC overlay (no picker).</summary>
+    [RelayCommand]
+    private void PlayMediaFile(MediaFileCardVm? card)
+    {
+        if (card == null || !File.Exists(card.FilePath)) return;
+        DevLogService.Log($"[MediaViewModel] PlayMediaFile: {card.FilePath}");
+        PlaySpecificFileRequested?.Invoke(card.FilePath);
+    }
+
+    /// <summary>Open the file-picker and play whatever the user selects.</summary>
     [RelayCommand]
     private void PlayLocalVideo()
     {
