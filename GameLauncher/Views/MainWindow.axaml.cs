@@ -195,7 +195,8 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.Enter:
-                    vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null);
+                    if (!vm.DashboardVm.IsXb360MediaBlade)
+                        vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null);
                     e.Handled = true;
                     return;
             }

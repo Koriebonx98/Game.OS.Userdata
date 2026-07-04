@@ -311,57 +311,49 @@
                 </Grid>
 
                 <!-- Media blade -->
-                <StackPanel Margin="32,20,32,20" Spacing="12" IsVisible="{Binding IsXb360MediaBlade}">
-                    <TextBlock Text="Media" Classes="xb360-strip-header"/>
-                    <!-- Movies tile -->
-                    <Border Classes="xb360-metro-tile xb360-metro-stat" Height="80">
-                        <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="🎬  Movies" Classes="xb360-metro-label" FontSize="14"/>
-                                <TextBlock Text="Browse your movie collection." Classes="xb360-achievement-desc"/>
+                <Grid ColumnDefinitions="340,*" Margin="32,20,32,20" IsVisible="{Binding IsXb360MediaBlade}">
+                    <StackPanel Grid.Column="0" Spacing="6">
+                        <TextBlock Text="Media" Classes="xb360-strip-header"/>
+                        <ItemsControl ItemsSource="{Binding Xb360MediaCategories}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:Xb360MediaCategoryVm">
+                                    <Button Classes="xb360-list-game-btn"
+                                            Classes.focused="{Binding IsFocused}"
+                                            Command="{Binding $parent[UserControl].DataContext.SelectXb360MediaCategoryCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="*,Auto" Margin="6,3">
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="{Binding Name}" Classes="xb360-listgame-title"/>
+                                                <TextBlock Text="{Binding Description}" Classes="xb360-listgame-platform"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="{Binding ItemCount, StringFormat='{}{0}'}"
+                                                       Classes="xb360-listgame-playtime"
+                                                       VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="10">
+                        <TextBlock Text="{Binding Xb360FocusedMediaHeader}" Classes="xb360-strip-header"/>
+                        <TextBlock Text="{Binding Xb360FocusedMediaSummary}" Classes="xb360-achievement-desc"/>
+                        <Border Classes="xb360-metro-tile xb360-metro-stat" MinHeight="220">
+                            <StackPanel Margin="14,12" Spacing="4">
+                                <TextBlock Text="Detected files" Classes="xb360-metro-label"/>
+                                <ItemsControl ItemsSource="{Binding Xb360FocusedMediaEntries}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Text="•  {Binding}" Classes="xb360-achievement-desc" TextTrimming="CharacterEllipsis"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
                             </StackPanel>
-                            <Button Grid.Column="1"
-                                    Classes="btn-secondary"
-                                    Padding="12,6"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding OpenMoviesFolderCommand}">
-                                Open
-                            </Button>
-                        </Grid>
-                    </Border>
-                    <!-- Music tile -->
-                    <Border Classes="xb360-metro-tile xb360-metro-stat" Height="80">
-                        <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="🎵  Music" Classes="xb360-metro-label" FontSize="14"/>
-                                <TextBlock Text="Play your music library." Classes="xb360-achievement-desc"/>
-                            </StackPanel>
-                            <Button Grid.Column="1"
-                                    Classes="btn-secondary"
-                                    Padding="12,6"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding OpenMusicFolderCommand}">
-                                Open
-                            </Button>
-                        </Grid>
-                    </Border>
-                    <!-- TV Shows tile -->
-                    <Border Classes="xb360-metro-tile xb360-metro-stat" Height="80">
-                        <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
-                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                <TextBlock Text="📺  TV Shows" Classes="xb360-metro-label" FontSize="14"/>
-                                <TextBlock Text="Browse your TV show collection." Classes="xb360-achievement-desc"/>
-                            </StackPanel>
-                            <Button Grid.Column="1"
-                                    Classes="btn-secondary"
-                                    Padding="12,6"
-                                    VerticalAlignment="Center"
-                                    Command="{Binding OpenTvShowsFolderCommand}">
-                                Open
-                            </Button>
-                        </Grid>
-                    </Border>
-                </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </Grid>
 
                 <!-- Settings blade -->
                 <StackPanel Margin="32,20,32,20" Spacing="12" IsVisible="{Binding IsXb360SettingsBlade}">

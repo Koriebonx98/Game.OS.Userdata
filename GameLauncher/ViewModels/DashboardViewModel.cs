@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -649,40 +650,6 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void NavigateToInbox() => OnNavigateToPage?.Invoke("inbox");
 
-    // ── Media blade commands ────────────────────────────────────────────────────
-    [RelayCommand]
-    private void OpenMoviesFolder() => OpenMediaFolder(
-        System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyVideos));
-
-    [RelayCommand]
-    private void OpenMusicFolder() => OpenMediaFolder(
-        System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyMusic));
-
-    [RelayCommand]
-    private void OpenTvShowsFolder() => OpenMediaFolder(
-        System.IO.Path.Combine(
-            System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyVideos),
-            "TV Shows"));
-
-    private static void OpenMediaFolder(string folderPath)
-    {
-        try
-        {
-            if (!System.IO.Directory.Exists(folderPath))
-                System.IO.Directory.CreateDirectory(folderPath);
-
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName        = folderPath,
-                UseShellExecute = true
-            });
-        }
-        catch (Exception ex)
-        {
-            DevLogService.Log($"[DashboardViewModel] OpenMediaFolder failed for '{folderPath}': {ex.GetType().Name}: {ex.Message}");
-        }
-    }
-
     // ── Dashboard friend actions ───────────────────────────────────────────────
     private const string InvitePayloadSeparator = "|";
     [ObservableProperty] private string _dashboardInviteStatus = "";
@@ -766,6 +733,13 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _xb360GameFocusIndex;
     [ObservableProperty] private LocalGameCardVm? _xb360FocusedGame;
     [ObservableProperty] private bool _xb360HasFocusedGame;
+    [ObservableProperty] private int _xb360MediaFocusIndex;
+    [ObservableProperty] private Xb360MediaCategoryVm? _xb360FocusedMediaCategory;
+    [ObservableProperty] private bool _xb360HasFocusedMediaCategory;
+    [ObservableProperty] private string _xb360FocusedMediaHeader = "Movies";
+    [ObservableProperty] private string _xb360FocusedMediaSummary = "No media found.";
+    public ObservableCollection<Xb360MediaCategoryVm> Xb360MediaCategories { get; } = new();
+    public ObservableCollection<string> Xb360FocusedMediaEntries { get; } = new();
 
     public bool IsXb360MyGamesBlade  => Xb360ActiveBlade == "mygames";
     public bool IsXb360SocialBlade   => Xb360ActiveBlade == "social";
@@ -777,6 +751,8 @@ public partial class DashboardViewModel : ViewModelBase
     {
         int idx = Math.Clamp(value, 0, Xb360Blades.Length - 1);
         Xb360ActiveBlade = Xb360Blades[idx];
+        if (IsXb360MediaBlade)
+            RefreshXb360MediaLibrary();
     }
 
     public void MoveXb360Blade(int delta)
@@ -787,6 +763,12 @@ public partial class DashboardViewModel : ViewModelBase
 
     public void MoveXb360GameFocus(int delta)
     {
+        if (IsXb360MediaBlade)
+        {
+            MoveXb360MediaFocus(delta);
+            return;
+        }
+
         if (LocalLibraryGames.Count == 0) return;
         int next = Math.Clamp(Xb360GameFocusIndex + delta, 0, LocalLibraryGames.Count - 1);
         Xb360GameFocusIndex = next;
@@ -794,6 +776,147 @@ public partial class DashboardViewModel : ViewModelBase
         Xb360FocusedGame = LocalLibraryGames[next];
         Xb360HasFocusedGame = true;
         Xb360FocusedGame.IsFocused = true;
+    }
+
+    [RelayCommand]
+    private void SelectXb360MediaCategory(Xb360MediaCategoryVm? category)
+    {
+        if (category == null || Xb360MediaCategories.Count == 0) return;
+        int index = Xb360MediaCategories.IndexOf(category);
+        if (index >= 0)
+            SetFocusedMediaCategory(index);
+    }
+
+    public void RefreshXb360MediaLibrary()
+    {
+        var refreshed = BuildXb360MediaCategories();
+        Xb360MediaCategories.Clear();
+        foreach (var category in refreshed)
+            Xb360MediaCategories.Add(category);
+
+        if (Xb360MediaCategories.Count == 0)
+        {
+            Xb360HasFocusedMediaCategory = false;
+            Xb360FocusedMediaCategory = null;
+            Xb360FocusedMediaHeader = "Media";
+            Xb360FocusedMediaSummary = "No media found.";
+            Xb360FocusedMediaEntries.Clear();
+            return;
+        }
+
+        int preferred = Math.Clamp(Xb360MediaFocusIndex, 0, Xb360MediaCategories.Count - 1);
+        SetFocusedMediaCategory(preferred);
+    }
+
+    public void MoveXb360MediaFocus(int delta)
+    {
+        if (Xb360MediaCategories.Count == 0) return;
+        int next = Math.Clamp(Xb360MediaFocusIndex + delta, 0, Xb360MediaCategories.Count - 1);
+        SetFocusedMediaCategory(next);
+    }
+
+    private void SetFocusedMediaCategory(int index)
+    {
+        if (Xb360MediaCategories.Count == 0) return;
+        int safeIndex = Math.Clamp(index, 0, Xb360MediaCategories.Count - 1);
+        Xb360MediaFocusIndex = safeIndex;
+
+        foreach (var category in Xb360MediaCategories)
+            category.IsFocused = false;
+
+        var focused = Xb360MediaCategories[safeIndex];
+        focused.IsFocused = true;
+        Xb360FocusedMediaCategory = focused;
+        Xb360HasFocusedMediaCategory = true;
+        Xb360FocusedMediaHeader = focused.Name;
+        Xb360FocusedMediaSummary = focused.ItemCount > 0
+            ? $"{focused.ItemCount} item(s) found in Media/{focused.FolderName}."
+            : $"No files found in Media/{focused.FolderName}.";
+
+        Xb360FocusedMediaEntries.Clear();
+        foreach (var entry in focused.Entries)
+            Xb360FocusedMediaEntries.Add(entry);
+    }
+
+    private static IReadOnlyList<Xb360MediaCategoryVm> BuildXb360MediaCategories()
+    {
+        var categories = new[]
+        {
+            new { Name = "Movies", FolderName = "Movies", AlternateFolderName = (string?)null, Description = "Feature films and video files." },
+            new { Name = "TV Shows", FolderName = "TV Shows", AlternateFolderName = "Tv Shows", Description = "Episodes and series folders." },
+            new { Name = "Music", FolderName = "Music", AlternateFolderName = (string?)null, Description = "Albums, tracks, and playlists." },
+        };
+
+        var driveRoots = GameScannerService.GetDriveRoots()
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var results = new List<Xb360MediaCategoryVm>();
+        foreach (var category in categories)
+        {
+            int totalCount = 0;
+            var previewEntries = new List<string>();
+
+            foreach (var driveRoot in driveRoots)
+            {
+                string mediaRoot = Path.Combine(driveRoot, "Media");
+                ScanMediaCategoryFolder(Path.Combine(mediaRoot, category.FolderName),
+                    category.FolderName, ref totalCount, previewEntries);
+                if (!string.IsNullOrWhiteSpace(category.AlternateFolderName))
+                {
+                    ScanMediaCategoryFolder(Path.Combine(mediaRoot, category.AlternateFolderName),
+                        category.FolderName, ref totalCount, previewEntries);
+                }
+            }
+
+            results.Add(new Xb360MediaCategoryVm
+            {
+                Name = category.Name,
+                FolderName = category.FolderName,
+                Description = category.Description,
+                ItemCount = totalCount,
+                Entries = previewEntries
+            });
+        }
+
+        return results;
+    }
+
+    private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp4", ".mkv", ".avi", ".mov", ".wmv", ".m4v", ".webm", ".mpg", ".mpeg", ".ts", ".m2ts"
+    };
+
+    private static readonly HashSet<string> AudioExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".mp3", ".flac", ".wav", ".m4a", ".aac", ".ogg", ".wma", ".alac"
+    };
+
+    private static void ScanMediaCategoryFolder(
+        string categoryPath,
+        string categoryFolderName,
+        ref int totalCount,
+        List<string> previewEntries)
+    {
+        if (!Directory.Exists(categoryPath)) return;
+
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(categoryPath, "*", SearchOption.AllDirectories))
+            {
+                string ext = Path.GetExtension(file);
+                bool isMatch = string.Equals(categoryFolderName, "Music", StringComparison.OrdinalIgnoreCase)
+                    ? AudioExtensions.Contains(ext)
+                    : VideoExtensions.Contains(ext);
+                if (!isMatch) continue;
+
+                totalCount++;
+                if (previewEntries.Count < 30)
+                    previewEntries.Add(Path.GetFileName(file));
+            }
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
     }
 
     [RelayCommand]
@@ -807,4 +930,14 @@ public partial class DashboardViewModel : ViewModelBase
     {
         if (Xb360FocusedGame != null) OnOpenLocalDetail?.Invoke(Xb360FocusedGame);
     }
+}
+
+public partial class Xb360MediaCategoryVm : ObservableObject
+{
+    [ObservableProperty] private string _name = "";
+    [ObservableProperty] private string _folderName = "";
+    [ObservableProperty] private string _description = "";
+    [ObservableProperty] private int _itemCount;
+    [ObservableProperty] private bool _isFocused;
+    public List<string> Entries { get; init; } = new();
 }
