@@ -1229,7 +1229,7 @@ public partial class GameDetailViewModel : ViewModelBase
             string? sourceOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.SyncAsync(
-                Platform, Title, _currentUsername, sourceOverridePath);
+                Platform, Title, _currentUsername, sourceOverridePath, CurrentTitleId);
 
             string statusText = result.Kind switch
             {
@@ -1276,7 +1276,7 @@ public partial class GameDetailViewModel : ViewModelBase
             string? targetOverridePath = ResolveEmulatorSavePathOverride(CurrentTitleId);
 
             var result = await Services.LudusaviService.RestoreAsync(
-                Platform, Title, _currentUsername, targetOverridePath);
+                Platform, Title, _currentUsername, targetOverridePath, CurrentTitleId);
 
             string statusText = result.Kind switch
             {

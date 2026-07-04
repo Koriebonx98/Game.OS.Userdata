@@ -114,7 +114,8 @@ namespace GameLauncher.Services
             string  platform,
             string  gameTitle,
             string  username,
-            string? sourceOverridePath = null)
+            string? sourceOverridePath = null,
+            string? titleId            = null)
         {
             if (string.IsNullOrWhiteSpace(username))
                 return LudusaviResult.Error("No user is logged in.");
@@ -126,10 +127,16 @@ namespace GameLauncher.Services
             if (!approval.Approved)
                 return LudusaviResult.Cancelled(approval.Message);
 
-            // Build the per-user per-game save path and ensure the directory exists
+            // Build the per-user per-game save path and ensure the directory exists.
+            // When a TitleID is supplied the saves are stored in a TitleID sub-folder so
+            // that multiple games with the same title (or the same game on different
+            // emulators) cannot collide:
+            //   Data/{username}/GameSaves/{platform}/{gameTitle}/{titleId}/
             string platformSavesRoot = UserDataService.GetGameSavesPath(username, platform);
             string safeGameTitle     = StorageHelpers.SanitiseName(gameTitle);
-            string gameSavePath      = Path.Combine(platformSavesRoot, safeGameTitle);
+            string gameSavePath      = !string.IsNullOrWhiteSpace(titleId)
+                ? Path.Combine(platformSavesRoot, safeGameTitle, titleId.Trim())
+                : Path.Combine(platformSavesRoot, safeGameTitle);
 
             try
             {
@@ -218,7 +225,8 @@ namespace GameLauncher.Services
             string  platform,
             string  gameTitle,
             string  username,
-            string? targetOverridePath = null)
+            string? targetOverridePath = null,
+            string? titleId            = null)
         {
             if (string.IsNullOrWhiteSpace(username))
                 return LudusaviResult.Error("No user is logged in.");
@@ -230,10 +238,22 @@ namespace GameLauncher.Services
             if (!approval.Approved)
                 return LudusaviResult.Cancelled(approval.Message);
 
-            // Locate the Game.OS backup folder for this game
+            // Locate the Game.OS backup folder for this game.
+            // Prefer the TitleID-scoped sub-folder; fall back to the legacy flat folder
+            // for saves that were backed up before this layout was introduced.
             string platformSavesRoot = UserDataService.GetGameSavesPath(username, platform);
             string safeGameTitle     = StorageHelpers.SanitiseName(gameTitle);
-            string gameSavePath      = Path.Combine(platformSavesRoot, safeGameTitle);
+            string gameSavePath;
+            if (!string.IsNullOrWhiteSpace(titleId))
+            {
+                string titleScopedPath = Path.Combine(platformSavesRoot, safeGameTitle, titleId.Trim());
+                string legacyPath      = Path.Combine(platformSavesRoot, safeGameTitle);
+                gameSavePath = Directory.Exists(titleScopedPath) ? titleScopedPath : legacyPath;
+            }
+            else
+            {
+                gameSavePath = Path.Combine(platformSavesRoot, safeGameTitle);
+            }
 
             if (!Directory.Exists(gameSavePath))
                 return LudusaviResult.NoSaveFound;
