@@ -80,6 +80,43 @@
                     </Grid>
                 </Border>
 
+                <!-- Games section -->
+                <TextBlock Text="Game Library" Classes="section-header"/>
+
+                <!-- Games folder tile -->
+                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
+                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="🎮  Games" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Browse your installed games folder." FontSize="12" Foreground="#8b949e"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Classes="btn-secondary"
+                                Padding="12,6"
+                                VerticalAlignment="Center"
+                                Command="{Binding OpenGamesFolderCommand}">
+                            Open
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <!-- ROMs tile -->
+                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10" Height="80">
+                    <Grid Margin="16,0" ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                        <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                            <TextBlock Text="🕹  ROMs" FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                            <TextBlock Text="Browse your emulator ROM library." FontSize="12" Foreground="#8b949e"/>
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                                Classes="btn-secondary"
+                                Padding="12,6"
+                                VerticalAlignment="Center"
+                                Command="{Binding OpenRomsFolderCommand}">
+                            Open
+                        </Button>
+                    </Grid>
+                </Border>
+
             </StackPanel>
         </ScrollViewer>
 

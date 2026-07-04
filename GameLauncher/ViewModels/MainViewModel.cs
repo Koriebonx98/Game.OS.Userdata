@@ -2458,10 +2458,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private async Task EnrichLibraryFromDatabaseAsync(List<Game> library)
     {
-        // Enrich games that are missing any visual metadata or the achievements URL
+        // Enrich games that are missing any visual metadata, trailer, or the achievements URL
         var toEnrich = library
             .Where(g => string.IsNullOrEmpty(g.CoverUrl)
                      || string.IsNullOrEmpty(g.Description)
+                     || string.IsNullOrEmpty(g.TrailerUrl)
                      || string.IsNullOrEmpty(g.AchievementsUrl))
             .ToList();
 
