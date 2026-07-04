@@ -167,16 +167,21 @@ namespace GameLauncher.Services
                     if (result.Kind == ResultKind.Synced)
                         return result;
 
-                    // If ludusavi is unavailable or cannot identify the game by title,
+                    // If ludusavi is unavailable, cannot identify the game by title, or
+                    // encounters an error (common for Xbox 360/Xenia games not in its database),
                     // copy directly from the resolved emulator save folder.
-                    if (result.Kind is ResultKind.NotInstalled or ResultKind.NoSaveFound)
+                    if (result.Kind is ResultKind.NotInstalled or ResultKind.NoSaveFound or ResultKind.Error)
                     {
+                        string reason = result.Kind == ResultKind.NotInstalled
+                            ? "ludusavi not installed"
+                            : result.Kind == ResultKind.NoSaveFound
+                                ? "game not found in ludusavi manifest"
+                                : $"ludusavi error: {result.Message}";
                         DevLogService.Log(
-                            $"[Ludusavi] backup returned {result.Kind}; falling back to direct copy.");
+                            $"[Ludusavi] backup fallback ({reason}); copying directly from \"{sourceOverridePath}\".");
                         return await CopyDirectoryAsync(sourceOverridePath, gameSavePath, gameTitle);
                     }
 
-                    // For other failures (permission/path/process), surface the error.
                     return result;
                 }
 
@@ -282,14 +287,17 @@ namespace GameLauncher.Services
                 if (result.Kind == ResultKind.Synced)
                     return result;
 
-                // Ludusavi not installed or game not found in its manifest (common for
-                // emulator titles like Xbox 360/Xenia that are not in the built-in database)
-                // — fall back to a direct file copy from the Game.OS backup folder.
-                if (result.Kind is ResultKind.NotInstalled or ResultKind.NoSaveFound)
+                // Ludusavi not installed, game not found in its manifest, or encountered
+                // an error (common for emulator titles like Xbox 360/Xenia that are not
+                // in the built-in database) — fall back to a direct file copy from the
+                // Game.OS backup folder.
+                if (result.Kind is ResultKind.NotInstalled or ResultKind.NoSaveFound or ResultKind.Error)
                 {
                     string reason = result.Kind == ResultKind.NotInstalled
                         ? "ludusavi not installed"
-                        : "game not found in ludusavi manifest";
+                        : result.Kind == ResultKind.NoSaveFound
+                            ? "game not found in ludusavi manifest"
+                            : $"ludusavi error: {result.Message}";
                     DevLogService.Log(
                         $"[Ludusavi] restore fallback ({reason}); copying directly to \"{targetOverridePath}\".");
                     return await CopyDirectoryAsync(gameSavePath, targetOverridePath, gameTitle);
