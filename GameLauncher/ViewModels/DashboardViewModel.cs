@@ -790,7 +790,9 @@ public partial class DashboardViewModel : ViewModelBase
             SetFocusedMediaCategory(index);
     }
 
-    public async void RefreshXb360MediaLibrary()
+    public void RefreshXb360MediaLibrary() => _ = RefreshXb360MediaLibraryAsync();
+
+    private async Task RefreshXb360MediaLibraryAsync()
     {
         int refreshToken = ++_xb360MediaRefreshToken;
         IReadOnlyList<Xb360MediaCategoryVm> refreshed;
@@ -798,8 +800,9 @@ public partial class DashboardViewModel : ViewModelBase
         {
             refreshed = await Task.Run(BuildXb360MediaCategories);
         }
-        catch
+        catch (Exception ex)
         {
+            DevLogService.Log($"[DashboardViewModel] Media scan failed: {ex.GetType().Name}: {ex.Message}");
             refreshed = Array.Empty<Xb360MediaCategoryVm>();
         }
 
@@ -848,8 +851,9 @@ public partial class DashboardViewModel : ViewModelBase
         Xb360FocusedMediaCategory = focused;
         Xb360HasFocusedMediaCategory = true;
         Xb360FocusedMediaHeader = focused.Name;
+        string itemLabel = focused.ItemCount == 1 ? "item" : "items";
         Xb360FocusedMediaSummary = focused.ItemCount > 0
-            ? $"{focused.ItemCount} item(s) found in Media/{focused.FolderName}."
+            ? $"{focused.ItemCount} {itemLabel} found in Media/{focused.FolderName}."
             : $"No files found in Media/{focused.FolderName}.";
 
         Xb360FocusedMediaEntries.Clear();
