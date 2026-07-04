@@ -251,14 +251,15 @@ namespace GameLauncher.Services
             return null;
         }
 
-        // Xbox 360 / Xenia profile IDs are exactly 8 uppercase hex characters, e.g. "00000001"
-        // (offline/default profile) or "E0300001" (gamertag-derived profile).
-        private const int XeniaProfileIdLength = 8;
+        // Xbox 360 / Xenia profile IDs are 8–16 uppercase hex characters,
+        // e.g. "00000001" (offline/default) or "E03000003D7E0695" (gamertag-derived).
+        private const int MinXeniaProfileIdLength = 8;
+        private const int MaxXeniaProfileIdLength = 16;
 
         /// <summary>
         /// Scans <paramref name="contentRoot"/> for the first sub-directory whose name
-        /// is exactly 8 hex characters — the standard Xenia profile folder format
-        /// (e.g. "00000001" for offline play, "E0300001" for a gamertag profile).
+        /// is 8–16 hex characters — the standard Xenia profile folder format
+        /// (e.g. "00000001" for offline play, "E03000003D7E0695" for a gamertag profile).
         /// Used as a last-resort fallback when game-specific detection fails.
         /// </summary>
         private static string? TryDetectAnyXeniaProfileId(string contentRoot)
@@ -270,7 +271,9 @@ namespace GameLauncher.Services
                 foreach (string profileDir in Directory.EnumerateDirectories(contentRoot))
                 {
                     string name = Path.GetFileName(profileDir);
-                    if (name.Length == XeniaProfileIdLength && IsHexString(name))
+                    if (name.Length >= MinXeniaProfileIdLength &&
+                        name.Length <= MaxXeniaProfileIdLength &&
+                        IsHexString(name))
                         return name;
                 }
             }

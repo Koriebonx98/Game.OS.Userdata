@@ -2150,7 +2150,10 @@ class Program
             }
 
             // When the titleId is not present under any profile, Resolve should
-            // fall back to the standard Xenia offline profile ("00000001").
+            // use any detected profile from the content directory rather than a
+            // hardcoded default.  The temp directory still contains the profile
+            // folder created for the first sub-test ("E03000003D7E0695"), so the
+            // resolver should return a path under that profile.
             string? missingTitle = EmulatorSavePathResolver.Resolve(
                 platform: "Xbox 360",
                 emulatorName: "Xenia",
@@ -2158,13 +2161,14 @@ class Program
                 titleId: "DEADBEEF",
                 profileId: null);
 
-            // Xbox 360 saves use 8-digit hex profile IDs; "00000001" is the default
-            // offline profile created by Xenia when no gamertag profile is present.
-            string expectedFallback = Path.Combine(tempRoot, "content", "00000001", "DEADBEEF", "00000001");
+            // Xbox 360 profile IDs are 8–16 uppercase hex characters.
+            // The resolver should pick the first profile folder it finds (the one
+            // created above) rather than a hardcoded "00000001" default.
+            string expectedFallback = Path.Combine(tempRoot, "content", profileId, "DEADBEEF", "00000001");
 
             if (missingTitle == expectedFallback)
             {
-                Console.WriteLine($"  ✅  Falls back to default offline profile (\"00000001\") for title not found in any profile");
+                Console.WriteLine($"  ✅  Falls back to detected profile (\"{profileId}\") for title not found in any profile");
             }
             else
             {
