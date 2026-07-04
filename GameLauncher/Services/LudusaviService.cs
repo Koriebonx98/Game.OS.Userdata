@@ -776,6 +776,10 @@ namespace GameLauncher.Services
                 || lower.Contains("no info found for this game");
         }
 
+        /// <summary>
+        /// Returns true when <paramref name="path"/> exists and contains at least one file
+        /// (including in nested subdirectories); returns false for missing/inaccessible paths.
+        /// </summary>
         private static bool DirectoryHasAnyFiles(string path)
         {
             if (!Directory.Exists(path)) return false;

@@ -195,6 +195,10 @@ public partial class MediaViewModel : ObservableObject
             _ => "music"
         };
 
+    /// <summary>
+    /// Scans each drive's Media folder for subdirectories matching any provided
+    /// category name and adds files with allowed extensions into <paramref name="destination"/>.
+    /// </summary>
     private static void TryCollectMediaCategory(
         string driveRoot,
         ICollection<MediaLibraryItem> destination,
