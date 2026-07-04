@@ -1733,19 +1733,29 @@ public partial class GameDetailViewModel : ViewModelBase
         return _driveInstances.Count > 0;
     }
 
-    private static int TryResolveSteamAppId(Game game)
+    private static int TryResolveSteamAppId(Game game, LocalGame? localGame = null)
     {
         if (game.SteamAppId.HasValue && game.SteamAppId.Value > 0)
             return (int)game.SteamAppId.Value;
 
-        if (string.IsNullOrWhiteSpace(game.TitleId))
-            return 0;
+        if (!string.IsNullOrWhiteSpace(game.TitleId))
+        {
+            string titleId = game.TitleId.Trim();
+            if (titleId.StartsWith("steam:", StringComparison.OrdinalIgnoreCase))
+                titleId = titleId[6..];
 
-        string titleId = game.TitleId.Trim();
-        if (titleId.StartsWith("steam:", StringComparison.OrdinalIgnoreCase))
-            titleId = titleId[6..];
+            if (int.TryParse(titleId, out int steamId) && steamId > 0)
+                return steamId;
+        }
 
-        return int.TryParse(titleId, out int steamId) && steamId > 0 ? steamId : 0;
+        // Fall back to reading steam_appid.txt from the installed game folder
+        if (localGame != null)
+        {
+            int folderAppId = SteamEmuAchievementService.TryReadAppIdFromFolder(localGame.FolderPath);
+            if (folderAppId > 0) return folderAppId;
+        }
+
+        return 0;
     }
 
     private static HashSet<int> CaptureProcessSnapshot()
@@ -2804,7 +2814,7 @@ public partial class GameDetailViewModel : ViewModelBase
         // IsCloudOnly: cloud library entry with no local copy of any kind
         IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
-        _steamAppId = TryResolveSteamAppId(game);
+        _steamAppId = TryResolveSteamAppId(game, localGame);
 
         // "Install via Steam" shown for Steam-API games not yet installed locally
         IsSteamInstallable   = _steamAppId > 0 && !IsInstalled;
@@ -2940,7 +2950,9 @@ public partial class GameDetailViewModel : ViewModelBase
         SelectedDriveIndex = 0;
         RefreshActiveDrive();
         PopulatePlaytime("PC", game.Title, externalMinutes);
-        _steamAppId = game.SteamAppId;
+        _steamAppId = game.SteamAppId > 0
+            ? game.SteamAppId
+            : SteamEmuAchievementService.TryReadAppIdFromFolder(game.FolderPath);
 
         // For locally-installed Steam games, show the Steam store page link
         if (game.SteamAppId > 0)

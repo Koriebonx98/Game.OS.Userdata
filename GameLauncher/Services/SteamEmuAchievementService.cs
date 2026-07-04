@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace GameLauncher.Services
@@ -474,6 +475,78 @@ namespace GameLauncher.Services
             {
                 yield return Path.Combine(progData, "SteamEmu");
             }
+        }
+
+        // ── steam_appid.txt reader ────────────────────────────────────────────
+
+        /// <summary>
+        /// Tries to read a Steam AppID from a <c>steam_appid.txt</c> file placed in
+        /// the game folder or its <c>steam_settings</c> / <c>SteamSettings</c>
+        /// sub-directory.  Some Steam emulators (Goldberg, GBE, etc.) and cracked
+        /// repacks write this file so the emulator knows which game it is emulating.
+        ///
+        /// <para>Locations checked (game folder and its parent):</para>
+        /// <list type="bullet">
+        ///   <item><c>{gameFolder}/steam_appid.txt</c></item>
+        ///   <item><c>{gameFolder}/steam_settings/steam_appid.txt</c></item>
+        ///   <item><c>{gameFolder}/SteamSettings/steam_appid.txt</c></item>
+        ///   <item>Same three paths under the parent directory of <paramref name="gameFolder"/>.</item>
+        /// </list>
+        /// </summary>
+        /// <param name="gameFolder">
+        /// The root folder of the installed game (e.g. <c>D:\Games\MyGame</c>).
+        /// </param>
+        /// <returns>
+        /// The parsed AppID (&gt; 0) when found; 0 when no valid file is located.
+        /// </returns>
+        public static int TryReadAppIdFromFolder(string? gameFolder)
+        {
+            if (string.IsNullOrEmpty(gameFolder)) return 0;
+
+            // Candidate directories: game folder itself and its parent
+            var dirs = new List<string> { gameFolder };
+            try
+            {
+                string? parent = Directory.GetParent(gameFolder)?.FullName;
+                if (!string.IsNullOrEmpty(parent))
+                    dirs.Add(parent);
+            }
+            catch { /* best-effort */ }
+
+            foreach (var dir in dirs)
+            {
+                // Direct placement: <gameDir>/steam_appid.txt
+                int id = ReadAppIdFile(Path.Combine(dir, "steam_appid.txt"));
+                if (id > 0) return id;
+
+                // steam_settings sub-folder (lower-case, used by Goldberg / GBE)
+                id = ReadAppIdFile(Path.Combine(dir, "steam_settings", "steam_appid.txt"));
+                if (id > 0) return id;
+
+                // SteamSettings sub-folder (Pascal-case variant)
+                id = ReadAppIdFile(Path.Combine(dir, "SteamSettings", "steam_appid.txt"));
+                if (id > 0) return id;
+            }
+
+            return 0;
+        }
+
+        /// <summary>
+        /// Reads the first line of <paramref name="filePath"/> and tries to parse it
+        /// as a positive integer Steam AppID.  Returns 0 on any error.
+        /// </summary>
+        private static int ReadAppIdFile(string filePath)
+        {
+            try
+            {
+                if (!File.Exists(filePath)) return 0;
+                string raw = File.ReadAllText(filePath).Trim();
+                // The file may contain just the AppID or a line like "1234567\n"
+                // Split on any whitespace/newline and take the first token.
+                string token = raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? "";
+                return int.TryParse(token, out int id) && id > 0 ? id : 0;
+            }
+            catch { return 0; }
         }
 
         // ── Parsers ───────────────────────────────────────────────────────────
