@@ -16,6 +16,9 @@ public partial class MediaViewModel : ObservableObject
         public string Title { get; init; } = "";
         public string FullPath { get; init; } = "";
         public string SourceFolder { get; init; } = "";
+        public string MediaType { get; init; } = "";
+        public string Extension { get; init; } = "";
+        public long FileSizeBytes { get; init; }
     }
 
     // ── VLC local file player ─────────────────────────────────────────────────
@@ -29,6 +32,7 @@ public partial class MediaViewModel : ObservableObject
     /// picker and—once the user selects a file—starts VLC playback in the overlay.
     /// </summary>
     public Action? PlayLocalVideoRequested { get; set; }
+    public Action<string>? PlayMediaItemRequested { get; set; }
 
     private static readonly HashSet<string> VideoExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -74,6 +78,24 @@ public partial class MediaViewModel : ObservableObject
     public bool IsMoviesSelected => SelectedMediaSection == "movies";
     public bool IsTvShowsSelected => SelectedMediaSection == "tvshows";
     public bool IsMusicSelected => SelectedMediaSection == "music";
+    public bool HasSelectedItem => SelectedItem != null;
+    public string SelectedItemTitle => SelectedItem?.Title ?? "Select media";
+    public string SelectedItemPath => SelectedItem?.FullPath ?? "Pick a media card to view details.";
+    public string SelectedItemTypeLabel =>
+        SelectedItem is null
+            ? ""
+            : $"{SelectedItem.MediaType.ToUpperInvariant()} · {SelectedItem.Extension.ToUpperInvariant().TrimStart('.')}";
+    public string SelectedItemSizeLabel => SelectedItem is null ? "" : FormatFileSize(SelectedItem.FileSizeBytes);
+    public string SelectedItemActionLabel => SelectedItem?.MediaType == "music" ? "▶ Play Track" : "▶ Play";
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasSelectedItem))]
+    [NotifyPropertyChangedFor(nameof(SelectedItemTitle))]
+    [NotifyPropertyChangedFor(nameof(SelectedItemPath))]
+    [NotifyPropertyChangedFor(nameof(SelectedItemTypeLabel))]
+    [NotifyPropertyChangedFor(nameof(SelectedItemSizeLabel))]
+    [NotifyPropertyChangedFor(nameof(SelectedItemActionLabel))]
+    private MediaLibraryItem? _selectedItem;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsMoviesSelected))]
@@ -83,6 +105,11 @@ public partial class MediaViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ActiveSectionTitle))]
     [NotifyPropertyChangedFor(nameof(ActiveSectionSummary))]
     private string _selectedMediaSection = "movies";
+
+    partial void OnSelectedMediaSectionChanged(string value)
+    {
+        EnsureSelectedItemForActiveSection();
+    }
 
     public MediaViewModel()
     {
@@ -96,6 +123,7 @@ public partial class MediaViewModel : ObservableObject
     {
         SelectedMediaSection = NormalizeSection(section);
         EnsureMediaLibraryFresh();
+        EnsureSelectedItemForActiveSection();
     }
 
     public void EnsureMediaLibraryFresh()
@@ -107,6 +135,7 @@ public partial class MediaViewModel : ObservableObject
             OnPropertyChanged(nameof(ActiveItems));
             OnPropertyChanged(nameof(ActiveSectionSummary));
         }
+        EnsureSelectedItemForActiveSection();
     }
 
     [RelayCommand]
@@ -117,6 +146,20 @@ public partial class MediaViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectMusic() => SelectedMediaSection = "music";
+
+    [RelayCommand]
+    private void SelectMediaItem(MediaLibraryItem? item)
+    {
+        if (item == null) return;
+        SelectedItem = item;
+    }
+
+    [RelayCommand]
+    private void PlaySelectedMedia()
+    {
+        if (SelectedItem == null) return;
+        PlayMediaItemRequested?.Invoke(SelectedItem.FullPath);
+    }
 
     [RelayCommand]
     private void RefreshMediaLibrary()
@@ -141,6 +184,7 @@ public partial class MediaViewModel : ObservableObject
         _lastScanUtc = DateTime.UtcNow;
         OnPropertyChanged(nameof(ActiveItems));
         OnPropertyChanged(nameof(ActiveSectionSummary));
+        EnsureSelectedItemForActiveSection();
     }
 
     private static string NormalizeSection(string? section) =>
@@ -191,10 +235,57 @@ public partial class MediaViewModel : ObservableObject
                 {
                     Title = Path.GetFileName(file),
                     FullPath = file,
-                    SourceFolder = mediaFolder
+                    SourceFolder = mediaFolder,
+                    MediaType = string.Equals(Path.GetFileName(mediaFolder), "Music", StringComparison.OrdinalIgnoreCase)
+                        ? "music"
+                        : "video",
+                    Extension = extension,
+                    FileSizeBytes = SafeGetFileSize(file)
                 });
             }
         }
+    }
+
+    private void EnsureSelectedItemForActiveSection()
+    {
+        var active = ActiveItems.ToList();
+        if (active.Count == 0)
+        {
+            SelectedItem = null;
+            return;
+        }
+
+        if (SelectedItem == null || !active.Any(item =>
+                string.Equals(item.FullPath, SelectedItem.FullPath, StringComparison.OrdinalIgnoreCase)))
+        {
+            SelectedItem = active[0];
+        }
+    }
+
+    private static long SafeGetFileSize(string filePath)
+    {
+        try
+        {
+            return new FileInfo(filePath).Length;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    private static string FormatFileSize(long bytes)
+    {
+        if (bytes <= 0) return "0 B";
+        string[] units = { "B", "KB", "MB", "GB", "TB" };
+        double size = bytes;
+        int unit = 0;
+        while (size >= 1024 && unit < units.Length - 1)
+        {
+            size /= 1024;
+            unit++;
+        }
+        return unit == 0 ? $"{size:0} {units[unit]}" : $"{size:0.##} {units[unit]}";
     }
 
     // ── VLC commands ─────────────────────────────────────────────────────────

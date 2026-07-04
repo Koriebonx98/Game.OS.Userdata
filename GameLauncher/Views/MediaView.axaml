@@ -55,36 +55,73 @@
                             </Button>
                         </StackPanel>
 
-                        <StackPanel Grid.Column="1" Spacing="8">
+                        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
                             <TextBlock Text="{Binding ActiveSectionTitle}" Classes="section-header"/>
                             <TextBlock Text="{Binding ActiveSectionSummary}"
+                                       Grid.Row="1"
                                        FontSize="12"
                                        Foreground="#8b949e"/>
-                            <ScrollViewer MaxHeight="420"
+                            <ScrollViewer Grid.Row="2" MaxHeight="300"
                                           HorizontalScrollBarVisibility="Disabled"
                                           VerticalScrollBarVisibility="Auto">
                                 <ItemsControl ItemsSource="{Binding ActiveItems}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" ItemWidth="180" ItemHeight="96"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Border Classes="xb360-metro-tile xb360-metro-stat"
-                                                    CornerRadius="8"
-                                                    Margin="0,0,0,8">
-                                                <StackPanel Margin="12,10" Spacing="2">
+                                            <Button Classes="btn-secondary"
+                                                    Margin="0,0,8,8"
+                                                    HorizontalContentAlignment="Stretch"
+                                                    VerticalContentAlignment="Stretch"
+                                                    Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Margin="8,6" Spacing="3">
                                                     <TextBlock Text="{Binding Title}"
-                                                               FontSize="13"
+                                                               FontSize="12"
                                                                FontWeight="SemiBold"
+                                                               MaxHeight="34"
                                                                TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding FullPath}"
-                                                               FontSize="11"
-                                                               Foreground="#8b949e"
-                                                               TextWrapping="Wrap"/>
+                                                    <TextBlock Text="{Binding Extension}"
+                                                               FontSize="10"
+                                                               Foreground="#8b949e"/>
                                                 </StackPanel>
-                                            </Border>
+                                            </Button>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
                             </ScrollViewer>
-                        </StackPanel>
+                            <Border Grid.Row="3"
+                                    Classes="xb360-metro-tile xb360-metro-stat"
+                                    CornerRadius="8"
+                                    IsVisible="{Binding HasSelectedItem}">
+                                <StackPanel Margin="12,10" Spacing="6">
+                                    <TextBlock Text="Info" Classes="section-header" FontSize="14"/>
+                                    <TextBlock Text="{Binding SelectedItemTitle}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding SelectedItemTypeLabel}"
+                                               FontSize="11"
+                                               Foreground="#8b949e"/>
+                                    <TextBlock Text="{Binding SelectedItemSizeLabel}"
+                                               FontSize="11"
+                                               Foreground="#8b949e"/>
+                                    <TextBlock Text="{Binding SelectedItemPath}"
+                                               FontSize="10"
+                                               Foreground="#8b949e"
+                                               TextWrapping="Wrap"
+                                               MaxHeight="36"/>
+                                    <Button Classes="btn-primary"
+                                            HorizontalAlignment="Left"
+                                            Command="{Binding PlaySelectedMediaCommand}">
+                                        <TextBlock Text="{Binding SelectedItemActionLabel}"/>
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Border>
 
