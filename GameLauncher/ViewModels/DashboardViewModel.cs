@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -740,6 +741,8 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private string _xb360FocusedMediaSummary = "No media found.";
     public ObservableCollection<Xb360MediaCategoryVm> Xb360MediaCategories { get; } = new();
     public ObservableCollection<string> Xb360FocusedMediaEntries { get; } = new();
+    private int _xb360MediaRefreshToken;
+    private const int MaxMediaPreviewEntries = 30;
 
     public bool IsXb360MyGamesBlade  => Xb360ActiveBlade == "mygames";
     public bool IsXb360SocialBlade   => Xb360ActiveBlade == "social";
@@ -787,9 +790,25 @@ public partial class DashboardViewModel : ViewModelBase
             SetFocusedMediaCategory(index);
     }
 
-    public void RefreshXb360MediaLibrary()
+    public async void RefreshXb360MediaLibrary()
     {
-        var refreshed = BuildXb360MediaCategories();
+        int refreshToken = ++_xb360MediaRefreshToken;
+        IReadOnlyList<Xb360MediaCategoryVm> refreshed;
+        try
+        {
+            refreshed = await Task.Run(BuildXb360MediaCategories);
+        }
+        catch
+        {
+            refreshed = Array.Empty<Xb360MediaCategoryVm>();
+        }
+
+        if (refreshToken != _xb360MediaRefreshToken) return;
+        ApplyXb360MediaCategories(refreshed);
+    }
+
+    private void ApplyXb360MediaCategories(IReadOnlyList<Xb360MediaCategoryVm> refreshed)
+    {
         Xb360MediaCategories.Clear();
         foreach (var category in refreshed)
             Xb360MediaCategories.Add(category);
@@ -911,7 +930,7 @@ public partial class DashboardViewModel : ViewModelBase
                 if (!isMatch) continue;
 
                 totalCount++;
-                if (previewEntries.Count < 30)
+                if (previewEntries.Count < MaxMediaPreviewEntries)
                     previewEntries.Add(Path.GetFileName(file));
             }
         }

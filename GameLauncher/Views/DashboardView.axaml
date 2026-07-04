@@ -346,7 +346,7 @@
                                 <ItemsControl ItemsSource="{Binding Xb360FocusedMediaEntries}">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <TextBlock Text="•  {Binding}" Classes="xb360-achievement-desc" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding ., StringFormat='•  {0}'}" Classes="xb360-achievement-desc" TextTrimming="CharacterEllipsis"/>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
