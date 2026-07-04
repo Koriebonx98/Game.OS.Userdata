@@ -40,7 +40,7 @@
                                     Classes.active="{Binding IsTvShowsSelected}"
                                     HorizontalAlignment="Stretch"
                                     Command="{Binding SelectTvShowsCommand}">
-                                📺  Tv Shows
+                                📺  TV Shows
                             </Button>
                             <Button Classes="btn-secondary"
                                     Classes.active="{Binding IsMusicSelected}"

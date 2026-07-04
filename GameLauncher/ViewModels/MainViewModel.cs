@@ -1692,7 +1692,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
         if (page == "media")
-            MediaVm.RefreshMediaLibraryCommand.Execute(null);
+            MediaVm.EnsureMediaLibraryFresh();
     }
 
     private void OpenDetailFromGame(Game game)

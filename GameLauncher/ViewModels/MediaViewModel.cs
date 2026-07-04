@@ -4,7 +4,6 @@ using GameLauncher.Services;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
 using System.IO;
 using System.Linq;
 
@@ -44,6 +43,8 @@ public partial class MediaViewModel : ObservableObject
     private readonly ObservableCollection<MediaLibraryItem> _movies = new();
     private readonly ObservableCollection<MediaLibraryItem> _tvShows = new();
     private readonly ObservableCollection<MediaLibraryItem> _music = new();
+    private DateTime _lastScanUtc = DateTime.MinValue;
+    private static readonly TimeSpan ScanCacheDuration = TimeSpan.FromMinutes(2);
 
     public ReadOnlyObservableCollection<MediaLibraryItem> Movies { get; }
     public ReadOnlyObservableCollection<MediaLibraryItem> TvShows { get; }
@@ -59,7 +60,7 @@ public partial class MediaViewModel : ObservableObject
     public string ActiveSectionTitle => SelectedMediaSection switch
     {
         "movies" => "Movies",
-        "tvshows" => "Tv Shows",
+        "tvshows" => "TV Shows",
         _ => "Music"
     };
 
@@ -94,7 +95,18 @@ public partial class MediaViewModel : ObservableObject
     public void OpenSection(string section)
     {
         SelectedMediaSection = NormalizeSection(section);
-        RefreshMediaLibrary();
+        EnsureMediaLibraryFresh();
+    }
+
+    public void EnsureMediaLibraryFresh()
+    {
+        if (DateTime.UtcNow - _lastScanUtc > ScanCacheDuration)
+            RefreshMediaLibrary();
+        else
+        {
+            OnPropertyChanged(nameof(ActiveItems));
+            OnPropertyChanged(nameof(ActiveSectionSummary));
+        }
     }
 
     [RelayCommand]
@@ -121,12 +133,12 @@ public partial class MediaViewModel : ObservableObject
 
         foreach (var driveRoot in roots)
         {
-            TryCollectMediaCategory(driveRoot, "Movies", _movies, VideoExtensions, knownPaths);
-            TryCollectMediaCategory(driveRoot, "Music", _music, AudioExtensions, knownPaths);
-            TryCollectMediaCategory(driveRoot, "TV Shows", _tvShows, VideoExtensions, knownPaths);
-            TryCollectMediaCategory(driveRoot, "Tv Shows", _tvShows, VideoExtensions, knownPaths);
+            TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies");
+            TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music");
+            TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows");
         }
 
+        _lastScanUtc = DateTime.UtcNow;
         OnPropertyChanged(nameof(ActiveItems));
         OnPropertyChanged(nameof(ActiveSectionSummary));
     }
@@ -141,31 +153,47 @@ public partial class MediaViewModel : ObservableObject
 
     private static void TryCollectMediaCategory(
         string driveRoot,
-        string categoryFolderName,
         ICollection<MediaLibraryItem> destination,
         HashSet<string> allowedExtensions,
-        HashSet<string> knownPaths)
+        HashSet<string> knownPaths,
+        params string[] categoryFolderNames)
     {
-        string mediaFolder = Path.Combine(driveRoot, "Media", categoryFolderName);
-        if (!Directory.Exists(mediaFolder)) return;
+        string mediaRoot = Path.Combine(driveRoot, "Media");
+        if (!Directory.Exists(mediaRoot)) return;
 
-        IEnumerable<string> files;
-        try { files = Directory.EnumerateFiles(mediaFolder, "*", SearchOption.AllDirectories); }
+        IEnumerable<string> categoryDirs;
+        try
+        {
+            categoryDirs = Directory
+                .EnumerateDirectories(mediaRoot)
+                .Where(path => categoryFolderNames.Contains(
+                    Path.GetFileName(path),
+                    StringComparer.OrdinalIgnoreCase))
+                .ToList();
+        }
         catch (UnauthorizedAccessException) { return; }
         catch (IOException) { return; }
 
-        foreach (var file in files)
+        foreach (var mediaFolder in categoryDirs)
         {
-            string extension = Path.GetExtension(file);
-            if (!allowedExtensions.Contains(extension)) continue;
-            if (!knownPaths.Add(file)) continue;
+            IEnumerable<string> files;
+            try { files = Directory.EnumerateFiles(mediaFolder, "*", SearchOption.AllDirectories); }
+            catch (UnauthorizedAccessException) { continue; }
+            catch (IOException) { continue; }
 
-            destination.Add(new MediaLibraryItem
+            foreach (var file in files)
             {
-                Title = Path.GetFileName(file),
-                FullPath = file,
-                SourceFolder = mediaFolder
-            });
+                string extension = Path.GetExtension(file);
+                if (!allowedExtensions.Contains(extension)) continue;
+                if (!knownPaths.Add(file)) continue;
+
+                destination.Add(new MediaLibraryItem
+                {
+                    Title = Path.GetFileName(file),
+                    FullPath = file,
+                    SourceFolder = mediaFolder
+                });
+            }
         }
     }
 
