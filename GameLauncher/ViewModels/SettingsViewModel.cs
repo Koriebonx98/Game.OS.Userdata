@@ -119,6 +119,16 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available quick-menu styles.</summary>
     public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM" };
 
+    /// <summary>Selected Games Library layout: "Default" or "Steam".</summary>
+    [ObservableProperty] private string _gamesLibraryMode = "Default";
+    /// <summary>Available Games Library layouts.</summary>
+    public IReadOnlyList<string> AvailableGamesLibraryModes { get; } = new[] { "Default", "Steam" };
+
+    /// <summary>Selected Game Info / detail layout: "Default" or "Steam".</summary>
+    [ObservableProperty] private string _gameInfoMode = "Default";
+    /// <summary>Available Game Info layouts.</summary>
+    public IReadOnlyList<string> AvailableGameInfoModes { get; } = new[] { "Default", "Steam" };
+
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
     /// Receives (apiKey, steamUserId) and returns a status string.
@@ -343,6 +353,8 @@ public partial class SettingsViewModel : ViewModelBase
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
+        GamesLibraryMode           = NormaliseDisplayMode(appSettings.GamesLibraryMode);
+        GameInfoMode               = NormaliseDisplayMode(appSettings.GameInfoMode);
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
         LogRomsScanner            = appSettings.LogRomsScanner;
@@ -535,6 +547,8 @@ public partial class SettingsViewModel : ViewModelBase
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
+            GamesLibraryMode           = NormaliseDisplayMode(GamesLibraryMode),
+            GameInfoMode               = NormaliseDisplayMode(GameInfoMode),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
             LogRomsScanner            = LogRomsScanner,
@@ -661,6 +675,13 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return "PS5";
+    }
+
+    private static string NormaliseDisplayMode(string value)
+    {
+        var v = (value ?? "").Trim();
+        if (string.Equals(v, "Steam", StringComparison.OrdinalIgnoreCase)) return "Steam";
+        return "Default";
     }
 }
 
