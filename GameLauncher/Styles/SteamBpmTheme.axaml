@@ -24,9 +24,9 @@
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#1C2734" Offset="0"/>
-                    <GradientStop Color="#0E1A28" Offset="0.58"/>
-                    <GradientStop Color="#09131E" Offset="1"/>
+                    <GradientStop Color="#1A2430" Offset="0"/>
+                    <GradientStop Color="#102132" Offset="0.6"/>
+                    <GradientStop Color="#0A1B2A" Offset="1"/>
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
@@ -38,41 +38,41 @@
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#2B3542" Offset="0"/>
-                    <GradientStop Color="#192636" Offset="0.45"/>
-                    <GradientStop Color="#0E1824" Offset="1"/>
+                    <GradientStop Color="#2C3949" Offset="0"/>
+                    <GradientStop Color="#172D43" Offset="0.46"/>
+                    <GradientStop Color="#0B1B2B" Offset="1"/>
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
     </Style>
 
     <Style Selector="TextBlock.steam-shell-title">
-        <Setter Property="FontSize" Value="26"/>
+        <Setter Property="FontSize" Value="50"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#F3F6F8"/>
     </Style>
     <Style Selector="TextBlock.steam-shell-icon">
-        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontSize" Value="31"/>
         <Setter Property="Foreground" Value="#F2F5F8"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBlock.steam-shell-time">
-        <Setter Property="FontSize" Value="22"/>
+        <Setter Property="FontSize" Value="44"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#F7F9FB"/>
     </Style>
     <Style Selector="Border.steam-shell-avatar">
-        <Setter Property="Width" Value="48"/>
-        <Setter Property="Height" Value="48"/>
-        <Setter Property="CornerRadius" Value="10"/>
-        <Setter Property="BorderThickness" Value="2"/>
-        <Setter Property="BorderBrush" Value="#FF4FD2"/>
+        <Setter Property="Width" Value="70"/>
+        <Setter Property="Height" Value="70"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="BorderThickness" Value="3"/>
+        <Setter Property="BorderBrush" Value="#EF42C7"/>
         <Setter Property="Background">
             <Setter.Value>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                    <GradientStop Color="#4822A5" Offset="0"/>
-                    <GradientStop Color="#0E2235" Offset="0.45"/>
-                    <GradientStop Color="#FF4FD2" Offset="1"/>
+                    <GradientStop Color="#5825AF" Offset="0"/>
+                    <GradientStop Color="#102638" Offset="0.45"/>
+                    <GradientStop Color="#FF4BD2" Offset="1"/>
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
@@ -81,7 +81,7 @@
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
         <Setter Property="FontWeight" Value="Bold"/>
-        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontSize" Value="24"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
@@ -103,7 +103,7 @@
                 <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                     <GradientStop Color="#10FFFFFF" Offset="0"/>
                     <GradientStop Color="#10000000" Offset="0.35"/>
-                    <GradientStop Color="#B8122030" Offset="1"/>
+                    <GradientStop Color="#44122233" Offset="1"/>
                 </LinearGradientBrush>
             </Setter.Value>
         </Setter>
@@ -121,29 +121,29 @@
         <Setter Property="Padding" Value="20,18,20,16"/>
     </Style>
     <Style Selector="TextBlock.steam-hero-game-title">
-        <Setter Property="FontSize" Value="26"/>
+        <Setter Property="FontSize" Value="48"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
     <Style Selector="TextBlock.steam-hero-game-meta">
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="36"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="#CED5DD"/>
+        <Setter Property="Foreground" Value="#AEBAC8"/>
     </Style>
 
     <Style Selector="Button.steam-side-recent-button">
-        <Setter Property="Width" Value="182"/>
+        <Setter Property="Width" Value="214"/>
         <Setter Property="Height" Value="392"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Background" Value="#18212E"/>
+        <Setter Property="Background" Value="#151F2B"/>
     </Style>
     <Style Selector="Button.steam-side-recent-button /template/ ContentPresenter">
-        <Setter Property="Background" Value="#18212E"/>
+        <Setter Property="Background" Value="#151F2B"/>
         <Setter Property="CornerRadius" Value="0"/>
     </Style>
     <Style Selector="Button.steam-side-recent-button:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#1D2A38"/>
+        <Setter Property="Background" Value="#1A2633"/>
     </Style>
     <Style Selector="Border.steam-side-image-tint">
         <Setter Property="Background">
@@ -158,12 +158,12 @@
     </Style>
     <Style Selector="Border.steam-side-card-chip">
         <Setter Property="Margin" Value="12,12,12,0"/>
-        <Setter Property="Padding" Value="8,4"/>
+        <Setter Property="Padding" Value="16,8"/>
         <Setter Property="CornerRadius" Value="3"/>
-        <Setter Property="Background" Value="#2E7EDE"/>
+        <Setter Property="Background" Value="#2A8BE4"/>
     </Style>
     <Style Selector="TextBlock.steam-side-card-chip-text">
-        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="FontSize" Value="30"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
@@ -189,33 +189,44 @@
         <Setter Property="Foreground" Value="#D4D9DE"/>
     </Style>
 
+    <Style Selector="Border.steam-tabs-strip">
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#2A3D50" Offset="0"/>
+                    <GradientStop Color="#1A3349" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+        <Setter Property="Padding" Value="0,14"/>
+    </Style>
     <Style Selector="Border.steam-tab-pill">
-        <Setter Property="Padding" Value="20,10"/>
-        <Setter Property="CornerRadius" Value="20"/>
-        <Setter Property="Background" Value="#3A4654"/>
+        <Setter Property="Padding" Value="32,14"/>
+        <Setter Property="CornerRadius" Value="26"/>
+        <Setter Property="Background" Value="Transparent"/>
     </Style>
     <Style Selector="Border.steam-tab-pill-active">
-        <Setter Property="Background" Value="#4B5665"/>
+        <Setter Property="Background" Value="#4A5A6B"/>
     </Style>
     <Style Selector="TextBlock.steam-tab-pill-text">
-        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontSize" Value="40"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#F5F7F9"/>
     </Style>
     <Style Selector="Border.steam-tab-count-pill">
         <Setter Property="Background" Value="#3A9B45"/>
-        <Setter Property="CornerRadius" Value="11"/>
-        <Setter Property="Padding" Value="8,2"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Padding" Value="12,2"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBlock.steam-tab-count-text">
-        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontSize" Value="30"/>
         <Setter Property="FontWeight" Value="Bold"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
     <Style Selector="Border.steam-news-card">
-        <Setter Property="Width" Value="410"/>
+        <Setter Property="Width" Value="580"/>
         <Setter Property="Background" Value="#161F2C"/>
     </Style>
     <Style Selector="Border.steam-news-image-tint">
@@ -230,8 +241,18 @@
         </Setter>
     </Style>
     <Style Selector="Border.steam-news-footer">
-        <Setter Property="Background" Value="#2D3949"/>
-        <Setter Property="Padding" Value="12,12,12,14"/>
+        <Setter Property="Background" Value="#2D3B4E"/>
+        <Setter Property="Padding" Value="16,14,16,16"/>
+    </Style>
+    <Style Selector="Border.steam-news-top-label">
+        <Setter Property="Margin" Value="0,12,0,0"/>
+        <Setter Property="Padding" Value="14,0,16,2"/>
+        <Setter Property="Background" Value="#2A5E9A"/>
+    </Style>
+    <Style Selector="TextBlock.steam-news-top-label-text">
+        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#89C7FF"/>
     </Style>
     <Style Selector="TextBlock.steam-news-category">
         <Setter Property="FontSize" Value="12"/>
@@ -239,8 +260,8 @@
         <Setter Property="Foreground" Value="#86B2E1"/>
     </Style>
     <Style Selector="TextBlock.steam-news-title">
-        <Setter Property="FontSize" Value="18"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="FontSize" Value="44"/>
+        <Setter Property="FontWeight" Value="Medium"/>
         <Setter Property="Foreground" Value="White"/>
     </Style>
     <Style Selector="TextBlock.steam-news-subtitle">
@@ -248,8 +269,8 @@
         <Setter Property="Foreground" Value="#D2D7DE"/>
     </Style>
     <Style Selector="TextBlock.steam-news-meta">
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontSize" Value="36"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="#9CA7B3"/>
+        <Setter Property="Foreground" Value="#B6BFCA"/>
     </Style>
 </Styles>

@@ -750,10 +750,11 @@
 
             <Grid Grid.Row="1"
                   Margin="54,22,54,0"
-                  Height="392"
+                  RowDefinitions="392,Auto"
                   ColumnDefinitions="2.55*,3.45*"
                   ColumnSpacing="18">
                 <Button Grid.Column="0"
+                        Grid.Row="0"
                         Classes="steam-hero-recent-button"
                         Command="{Binding ContinuePlayingCommand}">
                     <Grid>
@@ -765,19 +766,20 @@
                             LetterFontSize="110"
                             ImageCornerRadius="0"/>
                         <Border Classes="steam-hero-image-tint"/>
-                        <Border VerticalAlignment="Bottom"
-                                Classes="steam-hero-info-panel">
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="{Binding FeaturedGame.Title}"
-                                           Classes="steam-hero-game-title"/>
-                                <TextBlock Text="{Binding SteamHeroMetaText}"
-                                           Classes="steam-hero-game-meta"/>
-                            </StackPanel>
-                        </Border>
                     </Grid>
                 </Button>
+                <StackPanel Grid.Row="1"
+                            Grid.Column="0"
+                            Margin="-4,16,0,0"
+                            Spacing="3">
+                    <TextBlock Text="{Binding FeaturedGame.Title}"
+                               Classes="steam-hero-game-title"/>
+                    <TextBlock Text="{Binding SteamHeroMetaText}"
+                               Classes="steam-hero-game-meta"/>
+                </StackPanel>
 
                 <ItemsControl Grid.Column="1"
+                              Grid.Row="0"
                               ItemsSource="{Binding SteamRecentSideGames}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -805,16 +807,6 @@
                                         <TextBlock Text="{Binding KindLabel}"
                                                    Classes="steam-side-card-chip-text"/>
                                     </Border>
-                                    <Border VerticalAlignment="Bottom"
-                                            Classes="steam-side-card-footer">
-                                        <StackPanel Spacing="3">
-                                            <TextBlock Text="{Binding EffectiveTitle}"
-                                                       Classes="steam-side-card-title"/>
-                                            <TextBlock Text="{Binding PlaytimeLabel}"
-                                                       Classes="steam-side-card-meta"
-                                                       IsVisible="{Binding PlaytimeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                        </StackPanel>
-                                    </Border>
                                 </Grid>
                             </Button>
                         </DataTemplate>
@@ -823,24 +815,26 @@
             </Grid>
 
             <StackPanel Grid.Row="2" Margin="0,18,0,0" Spacing="24">
-                <StackPanel Orientation="Horizontal"
-                            HorizontalAlignment="Center"
-                            Spacing="18">
-                    <Border Classes="steam-tab-pill steam-tab-pill-active">
-                        <TextBlock Text="WHAT'S NEW" Classes="steam-tab-pill-text"/>
-                    </Border>
-                    <Border Classes="steam-tab-pill">
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="FRIENDS" Classes="steam-tab-pill-text"/>
-                            <Border Classes="steam-tab-count-pill">
-                                <TextBlock Text="{Binding OnlineFriendsCount}" Classes="steam-tab-count-text"/>
-                            </Border>
-                        </StackPanel>
-                    </Border>
-                    <Border Classes="steam-tab-pill">
-                        <TextBlock Text="RECOMMENDED" Classes="steam-tab-pill-text"/>
-                    </Border>
-                </StackPanel>
+                <Border Classes="steam-tabs-strip">
+                    <StackPanel Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                Spacing="18">
+                        <Border Classes="steam-tab-pill steam-tab-pill-active">
+                            <TextBlock Text="WHAT'S NEW" Classes="steam-tab-pill-text"/>
+                        </Border>
+                        <Border Classes="steam-tab-pill">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="FRIENDS" Classes="steam-tab-pill-text"/>
+                                <Border Classes="steam-tab-count-pill">
+                                    <TextBlock Text="{Binding OnlineFriendsCount}" Classes="steam-tab-count-text"/>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                        <Border Classes="steam-tab-pill">
+                            <TextBlock Text="RECOMMENDED" Classes="steam-tab-pill-text"/>
+                        </Border>
+                    </StackPanel>
+                </Border>
 
                 <ScrollViewer HorizontalScrollBarVisibility="Hidden"
                               VerticalScrollBarVisibility="Disabled">
@@ -864,19 +858,20 @@
                                                 LetterFontSize="58"
                                                 ImageCornerRadius="0"/>
                                             <Border Classes="steam-news-image-tint"/>
+                                            <Border VerticalAlignment="Top"
+                                                    HorizontalAlignment="Left"
+                                                    Classes="steam-news-top-label">
+                                                <TextBlock Text="{Binding Category}"
+                                                           Classes="steam-news-top-label-text"/>
+                                            </Border>
                                         </Grid>
                                         <Border Grid.Row="1" Classes="steam-news-footer">
                                             <StackPanel Spacing="6">
-                                                <TextBlock Text="{Binding Category}"
-                                                           Classes="steam-news-category"/>
+                                                <TextBlock Text="{Binding Meta}"
+                                                           Classes="steam-news-meta"/>
                                                 <TextBlock Text="{Binding Title}"
                                                            TextWrapping="Wrap"
                                                            Classes="steam-news-title"/>
-                                                <TextBlock Text="{Binding Subtitle}"
-                                                           TextWrapping="Wrap"
-                                                           Classes="steam-news-subtitle"/>
-                                                <TextBlock Text="{Binding Meta}"
-                                                           Classes="steam-news-meta"/>
                                             </StackPanel>
                                         </Border>
                                     </Grid>
