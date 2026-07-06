@@ -20,6 +20,7 @@ public partial class DashboardViewModel : ViewModelBase
         {
             Interval = TimeSpan.FromSeconds(30)
         };
+        SteamClockTime = GetSteamClockTime();
         _wiiClockTimer.Tick += (_, _) =>
         {
             OnPropertyChanged(nameof(WiiClockTime));
@@ -35,7 +36,7 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private int _achievementsCount;
     [ObservableProperty] private int _platformsCount;
     [ObservableProperty] private string _totalPlaytimeLabel = "";
-    [ObservableProperty] private string _steamClockTime = GetSteamClockTime();
+    [ObservableProperty] private string _steamClockTime = "";
     [ObservableProperty] private string _steamProfileInitial = "?";
     public string WiiClockTime => DateTime.Now.ToString("H:mm");
     public string WiiClockDate => DateTime.Now.ToString("ddd M/d");
@@ -180,7 +181,7 @@ public partial class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(WiiClockTime));
         OnPropertyChanged(nameof(WiiClockDate));
         SteamClockTime = GetSteamClockTime();
-        SteamProfileInitial = !string.IsNullOrWhiteSpace(profile.Username) && profile.Username.Length > 0
+        SteamProfileInitial = !string.IsNullOrWhiteSpace(profile.Username)
             ? profile.Username[0].ToString().ToUpperInvariant()
             : "?";
 
