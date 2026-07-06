@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using GameLauncher.Models;
@@ -37,6 +38,9 @@ namespace GameLauncher.Services
         // Keep fallback window short so accidental second presses do not auto-approve much later.
         private static readonly TimeSpan ApprovalFallbackWindow = TimeSpan.FromSeconds(20);
         private static readonly ConcurrentDictionary<string, DateTimeOffset> PendingApprovalTokens = new();
+        private static readonly string GamesDbCacheDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "GameOS", "GamesDbCache");
 
         // ── Result discriminated union ─────────────────────────────────────────
 
@@ -149,9 +153,12 @@ namespace GameLauncher.Services
                     titleId = extracted;
             }
 
-            string gameSavePath      = !string.IsNullOrWhiteSpace(titleId)
-                ? Path.Combine(platformSavesRoot, safeGameTitle, titleId.Trim())
-                : Path.Combine(platformSavesRoot, safeGameTitle);
+            var backupTitleIds = ResolveKnownTitleIds(platform, gameTitle, titleId);
+            string gameSavePath = backupTitleIds.Count > 0
+                ? Path.Combine(platformSavesRoot, safeGameTitle, backupTitleIds[0])
+                : !string.IsNullOrWhiteSpace(titleId)
+                    ? Path.Combine(platformSavesRoot, safeGameTitle, titleId.Trim())
+                    : Path.Combine(platformSavesRoot, safeGameTitle);
 
             try
             {
@@ -172,6 +179,10 @@ namespace GameLauncher.Services
             {
                 if (Directory.Exists(sourceOverridePath))
                 {
+                    if (ShouldMirrorXbox360TitleIds(platform, backupTitleIds))
+                        return await CopyDirectoryToTitleIdFoldersAsync(
+                            sourceOverridePath, platformSavesRoot, safeGameTitle, backupTitleIds, gameTitle);
+
                     // Register so ludusavi knows where this emulator game's saves live.
                     LudusaviConfigService.TryRegisterGameSave(gameTitle, sourceOverridePath);
 
@@ -286,19 +297,9 @@ namespace GameLauncher.Services
                     titleId = extracted;
             }
 
-            string gameSavePath;
-            if (!string.IsNullOrWhiteSpace(titleId))
-            {
-                string titleScopedPath = Path.Combine(platformSavesRoot, safeGameTitle, titleId.Trim());
-                string legacyPath      = Path.Combine(platformSavesRoot, safeGameTitle);
-                gameSavePath = Directory.Exists(titleScopedPath) ? titleScopedPath : legacyPath;
-            }
-            else
-            {
-                gameSavePath = Path.Combine(platformSavesRoot, safeGameTitle);
-            }
-
-            if (!Directory.Exists(gameSavePath))
+            var restoreTitleIds = ResolveKnownTitleIds(platform, gameTitle, titleId);
+            string? gameSavePath = ResolveRestoreSourcePath(platformSavesRoot, safeGameTitle, restoreTitleIds);
+            if (string.IsNullOrWhiteSpace(gameSavePath) || !Directory.Exists(gameSavePath))
                 return LudusaviResult.NoSaveFound;
 
             // ── TitleID-based emulator save registration ───────────────────────
@@ -698,6 +699,80 @@ namespace GameLauncher.Services
             return !string.Equals(platform.Trim(), "PC", StringComparison.OrdinalIgnoreCase);
         }
 
+        private static List<string> ResolveKnownTitleIds(string platform, string gameTitle, string? titleId)
+        {
+            var ids = new List<string>();
+
+            void Add(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                string normalized = value.Trim().ToUpperInvariant();
+                if (!ids.Contains(normalized))
+                    ids.Add(normalized);
+            }
+
+            Add(titleId);
+
+            if (string.Equals(platform.Trim(), "Xbox 360", StringComparison.OrdinalIgnoreCase))
+            {
+                foreach (string cachedTitleId in TryGetCachedTitleIds(platform, gameTitle))
+                    Add(cachedTitleId);
+            }
+
+            return ids;
+        }
+
+        private static bool ShouldMirrorXbox360TitleIds(string platform, IReadOnlyCollection<string> titleIds)
+            => string.Equals(platform?.Trim(), "Xbox 360", StringComparison.OrdinalIgnoreCase)
+            && titleIds.Count > 1;
+
+        private static List<string> TryGetCachedTitleIds(string platform, string gameTitle)
+        {
+            if (string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(gameTitle))
+                return new();
+
+            try
+            {
+                string cachePath = Path.Combine(
+                    GamesDbCacheDir,
+                    $"{Models.PlatformHelper.NormalizePlatform(platform)}.json");
+                if (!File.Exists(cachePath))
+                    return new();
+
+                var games = JsonSerializer.Deserialize<List<DatabaseGame>>(
+                    File.ReadAllText(cachePath),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (games == null || games.Count == 0)
+                    return new();
+
+                string normalized = Regex.Replace(gameTitle, @"^(.+?) - (.+)$", "$1: $2");
+                string stripped = Models.PlatformHelper.StripSpecialSymbols(gameTitle);
+
+                bool Matches(string? candidate)
+                {
+                    if (string.IsNullOrWhiteSpace(candidate)) return false;
+                    return string.Equals(candidate, gameTitle, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(candidate, normalized, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(
+                            Models.PlatformHelper.StripSpecialSymbols(candidate),
+                            stripped,
+                            StringComparison.OrdinalIgnoreCase);
+                }
+
+                return games
+                    .Where(g => Matches(g.Title) || (g.AlternateNames?.Any(Matches) ?? false))
+                    .Select(g => g.TitleId?.Trim())
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .Cast<string>()
+                    .ToList();
+            }
+            catch
+            {
+                return new();
+            }
+        }
+
         /// <summary>
         /// Attempts to extract the Xbox 360 / Xenia TitleID from a resolved emulator
         /// save path.  Xenia save paths take the form:
@@ -756,6 +831,39 @@ namespace GameLauncher.Services
             return null;
         }
 
+        private static string? ResolveRestoreSourcePath(
+            string platformSavesRoot,
+            string safeGameTitle,
+            IReadOnlyList<string> preferredTitleIds)
+        {
+            string gameRoot = Path.Combine(platformSavesRoot, safeGameTitle);
+
+            foreach (string titleId in preferredTitleIds)
+            {
+                string titleScopedPath = Path.Combine(gameRoot, titleId);
+                if (DirectoryHasAnyFiles(titleScopedPath))
+                    return titleScopedPath;
+            }
+
+            if (DirectoryHasDirectFiles(gameRoot))
+                return gameRoot;
+
+            try
+            {
+                if (Directory.Exists(gameRoot))
+                {
+                    foreach (string childDir in Directory.EnumerateDirectories(gameRoot).OrderBy(Path.GetFileName))
+                    {
+                        if (DirectoryHasAnyFiles(childDir))
+                            return childDir;
+                    }
+                }
+            }
+            catch { /* best-effort */ }
+
+            return Directory.Exists(gameRoot) ? gameRoot : null;
+        }
+
         private static bool IsHexString(string value)
         {
             if (string.IsNullOrEmpty(value)) return false;
@@ -806,6 +914,39 @@ namespace GameLauncher.Services
                 args.Add(looksLikePath ? SanitiseForLog(arg) : arg);
             }
             return string.Join(" ", args);
+        }
+
+        private static async Task<LudusaviResult> CopyDirectoryToTitleIdFoldersAsync(
+            string sourceDir,
+            string platformSavesRoot,
+            string safeGameTitle,
+            IReadOnlyCollection<string> titleIds,
+            string gameTitle)
+        {
+            try
+            {
+                if (!DirectoryHasAnyFiles(sourceDir))
+                    return LudusaviResult.NoSaveFound;
+
+                await Task.Run(() =>
+                {
+                    foreach (string titleId in titleIds)
+                    {
+                        string destDir = Path.Combine(platformSavesRoot, safeGameTitle, titleId);
+                        CopyDirectoryCore(sourceDir, destDir);
+                    }
+                });
+
+                DevLogService.Log(
+                    $"[Ludusavi] mirrored Xbox 360 saves for game=\"{gameTitle}\" ids=\"{string.Join(",", titleIds)}\"");
+                return LudusaviResult.Synced;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[Ludusavi] mirrored-copy failed game=\"{gameTitle}\": {ex.Message}");
+                return LudusaviResult.Error($"Save copy failed: {ex.Message}");
+            }
         }
 
         /// <summary>
@@ -883,6 +1024,19 @@ namespace GameLauncher.Services
             try
             {
                 return Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories).Any();
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool DirectoryHasDirectFiles(string path)
+        {
+            if (!Directory.Exists(path)) return false;
+            try
+            {
+                return Directory.EnumerateFiles(path, "*", SearchOption.TopDirectoryOnly).Any();
             }
             catch
             {
