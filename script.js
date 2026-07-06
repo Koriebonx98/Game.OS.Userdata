@@ -6555,7 +6555,7 @@ function _buildSteamInfoHeader(game, platform, title, coverUrl) {
     // Gather play stats from activity cache (if available on dashboard)
     let lastPlayedStr = '—';
     let playTimeStr   = '—';
-    if (Array.isArray(typeof _steamActivityCache !== 'undefined' ? _steamActivityCache : null)) {
+    if (Array.isArray(_steamActivityCache)) {
         const sessions = _steamActivityCache.filter(e =>
             e.type === 'playtime' &&
             (e.gameTitle || '').toLowerCase() === (title || '').toLowerCase()
@@ -6829,13 +6829,11 @@ function getDesignSetting(key) {
  */
 function setDesignSetting(key, value, controlEl) {
     localStorage.setItem(`gameOS_design_${key}`, value);
-    // Update active button state
+    // Update active button state using data-value attribute
     if (controlEl) {
         controlEl.querySelectorAll('.design-mode-btn').forEach(btn => {
-            btn.classList.remove('active');
+            btn.classList.toggle('active', btn.dataset.value === value);
         });
-        const activeBtn = controlEl.querySelector(`.design-mode-btn[onclick*="'${value}'"]`);
-        if (activeBtn) activeBtn.classList.add('active');
     }
     // Flash saved message if on account page
     const msgEl = document.getElementById('designSavedMsg');
@@ -6856,15 +6854,15 @@ function applyDesignSettingsUI() {
 
     const glCtrl = document.getElementById('gamesLibCtrl');
     if (glCtrl) {
-        glCtrl.querySelectorAll('.design-mode-btn').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = glCtrl.querySelector(`.design-mode-btn[onclick*="'${gamesLib}'"]`);
-        if (activeBtn) activeBtn.classList.add('active');
+        glCtrl.querySelectorAll('.design-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === gamesLib);
+        });
     }
     const giCtrl = document.getElementById('gameInfoCtrl');
     if (giCtrl) {
-        giCtrl.querySelectorAll('.design-mode-btn').forEach(btn => btn.classList.remove('active'));
-        const activeBtn = giCtrl.querySelector(`.design-mode-btn[onclick*="'${gameInfo}'"]`);
-        if (activeBtn) activeBtn.classList.add('active');
+        giCtrl.querySelectorAll('.design-mode-btn').forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.value === gameInfo);
+        });
     }
 }
 
@@ -6877,7 +6875,7 @@ const STEAM_DASH_RECENT_COUNT = 6; // Number of recently played games to show in
 let _steamCarouselGames = [];
 let _steamCarouselIndex = 0;
 let _steamFriendsCache  = [];
-let _steamActivityCache = {};
+let _steamActivityCache = [];
 
 /**
  * Initialise the Steam BPM dashboard (called from index.html on DOMContentLoaded).
@@ -6903,7 +6901,10 @@ async function initSteamDashboard() {
     const userDisplayEl = document.getElementById('userDisplay');
     const connStatusEl  = document.getElementById('connectionStatus');
     if (userDisplayEl) userDisplayEl.style.display = 'none';
-    if (connStatusEl)  connStatusEl.closest?.('.text-center')?.style && (connStatusEl.closest('.text-center').style.display = 'none');
+    if (connStatusEl) {
+        const connWrap = connStatusEl.closest('.text-center');
+        if (connWrap) connWrap.style.display = 'none';
+    }
 
     // Load data asynchronously
     const user = getCurrentUser();
