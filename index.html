@@ -31,44 +31,147 @@
         <main style="background:#f8fafc;">
             <!-- User Display (shows when logged in) -->
             <div id="userDisplay"></div>
-            
+
             <!-- Connection Status -->
             <div class="text-center" style="padding-top:16px;">
                 <div id="connectionStatus" class="status"></div>
             </div>
-            
-            <!-- Hero Section -->
-            <div class="hero-section">
-                <h2>Welcome to Game OS</h2>
-                <p>Create your account and join the gaming community. Secure, fast, and powered by modern technology.</p>
-                <div class="user-count-banner">👥 <span id="totalUsersCount">…</span> registered players</div>
-                
-                <div class="cta-buttons" id="guestCta">
-                    <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
-                    <a href="signup.html" class="btn btn-secondary">Get Started</a>
-                    <a href="login.html" class="btn btn-secondary">Sign In</a>
-                </div>
-                <div class="cta-buttons hidden" id="userCta">
-                    <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
-                    <a href="games.html?tab=library" class="btn btn-secondary">📚 My Library</a>
+
+            <!-- ── Steam BPM Dashboard (logged-in users) ── -->
+            <div id="steamBpmDashboard" style="display:none;">
+                <!-- Navigation tabs -->
+                <div class="steam-bpm">
+                    <nav class="steam-nav" aria-label="Dashboard navigation">
+                        <button class="steam-nav-item active" id="steamNavGames" onclick="steamSwitchTab('games')">Games</button>
+                        <button class="steam-nav-item" id="steamNavFriends" onclick="steamSwitchTab('friends')">Friends</button>
+                        <button class="steam-nav-item" id="steamNavNews" onclick="steamSwitchTab('news')">News</button>
+                        <button class="steam-nav-item" id="steamNavRecommended" onclick="steamSwitchTab('recommended')">Recommended</button>
+                    </nav>
+
+                    <!-- GAMES TAB -->
+                    <div class="steam-section active" id="steamTabGames">
+                        <div class="steam-games-layout">
+                            <!-- Left: selected game info -->
+                            <div class="steam-game-info-panel" id="steamGameInfoPanel">
+                                <div id="steamGameHeroWrap">
+                                    <div class="steam-game-hero-placeholder" id="steamGameHeroPlaceholder">🎮</div>
+                                    <img class="steam-game-hero" id="steamGameHeroImg" src="" alt="" style="display:none;" onerror="this.style.display='none';document.getElementById('steamGameHeroPlaceholder').style.display='flex';">
+                                </div>
+                                <div class="steam-game-info-body">
+                                    <div class="steam-info-empty" id="steamInfoEmpty">
+                                        <p>Select a game from your recently played list to see details.</p>
+                                        <p style="margin-top:8px;"><a href="games.html?tab=library">📚 Add games to your library →</a></p>
+                                    </div>
+                                    <div id="steamInfoDetails" style="display:none;">
+                                        <div class="steam-game-title" id="steamInfoTitle"></div>
+                                        <a href="games.html?tab=library" class="steam-play-btn" id="steamPlayBtn">
+                                            <span class="play-icon">▶</span> Play
+                                        </a>
+                                        <div class="steam-game-stats">
+                                            <div class="steam-stat">
+                                                <span class="steam-stat-label">Last Played</span>
+                                                <span class="steam-stat-value" id="steamInfoLastPlayed">—</span>
+                                            </div>
+                                            <div class="steam-stat">
+                                                <span class="steam-stat-label">Play Time</span>
+                                                <span class="steam-stat-value" id="steamInfoPlayTime">—</span>
+                                            </div>
+                                            <div class="steam-stat">
+                                                <span class="steam-stat-label">Platform</span>
+                                                <span class="steam-stat-value" id="steamInfoPlatform">—</span>
+                                            </div>
+                                        </div>
+                                        <div class="steam-friends-played" id="steamInfoFriendsWrap" style="display:none;">
+                                            <div class="steam-friends-played-label">Friends who played</div>
+                                            <div id="steamInfoFriendsList"></div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Right: carousel -->
+                            <div class="steam-carousel-area">
+                                <div class="steam-carousel-label">Recently Played</div>
+                                <div id="steamCarouselWrap" class="steam-carousel-outer">
+                                    <button class="steam-carousel-nav" id="steamCarouselPrev" onclick="steamCarouselMove(-1)" title="Previous (←)">&#8592;</button>
+                                    <div class="steam-carousel-scroll" id="steamCarouselScroll"></div>
+                                    <button class="steam-carousel-nav" id="steamCarouselNext" onclick="steamCarouselMove(1)" title="Next (→)">&#8594;</button>
+                                </div>
+                                <div id="steamCarouselEmpty" class="steam-no-games" style="display:none;">
+                                    <p>No recently played games yet.</p>
+                                    <p><a href="games.html?tab=library">Add games to your library →</a></p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- FRIENDS TAB -->
+                    <div class="steam-section" id="steamTabFriends">
+                        <div class="steam-friends-section">
+                            <h2>Friends</h2>
+                            <div id="steamFriendsList" class="steam-friends-list">
+                                <div class="steam-friends-empty">Loading friends…</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- NEWS TAB (dummy) -->
+                    <div class="steam-section" id="steamTabNews">
+                        <div class="steam-dummy-section">
+                            <div class="dummy-icon">📰</div>
+                            <h2>News</h2>
+                            <p>Game news and updates will appear here in a future update.</p>
+                            <span class="steam-coming-soon-badge">Coming Soon</span>
+                        </div>
+                    </div>
+
+                    <!-- RECOMMENDED TAB (dummy) -->
+                    <div class="steam-section" id="steamTabRecommended">
+                        <div class="steam-dummy-section">
+                            <div class="dummy-icon">⭐</div>
+                            <h2>Recommended</h2>
+                            <p>Personalised game recommendations will appear here in a future update.</p>
+                            <span class="steam-coming-soon-badge">Coming Soon</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
-            <!-- Features -->
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>🔒 Secure</h3>
-                    <p>Your account data is stored securely with industry-standard encryption and security practices.</p>
+
+            <!-- ── Standard landing page (guest or default mode) ── -->
+            <div id="standardDashboard">
+                <!-- Hero Section -->
+                <div class="hero-section">
+                    <h2>Welcome to Game OS</h2>
+                    <p>Create your account and join the gaming community. Secure, fast, and powered by modern technology.</p>
+                    <div class="user-count-banner">👥 <span id="totalUsersCount">…</span> registered players</div>
+
+                    <div class="cta-buttons" id="guestCta">
+                        <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
+                        <a href="signup.html" class="btn btn-secondary">Get Started</a>
+                        <a href="login.html" class="btn btn-secondary">Sign In</a>
+                    </div>
+                    <div class="cta-buttons hidden" id="userCta">
+                        <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
+                        <a href="games.html?tab=library" class="btn btn-secondary">📚 My Library</a>
+                    </div>
                 </div>
-                
-                <div class="feature-card">
-                    <h3>⚡ Fast</h3>
-                    <p>Quick account creation and login processes powered by GitHub Actions automation.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>🌐 Modern</h3>
-                    <p>Built with modern web technologies for the best user experience across all devices.</p>
+
+                <!-- Features -->
+                <div class="feature-grid">
+                    <div class="feature-card">
+                        <h3>🔒 Secure</h3>
+                        <p>Your account data is stored securely with industry-standard encryption and security practices.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>⚡ Fast</h3>
+                        <p>Quick account creation and login processes powered by GitHub Actions automation.</p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3>🌐 Modern</h3>
+                        <p>Built with modern web technologies for the best user experience across all devices.</p>
+                    </div>
                 </div>
             </div>
         </main>
