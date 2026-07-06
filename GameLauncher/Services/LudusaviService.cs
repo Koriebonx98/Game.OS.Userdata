@@ -707,7 +707,7 @@ namespace GameLauncher.Services
             {
                 if (string.IsNullOrWhiteSpace(value)) return;
                 string normalized = value.Trim().ToUpperInvariant();
-                if (!ids.Contains(normalized, StringComparer.OrdinalIgnoreCase))
+                if (!ids.Contains(normalized))
                     ids.Add(normalized);
             }
 
@@ -745,14 +745,14 @@ namespace GameLauncher.Services
                 if (games == null || games.Count == 0)
                     return new();
 
-                string normalised = Regex.Replace(gameTitle, @"^(.+?) - (.+)$", "$1: $2");
+                string normalized = Regex.Replace(gameTitle, @"^(.+?) - (.+)$", "$1: $2");
                 string stripped = Models.PlatformHelper.StripSpecialSymbols(gameTitle);
 
                 bool Matches(string? candidate)
                 {
                     if (string.IsNullOrWhiteSpace(candidate)) return false;
                     return string.Equals(candidate, gameTitle, StringComparison.OrdinalIgnoreCase)
-                        || string.Equals(candidate, normalised, StringComparison.OrdinalIgnoreCase)
+                        || string.Equals(candidate, normalized, StringComparison.OrdinalIgnoreCase)
                         || string.Equals(
                             Models.PlatformHelper.StripSpecialSymbols(candidate),
                             stripped,
@@ -852,7 +852,7 @@ namespace GameLauncher.Services
             {
                 if (Directory.Exists(gameRoot))
                 {
-                    foreach (string childDir in Directory.GetDirectories(gameRoot).OrderBy(Path.GetFileName))
+                    foreach (string childDir in Directory.EnumerateDirectories(gameRoot).OrderBy(Path.GetFileName))
                     {
                         if (DirectoryHasAnyFiles(childDir))
                             return childDir;

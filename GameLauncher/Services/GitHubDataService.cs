@@ -1858,7 +1858,7 @@ namespace GameLauncher.Services
 
         private static IEnumerable<DatabaseGame> FindGamesByTitle(IEnumerable<DatabaseGame> games, string title)
         {
-            string normalised = System.Text.RegularExpressions.Regex.Replace(
+            string normalized = System.Text.RegularExpressions.Regex.Replace(
                 title, @"^(.+?) - (.+)$", "$1: $2");
             string stripped = Models.PlatformHelper.StripSpecialSymbols(title);
 
@@ -1866,7 +1866,7 @@ namespace GameLauncher.Services
             {
                 if (string.IsNullOrWhiteSpace(candidate)) return false;
                 return string.Equals(candidate, title, StringComparison.OrdinalIgnoreCase)
-                    || string.Equals(candidate, normalised, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(candidate, normalized, StringComparison.OrdinalIgnoreCase)
                     || string.Equals(
                         Models.PlatformHelper.StripSpecialSymbols(candidate),
                         stripped,
