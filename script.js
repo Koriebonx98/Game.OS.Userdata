@@ -2480,12 +2480,19 @@ function _addFriendIp(friendName) {
     const address = (addrEl.value || '').trim();
     if (!address) { addrEl.focus(); return; }
 
-    // Basic validation: accept IPv4, IPv6 (with optional brackets), or a hostname/FQDN.
-    // Rejects obviously malformed input while staying permissive enough for Radmin VPN IPs.
-    const ipv4Re   = /^(\d{1,3}\.){3}\d{1,3}$/;
-    const ipv6Re   = /^\[?[0-9a-fA-F:]+\]?$/;
-    const hostRe   = /^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,61}[a-zA-Z0-9])?$/;
-    if (!ipv4Re.test(address) && !ipv6Re.test(address) && !hostRe.test(address)) {
+    // Validation: accept valid IPv4 (octets 0-255), IPv6 (contains colons, hex only),
+    // or a well-formed hostname/FQDN (no consecutive dots, no leading/trailing hyphens per label).
+    const isValidIpv4 = addr => {
+        const parts = addr.split('.');
+        return parts.length === 4 && parts.every(p => /^\d{1,3}$/.test(p) && +p >= 0 && +p <= 255);
+    };
+    const isValidIpv6 = addr => {
+        const bare = addr.replace(/^\[|\]$/g, '');
+        return bare.includes(':') && /^[0-9a-fA-F:]+$/.test(bare) && bare.split(':').length <= 9;
+    };
+    const isValidHost = addr =>
+        /^[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]*[a-zA-Z0-9])?)*$/.test(addr);
+    if (!isValidIpv4(address) && !isValidIpv6(address) && !isValidHost(address)) {
         addrEl.setCustomValidity('Enter a valid IPv4, IPv6, or hostname.');
         addrEl.reportValidity();
         addrEl.setCustomValidity('');

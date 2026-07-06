@@ -3520,6 +3520,10 @@ public partial class GameDetailViewModel : ViewModelBase
                     const string emuFallbackTs = "1970-01-01T00:00:00Z";
                     int mergedCount = 0;
 
+                    // Ensure O(1) Contains lookups for both direct-ID matching (lines below)
+                    // and the knownUnlocked cloud-record cross-check.
+                    var emuIdsSet = new HashSet<string>(emuIds, StringComparer.OrdinalIgnoreCase);
+
                     // Pre-build a set of translated display names from the achNameMap so
                     // the name-map path is an O(1) lookup per achievement rather than
                     // O(emuIds.Count) — avoids an O(n²) inner loop.
@@ -3534,8 +3538,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
                         // Direct match: emu API name equals DB achievementId or DB name.
                         // Works when the template was scraped from Steam (API names preserved).
-                        if (emuIds.Contains(a.AchievementId ?? "") ||
-                            emuIds.Contains(a.Name ?? ""))
+                        if (emuIdsSet.Contains(a.AchievementId ?? "") ||
+                            emuIdsSet.Contains(a.Name ?? ""))
                         {
                             a.UnlockedAt = emuFallbackTs;
                             mergedCount++;
@@ -3560,7 +3564,7 @@ public partial class GameDetailViewModel : ViewModelBase
                         if (knownUnlocked != null)
                         {
                             var cloudMatch = knownUnlocked.FirstOrDefault(u =>
-                                emuIds.Contains(u.AchievementId ?? "") &&
+                                emuIdsSet.Contains(u.AchievementId ?? "") &&
                                 string.Equals(u.Name, a.Name, StringComparison.OrdinalIgnoreCase));
                             if (cloudMatch != null)
                             {
