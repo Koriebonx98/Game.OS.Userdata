@@ -870,6 +870,7 @@
                                                                TextWrapping="Wrap"
                                                                MaxLines="2"
                                                                ToolTip.Tip="{Binding Title}"
+                                                               AutomationProperties.Name="{Binding Title}"
                                                                Classes="steam-news-title"/>
                                                 </StackPanel>
                                             </Border>
