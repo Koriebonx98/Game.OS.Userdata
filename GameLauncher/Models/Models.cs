@@ -452,6 +452,12 @@ namespace GameLauncher.Models
         /// <summary>Style of quick menu overlay: "GameOS", "PS5", "XB360", "Wii", "Switch", or "SteamBPM".</summary>
         [JsonPropertyName("quickMenuTheme")] public string QuickMenuTheme { get; set; } = "PS5";
 
+        /// <summary>Layout used for the Games Library page: "Default" or "Steam".</summary>
+        [JsonPropertyName("gamesLibraryMode")] public string GamesLibraryMode { get; set; } = "Default";
+
+        /// <summary>Layout used for the Game Info / detail page: "Default" or "Steam".</summary>
+        [JsonPropertyName("gameInfoMode")] public string GameInfoMode { get; set; } = "Default";
+
         /// <summary>
         /// When <see langword="true"/>, Game.OS reads the Ryujinx log file after each
         /// Switch game session and displays any relevant output in the launcher.

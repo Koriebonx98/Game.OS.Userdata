@@ -75,15 +75,6 @@
             <!-- OWNED / MY LIBRARY TAB -->
             <div id="ownedPanelWrap" style="display:none;">
                 <div id="ownedMessage" class="message"></div>
-                <!-- Steam grid view (shown when gamesLib=steam) -->
-                <div id="steamLibWrap" style="display:none;" class="steam-lib-wrap">
-                    <div class="steam-lib-cats" id="steamLibCats">
-                        <button class="steam-lib-cat active" id="steamLibCatAll" onclick="steamLibFilterCat('all')">All Games <span class="cat-count" id="steamLibCatAllCount">0</span></button>
-                        <button class="steam-lib-cat" id="steamLibCatRecent" onclick="steamLibFilterCat('recent')">Recently Played <span class="cat-count" id="steamLibCatRecentCount">0</span></button>
-                    </div>
-                    <div class="steam-lib-grid" id="steamLibGrid"></div>
-                </div>
-                <!-- Default view -->
                 <div id="ownedGamesList"></div>
             </div>
 
@@ -541,13 +532,7 @@
         }
         // Load friend libraries for "also owned by friends" counts
         _friendLibraries = await loadFriendLibraries(user.username).catch(() => ({}));
-        // Decide which view to render
-        const gamesLibMode = (typeof getDesignSetting === 'function') ? getDesignSetting('gamesLib') : 'default';
-        if (gamesLibMode === 'steam') {
-            renderSteamLibGrid(_myLibrary);
-        } else {
-            renderOwnedGames();
-        }
+        renderOwnedGames();
     }
 
     function renderOwnedGames() {
@@ -767,65 +752,6 @@
         document.getElementById('wishlistPanelWrap').style.display = tab === 'wishlist' ? '' : 'none';
         if (tab === 'owned')    refreshOwnedGames();
         if (tab === 'wishlist') refreshWishlist();
-    }
-
-    // ── Steam Grid Library ──────────────────────────────────────
-    let _steamLibCat = 'all';
-
-    function renderSteamLibGrid(library) {
-        const steamWrap    = document.getElementById('steamLibWrap');
-        const defaultList  = document.getElementById('ownedGamesList');
-        const allCountEl   = document.getElementById('steamLibCatAllCount');
-        const recCountEl   = document.getElementById('steamLibCatRecentCount');
-        const gridEl       = document.getElementById('steamLibGrid');
-
-        if (!steamWrap) return;
-        steamWrap.style.display = '';
-        defaultList.style.display = 'none';
-
-        if (library.length === 0) {
-            gridEl.innerHTML = '<div class="steam-lib-empty">Your library is empty.<br><a href="games.html" style="color:#4b9bd4;">Browse games →</a></div>';
-            if (allCountEl) allCountEl.textContent = '0';
-            if (recCountEl) recCountEl.textContent = '0';
-            return;
-        }
-
-        // Recently added = last 10 games by addedAt
-        const recent = [...library].sort((a, b) => {
-            const da = a.addedAt ? new Date(a.addedAt) : new Date(0);
-            const db = b.addedAt ? new Date(b.addedAt) : new Date(0);
-            return db - da;
-        }).slice(0, 10);
-
-        if (allCountEl) allCountEl.textContent = library.length;
-        if (recCountEl) recCountEl.textContent = recent.length;
-
-        const games = (_steamLibCat === 'recent') ? recent : library;
-        gridEl.innerHTML = games.map(g => {
-            const title    = escapeHtml(g.title || '');
-            const plat     = escapeHtml(g.platform || '');
-            const coverUrl = g.coverUrl || null;
-            const icon     = getPlatformIcon(g.platform || '');
-            const coverHtml = coverUrl
-                ? `<img class="steam-lib-cover" src="${escapeHtml(coverUrl)}" alt="${title}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
-                   <div class="steam-lib-cover-placeholder" style="display:none;">${icon}</div>`
-                : `<div class="steam-lib-cover-placeholder">${icon}</div>`;
-            return `<div class="steam-lib-item" tabindex="0"
-                onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}','${plat}','${escapeHtml(String(g.titleId || ''))}')"
-                onkeydown="if(event.key==='Enter'){openGameModalFromLibrary('${escapeHtml(g.title || '')}','${plat}','${escapeHtml(String(g.titleId || ''))}');}">
-                ${coverHtml}
-                <div class="steam-lib-item-name" title="${title}">${title}</div>
-                <div class="steam-lib-item-overlay"><span>▶ View</span></div>
-            </div>`;
-        }).join('');
-    }
-
-    function steamLibFilterCat(cat) {
-        _steamLibCat = cat;
-        document.getElementById('steamLibCatAll').classList.toggle('active', cat === 'all');
-        document.getElementById('steamLibCatRecent').classList.toggle('active', cat === 'recent');
-        const gamesLibMode = (typeof getDesignSetting === 'function') ? getDesignSetting('gamesLib') : 'default';
-        if (gamesLibMode === 'steam') renderSteamLibGrid(_myLibrary);
     }
     </script>
 </body>
