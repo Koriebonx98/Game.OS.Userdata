@@ -1,7 +1,7 @@
 <Styles xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
-    <!-- Nintendo Wii inspired bright shell -->
+    <!-- Show Wii layout, hide others -->
     <Style Selector="Border.dashboard-xb360-layout">
         <Setter Property="IsVisible" Value="False"/>
     </Style>
@@ -15,166 +15,234 @@
         <Setter Property="IsVisible" Value="False"/>
     </Style>
 
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- WII HOME MENU MAIN BACKGROUND -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
     <Style Selector="Window.main-window-shell">
-        <Setter Property="Background" Value="#dff4ff"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
     </Style>
+    
     <Style Selector="Border.main-content-surface">
-        <Setter Property="Background" Value="#dff4ff"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
     </Style>
-    <Style Selector="Border.detail-overlay-surface">
-        <Setter Property="Background" Value="#cfeefe"/>
-    </Style>
+    
     <Style Selector="UserControl.dashboard-root">
-        <Setter Property="Background" Value="#dff4ff"/>
-    </Style>
-    <Style Selector="Border.nav-sidebar">
-        <Setter Property="Background" Value="#f5fcff"/>
-        <Setter Property="BorderBrush" Value="#a4d9ee"/>
-        <Setter Property="BorderThickness" Value="0,0,1,0"/>
-    </Style>
-    <Style Selector="Border.nav-logo-area">
-        <Setter Property="Background" Value="#4cb7dc"/>
-    </Style>
-    <Style Selector="TextBlock.nav-logo-text">
-        <Setter Property="Foreground" Value="#ffffff"/>
-    </Style>
-    <Style Selector="Button.nav-item">
-        <Setter Property="Foreground" Value="#2e6c88"/>
-    </Style>
-    <Style Selector="Button.nav-item.active /template/ ContentPresenter">
-        <Setter Property="Background" Value="#6ec8e8"/>
-    </Style>
-    <Style Selector="Button.nav-item.active">
-        <Setter Property="Foreground" Value="#ffffff"/>
+        <Setter Property="Background" Value="#e8e8e8"/>
     </Style>
 
-    <Style Selector="TextBlock.page-title">
-        <Setter Property="Foreground" Value="#1f5f7f"/>
-    </Style>
-    <Style Selector="TextBlock.page-subtitle">
-        <Setter Property="Foreground" Value="#4b89a8"/>
-    </Style>
-    <Style Selector="TextBlock.section-header">
-        <Setter Property="Foreground" Value="#1f5f7f"/>
-    </Style>
-
-    <Style Selector="Border.stat-tile">
-        <Setter Property="Background" Value="#f6fdff"/>
-        <Setter Property="BorderBrush" Value="#a4d9ee"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-    <Style Selector="TextBlock.stat-number">
-        <Setter Property="Foreground" Value="#1f5f7f"/>
-    </Style>
-    <Style Selector="TextBlock.stat-label">
-        <Setter Property="Foreground" Value="#5a92ae"/>
-    </Style>
-    <Style Selector="TextBlock.stat-number-achievements">
-        <Setter Property="Foreground" Value="#f5a623"/>
-    </Style>
-    <Style Selector="TextBlock.stat-number-platforms">
-        <Setter Property="Foreground" Value="#2bb2d9"/>
-    </Style>
-    <Style Selector="TextBlock.stat-number-playtime">
-        <Setter Property="Foreground" Value="#2a7fab"/>
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- WII CHANNEL GRID LAYOUT -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Container for channel grid -->
+    <Style Selector="ItemsControl.wii-channel-grid">
+        <Setter Property="Margin" Value="32,24,32,120"/>
     </Style>
 
-    <Style Selector="Border.featured-hero-banner">
-        <Setter Property="Background" Value="#f6fdff"/>
-        <Setter Property="BorderBrush" Value="#a4d9ee"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-    <Style Selector="TextBlock.hero-title">
-        <Setter Property="Foreground" Value="#1f5f7f"/>
-    </Style>
-    <Style Selector="TextBlock.hero-desc">
-        <Setter Property="Foreground" Value="#4b89a8"/>
-    </Style>
-    <Style Selector="Border.game-card">
-        <Setter Property="Background" Value="#ffffff"/>
-        <Setter Property="BorderBrush" Value="#a4d9ee"/>
-        <Setter Property="BorderThickness" Value="1"/>
-    </Style>
-    <Style Selector="TextBlock.game-card-title">
-        <Setter Property="Foreground" Value="#1f5f7f"/>
-    </Style>
-    <Style Selector="TextBlock.game-card-meta">
-        <Setter Property="Foreground" Value="#4b89a8"/>
-    </Style>
-
-    <Style Selector="Button.btn-primary">
-        <Setter Property="Background" Value="#4cb7dc"/>
-    </Style>
-    <Style Selector="Button.btn-primary:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#5ec2e5"/>
-    </Style>
-    <Style Selector="Button.btn-secondary">
-        <Setter Property="Foreground" Value="#2e6c88"/>
-        <Setter Property="BorderBrush" Value="#8bcbe4"/>
-    </Style>
-    <Style Selector="Button.btn-secondary:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#eef9ff"/>
-    </Style>
-
-    <Style Selector="TextBlock.wii-menu-title">
-        <Setter Property="FontSize" Value="36"/>
-        <Setter Property="FontWeight" Value="Light"/>
-        <Setter Property="Foreground" Value="#2f6f8c"/>
-    </Style>
+    <!-- Individual channel tiles - the iconic Wii channel look -->
     <Style Selector="Button.wii-channel-tile">
-        <Setter Property="Margin" Value="8"/>
-        <Setter Property="Background" Value="#fbfeff"/>
-        <Setter Property="BorderBrush" Value="#9bd2e8"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="14"/>
-        <Setter Property="Padding" Value="10"/>
+        <Setter Property="Width" Value="160"/>
+        <Setter Property="Height" Value="120"/>
+        <Setter Property="Margin" Value="12"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="#f5f5f5"/>
+        <Setter Property="BorderBrush" Value="#a0a0a0"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="16"/>
+        <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="HorizontalContentAlignment" Value="Center"/>
         <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
-    <Style Selector="Button.wii-channel-tile:pointerover /template/ ContentPresenter">
-        <Setter Property="Background" Value="#eef9ff"/>
-    </Style>
-    <Style Selector="TextBlock.wii-channel-title">
-        <Setter Property="FontSize" Value="16"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="Foreground" Value="#2f6f8c"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-    </Style>
-    <Style Selector="TextBlock.wii-channel-subtitle">
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Foreground" Value="#5d93ad"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-    </Style>
-    <Style Selector="Border.wii-bottom-bar">
-        <Setter Property="Background" Value="#ecf9ff"/>
-        <Setter Property="BorderBrush" Value="#9bd2e8"/>
-        <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="28"/>
-        <Setter Property="Padding" Value="12,8"/>
-    </Style>
-    <Style Selector="Border.wii-bottom-orb">
-        <Setter Property="Width" Value="52"/>
-        <Setter Property="Height" Value="52"/>
-        <Setter Property="CornerRadius" Value="26"/>
+
+    <!-- Channel tile hover state - lift and glow effect -->
+    <Style Selector="Button.wii-channel-tile:pointerover">
+        <Setter Property="BorderBrush" Value="#7cb7d6"/>
+        <Setter Property="BorderThickness" Value="3"/>
         <Setter Property="Background" Value="#ffffff"/>
-        <Setter Property="BorderBrush" Value="#9bd2e8"/>
-        <Setter Property="BorderThickness" Value="2"/>
+    </Style>
+
+    <!-- Channel tile pressed state -->
+    <Style Selector="Button.wii-channel-tile:pressed /template/ ContentPresenter">
+        <Setter Property="Background" Value="#e0e0e0"/>
+    </Style>
+
+    <!-- Colored channel backgrounds - matches Wii channels -->
+    <Style Selector="Button.wii-channel-tile.channel-blue">
+        <Setter Property="Background" Value="#0066cc"/>
+    </Style>
+    
+    <Style Selector="Button.wii-channel-tile.channel-green">
+        <Setter Property="Background" Value="#00aa00"/>
+    </Style>
+    
+    <Style Selector="Button.wii-channel-tile.channel-red">
+        <Setter Property="Background" Value="#cc0000"/>
+    </Style>
+    
+    <Style Selector="Button.wii-channel-tile.channel-orange">
+        <Setter Property="Background" Value="#ff9900"/>
+    </Style>
+    
+    <Style Selector="Button.wii-channel-tile.channel-cyan">
+        <Setter Property="Background" Value="#00bbdd"/>
+    </Style>
+    
+    <Style Selector="Button.wii-channel-tile.channel-yellow">
+        <Setter Property="Background" Value="#ffdd00"/>
+    </Style>
+
+    <Style Selector="Button.wii-channel-tile.channel-white">
+        <Setter Property="Background" Value="#f5f5f5"/>
+    </Style>
+
+    <!-- Channel tile text - white and bold for colored tiles -->
+    <Style Selector="TextBlock.wii-channel-title">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#ffffff"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="Margin" Value="8"/>
+    </Style>
+
+    <!-- Subtitle within channel -->
+    <Style Selector="TextBlock.wii-channel-subtitle">
+        <Setter Property="FontSize" Value="10"/>
+        <Setter Property="Foreground" Value="#cccccc"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Dark text for white tiles -->
+    <Style Selector="Button.wii-channel-tile.channel-white TextBlock.wii-channel-title">
+        <Setter Property="Foreground" Value="#333333"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- WII BOTTOM BAR (Clock, Date, Status) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Wave-like bottom bar container -->
+    <Style Selector="Border.wii-bottom-bar">
+        <Setter Property="Background" Value="#dae8f2"/>
+        <Setter Property="BorderBrush" Value="#a8c8d8"/>
+        <Setter Property="BorderThickness" Value="2,1,2,0"/>
+        <Setter Property="Height" Value="100"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="Padding" Value="32,12"/>
+    </Style>
+
+    <!-- Center clock section -->
+    <Style Selector="StackPanel.wii-clock-section">
         <Setter Property="HorizontalAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="Spacing" Value="4"/>
     </Style>
-    <Style Selector="TextBlock.wii-bottom-orb-text">
-        <Setter Property="Foreground" Value="#2f6f8c"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="VerticalAlignment" Value="Center"/>
-    </Style>
+
+    <!-- Clock time display -->
     <Style Selector="TextBlock.wii-clock-time">
-        <Setter Property="Foreground" Value="#2f6f8c"/>
-        <Setter Property="FontSize" Value="34"/>
-        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="Foreground" Value="#333333"/>
+        <Setter Property="FontSize" Value="48"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontFamily" Value="Arial"/>
+        <Setter Property="TextAlignment" Value="Center"/>
     </Style>
+
+    <!-- Clock date display -->
     <Style Selector="TextBlock.wii-clock-date">
-        <Setter Property="Foreground" Value="#5d93ad"/>
-        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="Foreground" Value="#666666"/>
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="Normal"/>
+        <Setter Property="TextAlignment" Value="Center"/>
     </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- WII BOTTOM STATUS ORBS (Left & Right) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Wii Remote battery/status orb - left side -->
+    <Style Selector="Border.wii-status-orb-left">
+        <Setter Property="Width" Value="56"/>
+        <Setter Property="Height" Value="56"/>
+        <Setter Property="CornerRadius" Value="28"/>
+        <Setter Property="Background" Value="#87ceeb"/>
+        <Setter Property="BorderBrush" Value="#5a9fd4"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="Margin" Value="16,0,0,8"/>
+    </Style>
+
+    <!-- Wii Remote battery/status orb - right side (envelope icon) -->
+    <Style Selector="Border.wii-status-orb-right">
+        <Setter Property="Width" Value="56"/>
+        <Setter Property="Height" Value="56"/>
+        <Setter Property="CornerRadius" Value="28"/>
+        <Setter Property="Background" Value="#87ceeb"/>
+        <Setter Property="BorderBrush" Value="#5a9fd4"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Bottom"/>
+        <Setter Property="Margin" Value="0,0,16,8"/>
+    </Style>
+
+    <!-- Text in orb -->
+    <Style Selector="TextBlock.wii-orb-text">
+        <Setter Property="Foreground" Value="#ffffff"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- MENU TITLE (top of screen) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="TextBlock.wii-menu-title">
+        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="FontWeight" Value="Light"/>
+        <Setter Property="Foreground" Value="#333333"/>
+        <Setter Property="Margin" Value="32,16,0,8"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- GENERIC TEXT STYLES (fallback) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="TextBlock.page-title">
+        <Setter Property="Foreground" Value="#333333"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+    </Style>
+
+    <Style Selector="TextBlock.page-subtitle">
+        <Setter Property="Foreground" Value="#666666"/>
+        <Setter Property="FontSize" Value="14"/>
+    </Style>
+
+    <Style Selector="TextBlock.section-header">
+        <Setter Property="Foreground" Value="#333333"/>
+    </Style>
+
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+    <!-- DETAIL OVERLAY (when opening a game) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+    <Style Selector="Border.detail-overlay-surface">
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#a8c8d8"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="CornerRadius" Value="12"/>
+    </Style>
+
+    <!-- Hidden/unused elements from default theme -->
+    <Style Selector="Border.nav-sidebar">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
+    <Style Selector="Border.nav-logo-area">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
 </Styles>
