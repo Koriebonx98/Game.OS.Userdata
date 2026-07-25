@@ -3212,7 +3212,7 @@ async function displayTotalUsersCount() {
 const GAMES_DB_RAW_BASE = 'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main';
 
 const GAMES_DB_PLATFORMS = [
-    'PC', 'PS3', 'PS4', 'Switch', 'Xbox 360'
+    'PC', 'PS3', 'PS4', 'PS1', 'PS2', 'Xbox', 'Switch', 'GameCube', 'DS', 'Xbox 360'
 ];
 
 // Token for writing to the Games Database repository (XOR-hex-encoded, injected at deploy time).
