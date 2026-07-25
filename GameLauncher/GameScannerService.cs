@@ -103,7 +103,7 @@ public sealed class GameScannerService : IDisposable
     /// Background loop that rescans all drives every <see cref="PeriodicInterval"/> so
     /// that drives mounted after startup (e.g. USB sticks or newly shared folders) are
     /// discovered automatically without requiring the user to restart the app.
-    /// Also refreshes file-system watchers so any new game/repack/ROM directories are
+    /// Also refreshes file-system watchers so any new game/repack/ directories are
     /// monitored for live changes.
     /// <para>
     /// The loop is sequential: the <see cref="PeriodicInterval"/> delay begins AFTER
@@ -236,7 +236,7 @@ public sealed class GameScannerService : IDisposable
     {
         var foundGamesRaw = new List<LocalGame>();
         var foundRepacks  = new List<LocalRepack>();
-        var foundRomsRaw  = new List<LocalRom>();
+        var foundsRaw  = new List<Local>();
 
         var driveRoots = GetDriveRoots().ToList();
         DevLogService.Log($"[Scanner] Scanning {driveRoots.Count} drive root(s): {string.Join(", ", driveRoots)}");
@@ -248,15 +248,15 @@ public sealed class GameScannerService : IDisposable
                 ScanGamesDir(driveRoot, foundGamesRaw);
                 ScanStorefrontDirs(driveRoot, foundGamesRaw);
                 ScanRepacksDir(driveRoot, foundRepacks);
-                ScanRomsDir(driveRoot, foundRomsRaw);
+                ScansDir(driveRoot, foundsRaw);
             }
 
             // ── Normalize abbreviated folder names found in Games/ directories ──
             // Steam uses short install-directory names (e.g. "LHPCR" for
-            // "LEGO® Harry Potter™ Collection") that differ from the game's
+            // "LEGO® Harry Potter™ Collection") that differ f the game's
             // display name.  ACF manifest scanning (ScanSteamAcfManifests) runs
             // alongside ScanGamesDir and records the proper name for each
-            // installdir.  Build a folder-name → proper-title lookup from those
+            // installdir.  Build a folder-name → proper-title lookup f those
             // ACF-discovered entries (Source = "Steam") and apply it to any
             // Games/-folder entries (Source = "Local") whose title matches a raw
             // Steam install directory name.
@@ -310,7 +310,7 @@ public sealed class GameScannerService : IDisposable
             foundGames.Add(primary);
         }
 
-        // Merge ROMs with identical base title + platform into a single entry,
+        // Merge s with identical base title + platform into a single entry,
         // aggregating regions and additional file paths.
         var foundRoms = new List<LocalRom>();
         foreach (var grp in foundRomsRaw.GroupBy(
@@ -1151,13 +1151,13 @@ public sealed class GameScannerService : IDisposable
         // Generic archive / disc formats
         ".zip", ".7z", ".rar",
         // Sony / Microsoft
-        ".iso", ".bin", ".cue", ".xex", ".xiso",
+        ".iso", ".bin", ".cue", ".xex", ".xiso", ".chd", 
         // Xbox 360 archive format
         ".zar",
         // Nintendo Switch
         ".nsp", ".xci", ".nca", ".nsz", ".xcz",
         // Nintendo (other)
-        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro",
+        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro", ".m3u", ".rvz",  
         // Other
         ".elf", ".img", ".chd", ".pbp", ".pkg",
     };
