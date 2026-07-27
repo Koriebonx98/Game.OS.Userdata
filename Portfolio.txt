@@ -1,0 +1,121 @@
+                                                                                              Game OS
+
+
+                                                                             "You Bring The Games, We Bring The OS" 
+
+# Intro:
+
+"Game OS" is a universal platform that is crosscompatabile with windows, mac and linux. on linux it can also be used by addin the windows version to steam as a non steam game & Proton, this has its pros and cons
+Game OS has a lot of features/utilities that solves alot of problems console players and pc users have... Ease.
+Game OS also uses its own apis, other lib apis for account data to sync with Game OS, uses a varitiy of pc scripts/languages such as ps1, bat, py, js, c# enviroments and avoliva. 
+
+Problems on console:
+1) Limited customisation
+2) Compatability
+3) cost every 5x years 
+4) Subscription prices 
+
+Problems on pc:
+1) Too Much freedom without ease 
+2) multiple libaries and store fronts 
+3) Desktop enviroment 
+4) lack of controller support 
+
+Console to PC issues:
+1) What is a desktop/start menu? 
+2) Where do i get Games from?
+3) How do i play non pc Games That i have from the years? 
+4) What "OS" do i choose? Windows/mac/linux? 
+
+# Solution: 
+To make a al in one "OS" styled echo system that works on any PC (Mac, Linux and windows) possibley in future can run on android using a vm? 
+This will handle social asspects, backwards compat, ease, controller friendly, unified store, all in one launcher/media centre with full user customisation! 
+
+"Game OS" can be used as windows shell replacment, linux or mac alt also, this makes users who went from console -> PC have a familair feel and nostaliga with ease
+
+see below for list of features, how they have a possitive impact on pc users and why "Game OS" is unique and not like anything thats been made before. 
+
+# Features:
+
+- Accounts: (Online/Offline)
+Game OS has its own account system to sync playtime, achivements, friends list, wishlist, libaray, and other bits of data, User Data is encrtyped and stored via a private repo on github until a change is needed..
+Game OS Also offers local accounts via the Launcher App, this ensures users who dont have internet can still enjoy features and a connsole like expreince on pc
+
+- Scanner:
+Scanner will auto find...
+
+Games/SetUp Files, Archives & Repacks and combine per platform.
+This is usful as Pc Players Want Ease to download/play Games, Roms or Media without having to dig via folders or multiple launchers... this gives pc usrese a mroe consonle expeince 
+It Searches Folders "<Root>/Games/$GameFolderName/...$ExeFile" for games, it also searches default launcher folders like Steam, Epic, GoG and many more.. 
+if a game is in multiple drives users are able to decided in Game Info Page what Drive & Exe to use.. this then makes game managment easier and more simple
+
+Roms, use "<Root>/Roms/$PlatformName/Games/$RomName" else "<Root>/Roms/$PlatformName/Games/$GameName/$RomName" 
+Examples of "$platformNames"
+"Nintendo - Switch" "Sony - PlayStation 2" "Microsoft - Xbox 360"  
+
+Media, does same as "Games" and "Roms" but searches "<Root>/Media/$MediaType/" 
+"$MediaTypes" 
+"Movies" = "Movies/$MovieName/$MediaFile" else "Movies/$CollectionName/$MediaFile" or "Movies/$MediaFile" 
+"Tv Shows" = "Tv Shows/$ShowName/$Series/$Episode/$MediaFile" else "Tv Shows/$ShowName/$MediaFiles" such as "Show Name.S01.E01.EpName.Mp4" 
+"Music" = "Music/$ArtistName/$Album/$Songs" else "Music/$ArtistName/$Songs" 
+
+This makes setting up Games/Roms/Media 100x easier and displays in one place, this is what consoles players are use to and what pc players wish was the default! 
+
+- Install Button:
+The install button depends on how users obtain there games/ Store there Games..  
+if user is using an api key it will auto find these Games and add auto to lib, install button = Api Action... for example "install" -> Steam Opens -> Ready to Install
+
+If User has a "Zip/Rar/7z" in "<Root>/Repacks/$Archive" then install usues built in archive tool  "install" -> Choose Drive (Shows Availbe Storage) -> Installs to Selected Drives "Games" Folder 
+
+if User Has a "Repack" in ",Root>/Repacks/$GameRepackFolderName/Setup.exe" then "Install" -> Runs "Setup.exe" and user then chooses via Setup where to install Games
+
+This makes it easy to install games regardless of the source so users can always enjoy there games regardless as diffrent store isntall games diffrently, essentialy makeing Games OS the ultimate Install Hub
+
+- Ach 
+Game OS unifies Ach from multiple sources depending if "Api Key" "Emulator" or "Exophase" account 
+
+(Switch) Ruyjinx Emulator... 
+how i managed to do this is by programin "Game OS" to del the old log from emu, and then start tracking log.. this then compares Raw Log data with the "Translations" file i have made
+If the Raw Data -> Clean Log Data = "$Success" then it will "Unlock" ach for that switch game... this will also activate windows toast if using Windows 
+
+(Xbox 360) Xenia Emulator
+How this works is "Game OS" reads log in real time when Game is running, it checks for "Unlocked", this triggers "Game OS" to compare already unlocked ach... if no it then 
+Activates windows toast notification and syncs to Game OS User Data 
+
+(PC) 
+PC has multiple ways for ach, 
+
+Steam API - This will when game starts check steam api for any new ach unlocked 
+
+Steam Emu - This will check most common steam emu locaions for json/txt and check if already "Unlocked" if no it sends  a toast and marks as unlocked 
+
+Exophase - User Signs in Via Exophase (Games info page also inc a Exophase URl to scrape With $ExophaseProfile) when game runs it does a background task to scrape url every 1x min to check 
+Exophase then helps for non steam games such as epic/GoG/Xbox and then we can combine into a unfied Ach System... Exophase also can be used for RetroAch and older platforms like xbox 360 (Genuine) 
+
+- Before/During/After Options for Games and "Game OS":
+This allows users to choose a script/app to launch and can be used for anything like steam on boot, radmin vpn or a dedi server, this allows the user to have more freedom 
+
+- Cloud Saves:
+
+"Game OS" uses ludusavi x custom backup tool to backup PC Games and Roms, most users who use ludusavi knows that its painful to set up manually and most people "Sync" the whole emu per game
+issue is then that the user is using more stoargge than needed.. 
+
+What we done is use our own Games DB that includes "$TitleID" or "$AppID" and in emulator settings a "Save" path location... this then helps to identify Games to Back Up 
+
+issue/bug = while setting this up one of the bugs i came across was some games/Rom had Multiple Regional "$TitleID" this would then say "No Save Found" (Xenia Emu) when user tried to "Back UP" 
+However if user already had a save in "GameOS.exe/Data/$profile/GameSaves/$PlatformName/$TitlteID" then they could "Restore" succesfully but not back up...
+
+Fix: I rewrote the code and got Game OS to combine all Games with same "$GameName" but more than 1x "$TitleID" in Game Info Page (Per PLatform), then when "Back UP" it makes a folder per "$TitleID" and copy save
+into Each "$TitleID" ... this then made cloud Saves not only work fully with "Game OS" but resolved a future solution as now game saves will work regardless of region 
+
+for example "Skate 3" has "USA" "JAP" "Uk" and "EU" on xbox 360... with this fix itll make 4x "$TitleID" inside of "GameSaves/Skate 3/$TitleID" so no matter what region it will be playable 
+
+
+- Unfied Game Store:
+This is one of the strongest advanatges "Game OS" has as the goal isnt to compeate with big companies but instead making Gaming easier for all,
+the store will combine all stores of the game into a single entry but with a button per store so users can easily obtain game legaly with ease 
+
+e.g "Steam" "xbox" "Epic" "Amazon/Ebay" (For non Digital Games like 3DS, GBA, PS2)
+
+Another feature in game store is that users can also manually add "Games" to there lib (non digital Media) therefore making game collections easier 
+Users who wish for playtime/ach ect will need to rip this into a readable rom for an emu.. but can then play on "Game OS" 
