@@ -4509,8 +4509,10 @@ async function handleAdminEditSave() {
             }
             const fileMeta = await contentsResp.json();
             // Inline base64 content for files < 1 MB; download_url for larger files
+            // Use TextDecoder to correctly handle UTF-8 multi-byte characters (e.g. ™)
+            // that atob() alone would misinterpret as Latin-1.
             const fileData = fileMeta.content
-                ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                ? JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(fileMeta.content.replace(/\n/g, '')), c => c.charCodeAt(0))))
                 : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
 
             // Normalise – some files use { Games: [...] }, some use a bare array
@@ -4701,7 +4703,7 @@ async function handleAdminDeleteGame() {
         }
         const fileMeta = await contentsResp.json();
         const fileData = fileMeta.content
-            ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+            ? JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(fileMeta.content.replace(/\n/g, '')), c => c.charCodeAt(0))))
             : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
 
         let gamesArr;
@@ -5091,7 +5093,7 @@ async function handleAddPcGameToDb() {
             if (contentsResp.ok) {
                 const fileMeta = await contentsResp.json();
                 fileData = fileMeta.content
-                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                    ? JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(fileMeta.content.replace(/\n/g, '')), c => c.charCodeAt(0))))
                     : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
 
                 if (fileData && Array.isArray(fileData.Games)) {
@@ -5631,7 +5633,7 @@ async function handleAddSteamGameToDb() {
             if (contentsResp.ok) {
                 const fileMeta = await contentsResp.json();
                 fileData = fileMeta.content
-                    ? JSON.parse(atob(fileMeta.content.replace(/\n/g, '')))
+                    ? JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(fileMeta.content.replace(/\n/g, '')), c => c.charCodeAt(0))))
                     : await (await fetch(fileMeta.download_url, { cache: 'no-store' })).json();
 
                 if (fileData && Array.isArray(fileData.Games)) {
