@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game OS – Store</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body class="console-body">
+
+    <!-- Top Navigation Bar -->
+    <nav class="console-topbar">
+        <a href="index.html" class="console-topbar-logo">🎮 <span>Game OS</span></a>
+        <div class="console-nav">
+            <a href="index.html" class="console-nav-link">🏠 <span class="nav-label">Home</span></a>
+            <a href="games.html" class="console-nav-link">🎮 <span class="nav-label">Games</span></a>
+            <a href="games.html?tab=library" class="console-nav-link">📚 <span class="nav-label">Library</span></a>
+            <a href="store.html" class="console-nav-link active">🛒 <span class="nav-label">Store</span></a>
+            <a href="friends.html" class="console-nav-link">👥 <span class="nav-label">Friends</span></a>
+        </div>
+        <div class="console-nav-sep"></div>
+        <div id="guestNavTop">
+            <a href="login.html" class="console-nav-link">Login</a>
+            <a href="signup.html" class="console-btn-primary" style="font-size:0.85em;padding:8px 18px;">Sign Up</a>
+        </div>
+        <a href="account.html" id="userPillTop" class="console-user-pill" style="display:none;text-decoration:none;">
+            <div class="console-avatar">👤</div>
+            <span class="console-avatar-name" id="topbarUsername">Player</span>
+        </a>
+    </nav>
+
+    <div class="console-main">
+        <!-- Store Hero Banner -->
+        <div class="store-hero">
+            <div class="store-hero-bg"></div>
+            <div class="store-hero-content">
+                <div class="console-hero-tag">🛒 Game Store</div>
+                <h1 style="font-size:2.4em;font-weight:800;color:#fff;line-height:1.1;margin-bottom:14px;">Discover &amp; Buy Games</h1>
+                <p style="font-size:1em;color:rgba(255,255,255,0.65);line-height:1.6;margin-bottom:24px;max-width:460px;">
+                    Explore thousands of titles across every platform. New releases, classic hits, and exclusive deals — all in one place.
+                </p>
+                <div style="display:flex;gap:10px;flex-wrap:wrap;">
+                    <a href="games.html" class="console-btn-primary">🎮 Browse Library</a>
+                    <a href="games.html?tab=wishlist" class="console-btn-secondary">⭐ My Wishlist</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Bar -->
+        <div style="padding:20px 40px;background:rgba(255,255,255,0.03);border-bottom:1px solid rgba(255,255,255,0.07);display:flex;gap:12px;align-items:center;flex-wrap:wrap;">
+            <input
+                type="text"
+                id="storeSearch"
+                placeholder="🔍  Search games…"
+                oninput="filterStore()"
+                style="flex:1;min-width:200px;padding:11px 18px;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-size:0.95em;font-family:inherit;"
+            >
+            <select id="storePlatformFilter" onchange="filterStore()" style="padding:11px 16px;background:rgba(255,255,255,0.07);border:1.5px solid rgba(255,255,255,0.12);border-radius:10px;color:#fff;font-size:0.88em;font-family:inherit;cursor:pointer;">
+                <option value="">All Platforms</option>
+                <option value="PC">PC</option>
+                <option value="PlayStation">PlayStation</option>
+                <option value="Xbox">Xbox</option>
+                <option value="Nintendo">Nintendo</option>
+                <option value="Retro">Retro / ROM</option>
+            </select>
+        </div>
+
+        <!-- Category Tabs -->
+        <div class="store-categories">
+            <button class="store-cat-btn active" onclick="setStoreCategory('all', this)">All Games</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('new', this)">🆕 New Releases</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('popular', this)">🔥 Popular</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('sale', this)">🏷️ On Sale</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('free', this)">🆓 Free to Play</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('action', this)">⚔️ Action</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('rpg', this)">🧙 RPG</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('sports', this)">⚽ Sports</button>
+            <button class="store-cat-btn" onclick="setStoreCategory('strategy', this)">♟️ Strategy</button>
+        </div>
+
+        <!-- Featured Deal Banner -->
+        <div style="margin:0 40px;margin-top:32px;padding:28px 32px;background:linear-gradient(135deg,rgba(108,99,255,0.2),rgba(0,180,216,0.15));border:1px solid rgba(108,99,255,0.3);border-radius:16px;display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+            <div style="font-size:4em;flex-shrink:0;">🏆</div>
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:0.72em;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#a5a0ff;margin-bottom:8px;">Featured Deal of the Week</div>
+                <div style="font-size:1.5em;font-weight:800;color:#fff;margin-bottom:6px;">Ultimate Gaming Bundle</div>
+                <div style="font-size:0.9em;color:rgba(255,255,255,0.55);">Access the full game database — PC, PlayStation, Xbox, Nintendo and Retro ROMs all in one library.</div>
+            </div>
+            <div style="text-align:center;flex-shrink:0;">
+                <div style="font-size:0.78em;color:rgba(255,255,255,0.4);text-decoration:line-through;margin-bottom:4px;">$49.99</div>
+                <div style="font-size:1.8em;font-weight:800;color:#4ade80;margin-bottom:12px;">FREE</div>
+                <a href="signup.html" class="console-btn-primary" style="font-size:0.85em;padding:10px 22px;">Get Access</a>
+            </div>
+        </div>
+
+        <!-- Games Grid -->
+        <div id="storeGrid" class="store-grid"></div>
+
+        <!-- Empty state -->
+        <div id="storeEmpty" class="console-empty" style="display:none;padding:80px 20px;">
+            <div class="console-empty-icon">🔍</div>
+            <div class="console-empty-text">No games match your search.</div>
+        </div>
+
+        <!-- Load More -->
+        <div style="text-align:center;padding:8px 40px 48px;" id="storeLoadMore" style="display:none;">
+            <button class="console-btn-secondary" onclick="loadMoreStore()" id="loadMoreBtn" style="padding:12px 36px;">Load More Games</button>
+        </div>
+    </div>
+
+    <footer class="console-footer">
+        <p>&copy; 2026 Game OS. All rights reserved.</p>
+        <p style="margin-top:4px;">Powered by GitHub Actions &amp; Node.js</p>
+    </footer>
+
+    <script src="script.js"></script>
+    <script>
+    // ── Store Page Logic ──────────────────────────────────────────────────────────
+    const STORE_PAGE_SIZE = 24;
+    let _storeAllGames  = [];
+    let _storeFiltered  = [];
+    let _storeOffset    = 0;
+    let _storeCategory  = 'all';
+
+    // Sample store catalogue (supplemented by game database when available)
+    const STORE_CATALOGUE = [
+        { title:'Elden Ring',          platform:'PC',          genre:'RPG',      price:59.99, badge:'hot',     emoji:'⚔️' },
+        { title:'God of War: Ragnarök', platform:'PlayStation', genre:'Action',   price:69.99, badge:'new',     emoji:'🪓' },
+        { title:'Halo Infinite',        platform:'Xbox',        genre:'FPS',      price:0,     badge:'free',    emoji:'🎯' },
+        { title:'The Legend of Zelda: TotK', platform:'Nintendo', genre:'Adventure', price:59.99, badge:'popular', emoji:'🗡️' },
+        { title:'Cyberpunk 2077',       platform:'PC',          genre:'RPG',      price:29.99, origPrice:59.99, badge:'sale', emoji:'🤖' },
+        { title:'FIFA 24',              platform:'PlayStation', genre:'Sports',   price:39.99, badge:'popular', emoji:'⚽' },
+        { title:'Starfield',            platform:'Xbox',        genre:'RPG',      price:0,     badge:'free',    emoji:'🚀' },
+        { title:'Super Mario Odyssey',  platform:'Nintendo',    genre:'Platform', price:49.99, emoji:'🍄' },
+        { title:'Red Dead Redemption 2', platform:'PC',         genre:'Action',   price:19.99, origPrice:59.99, badge:'sale', emoji:'🤠' },
+        { title:'Fortnite',             platform:'PC',          genre:'Battle Royale', price:0, badge:'free',  emoji:'🔫' },
+        { title:'Spider-Man 2',         platform:'PlayStation', genre:'Action',   price:69.99, badge:'new',     emoji:'🕷️' },
+        { title:'Age of Empires IV',    platform:'PC',          genre:'Strategy', price:49.99, emoji:'⚔️' },
+        { title:'Minecraft',            platform:'PC',          genre:'Sandbox',  price:29.99, badge:'popular', emoji:'⛏️' },
+        { title:'Pokémon Scarlet',      platform:'Nintendo',    genre:'RPG',      price:59.99, badge:'new',     emoji:'🐲' },
+        { title:'Baldur\'s Gate 3',     platform:'PC',          genre:'RPG',      price:59.99, badge:'hot',     emoji:'🧙' },
+        { title:'Street Fighter 6',     platform:'PlayStation', genre:'Fighting', price:39.99, emoji:'🥊' },
+        { title:'Diablo IV',            platform:'PC',          genre:'Action RPG', price:44.99, badge:'popular', emoji:'😈' },
+        { title:'Forza Horizon 5',      platform:'Xbox',        genre:'Racing',   price:0,     badge:'free',    emoji:'🏎️' },
+        { title:'The Witcher 3: Wild Hunt', platform:'PC',      genre:'RPG',      price:9.99,  origPrice:39.99, badge:'sale', emoji:'🗡️' },
+        { title:'Mario Kart 8 Deluxe',  platform:'Nintendo',    genre:'Racing',   price:49.99, badge:'popular', emoji:'🏁' },
+        { title:'Call of Duty: MW III', platform:'PC',          genre:'FPS',      price:69.99, badge:'new',     emoji:'💥' },
+        { title:'Tekken 8',             platform:'PlayStation', genre:'Fighting', price:59.99, badge:'new',     emoji:'🥋' },
+        { title:'Apex Legends',         platform:'PC',          genre:'Battle Royale', price:0, badge:'free',  emoji:'🏹' },
+        { title:'Sea of Thieves',       platform:'Xbox',        genre:'Adventure', price:0,    badge:'free',    emoji:'🏴‍☠️' },
+        { title:'Animal Crossing: New Horizons', platform:'Nintendo', genre:'Simulation', price:49.99, emoji:'🌿' },
+        { title:'Genshin Impact',       platform:'PC',          genre:'RPG',      price:0,     badge:'free',    emoji:'✨' },
+        { title:'Gran Turismo 7',       platform:'PlayStation', genre:'Racing',   price:49.99, emoji:'🏎️' },
+        { title:'Hollow Knight',        platform:'PC',          genre:'Indie',    price:9.99,  badge:'popular', emoji:'🦋' },
+        { title:'Pac-Man (Arcade)',     platform:'Retro',       genre:'Arcade',   price:0,     badge:'free',    emoji:'👾' },
+        { title:'Super Mario Bros.',    platform:'Retro',       genre:'Platform', price:0,     badge:'free',    emoji:'🍄' },
+        { title:'Sonic the Hedgehog',   platform:'Retro',       genre:'Platform', price:0,     badge:'free',    emoji:'💨' },
+        { title:'Street Fighter II',    platform:'Retro',       genre:'Fighting', price:0,     badge:'free',    emoji:'🥊' },
+    ];
+
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Auth state
+        modeReady = initializeMode();
+        await modeReady;
+        updateStoreNav();
+
+        // Load games from database (async), fall back to catalogue
+        _storeAllGames = [...STORE_CATALOGUE];
+        applyStoreFilters();
+        renderStoreTiles();
+
+        // Attempt to load real game database in background
+        loadStoreFromDatabase();
+    });
+
+    async function loadStoreFromDatabase() {
+        try {
+            // Try to fetch the PC games database as a supplement
+            const resp = await fetch('https://raw.githubusercontent.com/Koriebonx98/Game.OS.Userdata/main/Games.Database/PC.Games.json');
+            if (!resp.ok) return;
+            const pcGames = await resp.json();
+            if (!Array.isArray(pcGames) || pcGames.length === 0) return;
+
+            // Add PC games not already in catalogue
+            const catalogueTitles = new Set(_storeAllGames.map(g => g.title.toLowerCase()));
+            let added = 0;
+            for (const g of pcGames) {
+                const title = g.title || g.name || '';
+                if (!title || catalogueTitles.has(title.toLowerCase())) continue;
+                _storeAllGames.push({
+                    title,
+                    platform: 'PC',
+                    genre: g.genre || 'PC Game',
+                    price: 0,
+                    badge: 'free',
+                    emoji: '🖥️',
+                    fromDB: true
+                });
+                catalogueTitles.add(title.toLowerCase());
+                added++;
+                if (added > 200) break; // cap
+            }
+            if (added > 0) {
+                applyStoreFilters();
+                renderStoreTiles();
+            }
+        } catch (_) { /* database not available, use catalogue */ }
+    }
+
+    function updateStoreNav() {
+        const session = getCurrentUser();
+        const guestTop = document.getElementById('guestNavTop');
+        const userPill = document.getElementById('userPillTop');
+        if (session && session.username) {
+            if (guestTop) guestTop.style.display = 'none';
+            if (userPill) {
+                userPill.style.display = 'flex';
+                const nameEl = document.getElementById('topbarUsername');
+                if (nameEl) nameEl.textContent = session.username;
+            }
+        } else {
+            if (guestTop) guestTop.style.display = 'flex';
+            if (userPill) userPill.style.display = 'none';
+        }
+    }
+
+    function setStoreCategory(cat, btn) {
+        _storeCategory = cat;
+        _storeOffset = 0;
+        document.querySelectorAll('.store-cat-btn').forEach(b => b.classList.remove('active'));
+        if (btn) btn.classList.add('active');
+        applyStoreFilters();
+        renderStoreTiles();
+    }
+
+    function filterStore() {
+        _storeOffset = 0;
+        applyStoreFilters();
+        renderStoreTiles();
+    }
+
+    function applyStoreFilters() {
+        const q        = (document.getElementById('storeSearch')?.value || '').toLowerCase();
+        const platform = document.getElementById('storePlatformFilter')?.value || '';
+        _storeFiltered = _storeAllGames.filter(g => {
+            if (platform && g.platform !== platform) return false;
+            const catMap = {
+                all:      true,
+                new:      g.badge === 'new',
+                popular:  g.badge === 'popular' || g.badge === 'hot',
+                sale:     g.badge === 'sale',
+                free:     g.price === 0,
+                action:   (g.genre||'').toLowerCase().includes('action'),
+                rpg:      (g.genre||'').toLowerCase().includes('rpg'),
+                sports:   (g.genre||'').toLowerCase().includes('sports'),
+                strategy: (g.genre||'').toLowerCase().includes('strategy'),
+            };
+            if (!catMap[_storeCategory]) return false;
+            if (q && !g.title.toLowerCase().includes(q)) return false;
+            return true;
+        });
+    }
+
+    function renderStoreTiles() {
+        const grid  = document.getElementById('storeGrid');
+        const empty = document.getElementById('storeEmpty');
+        const lm    = document.getElementById('storeLoadMore');
+
+        const page = _storeFiltered.slice(0, _storeOffset + STORE_PAGE_SIZE);
+        _storeOffset = page.length;
+
+        if (_storeFiltered.length === 0) {
+            grid.innerHTML = '';
+            if (empty) empty.style.display = 'block';
+            if (lm) lm.style.display = 'none';
+            return;
+        }
+        if (empty) empty.style.display = 'none';
+
+        const session = getCurrentUser();
+        const loggedIn = !!(session && session.username);
+
+        grid.innerHTML = page.map(g => {
+            const badgeHtml = g.badge
+                ? `<div class="store-tile-badge" style="background:${badgeColor(g.badge)}">${badgeLabel(g.badge)}</div>`
+                : '';
+            const origHtml = g.origPrice
+                ? `<span class="store-tile-orig-price">$${g.origPrice.toFixed(2)}</span>`
+                : '';
+            const priceText = g.price === 0 ? 'Free' : `$${g.price.toFixed(2)}`;
+            const priceClass = g.price === 0 ? 'store-tile-price free' : 'store-tile-price';
+            const addBtn = loggedIn
+                ? `<button class="store-add-btn" onclick="addToWishlist(event,'${escapeHtml(g.title)}','${escapeHtml(g.platform)}')">+ Wishlist</button>`
+                : `<a href="login.html" class="store-add-btn" style="text-decoration:none;">Sign In</a>`;
+            return `
+            <div class="store-tile" onclick="openGameModalFromLibrary('${escapeHtml(g.title)}','${escapeHtml(g.platform)}','')">
+                <div class="store-tile-cover">
+                    <span style="font-size:3em;">${g.emoji || '🎮'}</span>
+                    ${badgeHtml}
+                </div>
+                <div class="store-tile-info">
+                    <div class="store-tile-title">${escapeHtml(g.title)}</div>
+                    <div class="store-tile-genre">${escapeHtml(g.platform)} · ${escapeHtml(g.genre || '')}</div>
+                    <div class="store-tile-price-row">
+                        <div>
+                            ${origHtml}
+                            <span class="${priceClass}">${priceText}</span>
+                        </div>
+                        ${addBtn}
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+
+        if (lm) lm.style.display = _storeOffset < _storeFiltered.length ? 'block' : 'none';
+    }
+
+    function loadMoreStore() {
+        renderStoreTiles();
+    }
+
+    function badgeColor(badge) {
+        const map = { new:'rgba(34,197,94,0.9)', hot:'rgba(245,158,11,0.9)', sale:'rgba(239,68,68,0.9)', popular:'rgba(108,99,255,0.9)', free:'rgba(0,180,216,0.9)' };
+        return map[badge] || 'rgba(108,99,255,0.9)';
+    }
+
+    function badgeLabel(badge) {
+        const map = { new:'NEW', hot:'HOT', sale:'SALE', popular:'TOP', free:'FREE' };
+        return map[badge] || badge.toUpperCase();
+    }
+
+    function addToWishlist(event, title, platform) {
+        event.stopPropagation();
+        const session = getCurrentUser();
+        if (!session) { window.location = 'login.html'; return; }
+        // Reuse existing wishlist function from script.js
+        if (typeof toggleWishlist === 'function') {
+            toggleWishlist(title, platform);
+        } else {
+            alert(`"${title}" added to wishlist!`);
+        }
+    }
+    </script>
+</body>
+</html>

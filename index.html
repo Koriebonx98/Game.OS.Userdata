@@ -3,82 +3,397 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game OS</title>
+    <title>Game OS – Dashboard</title>
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🎮 Game OS</h1>
-            <p style="opacity:0.75;font-size:0.9em;margin-bottom:14px;">Your Gaming Hub</p>
-            <nav>
-                <div id="guestNav">
-                    <a href="games.html" class="nav-link">🔍 Browse Games</a>
-                    <a href="signup.html" class="nav-link">Sign Up</a>
-                    <a href="login.html" class="nav-link">Login</a>
-                </div>
-                <div id="userNav" class="hidden">
-                    <a href="games.html" class="nav-link">🔍 Games</a>
-                    <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
-                    <a href="friends.html" class="nav-link">👥 Friends</a>
-                    <a href="inbox.html" class="nav-link">📬 Inbox</a>
-                    <a href="account.html" class="nav-link">👤 My Account</a>
-                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
-                </div>
-            </nav>
-        </header>
-        
-        <main style="background:#f8fafc;">
-            <!-- User Display (shows when logged in) -->
-            <div id="userDisplay"></div>
-            
-            <!-- Connection Status -->
-            <div class="text-center" style="padding-top:16px;">
-                <div id="connectionStatus" class="status"></div>
-            </div>
-            
-            <!-- Hero Section -->
-            <div class="hero-section">
-                <h2>Welcome to Game OS</h2>
-                <p>Create your account and join the gaming community. Secure, fast, and powered by modern technology.</p>
-                <div class="user-count-banner">👥 <span id="totalUsersCount">…</span> registered players</div>
-                
-                <div class="cta-buttons" id="guestCta">
-                    <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
-                    <a href="signup.html" class="btn btn-secondary">Get Started</a>
-                    <a href="login.html" class="btn btn-secondary">Sign In</a>
-                </div>
-                <div class="cta-buttons hidden" id="userCta">
-                    <a href="games.html" class="btn btn-primary">🔍 Browse Games</a>
-                    <a href="games.html?tab=library" class="btn btn-secondary">📚 My Library</a>
+<body class="console-body">
+
+    <!-- Top Navigation Bar -->
+    <nav class="console-topbar">
+        <a href="index.html" class="console-topbar-logo">🎮 <span>Game OS</span></a>
+        <div class="console-nav" id="mainNav">
+            <a href="index.html" class="console-nav-link active">🏠 <span class="nav-label">Home</span></a>
+            <a href="games.html" class="console-nav-link">🎮 <span class="nav-label">Games</span></a>
+            <a href="games.html?tab=library" class="console-nav-link">📚 <span class="nav-label">Library</span></a>
+            <a href="store.html" class="console-nav-link">🛒 <span class="nav-label">Store</span></a>
+            <a href="friends.html" class="console-nav-link" id="navFriends" style="display:none;">👥 <span class="nav-label">Friends</span></a>
+            <a href="inbox.html" class="console-nav-link" id="navInbox" style="display:none;">📬 <span class="nav-label">Inbox</span></a>
+        </div>
+        <div class="console-nav-sep"></div>
+        <!-- Guest nav (when not logged in) -->
+        <div id="guestNavTop">
+            <a href="login.html" class="console-nav-link">Login</a>
+            <a href="signup.html" class="console-btn-primary" style="font-size:0.85em;padding:8px 18px;">Sign Up</a>
+        </div>
+        <!-- User pill (when logged in) -->
+        <a href="account.html" id="userPillTop" class="console-user-pill" style="display:none;text-decoration:none;">
+            <div class="console-avatar">👤</div>
+            <span class="console-avatar-name" id="topbarUsername">Player</span>
+        </a>
+    </nav>
+
+    <div class="console-main">
+        <!-- Hero Banner -->
+        <div class="console-hero">
+            <div class="console-hero-bg"></div>
+            <div class="console-hero-art">🎮</div>
+            <div class="console-hero-content">
+                <div class="console-hero-tag" id="heroBadge">Your Gaming Hub</div>
+                <h1 id="heroTitle">Welcome to Game OS</h1>
+                <p id="heroSubtitle">Browse your game library, connect with friends, and discover new titles — all in one place.</p>
+                <div class="console-hero-actions" id="heroActions">
+                    <a href="games.html" class="console-btn-primary">🎮 Browse Games</a>
+                    <a href="signup.html" class="console-btn-secondary" id="heroSignupBtn">Get Started</a>
+                    <a href="login.html" class="console-btn-secondary" id="heroLoginBtn">Sign In</a>
                 </div>
             </div>
-            
-            <!-- Features -->
-            <div class="feature-grid">
-                <div class="feature-card">
-                    <h3>🔒 Secure</h3>
-                    <p>Your account data is stored securely with industry-standard encryption and security practices.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>⚡ Fast</h3>
-                    <p>Quick account creation and login processes powered by GitHub Actions automation.</p>
-                </div>
-                
-                <div class="feature-card">
-                    <h3>🌐 Modern</h3>
-                    <p>Built with modern web technologies for the best user experience across all devices.</p>
+        </div>
+
+        <!-- Stats Bar (logged-in users only) -->
+        <div class="console-statsbar" id="statsBar" style="display:none;">
+            <div class="console-stat-item">
+                <div class="console-stat-icon purple">📚</div>
+                <div>
+                    <div class="console-stat-label">Games Owned</div>
+                    <div class="console-stat-value" id="statGames">—</div>
                 </div>
             </div>
-        </main>
-        
-        <footer>
-            <p>&copy; 2026 Game OS. All rights reserved.</p>
-            <p>Powered by GitHub Actions & Node.js</p>
-        </footer>
+            <div class="console-stat-item">
+                <div class="console-stat-icon blue">👥</div>
+                <div>
+                    <div class="console-stat-label">Friends</div>
+                    <div class="console-stat-value" id="statFriends">—</div>
+                </div>
+            </div>
+            <div class="console-stat-item">
+                <div class="console-stat-icon green">⭐</div>
+                <div>
+                    <div class="console-stat-label">Wishlist</div>
+                    <div class="console-stat-value" id="statWishlist">—</div>
+                </div>
+            </div>
+            <div class="console-stat-item">
+                <div class="console-stat-icon orange">👥</div>
+                <div>
+                    <div class="console-stat-label">Total Players</div>
+                    <div class="console-stat-value" id="statTotalUsers">—</div>
+                </div>
+            </div>
+            <div style="margin-left:auto;">
+                <button onclick="logout()" class="console-btn-secondary" style="font-size:0.82em;padding:8px 18px;">Sign Out</button>
+            </div>
+        </div>
+
+        <!-- Dashboard grid (two-col) -->
+        <div class="console-dash-grid">
+            <!-- Main content column -->
+            <div>
+                <!-- Quick Access (always visible) -->
+                <div class="console-section">
+                    <div class="console-section-header">
+                        <div class="console-section-title">
+                            <div class="title-icon">⚡</div>
+                            Quick Access
+                        </div>
+                    </div>
+                    <div class="console-quick-row">
+                        <a href="games.html" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">��</div>
+                            <div class="console-quick-tile-label">Browse Games</div>
+                        </a>
+                        <a href="games.html?tab=library" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">📚</div>
+                            <div class="console-quick-tile-label">My Library</div>
+                        </a>
+                        <a href="store.html" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">🛒</div>
+                            <div class="console-quick-tile-label">Store</div>
+                        </a>
+                        <a href="friends.html" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">👥</div>
+                            <div class="console-quick-tile-label">Friends</div>
+                        </a>
+                        <a href="games.html?tab=wishlist" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">⭐</div>
+                            <div class="console-quick-tile-label">Wishlist</div>
+                        </a>
+                        <a href="account.html" class="console-quick-tile">
+                            <div class="console-quick-tile-icon">👤</div>
+                            <div class="console-quick-tile-label">Profile</div>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Featured Games (platform tiles) -->
+                <div class="console-section" id="featuredSection">
+                    <div class="console-section-header">
+                        <div class="console-section-title">
+                            <div class="title-icon">🔥</div>
+                            Featured Platforms
+                        </div>
+                        <a href="games.html" class="console-section-see-all">See all →</a>
+                    </div>
+                    <div class="console-tiles-row">
+                        <div class="console-game-tile" onclick="window.location='games.html?platform=PC'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#1565c0,#0d47a1);font-size:4em;">🖥️</div>
+                            <div class="tile-info">
+                                <div class="tile-title">PC Games</div>
+                                <div class="tile-platform">Steam • Epic • GOG</div>
+                            </div>
+                        </div>
+                        <div class="console-game-tile" onclick="window.location='games.html?platform=PlayStation'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#003087,#0070cc);font-size:4em;">🎮</div>
+                            <div class="tile-info">
+                                <div class="tile-title">PlayStation</div>
+                                <div class="tile-platform">PS4 • PS5 • PSP</div>
+                            </div>
+                        </div>
+                        <div class="console-game-tile" onclick="window.location='games.html?platform=Xbox'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#107c10,#0a520a);font-size:4em;">🎯</div>
+                            <div class="tile-info">
+                                <div class="tile-title">Xbox</div>
+                                <div class="tile-platform">Xbox One • Series X/S</div>
+                            </div>
+                        </div>
+                        <div class="console-game-tile" onclick="window.location='games.html?platform=Nintendo'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#e60012,#9a000d);font-size:4em;">🍄</div>
+                            <div class="tile-info">
+                                <div class="tile-title">Nintendo</div>
+                                <div class="tile-platform">Switch • Wii U • 3DS</div>
+                            </div>
+                        </div>
+                        <div class="console-game-tile" onclick="window.location='games.html?platform=Retro'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#6a1b9a,#4a148c);font-size:4em;">👾</div>
+                            <div class="tile-info">
+                                <div class="tile-title">Retro / ROM</div>
+                                <div class="tile-platform">SNES • N64 • GBA • Arcade</div>
+                            </div>
+                        </div>
+                        <div class="console-game-tile" onclick="window.location='games.html'">
+                            <div class="tile-cover" style="background:linear-gradient(135deg,#37474f,#263238);font-size:4em;">🕹️</div>
+                            <div class="tile-info">
+                                <div class="tile-title">All Platforms</div>
+                                <div class="tile-platform">Browse full library</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent / News -->
+                <div class="console-section">
+                    <div class="console-section-header">
+                        <div class="console-section-title">
+                            <div class="title-icon">📰</div>
+                            What's New
+                        </div>
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;">
+                        <a href="store.html" class="console-news-card" style="text-decoration:none;">
+                            <div class="console-news-img">🛒</div>
+                            <div class="console-news-body">
+                                <div class="console-news-cat">Store</div>
+                                <div class="console-news-title">New Arrivals in the Game Store</div>
+                                <div class="console-news-date">Browse the latest releases and deals</div>
+                            </div>
+                        </a>
+                        <a href="games.html?tab=library" class="console-news-card" style="text-decoration:none;">
+                            <div class="console-news-img">📚</div>
+                            <div class="console-news-body">
+                                <div class="console-news-cat">Library</div>
+                                <div class="console-news-title">Manage Your Game Collection</div>
+                                <div class="console-news-date">Add ROMs and local games from any drive</div>
+                            </div>
+                        </a>
+                        <a href="friends.html" class="console-news-card" style="text-decoration:none;">
+                            <div class="console-news-img">👥</div>
+                            <div class="console-news-body">
+                                <div class="console-news-cat">Social</div>
+                                <div class="console-news-title">Connect with Friends</div>
+                                <div class="console-news-date">Send requests, chat, compare libraries</div>
+                            </div>
+                        </a>
+                        <a href="account.html" class="console-news-card" style="text-decoration:none;">
+                            <div class="console-news-img">🏆</div>
+                            <div class="console-news-body">
+                                <div class="console-news-cat">Achievements</div>
+                                <div class="console-news-title">Track Your Achievements</div>
+                                <div class="console-news-date">Log trophies, badges and milestones</div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sidebar -->
+            <aside class="console-sidebar" id="dashSidebar">
+                <!-- Online Friends -->
+                <div class="console-sidebar-section" id="friendsWidget">
+                    <div class="console-sidebar-title">Friends Online</div>
+                    <div class="console-friends-row" id="friendsOnlineList">
+                        <div class="console-empty">
+                            <div class="console-empty-icon">👥</div>
+                            <div class="console-empty-text">Sign in to see friends</div>
+                        </div>
+                    </div>
+                    <a href="friends.html" class="console-section-see-all" style="display:block;margin-top:12px;">Manage friends →</a>
+                </div>
+
+                <!-- Stats / Info -->
+                <div class="console-sidebar-section">
+                    <div class="console-sidebar-title">Platform</div>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07);">
+                            <span style="font-size:1.2em;">🔒</span>
+                            <div>
+                                <div style="font-size:0.82em;font-weight:600;color:#fff;">Secure</div>
+                                <div style="font-size:0.72em;color:rgba(255,255,255,0.4);">PBKDF2 password hashing</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07);">
+                            <span style="font-size:1.2em;">⚡</span>
+                            <div>
+                                <div style="font-size:0.82em;font-weight:600;color:#fff;">Fast</div>
+                                <div style="font-size:0.72em;color:rgba(255,255,255,0.4);">GitHub-powered backend</div>
+                            </div>
+                        </div>
+                        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(255,255,255,0.04);border-radius:8px;border:1px solid rgba(255,255,255,0.07);">
+                            <span style="font-size:1.2em;">🌐</span>
+                            <div>
+                                <div style="font-size:0.82em;font-weight:600;color:#fff;">Modern</div>
+                                <div style="font-size:0.72em;color:rgba(255,255,255,0.4);">Web technologies</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- User Count -->
+                <div class="console-sidebar-section">
+                    <div class="console-sidebar-title">Community</div>
+                    <div style="padding:16px;background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.2);border-radius:10px;text-align:center;">
+                        <div style="font-size:2em;font-weight:800;color:#a5a0ff;" id="sidebarUserCount">—</div>
+                        <div style="font-size:0.78em;color:rgba(255,255,255,0.45);margin-top:4px;">Registered Players</div>
+                    </div>
+                </div>
+            </aside>
+        </div>
     </div>
-    
+
+    <footer class="console-footer">
+        <p>&copy; 2026 Game OS. All rights reserved.</p>
+        <p style="margin-top:4px;">Powered by GitHub Actions &amp; Node.js</p>
+    </footer>
+
     <script src="script.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        modeReady = initializeMode();
+        await modeReady;
+        updateDashboardNav();
+    });
+
+    async function updateDashboardNav() {
+        const session = getCurrentUser();
+        const guestTop = document.getElementById('guestNavTop');
+        const userPill = document.getElementById('userPillTop');
+        const statsBar  = document.getElementById('statsBar');
+        const navFriends = document.getElementById('navFriends');
+        const navInbox   = document.getElementById('navInbox');
+
+        if (session && session.username) {
+            const uname = session.username;
+            // Topbar
+            if (guestTop) guestTop.style.display = 'none';
+            if (userPill) {
+                userPill.style.display = 'flex';
+                const nameEl = document.getElementById('topbarUsername');
+                if (nameEl) nameEl.textContent = uname;
+            }
+            if (navFriends) navFriends.style.display = '';
+            if (navInbox)   navInbox.style.display   = '';
+
+            // Hero
+            document.getElementById('heroTitle').textContent = `Welcome back, ${uname}! 👋`;
+            document.getElementById('heroSubtitle').textContent = 'Your gaming dashboard is ready. Browse your library, check friends, or explore the store.';
+            document.getElementById('heroBadge').textContent = `👤 ${uname}`;
+            const signupBtn = document.getElementById('heroSignupBtn');
+            const loginBtn  = document.getElementById('heroLoginBtn');
+            if (signupBtn) signupBtn.style.display = 'none';
+            if (loginBtn)  loginBtn.style.display  = 'none';
+            document.getElementById('heroActions').innerHTML =
+                '<a href="games.html" class="console-btn-primary">🎮 My Games</a>' +
+                '<a href="store.html" class="console-btn-secondary">🛒 Store</a>';
+
+            // Stats bar
+            if (statsBar) statsBar.style.display = 'flex';
+
+            // Load stats asynchronously
+            loadDashboardStats(uname);
+            loadFriendsWidget(uname);
+        } else {
+            if (guestTop) guestTop.style.display = 'flex';
+            if (userPill) userPill.style.display = 'none';
+        }
+
+        // Total users count (for sidebar + stats bar)
+        const totalUsersEl  = document.getElementById('statTotalUsers');
+        const sidebarCount  = document.getElementById('sidebarUserCount');
+        try {
+            const count = await getTotalUsersCount();
+            if (totalUsersEl) totalUsersEl.textContent = count;
+            if (sidebarCount) sidebarCount.textContent = count;
+        } catch (_) {}
+    }
+
+    async function loadDashboardStats(username) {
+        try {
+            const [library, wishlist] = await Promise.all([
+                MODE === 'demo'
+                    ? Promise.resolve(getDemoGameLibrary(username))
+                    : getGameLibraryGitHub(username),
+                MODE === 'demo'
+                    ? Promise.resolve(getDemoWishlist(username))
+                    : getWishlistGitHub(username)
+            ]);
+            const gamesEl = document.getElementById('statGames');
+            const wishEl  = document.getElementById('statWishlist');
+            if (gamesEl) gamesEl.textContent = library.length;
+            if (wishEl)  wishEl.textContent  = wishlist.length;
+        } catch (_) {}
+    }
+
+    async function loadFriendsWidget(username) {
+        const container = document.getElementById('friendsOnlineList');
+        const statFriendsEl = document.getElementById('statFriends');
+        if (!container) return;
+        try {
+            const friends = MODE === 'demo'
+                ? getDemoFriends(username)
+                : await getFriendsGitHub(username);
+
+            if (statFriendsEl) statFriendsEl.textContent = friends.length;
+
+            if (!friends || friends.length === 0) {
+                container.innerHTML = '<div class="console-empty"><div class="console-empty-icon">👥</div><div class="console-empty-text">No friends yet. <a href="friends.html" style="color:#a5a0ff;">Add some →</a></div></div>';
+                return;
+            }
+            container.innerHTML = friends.slice(0, 5).map(f => {
+                const name = typeof f === 'string' ? f : f.username || f.name || '?';
+                return `
+                <a href="profile.html?user=${encodeURIComponent(name)}" class="console-friend-item" style="text-decoration:none;">
+                    <div class="console-friend-avatar">
+                        👤
+                        <div class="online-dot offline"></div>
+                    </div>
+                    <div class="console-friend-info">
+                        <div class="console-friend-name">${escapeHtml(name)}</div>
+                        <div class="console-friend-status">View Profile</div>
+                    </div>
+                </a>`;
+            }).join('');
+        } catch (_) {
+            container.innerHTML = '<div class="console-empty"><div class="console-empty-text">Could not load friends.</div></div>';
+        }
+    }
+    </script>
 </body>
 </html>
