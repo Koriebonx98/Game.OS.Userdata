@@ -34,6 +34,25 @@ app.use(cors(corsOptions));
 // ── Body parser ───────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 
+// ── Security headers ──────────────────────────────────────────────────────────
+// Apply security-related HTTP response headers to every request.
+// These headers mitigate a range of common web vulnerabilities (XSS,
+// clickjacking, MIME sniffing, information leakage) without requiring
+// an external dependency.
+app.use((_req, res, next) => {
+    // Prevent MIME type sniffing
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    // Deny framing (clickjacking protection)
+    res.setHeader('X-Frame-Options', 'DENY');
+    // Limit referrer information sent to third parties
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    // Prevent cross-site leakage via the Referer header on cross-origin navigations
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    // Remove the Express server fingerprint
+    res.removeHeader('X-Powered-By');
+    next();
+});
+
 // ── GitHub client ─────────────────────────────────────────────────────────────
 const octokit = new Octokit({ auth: process.env.GITHUB_TOKEN });
 const REPO_OWNER = process.env.REPO_OWNER;
@@ -323,6 +342,16 @@ async function verifyPassword(password, storedHash, username) {
 const ADMIN_USERNAME       = 'Admin.GameOS';
 const ADMIN_USERNAME_LOWER = ADMIN_USERNAME.toLowerCase(); // 'admin.gameos'
 const ADMIN_EMAIL          = 'admin@gameos.local';
+
+// ── Reserved usernames ────────────────────────────────────────────────────────
+// These usernames are blocked during account registration to prevent misuse of
+// commonly understood administrative or generic names.
+const RESERVED_USERNAMES = [
+    'admin', 'administrator', 'root', 'superuser', 'sysadmin',
+    'user', 'test', 'guest', 'anonymous', 'anon',
+    'system', 'support', 'mod', 'moderator', 'staff',
+    'help', 'info', 'null', 'undefined', 'nobody'
+];
 
 // ── Simple in-memory rate limiter ─────────────────────────────────────────────
 
@@ -962,6 +991,9 @@ app.post('/api/create-account', async (req, res) => {
         }
         if (!sanitiseUsername(username)) {
             return res.status(400).json({ success: false, message: 'Username may only contain letters, numbers, underscores, and hyphens' });
+        }
+        if (RESERVED_USERNAMES.includes(username.toLowerCase())) {
+            return res.status(400).json({ success: false, message: 'This username is reserved and cannot be registered. Please choose a different username.' });
         }
         if (!isValidEmail(email)) {
             return res.status(400).json({ success: false, message: 'Please enter a valid email address' });
