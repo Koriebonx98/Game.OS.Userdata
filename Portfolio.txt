@@ -119,3 +119,19 @@ e.g "Steam" "xbox" "Epic" "Amazon/Ebay" (For non Digital Games like 3DS, GBA, PS
 
 Another feature in game store is that users can also manually add "Games" to there lib (non digital Media) therefore making game collections easier 
 Users who wish for playtime/ach ect will need to rip this into a readable rom for an emu.. but can then play on "Game OS" 
+
+- Game Invittes:
+How this works is a user runs a game or rom, then calls the Quick Guide (Left ctrl & Tab) goes to Friends and clicks "..." this gives options such as "View Profile" "Message" 
+
+Messaging is a build in system that uses github actions in the private.users repo (Backend) this then sends a signal to the users friend and sends a message (client) 
+
+The Friend (Client) has a loop looking for a siganl to say an event has happened... this then retrives the data and displays as a message on the client side.. it also keeps a record of messages (Server) for security and logging... i will then later set up a way to "Filter" messages (Under 18's) to blur any not allowed words such as racial slurs and swearwords, we woudl like "Game OS" as user/Family Friendly as possible 
+
+Invites take on a simialr approach as messages (CLient 1 -> Server -> Client 2) but iin the message it includes "$User1 invites to $GameName, $Platform, $Method" 
+
+"$Methods" = "Radmin VPN" "Steam" "Cross Play" "Local" Game OS has an option to fill out ips per friend (Client) to enusre IPs dont get leaked, as if i was to make Friends IP (Cloud) so users can jump from machine to machine i need ensure it can clearly identify "IP" correctly to send to friends (Client) so connectiono is correct. this defeats a lot of issues pc players was having due to multiple launcherse for games "Steam" "Epic" "GOG" ect 
+
+
+- Media:
+
+The Media section is split into 3x "Movies" "Music" "Tv Shows" by looking on "<Root>/Media/$MediaType" with specific patters, this ensures an easy set up for users and makes "Game OS" the all in on experince 
