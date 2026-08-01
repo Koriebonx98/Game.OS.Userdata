@@ -512,21 +512,32 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void CreateControllerProfile()
     {
-        if (string.IsNullOrWhiteSpace(NewProfileName)) return;
+        // Null-guard: Avalonia two-way TextBox bindings can set a string property to null
+        // when the user clears the field, even though the backing field is typed string.
+        string profileName = (NewProfileName ?? "").Trim();
+        if (string.IsNullOrWhiteSpace(profileName)) return;
 
-        var profile = Services.ControllerProfileService.CreateDefaultProfile(_currentUsername);
-        profile.ProfileName  = NewProfileName.Trim();
-        profile.Description  = NewProfileDescription.Trim();
-        profile.Author       = _currentUsername;
-        profile.CreatedAt    = System.DateTime.UtcNow.ToString("o");
+        try
+        {
+            var profile = Services.ControllerProfileService.CreateDefaultProfile(_currentUsername);
+            profile.ProfileName  = profileName;
+            profile.Description  = (NewProfileDescription ?? "").Trim();
+            profile.Author       = _currentUsername;
+            profile.CreatedAt    = System.DateTime.UtcNow.ToString("o");
 
-        Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
-        LoadControllerProfiles();
+            Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
+            LoadControllerProfiles();
 
-        NewProfileName        = "";
-        NewProfileDescription = "";
-        ShowNewProfileForm    = false;
-        ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" created.";
+            NewProfileName        = "";
+            NewProfileDescription = "";
+            ShowNewProfileForm    = false;
+            ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" created.";
+        }
+        catch (Exception ex)
+        {
+            Services.DevLogService.Log($"[ControllerProfile] Create failed: {ex.Message}");
+            ControllerStatus = $"Failed to create profile: {ex.Message}";
+        }
     }
 
     [RelayCommand]
@@ -2629,13 +2640,19 @@ public partial class GameDetailViewModel : ViewModelBase
             try { gameProc.Dispose(); } catch { }
         }
 
-        // Final pass for writes flushed right after exit.
-        try
+        // Final passes: some Steam emulators flush achievement files asynchronously after
+        // the game process exits.  Poll immediately on exit then retry twice at 1.5 s
+        // intervals (≈ 3 s total) to reliably capture any late-written unlocks.
+        for (int finalPass = 0; finalPass < 3; finalPass++)
         {
-            await System.Threading.Tasks.Task.Delay(LogFlushDelayMs);
-            await PollOnceAsync();
+            try
+            {
+                if (finalPass > 0)
+                    await System.Threading.Tasks.Task.Delay(1500);
+                await PollOnceAsync();
+            }
+            catch { /* best-effort */ }
         }
-        catch { /* best-effort */ }
     }
 
     private Achievement? ResolvePcAchievementForUnlock(string unlockId)
