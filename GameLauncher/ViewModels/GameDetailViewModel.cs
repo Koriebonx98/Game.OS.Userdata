@@ -3604,10 +3604,11 @@ public partial class GameDetailViewModel : ViewModelBase
 
                 if (emuIds.Count > 0)
                 {
-                    // Sentinel timestamp: a valid ISO date that sorts below timed unlocks
-                    // (real timestamps from Steam API / Exophase) but still marks the
-                    // achievement as unlocked.
-                    const string emuFallbackTs = "1970-01-01T00:00:00Z";
+                    // Sentinel timestamp: a valid ISO date that sorts below real unlock times
+                    // (Steam API / Exophase timestamps) but is still treated as unlocked.
+                    // NOTE: must NOT be the Unix epoch ("1970-01-01T00:00:00") because
+                    // Achievement.IsUnlocked explicitly returns false for the epoch sentinel.
+                    const string emuFallbackTs = "2000-01-01T00:00:00Z";
                     int mergedCount = 0;
 
                     // Ensure O(1) Contains lookups for both direct-ID matching (lines below)
@@ -3618,9 +3619,32 @@ public partial class GameDetailViewModel : ViewModelBase
                     // the name-map path is an O(1) lookup per achievement rather than
                     // O(emuIds.Count) — avoids an O(n²) inner loop.
                     var emuDisplayNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    // Pre-build a reverse map (display name → raw ID) for real-timestamp lookups.
+                    var displayNameToRawId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var kv in achNameMap)
+                    {
                         if (!string.IsNullOrEmpty(kv.Value))
+                        {
                             emuDisplayNames.Add(kv.Value);
+                            displayNameToRawId.TryAdd(kv.Value, kv.Key);
+                        }
+                    }
+
+                    // Build a lookup from raw emu IDs → real timestamp from knownUnlocked so the
+                    // direct/name-map merge paths can preserve the actual unlock time instead of
+                    // using the fallback sentinel (which loses the original timestamp).
+                    var emuIdToRealTs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (knownUnlocked != null)
+                    {
+                        foreach (var u in knownUnlocked)
+                        {
+                            if (!u.IsUnlocked || string.IsNullOrEmpty(u.UnlockedAt)) continue;
+                            if (!string.IsNullOrEmpty(u.AchievementId) && emuIdsSet.Contains(u.AchievementId))
+                                emuIdToRealTs.TryAdd(u.AchievementId, u.UnlockedAt);
+                            if (!string.IsNullOrEmpty(u.Name) && emuIdsSet.Contains(u.Name))
+                                emuIdToRealTs.TryAdd(u.Name, u.UnlockedAt);
+                        }
+                    }
 
                     foreach (var a in list)
                     {
@@ -3631,7 +3655,10 @@ public partial class GameDetailViewModel : ViewModelBase
                         if (emuIdsSet.Contains(a.AchievementId ?? "") ||
                             emuIdsSet.Contains(a.Name ?? ""))
                         {
-                            a.UnlockedAt = emuFallbackTs;
+                            // Prefer the real timestamp from a previous session if available.
+                            string? matchedId = emuIdsSet.Contains(a.AchievementId ?? "") ? a.AchievementId : a.Name;
+                            a.UnlockedAt = matchedId != null && emuIdToRealTs.TryGetValue(matchedId, out var directRealTs)
+                                ? directRealTs : emuFallbackTs;
                             mergedCount++;
                             continue;
                         }
@@ -3642,7 +3669,10 @@ public partial class GameDetailViewModel : ViewModelBase
                         // the DB achievementId.
                         if (emuDisplayNames.Contains(a.Name ?? ""))
                         {
-                            a.UnlockedAt = emuFallbackTs;
+                            // Prefer the real timestamp from a previous session if available.
+                            string? rawId = displayNameToRawId.TryGetValue(a.Name ?? "", out var rid) ? rid : null;
+                            a.UnlockedAt = rawId != null && emuIdToRealTs.TryGetValue(rawId, out var nameMapRealTs)
+                                ? nameMapRealTs : emuFallbackTs;
                             mergedCount++;
                             continue;
                         }

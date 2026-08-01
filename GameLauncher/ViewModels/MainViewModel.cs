@@ -714,7 +714,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                      string.Equals(a.Name, ach.Name, StringComparison.OrdinalIgnoreCase)));
                 if (existing != null)
                 {
-                    if (string.IsNullOrEmpty(existing.UnlockedAt))
+                    // Update when: (a) no timestamp yet, (b) existing is an emu sentinel
+                    // (epoch or "2000-01-01") and we now have a real timestamp — this
+                    // preserves the actual unlock time on subsequent game-info opens.
+                    bool existingIsSentinel =
+                        string.IsNullOrEmpty(existing.UnlockedAt) ||
+                        existing.UnlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase) ||
+                        existing.UnlockedAt.StartsWith("2000-01-01T00:00:00", StringComparison.OrdinalIgnoreCase);
+                    if (existingIsSentinel && ach.IsUnlocked)
                         existing.UnlockedAt = ach.UnlockedAt;
                 }
                 else
