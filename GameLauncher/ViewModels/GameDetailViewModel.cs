@@ -449,6 +449,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         // Refresh the displayed list
         LoadReviews();
+        LoadControllerProfiles();
 
         NewReviewNote  = "";
         ReviewStatus   = "✓ Review saved!";
@@ -480,7 +481,152 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleCompatibilityPanel() => ShowCompatibilityPanel = !ShowCompatibilityPanel;
 
-    // ── Navigation back-action ────────────────────────────────────────────────
+    // ── Per-game controller profiles ──────────────────────────────────────────
+    public System.Collections.ObjectModel.ObservableCollection<Models.ControllerProfile> ControllerProfiles { get; } = new();
+    [ObservableProperty] private bool   _hasControllerProfiles;
+    [ObservableProperty] private bool   _showControllerPanel;
+    [ObservableProperty] private bool   _showNewProfileForm;
+    [ObservableProperty] private bool   _isControllerSyncing;
+    [ObservableProperty] private string _newProfileName        = "";
+    [ObservableProperty] private string _newProfileDescription = "";
+    [ObservableProperty] private string _controllerStatus      = "";
+
+    [RelayCommand]
+    private void ToggleControllerPanel()
+    {
+        ShowControllerPanel = !ShowControllerPanel;
+        if (ShowControllerPanel) LoadControllerProfiles();
+    }
+
+    [RelayCommand]
+    private void ShowCreateProfileForm() => ShowNewProfileForm = true;
+
+    [RelayCommand]
+    private void CancelCreateProfile()
+    {
+        ShowNewProfileForm    = false;
+        NewProfileName        = "";
+        NewProfileDescription = "";
+    }
+
+    [RelayCommand]
+    private void CreateControllerProfile()
+    {
+        if (string.IsNullOrWhiteSpace(NewProfileName)) return;
+
+        var profile = Services.ControllerProfileService.CreateDefaultProfile(_currentUsername);
+        profile.ProfileName  = NewProfileName.Trim();
+        profile.Description  = NewProfileDescription.Trim();
+        profile.Author       = _currentUsername;
+        profile.CreatedAt    = System.DateTime.UtcNow.ToString("o");
+
+        Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
+        LoadControllerProfiles();
+
+        NewProfileName        = "";
+        NewProfileDescription = "";
+        ShowNewProfileForm    = false;
+        ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" created.";
+    }
+
+    [RelayCommand]
+    private void DeleteControllerProfile(string profileName)
+    {
+        Services.ControllerProfileService.DeleteProfile(
+            Platform, Title, profileName, _currentUsername);
+        LoadControllerProfiles();
+        ControllerStatus = $"Profile \"{profileName}\" deleted.";
+    }
+
+    /// <summary>
+    /// Uploads a named profile to the public Games.Database repository so other users
+    /// can discover and download community controller configs.
+    /// The stored entry records the author username, profile name, and description.
+    /// </summary>
+    [RelayCommand]
+    private void UploadProfileToDb(string profileName)
+    {
+        var all     = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        var profile = all.Find(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(p.Author,      _currentUsername, StringComparison.OrdinalIgnoreCase));
+        if (profile == null) return;
+
+        string? titleId  = CurrentTitleId;
+        string  title    = Title;
+        string  platform = Platform;
+
+        ControllerStatus = "Uploading to Games.Database…";
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                await svc.UploadControllerProfileToDatabaseAsync(platform, titleId, title, profile);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    ControllerStatus = $"✓ Profile \"{profileName}\" shared to database.");
+            }
+            catch (Exception ex)
+            {
+                Services.DevLogService.Log($"[ControllerProfile] Upload failed: {ex.Message}");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    ControllerStatus = $"Upload failed: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Syncs all local controller profiles for this game to the user's private cloud
+    /// data repository so they are available on other devices.
+    /// </summary>
+    [RelayCommand]
+    private void SyncProfilesToCloud()
+    {
+        if (string.IsNullOrWhiteSpace(_currentUsername)) return;
+
+        string titleKey = CurrentTitleId ?? Title;
+        string platform = Platform;
+        string username = _currentUsername;
+        var profiles    = Services.ControllerProfileService.LoadProfiles(platform, Title);
+
+        IsControllerSyncing = true;
+        ControllerStatus    = "Syncing to cloud…";
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                await svc.SyncUserControllerProfilesAsync(username, platform, titleKey, profiles);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsControllerSyncing = false;
+                    ControllerStatus    = $"✓ {profiles.Count} profile(s) synced to cloud.";
+                });
+            }
+            catch (Exception ex)
+            {
+                Services.DevLogService.Log($"[ControllerProfile] Sync failed: {ex.Message}");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsControllerSyncing = false;
+                    ControllerStatus    = $"Sync failed: {ex.Message}";
+                });
+            }
+        });
+    }
+
+    private void LoadControllerProfiles()
+    {
+        ControllerProfiles.Clear();
+        var all = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        foreach (var p in all)
+            ControllerProfiles.Add(p);
+        HasControllerProfiles = ControllerProfiles.Count > 0;
+    }
     public System.Action? OnClose { get; set; }
 
     [RelayCommand]
@@ -2965,6 +3111,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (IsSteamInstallable) IsCloudOnly = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
 
         // Always load the full achievement template from the database so the detail view
         // shows ALL achievements (not just the unlocked subset in GameAchievements).
@@ -3023,6 +3170,7 @@ public partial class GameDetailViewModel : ViewModelBase
         SteamInstallUrl      = "";
         HasSteamLaunchOption = false;
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -3114,6 +3262,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = game.SteamAppId > 0;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     /// <summary>
@@ -3181,6 +3330,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     public void LoadFromLocalRom(LocalRom rom)
@@ -3238,6 +3388,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
 
