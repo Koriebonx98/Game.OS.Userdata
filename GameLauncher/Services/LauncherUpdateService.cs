@@ -237,11 +237,11 @@ namespace GameLauncher.Services
 
         private static int CompareVersions(int[] left, int[] right)
         {
-            int count = Math.Max(left.Count, right.Count);
+            int count = Math.Max(left.Length, right.Length);
             for (int i = 0; i < count; i++)
             {
-                int leftPart = i < left.Count ? left[i] : 0;
-                int rightPart = i < right.Count ? right[i] : 0;
+                int leftPart = i < left.Length ? left[i] : 0;
+                int rightPart = i < right.Length ? right[i] : 0;
                 if (leftPart != rightPart)
                     return leftPart.CompareTo(rightPart);
             }
