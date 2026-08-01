@@ -127,8 +127,9 @@ namespace GameLauncher.Models
         [JsonPropertyName("unlockedAt")]    public string  UnlockedAt    { get; set; } = "";
         /// <summary>Achievement icon image URL from the real Games.Database.</summary>
         [JsonIgnore] public string? IconUrl      { get; set; }
-        /// <summary>True when the achievement has been unlocked (UnlockedAt is non-empty).</summary>
-        [JsonIgnore] public bool    IsUnlocked   => !string.IsNullOrEmpty(UnlockedAt);
+        /// <summary>True when the achievement has been unlocked (UnlockedAt is non-empty and not the Unix epoch sentinel).</summary>
+        [JsonIgnore] public bool    IsUnlocked   => !string.IsNullOrEmpty(UnlockedAt) &&
+                                                    !UnlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase);
         /// <summary>Opacity used in the UI: 1.0 for unlocked, 0.35 for locked (darkened).</summary>
         [JsonIgnore] public double  LockedOpacity => IsUnlocked ? 1.0 : 0.35;
     }

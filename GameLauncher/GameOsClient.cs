@@ -339,7 +339,7 @@ namespace GameLauncher
                         AchievementId = achievementId,
                         Name          = name,
                         Description   = description ?? "",
-                        UnlockedAt    = string.IsNullOrEmpty(unlockedAt)
+                        UnlockedAt    = string.IsNullOrEmpty(unlockedAt) || unlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase)
                             ? DateTime.UtcNow.ToString("O")
                             : unlockedAt,
                     }

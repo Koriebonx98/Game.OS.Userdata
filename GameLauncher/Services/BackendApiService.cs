@@ -674,7 +674,7 @@ namespace GameLauncher.Services
                     achievementId,
                     name,
                     description,
-                    unlockedAt = string.IsNullOrEmpty(unlockedAt)
+                    unlockedAt = string.IsNullOrEmpty(unlockedAt) || unlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase)
                         ? DateTimeOffset.UtcNow.ToString("O")
                         : unlockedAt,
                 };
@@ -711,7 +711,7 @@ namespace GameLauncher.Services
                         achievementId = a.AchievementId,
                         name          = a.Name,
                         description   = a.Description,
-                        unlockedAt    = a.UnlockedAt,
+                        unlockedAt    = a.UnlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase) ? "" : a.UnlockedAt,
                     }).ToArray(),
                 };
                 using var resp = await _http.PutAsJsonAsync("/api/me/achievements/game-template", body, ct);
