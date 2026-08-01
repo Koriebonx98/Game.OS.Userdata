@@ -806,6 +806,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (settings.AutoUpdate)
             _ = Services.GitHubDataService.CheckForUpdatesAsync();
 
+        if (settings.AppAutoUpdate)
+            _ = CheckForLauncherUpdateAsync();
+
         _ = Services.SwitchTranslateService.SyncAsync();
         _ = LoginVm.TryAutoLoginAsync();
     }
@@ -3697,6 +3700,39 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
+    /// Checks GitHub Releases for a newer version of the Game.OS launcher.
+    /// When a new release is found, the update asset is downloaded to the exe directory
+    /// and the user receives a toast notification.
+    /// Runs silently in the background; all errors are swallowed.
+    /// </summary>
+    private async Task CheckForLauncherUpdateAsync()
+    {
+        try
+        {
+            var result = await Services.LauncherUpdateService
+                .CheckForAppUpdateAsync()
+                .ConfigureAwait(false);
+
+            DevLogService.Log(
+                $"[LauncherUpdate] Status={result.Status} Tag={result.Tag ?? "—"} File={result.FilePath ?? "—"}");
+
+            if (result.Status == Services.UpdateCheckStatus.Downloaded)
+            {
+                string tag      = result.Tag ?? "new version";
+                string fileName = result.FilePath != null
+                    ? System.IO.Path.GetFileName(result.FilePath)
+                    : "";
+                string body = string.IsNullOrEmpty(fileName)
+                    ? $"Game.OS {tag} downloaded. Restart to apply."
+                    : $"Game.OS {tag} downloaded ({fileName}). Restart to apply.";
+                Services.NotificationService.ShowDeveloperNotification(
+                    "🔄  Update Ready", body);
+            }
+        }
+        catch { /* best-effort — update check must never crash the app */ }
+    }
+
+    /// <summary>
     /// Called by the online sync-check timer.  Re-fetches the logged-in user's games
     /// and achievements from the server; if they differ from the current in-memory data
     /// the local cache and UI are updated.  Also triggers a Games.Database staleness check.
@@ -3771,10 +3807,26 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     // ApplyCloudPlaytimeAsync (called below) once cloud playtime has been applied,
                     // so the dashboard always shows the correct playtime total rather than the
                     // server-only (local-playtime-only) value that exists at this point.
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    //
+                    // Optimisation: when only playtime/last-played values changed (game titles and
+                    // platforms are the same) avoid a full rebuild of all library cards — just
+                    // update the PlaytimeLabel on the existing cards.  This prevents the UI from
+                    // freezing every 5-minute sync tick when the library is large.
+                    var capturedGames = games;
+                    if (playtimeChanged && !gamesChanged && !achvChanged)
                     {
-                        LibraryVm.Load(_library);
-                    });
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            LibraryVm.UpdatePlaytimeLabels(capturedGames);
+                        }, Avalonia.Threading.DispatcherPriority.Background);
+                    }
+                    else
+                    {
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            LibraryVm.Load(_library);
+                        });
+                    }
                     _ = RefreshMyGamesAchievementLabelsAsync();
                 }
                 else
