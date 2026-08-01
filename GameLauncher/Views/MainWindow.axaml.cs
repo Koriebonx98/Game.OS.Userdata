@@ -586,25 +586,35 @@ public partial class MainWindow : Window
     /// Wires XInput button callbacks once, mapping each controller button to the
     /// same navigation actions that the keyboard path uses.
     /// Console button mapping:
-    ///   D-pad / left stick → directional navigation (Up / Down / Left / Right)
+    ///   D-pad / left stick / right stick → directional navigation (Up / Down / Left / Right)
     ///   A (cross)          → confirm / select   (Enter)
     ///   B (circle)         → back / cancel      (Escape)
     ///   X (square)         → secondary action   (X key — open game detail)
+    ///   Y (triangle)       → tertiary action    (Y key — play focused item)
+    ///   Back / Select      → back / cancel      (Escape)
     ///   LB / L1            → previous page      (PageUp)
     ///   RB / R1            → next page          (PageDown)
+    ///   LT / L2            → previous page      (PageUp — same as LB for menu nav)
+    ///   RT / R2            → next page          (PageDown — same as RB for menu nav)
     ///   Start / Menu       → toggle Quick Menu  (≡ Left Ctrl + Left Shift)
     /// </summary>
     private void WireXInputCallbacks()
     {
-        _xinput.OnUp     = () => HandleControllerKey(Key.Up);
-        _xinput.OnDown   = () => HandleControllerKey(Key.Down);
-        _xinput.OnLeft   = () => HandleControllerKey(Key.Left);
-        _xinput.OnRight  = () => HandleControllerKey(Key.Right);
+        _xinput.OnUp      = () => HandleControllerKey(Key.Up);
+        _xinput.OnDown    = () => HandleControllerKey(Key.Down);
+        _xinput.OnLeft    = () => HandleControllerKey(Key.Left);
+        _xinput.OnRight   = () => HandleControllerKey(Key.Right);
         _xinput.OnButtonA = () => HandleControllerKey(Key.Enter);
         _xinput.OnButtonB = () => HandleControllerKey(Key.Escape);
         _xinput.OnButtonX = () => HandleControllerKey(Key.X);
+        _xinput.OnButtonY = () => HandleControllerKey(Key.Y);
+        _xinput.OnBack    = () => HandleControllerKey(Key.Escape);
         _xinput.OnLb      = () => HandleControllerKey(Key.PageUp);
         _xinput.OnRb      = () => HandleControllerKey(Key.PageDown);
+        // Analog triggers act as additional prev/next page buttons for controllers
+        // where the bumpers are awkward or not present.
+        _xinput.OnLt      = () => HandleControllerKey(Key.PageUp);
+        _xinput.OnRt      = () => HandleControllerKey(Key.PageDown);
 
         // Start → open/toggle the Quick Menu (mirrors the Shift+Ctrl keyboard hotkey)
         _xinput.OnStart = () =>
@@ -710,6 +720,7 @@ public partial class MainWindow : Window
                 case Key.Up:    vm.DashboardVm.MoveXb360GameFocus(-1); return;
                 case Key.Down:  vm.DashboardVm.MoveXb360GameFocus(1);  return;
                 case Key.Enter: vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null); return;
+                case Key.Y:     vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null); return;
             }
         }
 
@@ -728,6 +739,7 @@ public partial class MainWindow : Window
                     if (vm.DashboardVm.HasFocusedCard) { vm.DashboardVm.MoveFocus(-1); return; }
                     break;
                 case Key.Enter:
+                case Key.Y:
                     if (vm.DashboardVm.HasFocusedCard)
                     { vm.DashboardVm.PlayFocusedCardCommand.Execute(null); return; }
                     break;
@@ -742,6 +754,7 @@ public partial class MainWindow : Window
         switch (key)
         {
             case Key.Escape:
+            case Key.Y:
                 if (vm.ShowDetail)             vm.DetailVm.CloseCommand.Execute(null);
                 else if (vm.ShowFriendProfile) vm.CloseFriendProfileCommand.Execute(null);
                 else if (vm.IsNavExpanded)     vm.IsNavExpanded = false;

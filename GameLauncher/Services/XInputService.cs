@@ -6,8 +6,9 @@ namespace GameLauncher.Services;
 /// <summary>
 /// Polls XInput controller state on Windows and fires button-press callbacks
 /// with latch-based repeat prevention (one callback per press until release).
-/// Supports D-pad, left stick (with dead-zone), face buttons (A / B / X),
-/// shoulder bumpers (LB / RB), and the Start button.
+/// Supports D-pad, left stick (with dead-zone), face buttons (A / B / X / Y),
+/// shoulder bumpers (LB / RB), analog triggers (LT / RT), Back (Select),
+/// the right stick, and the Start button.
 /// All calls are safe to make on non-Windows — they become no-ops.
 /// </summary>
 internal sealed class XInputService
@@ -18,24 +19,29 @@ internal sealed class XInputService
     private const ushort DpadLeftMask  = 0x0004;
     private const ushort DpadRightMask = 0x0008;
     private const ushort StartMask     = 0x0010;
+    private const ushort BackMask      = 0x0020;
     private const ushort LbMask        = 0x0100;
     private const ushort RbMask        = 0x0200;
     private const ushort ButtonAMask   = 0x1000;
     private const ushort ButtonBMask   = 0x2000;
     private const ushort ButtonXMask   = 0x4000;
+    private const ushort ButtonYMask   = 0x8000;
 
-    // Left stick dead-zone (≈ 25 % of the signed 16-bit full range 32767)
+    // Left/right stick dead-zones (≈ 25 % of the signed 16-bit full range 32767)
     private const short StickDeadZone = 8000;
+
+    // Analog trigger digital threshold (XInput recommended value: 30 of 255)
+    private const byte TriggerThreshold = 30;
 
     // ── Callbacks ─────────────────────────────────────────────────────────────
 
-    /// <summary>D-pad Up or left-stick tilted upward.</summary>
+    /// <summary>D-pad Up or left/right-stick tilted upward.</summary>
     public Action? OnUp { get; set; }
-    /// <summary>D-pad Down or left-stick tilted downward.</summary>
+    /// <summary>D-pad Down or left/right-stick tilted downward.</summary>
     public Action? OnDown { get; set; }
-    /// <summary>D-pad Left or left-stick tilted left.</summary>
+    /// <summary>D-pad Left or left/right-stick tilted left.</summary>
     public Action? OnLeft { get; set; }
-    /// <summary>D-pad Right or left-stick tilted right.</summary>
+    /// <summary>D-pad Right or left/right-stick tilted right.</summary>
     public Action? OnRight { get; set; }
     /// <summary>A button (cross / confirm on PlayStation).</summary>
     public Action? OnButtonA { get; set; }
@@ -43,10 +49,18 @@ internal sealed class XInputService
     public Action? OnButtonB { get; set; }
     /// <summary>X button (square / secondary action on PlayStation).</summary>
     public Action? OnButtonX { get; set; }
+    /// <summary>Y button (triangle / tertiary action on PlayStation).</summary>
+    public Action? OnButtonY { get; set; }
+    /// <summary>Back / Select / View button.</summary>
+    public Action? OnBack { get; set; }
     /// <summary>Left Bumper / L1 — previous tab or page.</summary>
     public Action? OnLb { get; set; }
     /// <summary>Right Bumper / R1 — next tab or page.</summary>
     public Action? OnRb { get; set; }
+    /// <summary>Left Trigger / L2 — fires as a digital button once the trigger exceeds the threshold.</summary>
+    public Action? OnLt { get; set; }
+    /// <summary>Right Trigger / R2 — fires as a digital button once the trigger exceeds the threshold.</summary>
+    public Action? OnRt { get; set; }
     /// <summary>Start / Options / Menu button — opens the quick menu.</summary>
     public Action? OnStart { get; set; }
 
@@ -56,6 +70,12 @@ internal sealed class XInputService
     private bool   _stickDownLatched;
     private bool   _stickLeftLatched;
     private bool   _stickRightLatched;
+    private bool   _rstickUpLatched;
+    private bool   _rstickDownLatched;
+    private bool   _rstickLeftLatched;
+    private bool   _rstickRightLatched;
+    private bool   _ltLatched;
+    private bool   _rtLatched;
     private int    _connectedIndex  = -1;   // cached slot of the connected controller
     private bool   _xinputAvailable = true; // set false if xinput1_4.dll is missing
 
@@ -114,6 +134,8 @@ internal sealed class XInputService
     private void ProcessGamepad(NativeMethods.XINPUT_GAMEPAD gp)
     {
         ushort b = gp.wButtons;
+
+        // Digital buttons (bitmask-based)
         Fire(b, DpadUpMask,    ref _latchedButtons, OnUp);
         Fire(b, DpadDownMask,  ref _latchedButtons, OnDown);
         Fire(b, DpadLeftMask,  ref _latchedButtons, OnLeft);
@@ -121,6 +143,8 @@ internal sealed class XInputService
         Fire(b, ButtonAMask,   ref _latchedButtons, OnButtonA);
         Fire(b, ButtonBMask,   ref _latchedButtons, OnButtonB);
         Fire(b, ButtonXMask,   ref _latchedButtons, OnButtonX);
+        Fire(b, ButtonYMask,   ref _latchedButtons, OnButtonY);
+        Fire(b, BackMask,      ref _latchedButtons, OnBack);
         Fire(b, LbMask,        ref _latchedButtons, OnLb);
         Fire(b, RbMask,        ref _latchedButtons, OnRb);
         Fire(b, StartMask,     ref _latchedButtons, OnStart);
@@ -130,6 +154,16 @@ internal sealed class XInputService
         FireStick(gp.sThumbLY < -StickDeadZone, ref _stickDownLatched,  OnDown);
         FireStick(gp.sThumbLX < -StickDeadZone, ref _stickLeftLatched,  OnLeft);
         FireStick(gp.sThumbLX >  StickDeadZone, ref _stickRightLatched, OnRight);
+
+        // Right stick — shares the same directional callbacks as D-pad / left stick
+        FireStick(gp.sThumbRY >  StickDeadZone, ref _rstickUpLatched,    OnUp);
+        FireStick(gp.sThumbRY < -StickDeadZone, ref _rstickDownLatched,  OnDown);
+        FireStick(gp.sThumbRX < -StickDeadZone, ref _rstickLeftLatched,  OnLeft);
+        FireStick(gp.sThumbRX >  StickDeadZone, ref _rstickRightLatched, OnRight);
+
+        // Analog triggers as digital buttons (threshold = 30 / 255)
+        FireStick(gp.bLeftTrigger  >= TriggerThreshold, ref _ltLatched, OnLt);
+        FireStick(gp.bRightTrigger >= TriggerThreshold, ref _rtLatched, OnRt);
     }
 
     /// <summary>
@@ -159,10 +193,16 @@ internal sealed class XInputService
 
     private void ResetLatches()
     {
-        _latchedButtons  = 0;
+        _latchedButtons    = 0;
         _stickUpLatched    = false;
         _stickDownLatched  = false;
         _stickLeftLatched  = false;
         _stickRightLatched = false;
+        _rstickUpLatched   = false;
+        _rstickDownLatched = false;
+        _rstickLeftLatched = false;
+        _rstickRightLatched = false;
+        _ltLatched         = false;
+        _rtLatched         = false;
     }
 }
