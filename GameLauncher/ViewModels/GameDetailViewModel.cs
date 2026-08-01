@@ -2413,6 +2413,33 @@ public partial class GameDetailViewModel : ViewModelBase
                         ? $"🏆  Achievements  ({unlockedCount} / {Achievements.Count})"
                         : "🏆  Achievements";
                     RefreshVisibleAchievements();
+
+                    // Sync the full achievement list (locked + unlocked) to the per-game
+                    // cloud folder immediately after each unlock so the private repo always
+                    // has a complete JSON — not just the single unlocked entry saved by
+                    // OnRequestAchievementUnlockAsync.  Only fire when the full template is
+                    // already loaded (Achievements.Count > 0); if the user never opened the
+                    // achievements panel the template won't be available here, but
+                    // OnFullAchievementListReadyAsync will fire the next time the detail
+                    // view is opened and the template is fetched.
+                    if (OnFullAchievementListReadyAsync != null && Achievements.Count > 0)
+                    {
+                        string snapshotPlatform = Platform;
+                        string snapshotTitle    = Title;
+                        string? titleId2        = _currentLocalRom?.TitleId ?? _databaseTitleId;
+                        string snapshotTitleKey = titleId2 ?? Title;
+                        var snapshotList        = Achievements.ToList().AsReadOnly();
+                        _ = System.Threading.Tasks.Task.Run(async () =>
+                        {
+                            try
+                            {
+                                await OnFullAchievementListReadyAsync(
+                                    snapshotPlatform, snapshotTitleKey, snapshotTitle, snapshotList)
+                                    .ConfigureAwait(false);
+                            }
+                            catch { /* best-effort — cloud write failure must not affect gameplay */ }
+                        });
+                    }
                 });
             }
             await System.Threading.Tasks.Task.CompletedTask;
@@ -4010,10 +4037,18 @@ public partial class GameDetailViewModel : ViewModelBase
 
     private string? ResolveEmulatorSavePathOverride(string? titleId)
     {
-        if (string.IsNullOrWhiteSpace(titleId))
+        var emuSettings = EmulatorSettingsService.Load(Platform);
+
+        // DuckStation (PS1) resolves the memcard by game title rather than TitleId
+        // (path: memcards/{gameTitle}.mcd).  Allow empty/null titleId through to
+        // EmulatorSavePathResolver so it can use the Title property to find the
+        // correct .mcd file instead of returning null here prematurely.
+        bool isDuckStation = string.Equals(Platform, "PS1", StringComparison.OrdinalIgnoreCase)
+            || (emuSettings.EmulatorName ?? "").Contains("duckstation", StringComparison.OrdinalIgnoreCase);
+
+        if (string.IsNullOrWhiteSpace(titleId) && !isDuckStation)
             return null;
 
-        var emuSettings = EmulatorSettingsService.Load(Platform);
         string saveRoot = !string.IsNullOrWhiteSpace(emuSettings.SaveDataPath)
             ? emuSettings.SaveDataPath
             // Xbox 360 setups often only configure the emulator executable path.
