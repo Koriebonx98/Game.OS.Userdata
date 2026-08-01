@@ -200,6 +200,28 @@
 
                             <Rectangle Height="1" Fill="#21262d"/>
 
+                            <!-- App Auto Update toggle -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <TextBlock Text="Auto Update Game.OS"
+                                                   FontSize="13" Foreground="#e6edf3"/>
+                                        <TextBlock Text="{Binding AppVersionLabel}"
+                                                   FontSize="11" Foreground="#8b949e"
+                                                   VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                               Text="When a new Game.OS release is available, downloads it to the launcher folder ready to apply on next restart."/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding AppAutoUpdate}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Rectangle Height="1" Fill="#21262d"/>
+
                             <!-- Intro video toggle -->
                             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                                 <StackPanel Grid.Column="0" Spacing="2">

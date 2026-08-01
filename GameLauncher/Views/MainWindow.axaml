@@ -48,7 +48,15 @@
                             <Border IsVisible="{Binding IsHome}">
                                 <views:DashboardView DataContext="{Binding DashboardVm}"/>
                             </Border>
-                            <Border IsVisible="{Binding IsLibrary}">
+                            <!--
+                                LibraryView's height is bound to the ScrollViewer viewport so the
+                                inner Grid '*' row has a finite constraint.  This enables the
+                                ItemsRepeater + UniformGridLayout to virtualise cards (only the
+                                visible rows are created), which eliminates the "freeze" that
+                                occurred when navigating to a large library.
+                            -->
+                            <Border IsVisible="{Binding IsLibrary}"
+                                    Height="{Binding $parent[ScrollViewer].Bounds.Height}">
                                 <views:LibraryView DataContext="{Binding LibraryVm}"/>
                             </Border>
                             <Border IsVisible="{Binding IsStore}">

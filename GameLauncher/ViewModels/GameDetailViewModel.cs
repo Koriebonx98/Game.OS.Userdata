@@ -3374,6 +3374,23 @@ public partial class GameDetailViewModel : ViewModelBase
     internal async System.Threading.Tasks.Task FetchAndDisplayAchievementsAsync(
         string url, List<Achievement>? knownUnlocked = null)
     {
+        // Snapshot any achievements that are already shown as unlocked in the detail view
+        // BEFORE the first await (we are still on the calling/UI thread here).  The
+        // background merge below uses this list as a last-resort fallback to prevent
+        // previously-unlocked achievements from reverting to "locked" after the template
+        // is re-fetched — which can happen when ID/name formatting differences between
+        // the emulator save file and the Games.Database template cause the primary merge
+        // to miss an already-known unlock.
+        var currentUnlockedSnapshot = Achievements
+            .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+            .Select(a => new Achievement
+            {
+                AchievementId = a.AchievementId,
+                Name          = a.Name,
+                UnlockedAt    = a.UnlockedAt,
+            })
+            .ToList();
+
         try
         {
             // Normalize GitHub blob URLs to raw content URLs so the achievements JSON
@@ -3605,6 +3622,26 @@ public partial class GameDetailViewModel : ViewModelBase
                     DevLogService.Log(
                         $"[AchMerge] Merged {mergedCount}/{emuIds.Count} Steam emu unlock(s) into template " +
                         $"for AppId {_steamAppId} (nameMap entries: {achNameMap.Count}).");
+                }
+            }
+
+            // Defensive pass: preserve any unlock that is currently shown in the detail
+            // view but was NOT caught by the knownUnlocked or Steam-emu merge above.
+            // This handles ID/name mismatches between the Games.Database template and the
+            // emulator save format (e.g. Exophase sequential IDs vs. Steam API names) and
+            // prevents achievements from flickering back to "locked" on every template refresh.
+            if (currentUnlockedSnapshot.Count > 0)
+            {
+                foreach (var a in list)
+                {
+                    if (!string.IsNullOrEmpty(a.UnlockedAt)) continue;
+                    var match = currentUnlockedSnapshot.FirstOrDefault(u =>
+                        (!string.IsNullOrEmpty(a.AchievementId) && !string.IsNullOrEmpty(u.AchievementId) &&
+                         string.Equals(a.AchievementId, u.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                        (!string.IsNullOrEmpty(a.Name) && !string.IsNullOrEmpty(u.Name) &&
+                         string.Equals(a.Name, u.Name, StringComparison.OrdinalIgnoreCase)));
+                    if (match != null)
+                        a.UnlockedAt = match.UnlockedAt;
                 }
             }
 

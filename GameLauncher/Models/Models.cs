@@ -426,6 +426,14 @@ namespace GameLauncher.Models
         [JsonPropertyName("autoUpdate")]    public bool AutoUpdate    { get; set; } = true;
 
         /// <summary>
+        /// When <see langword="true"/>, the launcher checks GitHub Releases for a new
+        /// version of Game.OS on startup and downloads the release asset to the same
+        /// directory as the executable, ready for the user to apply the update by
+        /// restarting.  Set to <see langword="false"/> to skip the automatic update check.
+        /// </summary>
+        [JsonPropertyName("appAutoUpdate")] public bool AppAutoUpdate { get; set; } = true;
+
+        /// <summary>
         /// When <see langword="true"/> (the default), the launcher plays the Game.OS
         /// intro animation on startup.  Set to <see langword="false"/> to skip it.
         /// </summary>

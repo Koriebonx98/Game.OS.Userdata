@@ -843,6 +843,36 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     /// <summary>
+    /// Lightweight update that refreshes only the <see cref="LocalGameCardVm.PlaytimeLabel"/>
+    /// on existing cloud-game cards without triggering a full library rebuild.
+    /// Use this instead of <see cref="Load"/> when the only changes are playtime values
+    /// (e.g. after a cloud sync that reports only <c>playtimeChanged</c>), to keep the
+    /// UI thread responsive.
+    /// </summary>
+    public void UpdatePlaytimeLabels(IReadOnlyList<Game> updatedGames)
+    {
+        // Build a fast lookup by normalised platform||title
+        var byKey = new Dictionary<string, Game>(StringComparer.OrdinalIgnoreCase);
+        foreach (var g in updatedGames)
+            byKey[$"{PlatformHelper.NormalizePlatform(g.Platform).ToLowerInvariant()}||{g.Title.ToLowerInvariant()}"] = g;
+
+        foreach (var card in _allMyGames)
+        {
+            if (card.SourceCloudGame == null) continue;
+            string key = $"{card.Platform.ToLowerInvariant()}||{card.Title.ToLowerInvariant()}";
+            if (byKey.TryGetValue(key, out var updated))
+            {
+                card.SourceCloudGame.PlaytimeMinutes = updated.PlaytimeMinutes;
+                card.SourceCloudGame.LastPlayedAt    = updated.LastPlayedAt;
+                card.PlaytimeLabel = FormatPlaytime(updated.PlaytimeMinutes);
+            }
+        }
+
+        // Update _allGames reference so subsequent rebuilds use the new playtime values
+        _allGames = updatedGames is List<Game> list ? list : updatedGames.ToList();
+    }
+
+    /// <summary>
     /// Formats a playtime value (minutes) into a short human-readable label.
     /// Returns an empty string when minutes is zero or negative.
     /// </summary>
