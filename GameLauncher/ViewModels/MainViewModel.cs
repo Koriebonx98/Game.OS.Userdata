@@ -40,11 +40,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private DateTime _lastSteamHealAt = DateTime.MinValue;
     private readonly SemaphoreSlim _manualSyncSemaphore = new(1, 1);
     private readonly SemaphoreSlim _syncRefreshSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _libraryCacheSemaphore = new(1, 1);
+    private readonly SemaphoreSlim _localCacheSemaphore = new(1, 1);
     private CancellationTokenSource? _manualSyncCts;
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _exophasePollers =
         new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, int> _achievementTotalCache =
+        new(StringComparer.OrdinalIgnoreCase);
     private static readonly TimeSpan ExophasePollInterval = TimeSpan.FromMinutes(1);
     private int _startupBegun;
+    private int _libraryCacheQueued;
+    private int _localCacheQueued;
 
     // ── Sync status (shown in the bottom-right overlay) ────────────────────
     /// <summary>True while any background metadata cache task is running.</summary>
@@ -520,10 +526,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             UnlockedAt    = unlockedAt,
                         });
                     }
+
+                    if (libEntry.GameAchievements.Count > libEntry.TotalAchievements)
+                        libEntry.TotalAchievements = libEntry.GameAchievements.Count;
                 }
 
                 if (!string.IsNullOrEmpty(_profile?.Username))
                     _offlineCache.Save(_profile.Username, _profile, _library, _achievements);
+
+                _ = RefreshMyGamesAchievementLabelsAsync();
 
                 string? titleId = queuedTitleId;
 
@@ -595,6 +606,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (libEntry != null && libEntry.TotalAchievements != total)
             {
                 libEntry.TotalAchievements = total;
+                SetCachedAchievementTotal(platform, libEntry.TitleId, title, total);
                 // Refresh the card's achievement label now that we have the correct denominator
                 var card = LibraryVm.FindMyGameCard(title, platform);
                 if (card?.SourceCloudGame != null)
@@ -754,7 +766,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             _ = EnrichMyGamesListAsync();
             // Populate achievement labels on My Games cards from the in-memory achievements list
-            EnrichMyGamesAchievementLabels();
+            _ = RefreshMyGamesAchievementLabelsAsync();
         };
         _scanner.GamesUpdated += games =>
         {
@@ -933,6 +945,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _profile      = profile;
         _library      = DeduplicateLibrary(library);
         _achievements = achievements;
+        MergeAchievementsIntoLibrary(_library, _achievements);
 
         IsOfflineMode = isOffline;
 
@@ -953,19 +966,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Apply stored playtime data to the library so the dashboard shows accurate totals
         PlaytimeService.ApplyStoredPlaytime(library);
-
-        // Cross-reference the user's unlocked achievements with their cloud library so that
-        // opening any game detail view immediately shows the achievements they have earned
-        // (covers Switch, PS3, Xbox 360, and all other platforms, not just PC/Steam).
-        foreach (var game in library)
-        {
-            var matching = achievements
-                .Where(a => string.Equals(a.Platform, game.Platform, StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(a.GameTitle, game.Title,    StringComparison.OrdinalIgnoreCase))
-                .ToList();
-            if (matching.Count > 0)
-                game.GameAchievements = matching;
-        }
 
         // Save data to local cache so the next launch can restore it offline.
         // Only save when we actually fetched from the server (isOffline = false).
@@ -1508,14 +1508,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     session.Platform, session.Title,
                     newTotal, end.ToString("o")).ConfigureAwait(false);
 
-                // 3. Write a sync signal so Device B's 30-second heartbeat poller detects
-                //    the new session immediately and refreshes without waiting for the
-                //    5-minute full sync tick.
-                await _client.WriteSyncSignalAsync().ConfigureAwait(false);
-
                 System.Diagnostics.Debug.WriteLine(
                     $"[Playtime] Synced '{session.Title}' ({session.Platform}) " +
-                    $"{session.Minutes} min to cloud (total {newTotal} min) + heartbeat.");
+                    $"{session.Minutes} min to cloud (total {newTotal} min).");
             }
             catch (Exception ex)
             {
@@ -2221,37 +2216,72 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Called on the UI thread (already inside <c>Dispatcher.UIThread.Post</c>) after each
     /// My Games rebuild so the achievement count appears without waiting for the cloud.
     /// </summary>
-    private void EnrichMyGamesAchievementLabels()
+    private async Task RefreshMyGamesAchievementLabelsAsync()
     {
         if (_achievements.Count == 0) return;
 
-        // Build a count lookup: (platform||title) → unlocked count
-        var unlockCounts = _achievements
+        var achievementSnapshot = _achievements
+            .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+            .Select(CloneAchievement)
+            .ToList();
+        if (achievementSnapshot.Count == 0) return;
+
+        var sources = await Avalonia.Threading.Dispatcher.UIThread
+            .InvokeAsync(() => LibraryVm.GetMyGameSources().ToList());
+        if (sources.Count == 0) return;
+
+        var unlockCounts = achievementSnapshot
             .GroupBy(a => $"{a.Platform.ToLowerInvariant()}||{a.GameTitle.ToLowerInvariant()}")
             .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-        if (unlockCounts.Count == 0) return;
-
-        foreach (var source in LibraryVm.GetMyGameSources())
+        var totals = await Task.Run(() =>
         {
-            var card = LibraryVm.FindMyGameCard(source.Title, source.Platform);
-            if (card == null) continue;
-            int total = GetCachedAchievementTotal(source.Platform, source.TitleId, source.Title);
-
-            // For cloud game cards whose source Game already has enriched achievements
-            // (GameAchievements populated), use AchievementCountLabel for the X / Y format.
-            if (card.SourceCloudGame?.GameAchievements?.Count > 0)
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var source in sources)
             {
-                card.AchievementLabel = card.SourceCloudGame.AchievementCountLabel;
-                continue;
+                string key = BuildAchievementTotalCacheKey(source.Platform, source.TitleId, source.Title);
+                if (!map.ContainsKey(key))
+                    map[key] = GetCachedAchievementTotalCached(source.Platform, source.TitleId, source.Title);
             }
+            return map;
+        }).ConfigureAwait(false);
 
-            string key = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
-            if (unlockCounts.TryGetValue(key, out int count))
-                card.AchievementLabel = total > 0 ? $"🏆 {count} / {total}" : (count > 0 ? $"🏆 {count}" : "");
-            else if (total > 0)
-                card.AchievementLabel = $"🏆 0 / {total}";
-        }
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            foreach (var source in sources)
+            {
+                var card = LibraryVm.FindMyGameCard(source.Title, source.Platform);
+                if (card == null) continue;
+
+                totals.TryGetValue(
+                    BuildAchievementTotalCacheKey(source.Platform, source.TitleId, source.Title),
+                    out int cachedTotal);
+
+                string unlockKey = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
+                unlockCounts.TryGetValue(unlockKey, out int globalUnlocked);
+
+                if (card.SourceCloudGame?.GameAchievements?.Count > 0)
+                {
+                    int templateUnlocked = card.SourceCloudGame.GameAchievements.Count(a => a.IsUnlocked);
+                    int templateTotal = card.SourceCloudGame.TotalAchievements > 0
+                        ? card.SourceCloudGame.TotalAchievements
+                        : card.SourceCloudGame.GameAchievements.Count;
+                    int total = Math.Max(cachedTotal, templateTotal);
+                    int unlocked = Math.Max(globalUnlocked, templateUnlocked);
+                    card.AchievementLabel = total > 0
+                        ? $"🏆 {unlocked} / {total}"
+                        : (unlocked > 0 ? $"🏆 {unlocked}" : "");
+                    continue;
+                }
+
+                if (globalUnlocked > 0)
+                    card.AchievementLabel = cachedTotal > 0 ? $"🏆 {globalUnlocked} / {cachedTotal}" : $"🏆 {globalUnlocked}";
+                else if (cachedTotal > 0)
+                    card.AchievementLabel = $"🏆 0 / {cachedTotal}";
+                else
+                    card.AchievementLabel = "";
+            }
+        });
     }
 
     private int GetCachedAchievementTotal(string platform, string? titleId, string title)
@@ -2277,6 +2307,95 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         catch { }
         return 0;
+    }
+
+    private int GetCachedAchievementTotalCached(string platform, string? titleId, string title)
+    {
+        string cacheKey = BuildAchievementTotalCacheKey(platform, titleId, title);
+        if (_achievementTotalCache.TryGetValue(cacheKey, out int cached))
+            return cached;
+
+        int total = GetCachedAchievementTotal(platform, titleId, title);
+        if (total > 0)
+            _achievementTotalCache[cacheKey] = total;
+        return total;
+    }
+
+    private void SetCachedAchievementTotal(string platform, string? titleId, string title, int total)
+    {
+        if (total <= 0) return;
+        _achievementTotalCache[BuildAchievementTotalCacheKey(platform, titleId, title)] = total;
+    }
+
+    private static string BuildAchievementTotalCacheKey(string platform, string? titleId, string title)
+        => $"{platform.ToLowerInvariant()}||{ResolveCacheKey(titleId, title).ToLowerInvariant()}";
+
+    private static Achievement CloneAchievement(Achievement achievement) => new()
+    {
+        Platform = achievement.Platform,
+        GameTitle = achievement.GameTitle,
+        AchievementId = achievement.AchievementId,
+        Name = achievement.Name,
+        Description = achievement.Description,
+        UnlockedAt = achievement.UnlockedAt,
+        IconUrl = achievement.IconUrl,
+    };
+
+    private static void MergeAchievementsIntoLibrary(
+        List<Game> library,
+        IReadOnlyList<Achievement> achievements)
+    {
+        if (library.Count == 0 || achievements.Count == 0) return;
+
+        var byGame = achievements
+            .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+            .GroupBy(a => $"{a.Platform.ToLowerInvariant()}||{a.GameTitle.ToLowerInvariant()}")
+            .ToDictionary(g => g.Key, g => g.ToList(), StringComparer.OrdinalIgnoreCase);
+
+        foreach (var game in library)
+        {
+            string gameKey = $"{game.Platform.ToLowerInvariant()}||{game.Title.ToLowerInvariant()}";
+            if (!byGame.TryGetValue(gameKey, out var unlockedForGame) || unlockedForGame.Count == 0)
+                continue;
+
+            if (game.GameAchievements == null || game.GameAchievements.Count == 0)
+            {
+                game.GameAchievements = unlockedForGame.Select(CloneAchievement).ToList();
+                if (game.GameAchievements.Count > game.TotalAchievements)
+                    game.TotalAchievements = game.GameAchievements.Count;
+                continue;
+            }
+
+            foreach (var unlocked in unlockedForGame)
+            {
+                var existing = game.GameAchievements.FirstOrDefault(a =>
+                    (!string.IsNullOrEmpty(a.AchievementId) &&
+                     !string.IsNullOrEmpty(unlocked.AchievementId) &&
+                     string.Equals(a.AchievementId, unlocked.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                    string.Equals(a.Name, unlocked.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (existing != null)
+                {
+                    if (string.IsNullOrEmpty(existing.UnlockedAt))
+                        existing.UnlockedAt = unlocked.UnlockedAt;
+                    if (string.IsNullOrEmpty(existing.AchievementId))
+                        existing.AchievementId = unlocked.AchievementId;
+                    if (string.IsNullOrEmpty(existing.Name))
+                        existing.Name = unlocked.Name;
+                    if (string.IsNullOrEmpty(existing.Description))
+                        existing.Description = unlocked.Description;
+                    if (string.IsNullOrEmpty(existing.IconUrl))
+                        existing.IconUrl = unlocked.IconUrl;
+                }
+                else
+                {
+                    game.GameAchievements.Add(CloneAchievement(unlocked));
+                }
+            }
+
+            if (game.GameAchievements.Count > game.TotalAchievements)
+                game.TotalAchievements = game.GameAchievements.Count;
+        }
     }
 
     /// "My Games" list from the Games.Database.  Groups cards by platform to
@@ -3131,6 +3250,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 $"Fetched {games.Count} games, {achievements.Count} achievements.");
 
             // Enrich platforms
+            var effectiveAchievements = achievements.Count > 0 ? achievements : _achievements;
+
             foreach (var g in games)
                 g.Platform = Models.PlatformHelper.NormalizePlatform(g.Platform);
 
@@ -3400,7 +3521,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     if (changes > 0)
                     {
                         await TryRefreshUserDataAsync().ConfigureAwait(false);
-                        await _client.WriteSyncSignalAsync(cts.Token).ConfigureAwait(false);
                     }
 
                     await Task.Delay(ExophasePollInterval, cts.Token).ConfigureAwait(false);
@@ -3457,7 +3577,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     DetailVm.PopulateAchievements(merged);
             });
 
-            await _client.WriteSyncSignalAsync(CancellationToken.None).ConfigureAwait(false);
         }
     }
 
@@ -3633,6 +3752,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     // Re-apply Steam cached games as a fallback so titles are never lost while
                     // background cloud sync catches up on freshly imported Steam libraries.
                     ReapplySteamCachedGames(games);
+                    MergeAchievementsIntoLibrary(games, effectiveAchievements);
 
                     _library = games;
                     // Guard: never replace the in-memory achievement list with an empty server
@@ -3651,6 +3771,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     {
                         LibraryVm.Load(_library);
                     });
+                    _ = RefreshMyGamesAchievementLabelsAsync();
                 }
                 else
                 {
@@ -3963,6 +4084,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         int processed = 0;
         var newlyUnlockedAchievements = new List<Models.Achievement>();
+        bool initialisedPerGameSync = false;
 
         foreach (var sg in games)
         {
@@ -4004,6 +4126,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                 if (!localExists || hasNewUnlocks)
                 {
+                    if (!localExists)
+                        initialisedPerGameSync = true;
+
                     // Build Achievement models for every achievement (locked + unlocked).
                     var fullList = allAch
                         .Select(a => new Models.Achievement
@@ -4109,10 +4234,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (!string.IsNullOrEmpty(_profile?.Username))
                 _offlineCache.Save(_profile.Username, _profile, _library, _achievements);
         }
+        else if (initialisedPerGameSync)
+        {
+            _ = _client.WriteSyncSignalAsync();
+        }
 
         // Update in-memory game achievement lists so the library cards show the right count
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
+            MergeAchievementsIntoLibrary(_library, _achievements);
             foreach (var game in _library)
             {
                 var gameAchs = _achievements
@@ -4123,6 +4253,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     game.GameAchievements = gameAchs;
             }
         });
+        _ = RefreshMyGamesAchievementLabelsAsync();
 
         DevLogService.Log($"[SteamAchievements] Synced achievements for {processed} Steam games.");
     }
@@ -4458,7 +4589,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     game.GameAchievements = cloudAchs;
+                    if (cloudAchs.Count > game.TotalAchievements)
+                        game.TotalAchievements = cloudAchs.Count;
                 });
+                SetCachedAchievementTotal("PC", titleKey, game.Title, cloudAchs.Count);
 
                 DevLogService.Log(
                     $"[AchievementSync] Loaded {cloudAchs.Count} achievements " +
@@ -4477,6 +4611,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 $"[AchievementSync] Synced per-game achievements from cloud for {loaded} game(s).");
             // Refresh the library view so card denominators reflect the full counts.
             Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library));
+            _ = RefreshMyGamesAchievementLabelsAsync();
         }
     }
 
@@ -4518,6 +4653,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Reports progress via IsCachingGames / CacheSyncLabel.
     /// </summary>
     private async Task BackgroundCacheLibraryAsync(List<Game> library)
+    {
+        Interlocked.Exchange(ref _libraryCacheQueued, 1);
+        if (!await _libraryCacheSemaphore.WaitAsync(0).ConfigureAwait(false))
+            return;
+
+        try
+        {
+            while (Interlocked.Exchange(ref _libraryCacheQueued, 0) == 1)
+            {
+                await BackgroundCacheLibraryCoreAsync(_library.ToList()).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            _libraryCacheSemaphore.Release();
+        }
+    }
+
+    private async Task BackgroundCacheLibraryCoreAsync(List<Game> library)
     {
         if (library.Count == 0) return;
         System.Threading.Interlocked.Increment(ref _cacheTaskCount);
@@ -4659,6 +4813,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// are skipped.
     /// </summary>
     private async Task BackgroundCacheLocalGamesAsync()
+    {
+        Interlocked.Exchange(ref _localCacheQueued, 1);
+        if (!await _localCacheSemaphore.WaitAsync(0).ConfigureAwait(false))
+            return;
+
+        try
+        {
+            while (Interlocked.Exchange(ref _localCacheQueued, 0) == 1)
+                await BackgroundCacheLocalGamesCoreAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            _localCacheSemaphore.Release();
+        }
+    }
+
+    private async Task BackgroundCacheLocalGamesCoreAsync()
     {
         try
         {
