@@ -1283,11 +1283,91 @@ namespace GameLauncher.Services
             "https://raw.githubusercontent.com/Koriebonx98/Games.Database/main";
 
         /// <summary>
-        /// The known platforms in the Games.Database repository.
-        /// Mirrors <c>GAMES_DB_PLATFORMS</c> in script.js.
+        /// The built-in fallback platforms for the Games.Database repository.
+        /// Used when the dynamic discovery call (<see cref="FetchAvailablePlatformsAsync"/>)
+        /// is not yet complete or fails.
         /// </summary>
         public static readonly string[] GamesDbPlatforms =
             { "PC", "PS3", "PS4", "Switch", "Xbox 360" };
+
+        // In-memory cache of dynamically discovered platforms.
+        // Null = not yet fetched; populated by FetchAvailablePlatformsAsync.
+        private static string[]? _discoveredPlatforms;
+        private static readonly SemaphoreSlim _platformDiscoverySem = new(1, 1);
+
+        /// <summary>
+        /// Returns the current list of known platforms: the dynamically-discovered list if
+        /// available, otherwise the built-in <see cref="GamesDbPlatforms"/> fallback.
+        /// </summary>
+        public static string[] KnownPlatforms =>
+            _discoveredPlatforms ?? GamesDbPlatforms;
+
+        /// <summary>
+        /// Queries the GitHub Contents API to discover all <c>{Platform}.Games.json</c>
+        /// files in the public Games.Database repository, and caches the result.
+        /// Falls back silently to <see cref="GamesDbPlatforms"/> on any error.
+        /// </summary>
+        public static async Task<string[]> FetchAvailablePlatformsAsync(
+            CancellationToken ct = default)
+        {
+            // Return cached result immediately to avoid redundant API calls.
+            if (_discoveredPlatforms != null)
+                return _discoveredPlatforms;
+
+            if (!await _platformDiscoverySem.WaitAsync(0, ct).ConfigureAwait(false))
+            {
+                // Another caller is already fetching — return fallback and let them cache.
+                return GamesDbPlatforms;
+            }
+
+            try
+            {
+                // GitHub Contents API: list files at the root of the repository.
+                var url = "https://api.github.com/repos/Koriebonx98/Games.Database/contents/";
+                using var req = new System.Net.Http.HttpRequestMessage(
+                    System.Net.Http.HttpMethod.Get, url);
+                req.Headers.UserAgent.ParseAdd("GameOS-Launcher/2.0");
+                req.Headers.Accept.ParseAdd("application/vnd.github.v3+json");
+
+                using var resp = await _rawHttp.SendAsync(req, ct).ConfigureAwait(false);
+                if (!resp.IsSuccessStatusCode)
+                    return _discoveredPlatforms ?? GamesDbPlatforms;
+
+                var json   = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
+                var opts   = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                using var doc = JsonDocument.Parse(json);
+
+                var platforms = new List<string>();
+                foreach (var entry in doc.RootElement.EnumerateArray())
+                {
+                    if (!entry.TryGetProperty("name", out var nameProp)) continue;
+                    string name = nameProp.GetString() ?? "";
+
+                    // Match files named "{Platform}.Games.json"
+                    if (!name.EndsWith(".Games.json", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    string platformName = name[..^".Games.json".Length];
+                    if (!string.IsNullOrWhiteSpace(platformName))
+                        platforms.Add(platformName);
+                }
+
+                if (platforms.Count > 0)
+                {
+                    // Sort: keep PC first (largest database), then alphabetically.
+                    platforms.Sort((a, b) =>
+                        a == "PC" ? -1 : b == "PC" ? 1 : string.Compare(a, b, StringComparison.OrdinalIgnoreCase));
+                    _discoveredPlatforms = platforms.ToArray();
+                    return _discoveredPlatforms;
+                }
+            }
+            catch { /* best-effort — fall through to built-in list */ }
+            finally
+            {
+                _platformDiscoverySem.Release();
+            }
+
+            return GamesDbPlatforms;
+        }
 
         // Shared HttpClient for public raw.githubusercontent.com fetches (no auth needed).
         // Static lifetime matches the application: a static HttpClient is intentionally not

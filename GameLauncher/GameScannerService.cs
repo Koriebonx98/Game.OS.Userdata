@@ -961,6 +961,9 @@ public sealed class GameScannerService : IDisposable
         string romsPath = Path.Combine(driveRoot, "Roms");
         if (!Directory.Exists(romsPath)) return;
 
+        // Build custom extension map from user-configured emulator settings once per scan.
+        var customExtsByPlatform = BuildCustomExtensions();
+
         try
         {
             foreach (var platformDir in Directory.EnumerateDirectories(romsPath))
@@ -995,7 +998,8 @@ public sealed class GameScannerService : IDisposable
 
                         bool hasRomInRoot = Directory
                             .EnumerateFiles(subDir, "*", SearchOption.TopDirectoryOnly)
-                            .Any(f => IsRomFile(Path.GetExtension(f).ToLowerInvariant()));
+                            .Any(f => IsRomFileForPlatform(
+                                Path.GetExtension(f).ToLowerInvariant(), platform, customExtsByPlatform));
                         if (hasRomInRoot) continue; // will be scanned as a normal ROM file below
 
                         long size = 0;
@@ -1031,7 +1035,7 @@ public sealed class GameScannerService : IDisposable
                     {
                         if (Directory.Exists(entry)) continue; // skip sub-folders
                         string ext = Path.GetExtension(entry).ToLowerInvariant();
-                        if (!IsRomFile(ext)) continue;
+                        if (!IsRomFileForPlatform(ext, platform, customExtsByPlatform)) continue;
 
                         long size = 0;
                         try { size = new FileInfo(entry).Length; } catch { }
@@ -1284,11 +1288,65 @@ public sealed class GameScannerService : IDisposable
         ".nsp", ".xci", ".nca", ".nsz", ".xcz",
         // Nintendo (other)
         ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro",
+        // Nintendo GameCube / Wii
+        ".rvz", ".gcm", ".gcz", ".wbfs", ".wad",
         // Other
         ".elf", ".img", ".chd", ".pbp", ".pkg",
     };
 
     private static bool IsRomFile(string ext) => _romExtensions.Contains(ext);
+
+    /// <summary>
+    /// Returns true when <paramref name="ext"/> is a known ROM extension OR is listed
+    /// in the custom <see cref="Models.EmulatorSettings.RomTypes"/> for any emulator
+    /// configured for <paramref name="platform"/>.
+    /// </summary>
+    private static bool IsRomFileForPlatform(string ext, string platform,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> customExtsByPlatform)
+    {
+        if (_romExtensions.Contains(ext)) return true;
+        if (customExtsByPlatform.TryGetValue(platform, out var custom))
+        {
+            foreach (var ce in custom)
+                if (string.Equals(ce, ext, StringComparison.OrdinalIgnoreCase))
+                    return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Builds a dictionary of custom ROM extensions per platform from the stored
+    /// emulator settings, so user-configured types (e.g. ".rvz" for GameCube) are
+    /// picked up during scanning even if not in the built-in extension list.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IReadOnlyList<string>> BuildCustomExtensions()
+    {
+        var result = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            foreach (var platform in EmulatorSettingsService.SupportedPlatforms)
+            {
+                var all = EmulatorSettingsService.LoadAll(platform);
+                var exts = new List<string>();
+                foreach (var emu in all)
+                {
+                    if (emu.RomTypes == null) continue;
+                    foreach (var rt in emu.RomTypes)
+                    {
+                        if (string.IsNullOrWhiteSpace(rt)) continue;
+                        string ext = rt.Trim().ToLowerInvariant();
+                        if (!ext.StartsWith('.')) ext = "." + ext;
+                        if (!exts.Contains(ext, StringComparer.OrdinalIgnoreCase))
+                            exts.Add(ext);
+                    }
+                }
+                if (exts.Count > 0)
+                    result[platform] = exts;
+            }
+        }
+        catch { /* best-effort */ }
+        return result;
+    }
 
     // ── Repack marker stripping ────────────────────────────────────────────
 

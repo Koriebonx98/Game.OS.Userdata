@@ -122,6 +122,38 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
         // Eagerly load App Store in the background
         _ = LoadAppStoreAsync();
+
+        // Discover all platform JSON files from the Games.Database repository so new
+        // platforms appear automatically without requiring an app update.
+        _ = RefreshPlatformListAsync();
+    }
+
+    /// <summary>
+    /// Fetches the list of available platforms from the Games.Database GitHub repository
+    /// and updates the <see cref="Platforms"/> collection so new platforms are discovered
+    /// automatically without hard-coding them in the app.
+    /// </summary>
+    private async Task RefreshPlatformListAsync()
+    {
+        try
+        {
+            var discovered = await Services.GitHubDataService
+                .FetchAvailablePlatformsAsync().ConfigureAwait(false);
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                var current = SelectedPlatform;
+                Platforms.Clear();
+                Platforms.Add("All");
+                foreach (var p in discovered)
+                    Platforms.Add(p);
+
+                // Keep the current selection if it still exists.
+                if (!Platforms.Contains(current))
+                    SelectedPlatform = "All";
+            });
+        }
+        catch { /* best-effort — the built-in list remains usable */ }
     }
 
     [RelayCommand]

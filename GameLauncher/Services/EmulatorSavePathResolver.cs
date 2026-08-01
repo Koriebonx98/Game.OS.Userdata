@@ -35,8 +35,8 @@ namespace GameLauncher.Services
             // Xbox 360 — Xenia: resolved via special-case logic
             ["xbox 360"]       = new[] { "{titleId}" },
 
-            // PS3 — RPCS3: <saveRoot>/dev_hdd0/home/00000001/savedata/<titleId>/
-            ["ps3"]            = new[] { "dev_hdd0", "home", "00000001", "savedata", "{titleId}" },
+            // PS3 — RPCS3: <saveRoot>/dev_hdd0/home/{profileId}/savedata/<titleId>/
+            ["ps3"]            = new[] { "dev_hdd0", "home", "{profileId}", "savedata", "{titleId}" },
 
             // PS Vita — Vita3K: <saveRoot>/ux0/user/00/savedata/<titleId>/
             ["ps vita"]        = new[] { "ux0", "user", "00", "savedata", "{titleId}" },
@@ -44,8 +44,19 @@ namespace GameLauncher.Services
             // PS4 — RPCS4 / shadPS4: <saveRoot>/<titleId>/  (simple layout)
             ["ps4"]            = new[] { "{titleId}" },
 
+            // PS1 — DuckStation: <saveRoot>/memcards/<gameName>.mcd  (resolved via special-case)
+            ["ps1"]            = new[] { "memcards", "{titleId}" },
+
             // Nintendo 3DS — Citra: <saveRoot>/<titleId>/
             ["nintendo - 3ds"] = new[] { "{titleId}" },
+
+            // Nintendo GameCube — Dolphin: <saveRoot>/GC/<titleId>/
+            ["gamecube"]       = new[] { "GC", "{titleId}" },
+
+            // Nintendo Wii — Dolphin: <saveRoot>/Wii/title/<highWord>/<lowWord>/data/
+            // titleId is treated as the full folder name here; Dolphin uses a more complex
+            // path but <saveRoot>/<titleId>/ is used as the best approximation.
+            ["wii"]            = new[] { "Wii", "{titleId}" },
         };
 
         // Emulator-name overrides (take precedence over the platform default).
@@ -56,14 +67,20 @@ namespace GameLauncher.Services
             // Ryujinx portable layout: <saveRoot>/<titleId>/
             ["ryujinx"]        = new[] { "{titleId}" },
 
-            // RPCS3: same as PS3 platform default
-            ["rpcs3"]          = new[] { "dev_hdd0", "home", "00000001", "savedata", "{titleId}" },
+            // RPCS3: <saveRoot>/dev_hdd0/home/{profileId}/savedata/<titleId>/
+            ["rpcs3"]          = new[] { "dev_hdd0", "home", "{profileId}", "savedata", "{titleId}" },
 
             // Xenia has multiple layouts (canary / legacy). Resolved via special-case logic.
             ["xenia"]          = new[] { "{titleId}" },
 
             // Vita3K: same as PS Vita platform default
             ["vita3k"]         = new[] { "ux0", "user", "00", "savedata", "{titleId}" },
+
+            // Dolphin (GameCube & Wii): <saveRoot>/GC/<titleId>/
+            ["dolphin"]        = new[] { "GC", "{titleId}" },
+
+            // DuckStation (PS1): <saveRoot>/memcards/<titleId>  (per-game memory card)
+            ["duckstation"]    = new[] { "memcards", "{titleId}" },
         };
 
         // ── Public API ─────────────────────────────────────────────────────────
@@ -116,15 +133,17 @@ namespace GameLauncher.Services
             string[] segments = ResolvePattern(platform ?? "", emulatorName);
             if (segments.Length == 0) return null;
 
-            // If the pattern requires a profileId but none was supplied, attempt
-            // to auto-detect it by scanning the emulator's content directory for
-            // a profile folder that contains the game's titleId subfolder.
+            // For patterns that require a {profileId} (RPCS3/PS3), default to the
+            // standard RPCS3 offline profile "00000001" when no profile ID is supplied.
+            // This matches the RPCS3 default save path:
+            //   <saveRoot>/dev_hdd0/home/00000001/savedata/<titleId>/
             bool needsProfile = Array.Exists(segments, s =>
                 string.Equals(s, "{profileId}", StringComparison.OrdinalIgnoreCase));
             if (needsProfile && string.IsNullOrWhiteSpace(profileId))
             {
-                profileId = TryDetectXeniaProfileId(safeRoot, safeTitleId);
-                if (string.IsNullOrWhiteSpace(profileId)) return null;
+                // For Xenia the auto-detect scans the Content folder.  For RPCS3/PS3 the
+                // default profile is always "00000001".
+                profileId = "00000001";
             }
 
             // Build the path by substituting {titleId} and {profileId} in each segment

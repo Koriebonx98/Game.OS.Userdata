@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -56,8 +58,13 @@ public partial class LibraryViewModel : ViewModelBase
     public ObservableCollection<LocalGame>         FilteredLocalGames  { get; } = new();
     public ObservableCollection<LocalRepack>        FilteredRepacks     { get; } = new();
     public ObservableCollection<LocalRom>           FilteredRoms        { get; } = new();
-    /// <summary>Unified filtered list combining LocalGames + Repacks + ROMs for "My Games".</summary>
-    public ObservableCollection<LocalGameCardVm>    FilteredMyGames     { get; } = new();
+    /// <summary>
+    /// Unified filtered list combining LocalGames + Repacks + ROMs for "My Games".
+    /// Uses <see cref="BulkObservableCollection{T}"/> so large list replacements fire a single
+    /// Reset notification instead of thousands of individual Add events — this prevents the UI
+    /// from freezing during background syncs that rebuild the library.
+    /// </summary>
+    public BulkObservableCollection<LocalGameCardVm> FilteredMyGames { get; } = new();
 
     /// <summary>Invoked when the user clicks a cloud game card.</summary>
     public Action<Game>?        OnOpenDetail       { get; set; }
@@ -149,18 +156,29 @@ public partial class LibraryViewModel : ViewModelBase
     {
         if (_rebuildScheduled) return;
         _rebuildScheduled = true;
-        // Take snapshots of the source lists so the background thread doesn't race
-        // with UI-thread updates that might swap the list references.
-        var localGamesSnap = _allLocalGames.ToList();
-        var repacksSnap    = _allRepacks.ToList();
-        var romsSnap       = _allRoms.ToList();
-        var allGamesSnap   = _allGames.ToList();
+        // Take snapshots of the source lists AND current filter settings so the
+        // background thread doesn't race with UI-thread updates.
+        var localGamesSnap    = _allLocalGames.ToList();
+        var repacksSnap       = _allRepacks.ToList();
+        var romsSnap          = _allRoms.ToList();
+        var allGamesSnap      = _allGames.ToList();
+        var filterPlatformSnap = FilterPlatform;
+        var searchTextSnap     = SearchText;
+        var installStatusSnap  = FilterInstallStatus;
 
         System.Threading.Tasks.Task.Run(() =>
         {
-            // Heavy computation on a background thread
-            var newMyGames = BuildMyGamesList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
+            // Heavy computation on a background thread — includes filtered list so the
+            // UI thread only needs to do a single-Reset collection swap.
+            var newMyGames   = BuildMyGamesList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
             var newPlatforms = BuildPlatformList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
+
+            // Pre-compute filtered My Games on the background thread using the snapshotted
+            // filter values.  This avoids doing N individual ObservableCollection.Add calls
+            // on the UI thread (which would cause a layout pass per-item and freeze the UI
+            // for large libraries during a background cloud sync).
+            var filteredMyGames = ComputeFilteredMyGames(
+                newMyGames, filterPlatformSnap, searchTextSnap, installStatusSnap);
 
             // Switch to UI thread only for collection updates
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -180,16 +198,139 @@ public partial class LibraryViewModel : ViewModelBase
 
                 TotalGames = newMyGames.Count;
 
-                ApplyFilter();
+                // If the filter changed between scheduling and arriving here re-apply with
+                // current values; otherwise use the pre-computed result (common case).
+                if (FilterPlatform == filterPlatformSnap &&
+                    SearchText == searchTextSnap &&
+                    FilterInstallStatus == installStatusSnap)
+                {
+                    // Refresh playtime labels before pushing to UI
+                    foreach (var card in filteredMyGames)
+                    {
+                        if (card.SourceCloudGame != null)
+                            card.PlaytimeLabel = FormatPlaytime(card.SourceCloudGame.PlaytimeMinutes);
+                    }
+                    // Batch-replace the collection with a single Reset notification instead of
+                    // N individual Add events — keeps the UI thread responsive.
+                    FilteredMyGames.Reset(filteredMyGames);
+                    HasMyGames = FilteredMyGames.Count > 0;
+
+                    // Small collections can be updated individually without noticeable lag.
+                    ApplyNonMyGamesFilter();
+                }
+                else
+                {
+                    // Filter changed mid-flight — fall back to the full ApplyFilter path.
+                    ApplyFilter();
+                }
+
                 OnMyGamesRebuilt?.Invoke();
             }, Avalonia.Threading.DispatcherPriority.Background);
         });
+    }
+
+    /// <summary>Computes the filtered My Games list on any thread.</summary>
+    private static List<LocalGameCardVm> ComputeFilteredMyGames(
+        List<LocalGameCardVm> allMyGames,
+        string filterPlatform,
+        string searchText,
+        string installStatus)
+    {
+        var results = allMyGames.AsEnumerable();
+
+        if (filterPlatform != "All")
+            results = results.Where(c =>
+                string.Equals(c.Platform, filterPlatform, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.IsNullOrWhiteSpace(searchText))
+            results = results.Where(c =>
+                c.Title.Contains(searchText, StringComparison.OrdinalIgnoreCase));
+
+        if (installStatus is "Installed" or "Uninstalled")
+        {
+            bool wantInstalled = installStatus == "Installed";
+            results = results.Where(c =>
+            {
+                if (c.SourceCloudGame != null &&
+                    !string.Equals(c.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+                    return true;
+                return wantInstalled ? c.IsInstalledLocal : !c.IsInstalledLocal;
+            });
+        }
+
+        return results.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    /// <summary>
+    /// Updates only the smaller filtered collections (LocalGames, Repacks, ROMs)
+    /// without touching FilteredMyGames, which is handled by the bulk-reset path.
+    /// </summary>
+    private void ApplyNonMyGamesFilter()
+    {
+        var search = SearchText;
+        var plat   = FilterPlatform;
+
+        FilteredGames.Clear();
+
+        FilteredLocalGames.Clear();
+        if (plat == "All" || string.Equals(plat, "PC", StringComparison.OrdinalIgnoreCase))
+        {
+            var localResults = _allLocalGames.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(search))
+                localResults = localResults.Where(g =>
+                    g.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+            foreach (var g in localResults.OrderBy(g => g.Title))
+                FilteredLocalGames.Add(g);
+        }
+        HasLocalGames = FilteredLocalGames.Count > 0;
+
+        FilteredRepacks.Clear();
+        if (plat == "All" || string.Equals(plat, "PC", StringComparison.OrdinalIgnoreCase))
+        {
+            var repackResults = _allRepacks.AsEnumerable();
+            if (!string.IsNullOrWhiteSpace(search))
+                repackResults = repackResults.Where(r =>
+                    r.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+            foreach (var r in repackResults.OrderBy(r => r.Title))
+                FilteredRepacks.Add(r);
+        }
+        HasRepacks = FilteredRepacks.Count > 0;
+
+        FilteredRoms.Clear();
+        var romResults = _allRoms.AsEnumerable();
+        if (plat != "All")
+            romResults = romResults.Where(r =>
+                string.Equals(r.Platform, plat, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrWhiteSpace(search))
+            romResults = romResults.Where(r =>
+                r.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
+        foreach (var r in romResults.OrderBy(r => r.Title))
+            FilteredRoms.Add(r);
+        HasRoms = FilteredRoms.Count > 0;
     }
 
     /// <summary>
     /// Called by MainViewModel after background cover-art enrichment updates a card's
     /// CoverUrl and CoverGradient from the Games.Database.
     /// </summary>
+    /// <summary>
+    /// Returns a dictionary keyed by <c>"platform||title"</c> (lower-case) for O(1)
+    /// achievement-label updates.  Unlike <see cref="FindMyGameCard"/> (O(n) per call),
+    /// this is built once and shared across the entire <c>RefreshMyGamesAchievementLabelsAsync</c>
+    /// pass, avoiding the O(n²) linear-scan pattern.
+    /// </summary>
+    public Dictionary<string, LocalGameCardVm> GetMyGameCardsDictionary()
+    {
+        var dict = new Dictionary<string, LocalGameCardVm>(
+            _allMyGames.Count, StringComparer.OrdinalIgnoreCase);
+        foreach (var card in _allMyGames)
+        {
+            string key = $"{card.Platform.ToLowerInvariant()}||{card.Title.ToLowerInvariant()}";
+            dict.TryAdd(key, card);
+        }
+        return dict;
+    }
+
     public LocalGameCardVm? FindMyGameCard(string title, string platform)
     {
         return _allMyGames.FirstOrDefault(c =>
@@ -691,32 +832,11 @@ public partial class LibraryViewModel : ViewModelBase
                 card.PlaytimeLabel = FormatPlaytime(card.SourceCloudGame.PlaytimeMinutes);
         }
 
-        FilteredMyGames.Clear();
-        var myResults = _allMyGames.AsEnumerable();
-        if (plat != "All")
-            myResults = myResults.Where(c =>
-                string.Equals(c.Platform, plat, StringComparison.OrdinalIgnoreCase));
-        if (!string.IsNullOrWhiteSpace(search))
-            myResults = myResults.Where(c =>
-                c.Title.Contains(search, StringComparison.OrdinalIgnoreCase));
-
-        // Apply install-status filter.
-        // Non-PC cloud games (Xbox 360, PS3, etc.) always pass — they cannot be
-        // "locally installed" the same way as PC games and should always be shown.
-        if (installStatus is "Installed" or "Uninstalled")
-        {
-            bool wantInstalled = installStatus == "Installed";
-            myResults = myResults.Where(c =>
-            {
-                if (c.SourceCloudGame != null &&
-                    !string.Equals(c.Platform, "PC", StringComparison.OrdinalIgnoreCase))
-                    return true; // non-PC cloud entries always shown regardless of filter
-                return wantInstalled ? c.IsInstalledLocal : !c.IsInstalledLocal;
-            });
-        }
-
-        foreach (var c in myResults.OrderBy(c => c.Title, StringComparer.OrdinalIgnoreCase))
-            FilteredMyGames.Add(c);
+        // Build the filtered list then replace the collection with a single Reset
+        // notification.  This avoids firing N CollectionChanged events for a large library
+        // which would cause the UI to freeze during background cloud syncs.
+        var filtered = ComputeFilteredMyGames(_allMyGames, plat, search, installStatus);
+        FilteredMyGames.Reset(filtered);
         HasMyGames = FilteredMyGames.Count > 0;
 
         TotalGames = _allMyGames.Count;
@@ -733,6 +853,31 @@ public partial class LibraryViewModel : ViewModelBase
         int hours = minutes / 60;
         int mins  = minutes % 60;
         return mins > 0 ? $"{hours}h {mins}m" : $"{hours}h";
+    }
+}
+
+/// <summary>
+/// An <see cref="ObservableCollection{T}"/> that adds a <see cref="Reset"/> method for
+/// bulk replacement.  <see cref="Reset"/> replaces all items and fires a single
+/// <c>CollectionChanged</c> event with <c>NotifyCollectionChangedAction.Reset</c> rather
+/// than one event per item.  This prevents the UI from freezing when a large library is
+/// rebuilt during a background cloud sync.
+/// </summary>
+public sealed class BulkObservableCollection<T> : ObservableCollection<T>
+{
+    /// <summary>
+    /// Replaces the entire contents of this collection with <paramref name="items"/>,
+    /// firing exactly one <c>CollectionChanged(Reset)</c> notification.
+    /// Must be called on the UI thread.
+    /// </summary>
+    public void Reset(IEnumerable<T> items)
+    {
+        Items.Clear();
+        foreach (var item in items)
+            Items.Add(item);
+        OnPropertyChanged(new PropertyChangedEventArgs("Count"));
+        OnPropertyChanged(new PropertyChangedEventArgs("Item[]"));
+        OnCollectionChanged(new NotifyCollectionChangedEventArgs(NotifyCollectionChangedAction.Reset));
     }
 }
 
@@ -768,6 +913,8 @@ public partial class PlatformChipVm : ViewModelBase
         "Xbox 360"  => "🟢",
         "Xbox One"  => "🟢",
         "Switch"    => "🕹",
+        "GameCube"  => "🟣",
+        "Wii"       => "🟣",
         _           => "",
     };
 }
