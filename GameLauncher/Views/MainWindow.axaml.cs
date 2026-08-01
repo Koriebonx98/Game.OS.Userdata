@@ -234,7 +234,14 @@ public partial class MainWindow : Window
                         e.Handled = true;
                         return;
                     }
-                    break;
+                    else
+                    {
+                        // Auto-select first card instead of dropping through to
+                        // open the nav sidebar (mirrors console carousel behaviour).
+                        vm.DashboardVm.MoveFocus(0);
+                        e.Handled = true;
+                        return;
+                    }
                 case Key.Enter:
                     if (vm.DashboardVm.HasFocusedCard)
                     {
@@ -251,6 +258,45 @@ public partial class MainWindow : Window
                         return;
                     }
                     break;
+            }
+        }
+
+        // Library controller navigation (when not in a text input so Y can open search)
+        if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            bool inSearch = IsTextInputFocused();
+            switch (e.Key)
+            {
+                // Y → focus search box (mirrors PS/Xbox "search" shortcut)
+                case Key.Y when !inSearch:
+                    vm.LibraryVm.FocusSearchRequested?.Invoke();
+                    e.Handled = true;
+                    return;
+                // X → cycle platform filter
+                case Key.X when !inSearch:
+                    vm.LibraryVm.CyclePlatform(1);
+                    e.Handled = true;
+                    return;
+                // LB (PageUp) → cycle install filter backward; RB (PageDown) → forward
+                case Key.PageUp when !inSearch:
+                    vm.LibraryVm.CycleInstallFilter(-1);
+                    e.Handled = true;
+                    return;
+                case Key.PageDown when !inSearch:
+                    vm.LibraryVm.CycleInstallFilter(1);
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // Store controller navigation (LB/RB switch Games / App Store tabs)
+        if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (e.Key is Key.PageUp or Key.PageDown)
+            {
+                vm.StoreVm.CycleTab();
+                e.Handled = true;
+                return;
             }
         }
 
@@ -301,9 +347,10 @@ public partial class MainWindow : Window
                 }
                 break;
 
-            // Left arrow → open the nav sidebar (when not in a text input)
+            // Left arrow → open the nav sidebar (when not in a text input and not on the
+            // dashboard — on the dashboard Left is already consumed by game-card scrolling above).
             case Key.Left:
-                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused() && !vm.IsHome)
                 {
                     if (!vm.IsNavExpanded)
                     {
@@ -736,8 +783,12 @@ public partial class MainWindow : Window
                     vm.DashboardVm.MoveFocus(1);
                     return;
                 case Key.Left:
-                    if (vm.DashboardVm.HasFocusedCard) { vm.DashboardVm.MoveFocus(-1); return; }
-                    break;
+                    // Always try to scroll cards left; if already at index 0 this is a no-op.
+                    // Never fall through to open the nav menu on the dashboard.
+                    vm.DashboardVm.MoveFocus(-1);
+                    if (!vm.DashboardVm.HasFocusedCard)
+                        vm.DashboardVm.MoveFocus(0); // auto-select first card
+                    return;
                 case Key.Enter:
                 case Key.Y:
                     if (vm.DashboardVm.HasFocusedCard)
@@ -750,10 +801,46 @@ public partial class MainWindow : Window
             }
         }
 
+        // Library controller navigation shortcuts
+        if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            switch (key)
+            {
+                case Key.Y:
+                    Dispatcher.UIThread.Post(() => vm.LibraryVm.FocusSearchRequested?.Invoke());
+                    return;
+                case Key.X:
+                    vm.LibraryVm.CyclePlatform(1);
+                    return;
+                case Key.PageUp:
+                    vm.LibraryVm.CycleInstallFilter(-1);
+                    return;
+                case Key.PageDown:
+                    vm.LibraryVm.CycleInstallFilter(1);
+                    return;
+            }
+        }
+
+        // Store controller navigation — LB/RB switch Games / App Store tabs
+        if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (key is Key.PageUp or Key.PageDown)
+            {
+                vm.StoreVm.CycleTab();
+                return;
+            }
+        }
+
         // Global navigation — back, page prev/next, nav sidebar, and confirm
         switch (key)
         {
             case Key.Escape:
+                if (vm.ShowDetail)             vm.DetailVm.CloseCommand.Execute(null);
+                else if (vm.ShowFriendProfile) vm.CloseFriendProfileCommand.Execute(null);
+                else if (vm.IsNavExpanded)     vm.IsNavExpanded = false;
+                break;
+
+            // Y (triangle / Y-button) = back/cancel at global level (when not library/store/dashboard)
             case Key.Y:
                 if (vm.ShowDetail)             vm.DetailVm.CloseCommand.Execute(null);
                 else if (vm.ShowFriendProfile) vm.CloseFriendProfileCommand.Execute(null);
@@ -769,7 +856,9 @@ public partial class MainWindow : Window
                 break;
 
             case Key.Left:
-                if (!vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+                // On the dashboard, Left is consumed by card-focus logic above.
+                // Elsewhere, Left opens the nav sidebar.
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.IsHome)
                     vm.IsNavExpanded = true;
                 break;
 

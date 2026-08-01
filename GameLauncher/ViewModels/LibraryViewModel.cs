@@ -366,6 +366,44 @@ public partial class LibraryViewModel : ViewModelBase
     [RelayCommand]
     private void SetPlatform(string platform) => FilterPlatform = platform;
 
+    // ── Controller navigation helpers ─────────────────────────────────────────
+
+    /// <summary>
+    /// Invoked by MainWindow when the user presses Y on the controller while in the
+    /// library — should focus the search TextBox so the user can type immediately.
+    /// Wired in LibraryView.axaml.cs.
+    /// </summary>
+    public Action? FocusSearchRequested { get; set; }
+
+    private static readonly string[] _installFilters = { "All", "Installed", "Uninstalled" };
+
+    /// <summary>
+    /// Cycles the install-status filter chip by <paramref name="delta"/> steps.
+    /// Called by the LB (−1) / RB (+1) controller handler in MainWindow.
+    /// </summary>
+    public void CycleInstallFilter(int delta)
+    {
+        int idx  = Array.IndexOf(_installFilters, FilterInstallStatus);
+        if (idx < 0) idx = 0;
+        idx = (idx + delta + _installFilters.Length) % _installFilters.Length;
+        FilterInstallStatus = _installFilters[idx];
+    }
+
+    /// <summary>
+    /// Cycles the platform filter to the next (delta = +1) or previous (delta = −1)
+    /// platform in the <see cref="Platforms"/> list.
+    /// Called by the X controller handler in MainWindow.
+    /// </summary>
+    public void CyclePlatform(int delta)
+    {
+        if (Platforms.Count == 0) return;
+        var list = Platforms.ToList();
+        int idx  = list.IndexOf(FilterPlatform);
+        if (idx < 0) idx = 0;
+        idx = (idx + delta + list.Count) % list.Count;
+        FilterPlatform = list[idx];
+    }
+
     [RelayCommand]
     private void OpenGameDetail(Game? game)
     {

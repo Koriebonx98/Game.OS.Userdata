@@ -499,31 +499,43 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void ShowCreateProfileForm() => ShowNewProfileForm = true;
-
-    [RelayCommand]
     private void CancelCreateProfile()
     {
         ShowNewProfileForm    = false;
         NewProfileName        = "";
         NewProfileDescription = "";
+        MappingRows.Clear();
     }
 
     [RelayCommand]
     private void CreateControllerProfile()
     {
-        // Null-guard: Avalonia two-way TextBox bindings can set a string property to null
-        // when the user clears the field, even though the backing field is typed string.
         string profileName = (NewProfileName ?? "").Trim();
         if (string.IsNullOrWhiteSpace(profileName)) return;
 
         try
         {
-            var profile = Services.ControllerProfileService.CreateDefaultProfile(_currentUsername);
-            profile.ProfileName  = profileName;
-            profile.Description  = (NewProfileDescription ?? "").Trim();
-            profile.Author       = _currentUsername;
-            profile.CreatedAt    = System.DateTime.UtcNow.ToString("o");
+            // Build mappings from the editor rows.
+            var mappings = new Dictionary<string, ControllerButtonAction>();
+            foreach (var row in MappingRows)
+            {
+                mappings[row.ButtonName] = new ControllerButtonAction
+                {
+                    Press   = string.IsNullOrWhiteSpace(row.PressAction) ? "Empty" : row.PressAction.Trim(),
+                    Hold    = string.IsNullOrWhiteSpace(row.HoldAction)  ? "Empty" : row.HoldAction.Trim(),
+                    Release = "Empty",
+                    Double  = "Empty",
+                };
+            }
+
+            var profile = new ControllerProfile
+            {
+                ProfileName  = profileName,
+                Description  = (NewProfileDescription ?? "").Trim(),
+                Author       = _currentUsername,
+                CreatedAt    = DateTime.UtcNow.ToString("o"),
+                Mappings     = mappings,
+            };
 
             Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
             LoadControllerProfiles();
@@ -531,12 +543,13 @@ public partial class GameDetailViewModel : ViewModelBase
             NewProfileName        = "";
             NewProfileDescription = "";
             ShowNewProfileForm    = false;
-            ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" created.";
+            MappingRows.Clear();
+            ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" saved.";
         }
         catch (Exception ex)
         {
             Services.DevLogService.Log($"[ControllerProfile] Create failed: {ex.Message}");
-            ControllerStatus = $"Failed to create profile: {ex.Message}";
+            ControllerStatus = $"Failed to save profile: {ex.Message}";
         }
     }
 
@@ -638,6 +651,52 @@ public partial class GameDetailViewModel : ViewModelBase
             ControllerProfiles.Add(p);
         HasControllerProfiles = ControllerProfiles.Count > 0;
     }
+
+    // ── Button mapping editor ────────────────────────────────────────────────
+    /// <summary>Rows shown in the button mapping editor (one per controller button).</summary>
+    public ObservableCollection<ButtonMappingRowVm> MappingRows { get; } = new();
+
+    /// <summary>
+    /// Populates <see cref="MappingRows"/> from the specified profile's mappings
+    /// (or from empty defaults when <paramref name="profile"/> is null).
+    /// Called when the user clicks "+ New Profile" or "Edit" on an existing profile.
+    /// </summary>
+    private void BeginProfileEditor(ControllerProfile? profile = null)
+    {
+        MappingRows.Clear();
+        foreach (var btn in Services.ControllerProfileService.ButtonNames)
+        {
+            ControllerButtonAction action = new();
+            if (profile?.Mappings.TryGetValue(btn, out var existing) == true)
+                action = existing;
+
+            MappingRows.Add(new ButtonMappingRowVm(btn, action.Press, action.Hold));
+        }
+        ShowNewProfileForm = true;
+    }
+
+    [RelayCommand]
+    private void ShowCreateProfileForm()
+    {
+        NewProfileName        = "";
+        NewProfileDescription = "";
+        BeginProfileEditor(null);
+    }
+
+    [RelayCommand]
+    private void EditControllerProfile(string profileName)
+    {
+        var profiles = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        var profile  = profiles.Find(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase));
+        if (profile == null) return;
+
+        NewProfileName        = profile.ProfileName;
+        NewProfileDescription = profile.Description;
+        BeginProfileEditor(profile);
+    }
+
+
     public System.Action? OnClose { get; set; }
 
     [RelayCommand]
@@ -4577,4 +4636,62 @@ public partial class GameDetailViewModel : ViewModelBase
         // ── 4. Open the folder — same as OpenGameFolder opens ActiveDrivePath ─
         OpenWithSystem(modsDir);
     }
+}
+
+/// <summary>
+/// A single row in the controller button mapping editor.
+/// Each row represents one controller button (e.g. A, B, X, Y, DPadUp, LB…)
+/// with editable Press and Hold action strings matching the Game.OS.Input format:
+///   "Empty"           — do nothing
+///   "Key:Enter"       — send keystroke (combos: "Key:Ctrl+Alt+Del")
+///   "Mouse:LeftClick" — mouse click
+///   "Media:PlayPause" — media key
+/// </summary>
+public sealed class ButtonMappingRowVm : CommunityToolkit.Mvvm.ComponentModel.ObservableObject
+{
+    private string _pressAction;
+    private string _holdAction;
+
+    public ButtonMappingRowVm(string buttonName, string pressAction, string holdAction)
+    {
+        ButtonName   = buttonName;
+        _pressAction = pressAction;
+        _holdAction  = holdAction;
+    }
+
+    public string ButtonName { get; }
+
+    public string PressAction
+    {
+        get => _pressAction;
+        set => SetProperty(ref _pressAction, value);
+    }
+
+    public string HoldAction
+    {
+        get => _holdAction;
+        set => SetProperty(ref _holdAction, value);
+    }
+
+    /// <summary>Friendly display name with icon hint shown in the editor header row.</summary>
+    public string DisplayName => ButtonName switch
+    {
+        "A"              => "🅐  A (Cross / A-button)",
+        "B"              => "🅑  B (Circle / B-button)",
+        "X"              => "🅧  X (Square / X-button)",
+        "Y"              => "🅨  Y (Triangle / Y-button)",
+        "DPadUp"         => "⬆  D-Pad Up",
+        "DPadDown"       => "⬇  D-Pad Down",
+        "DPadLeft"       => "⬅  D-Pad Left",
+        "DPadRight"      => "➡  D-Pad Right",
+        "LeftShoulder"   => "◀  LB / L1",
+        "RightShoulder"  => "▶  RB / R1",
+        "LeftTrigger"    => "◁  LT / L2",
+        "RightTrigger"   => "▷  RT / R2",
+        "LeftThumb"      => "🕹  Left Stick Click",
+        "RightThumb"     => "🕹  Right Stick Click",
+        "Start"          => "☰  Start / Menu",
+        "Back"           => "⟨  Back / Select",
+        _                => ButtonName,
+    };
 }
