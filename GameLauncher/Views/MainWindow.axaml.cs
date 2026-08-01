@@ -24,6 +24,8 @@ public partial class MainWindow : Window
     private bool _overlayEnterLatched;
     private bool _overlaySpaceLatched;
     private bool _overlayEscapeLatched;
+    private bool _overlayLbLatched;
+    private bool _overlayRbLatched;
 
     // Separate overlay window for the global Quick Menu (shown over games without
     // restoring the full launcher — mirrors the Steam/NVIDIA overlay pattern).
@@ -35,6 +37,8 @@ public partial class MainWindow : Window
     {
         Interval = TimeSpan.FromMilliseconds(150)
     };
+    // Controller input injection — forwards active profile mappings to the running game.
+    private readonly Services.ControllerInputInjector _controllerInjector = new();
 
     public MainWindow()
     {
@@ -495,6 +499,19 @@ public partial class MainWindow : Window
             if (!vm.HandleBackNavigation())
                 vm.DismissCommand.Execute(null);
         });
+        // LB (PageUp) / RB (PageDown) — tab navigation within the overlay
+        const int VK_PRIOR = 0x21; // PageUp
+        const int VK_NEXT  = 0x22; // PageDown
+        HandleOverlayKeyState(VK_PRIOR, ref _overlayLbLatched, () =>
+        {
+            if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+            else vm.MoveHubSelection(-1);
+        });
+        HandleOverlayKeyState(VK_NEXT, ref _overlayRbLatched, () =>
+        {
+            if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+            else vm.MoveHubSelection(1);
+        });
     }
 
     private static void HandleOverlayKeyState(int virtualKey, ref bool latched, Action onPressed)
@@ -523,6 +540,8 @@ public partial class MainWindow : Window
         _overlayEnterLatched = false;
         _overlaySpaceLatched = false;
         _overlayEscapeLatched = false;
+        _overlayLbLatched = false;
+        _overlayRbLatched = false;
     }
 
     /// <summary>
@@ -644,6 +663,8 @@ public partial class MainWindow : Window
     ///   LT / L2            → previous page      (PageUp — same as LB for menu nav)
     ///   RT / R2            → next page          (PageDown — same as RB for menu nav)
     ///   Start / Menu       → toggle Quick Menu  (≡ Left Ctrl + Left Shift)
+    ///   Guide / Home / Xbox → toggle Quick Menu (same as Start)
+    ///   Share              → screenshot via Win+Alt+PrintScreen
     /// </summary>
     private void WireXInputCallbacks()
     {
@@ -675,15 +696,49 @@ public partial class MainWindow : Window
             else
                 _boundVm.ToggleQuickMenu();
         };
+
+        // Guide / Home / Xbox button → same behaviour as Start
+        _xinput.OnGuide = () =>
+        {
+            if (_boundVm == null) return;
+            bool gameRunning       = _boundVm.DetailVm.IsGameRunning;
+            bool launcherMinimized = WindowState == WindowState.Minimized;
+            bool launcherUnfocused = !IsActive;
+            if (gameRunning || launcherMinimized || launcherUnfocused)
+                OpenGlobalQuickMenu();
+            else
+                _boundVm.ToggleQuickMenu();
+        };
+
+        // Share button → Win+Alt+PrintScreen screenshot (Xbox app / Game Bar)
+        _xinput.OnShare = () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            GameLauncher.Services.NativeMethods.TakeScreenshot();
+        };
     }
 
     /// <summary>
     /// Called every 150 ms by the XInput poller; delegates to
     /// <see cref="XInputService.Poll"/> which fires the wired callbacks.
+    /// Also refreshes the active controller profile for injection whenever the
+    /// running game changes.
     /// </summary>
     private void OnXInputTick(object? sender, EventArgs e)
     {
         if (!OperatingSystem.IsWindows() || _boundVm == null) return;
+
+        // Keep the injector's active profile in sync with the running game.
+        if (_boundVm.DetailVm.IsGameRunning)
+        {
+            var profile = _boundVm.DetailVm.ActiveControllerProfile;
+            _controllerInjector.SetProfile(profile);
+        }
+        else
+        {
+            _controllerInjector.SetProfile(null);
+        }
+
         _xinput.Poll();
     }
 
@@ -691,6 +746,11 @@ public partial class MainWindow : Window
     /// Handles a virtual key dispatched from the XInput controller, applying
     /// the same navigation logic as the keyboard handler but without requiring
     /// a focused window (works even when the launcher is behind a game).
+    ///
+    /// When a game is running and the Quick Menu is not open, all directional
+    /// and action inputs are forwarded to the game via the active controller
+    /// profile (virtual injection) — Game OS navigation is suppressed so that
+    /// the game remains fully playable through the mapped profile.
     /// </summary>
     private void HandleControllerKey(Key key)
     {
@@ -753,6 +813,31 @@ public partial class MainWindow : Window
                     if (!vm.QuickMenuVm.HandleBackNavigation()) vm.ShowQuickMenu = false;
                     return;
             }
+            return;
+        }
+
+        // A game is running and the quick menu is closed — block Game OS navigation
+        // and inject the button press into the game via the active controller profile.
+        // The Start / Guide callbacks bypass this guard entirely (handled above through
+        // the OnStart / OnGuide wiring) so they continue to open the Quick Menu.
+        if (vm.DetailVm.IsGameRunning)
+        {
+            string? xInputButtonName = key switch
+            {
+                Key.Up       => "DPadUp",
+                Key.Down     => "DPadDown",
+                Key.Left     => "DPadLeft",
+                Key.Right    => "DPadRight",
+                Key.Enter    => "A",
+                Key.Escape   => "B",
+                Key.X        => "X",
+                Key.Y        => "Y",
+                Key.PageUp   => "LeftShoulder",
+                Key.PageDown => "RightShoulder",
+                _            => null
+            };
+            if (xInputButtonName != null)
+                _controllerInjector.InjectPress(xInputButtonName);
             return;
         }
 

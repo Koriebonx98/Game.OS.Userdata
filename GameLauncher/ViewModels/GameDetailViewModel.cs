@@ -349,6 +349,26 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Steam AppId for locally-installed Steam games (0 for non-Steam games).</summary>
     private int _steamAppId;
 
+    // ── Controller profile ────────────────────────────────────────────────────
+    /// <summary>
+    /// The controller profile that is currently active for this game.
+    /// Read by <see cref="MainWindow"/> every tick to feed the
+    /// <see cref="Services.ControllerInputInjector"/>.
+    /// </summary>
+    public Models.ControllerProfile? ActiveControllerProfile { get; private set; }
+
+    /// <summary>
+    /// Display name of the active controller profile ("Default" when none is set).
+    /// </summary>
+    [ObservableProperty] private string _activeControllerProfileName = "Default";
+
+    /// <summary>Loads the named controller profile for this game from disk.</summary>
+    public void SetActiveControllerProfile(Models.ControllerProfile? profile)
+    {
+        ActiveControllerProfile = profile;
+        ActiveControllerProfileName = profile?.ProfileName ?? "Default";
+    }
+
     // ── Title / App ID display ────────────────────────────────────────────────
     /// <summary>
     /// Human-readable identifier shown in the game-info panel.
@@ -539,6 +559,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
             Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
             LoadControllerProfiles();
+            SetActiveControllerProfile(profile);
 
             NewProfileName        = "";
             NewProfileDescription = "";
@@ -650,6 +671,15 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var p in all)
             ControllerProfiles.Add(p);
         HasControllerProfiles = ControllerProfiles.Count > 0;
+
+        // Auto-select the Default profile (or the first available) as active for injection.
+        if (ActiveControllerProfile == null && all.Count > 0)
+        {
+            var defaultProfile = all.Find(p =>
+                string.Equals(p.ProfileName, "Default", StringComparison.OrdinalIgnoreCase))
+                ?? all[0];
+            SetActiveControllerProfile(defaultProfile);
+        }
     }
 
     // ── Button mapping editor ────────────────────────────────────────────────
@@ -681,6 +711,17 @@ public partial class GameDetailViewModel : ViewModelBase
         NewProfileName        = "";
         NewProfileDescription = "";
         BeginProfileEditor(null);
+    }
+
+    [RelayCommand]
+    private void ActivateControllerProfile(string profileName)
+    {
+        var profiles = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        var profile  = profiles.Find(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase));
+        if (profile == null) return;
+        SetActiveControllerProfile(profile);
+        ControllerStatus = $"✓ \"{profileName}\" is now the active profile.";
     }
 
     [RelayCommand]

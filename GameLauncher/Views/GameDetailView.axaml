@@ -1230,6 +1230,19 @@
                             </Button>
                         </Grid>
 
+                        <!-- Active profile indicator -->
+                        <Border Background="#0d2a0d" CornerRadius="6" Padding="10,6"
+                                IsVisible="{Binding HasControllerProfiles}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Active:" Foreground="#8b949e" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding ActiveControllerProfileName}"
+                                           Foreground="#3fb950" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="(injected into game when running)"
+                                           Foreground="#8b949e" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Saved profiles list -->
                         <ItemsControl ItemsSource="{Binding ControllerProfiles}"
                                       IsVisible="{Binding HasControllerProfiles}">
@@ -1259,13 +1272,20 @@
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal"
                                                         Spacing="6" VerticalAlignment="Center">
-                                                <!-- Edit mapping -->
+                                               <!-- Activate for injection -->
                                                 <Button Classes="btn-secondary" Padding="10,6"
-                                                        ToolTip.Tip="Edit button mappings"
-                                                        Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
+                                                       ToolTip.Tip="Use this profile when game is running"
+                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
                                                         CommandParameter="{Binding ProfileName}">
-                                                    <TextBlock Text="✏ Edit" FontSize="11"/>
+                                                   <TextBlock Text="▶ Activate" FontSize="11"/>
                                                 </Button>
+                                               <!-- Edit mapping -->
+                                               <Button Classes="btn-secondary" Padding="10,6"
+                                                       ToolTip.Tip="Edit button mappings"
+                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
+                                                       CommandParameter="{Binding ProfileName}">
+                                                   <TextBlock Text="✏ Edit" FontSize="11"/>
+                                               </Button>
                                                 <!-- Upload to Games.Database -->
                                                 <Button Classes="btn-secondary" Padding="10,6"
                                                         ToolTip.Tip="Share to Games.Database"
