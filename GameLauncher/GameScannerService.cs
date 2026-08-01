@@ -1088,125 +1088,125 @@ public sealed class GameScannerService : IDisposable
                 catch (UnauthorizedAccessException) { }
                 catch (IOException) { }
             }
+        }
+        catch (UnauthorizedAccessException) { }
+        catch (IOException) { }
+    }
 
-            /// <summary>
-            /// PS3/PS4 ROM scanning rules:
-            /// 1) Roms/{Platform}/Games/{TitleID}/{file}            → use TitleID folder size
-            /// 2) Roms/{Platform}/Games/{GameName}/{file}           → use GameName folder size
-            /// 3) Roms/{Platform}/Games/{GameName}/{TitleID}/{file} → use nested TitleID folder size
-            /// Emits one ROM entry per resolved scope folder to avoid duplicate size inflation.
-            /// </summary>
-            private static void ScanPs3Ps4Roms(string gamesDir, string platform, List<LocalRom> results)
+    /// <summary>
+    /// PS3/PS4 ROM scanning rules:
+    /// 1) Roms/{Platform}/Games/{TitleID}/{file}            → use TitleID folder size
+    /// 2) Roms/{Platform}/Games/{GameName}/{file}           → use GameName folder size
+    /// 3) Roms/{Platform}/Games/{GameName}/{TitleID}/{file} → use nested TitleID folder size
+    /// Emits one ROM entry per resolved scope folder to avoid duplicate size inflation.
+    /// </summary>
+    private static void ScanPs3Ps4Roms(string gamesDir, string platform, List<LocalRom> results)
+    {
+        try
+        {
+            var emittedScopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var entry in Directory.EnumerateFiles(gamesDir, "*", SearchOption.AllDirectories))
             {
-                try
-                {
-                    var emittedScopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                string ext = Path.GetExtension(entry).ToLowerInvariant();
+                if (!IsRomFile(ext)) continue;
 
-                    foreach (var entry in Directory.EnumerateFiles(gamesDir, "*", SearchOption.AllDirectories))
+                string? scopeDir = ResolvePs3Ps4ScopeDir(gamesDir, entry, platform);
+                if (string.IsNullOrEmpty(scopeDir))
+                {
+                    long fileSize = 0;
+                    try { fileSize = new FileInfo(entry).Length; } catch { }
+                    var (title, regions) = ParseRomTitle(Path.GetFileNameWithoutExtension(entry));
+                    results.Add(new LocalRom
                     {
-                        string ext = Path.GetExtension(entry).ToLowerInvariant();
-                        if (!IsRomFile(ext)) continue;
-
-                        string? scopeDir = ResolvePs3Ps4ScopeDir(gamesDir, entry, platform);
-                        if (string.IsNullOrEmpty(scopeDir))
-                        {
-                            long fileSize = 0;
-                            try { fileSize = new FileInfo(entry).Length; } catch { }
-                            var (title, regions) = ParseRomTitle(Path.GetFileNameWithoutExtension(entry));
-                            results.Add(new LocalRom
-                            {
-                                Title = string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(entry) : title,
-                                TitleId = ExtractTitleId(Path.GetFileNameWithoutExtension(entry), platform),
-                                Platform = platform,
-                                FilePath = entry,
-                                FileType = ext.TrimStart('.'),
-                                SizeBytes = fileSize,
-                                Regions = regions,
-                            });
-                            continue;
-                        }
-                        if (!emittedScopes.Add(Path.GetFullPath(scopeDir))) continue;
-
-                        BuildPs3Ps4RomEntry(gamesDir, scopeDir, entry, platform, results);
-                    }
+                        Title = string.IsNullOrWhiteSpace(title) ? Path.GetFileNameWithoutExtension(entry) : title,
+                        TitleId = ExtractTitleId(Path.GetFileNameWithoutExtension(entry), platform),
+                        Platform = platform,
+                        FilePath = entry,
+                        FileType = ext.TrimStart('.'),
+                        SizeBytes = fileSize,
+                        Regions = regions,
+                    });
+                    continue;
                 }
-                catch (UnauthorizedAccessException) { }
-                catch (IOException) { }
-            }
+                if (!emittedScopes.Add(Path.GetFullPath(scopeDir))) continue;
 
-            private static void BuildPs3Ps4RomEntry(
-                string gamesDir,
-                string scopeDir,
-                string representativeFile,
-                string platform,
-                List<LocalRom> results)
-            {
-                string scopeName = Path.GetFileName(scopeDir);
-                string? scopeTitleId = ExtractTitleId(scopeName, platform);
-
-                string rawTitle = scopeName;
-                if (scopeTitleId != null)
-                {
-                    string parent = Path.GetDirectoryName(scopeDir) ?? "";
-                    if (!string.IsNullOrEmpty(parent) &&
-                        !string.Equals(Path.GetFullPath(parent), Path.GetFullPath(gamesDir), StringComparison.OrdinalIgnoreCase))
-                    {
-                        string parentName = Path.GetFileName(parent);
-                        if (!string.IsNullOrWhiteSpace(parentName))
-                            rawTitle = parentName;
-                    }
-                }
-
-                var (cleanTitle, regions) = ParseRomTitle(rawTitle);
-                long size = GetDirectorySize(scopeDir);
-                string ext = Path.GetExtension(representativeFile).TrimStart('.').ToLowerInvariant();
-
-                results.Add(new LocalRom
-                {
-                    Title     = string.IsNullOrWhiteSpace(cleanTitle) ? rawTitle : cleanTitle,
-                    TitleId   = scopeTitleId,
-                    Platform  = platform,
-                    FilePath  = representativeFile,
-                    FileType  = string.IsNullOrEmpty(ext) ? "folder" : ext,
-                    SizeBytes = size,
-                    Regions   = regions,
-                });
-            }
-
-            private static string? ResolvePs3Ps4ScopeDir(string gamesDir, string filePath, string platform)
-            {
-                string? dir = Path.GetDirectoryName(filePath);
-                if (string.IsNullOrEmpty(dir)) return null;
-
-                string gamesFull = Path.GetFullPath(gamesDir);
-                string? walk = dir;
-                string? firstUnderGames = null;
-
-                while (!string.IsNullOrEmpty(walk))
-                {
-                    string walkFull = Path.GetFullPath(walk);
-                    string? parent = Path.GetDirectoryName(walkFull);
-                    if (!string.IsNullOrEmpty(parent) &&
-                        string.Equals(Path.GetFullPath(parent), gamesFull, StringComparison.OrdinalIgnoreCase))
-                    {
-                        firstUnderGames ??= walkFull;
-                    }
-
-                    string name = Path.GetFileName(walkFull);
-                    if (!string.IsNullOrEmpty(name) && ExtractTitleId(name, platform) != null)
-                        return walkFull;
-
-                    if (string.Equals(walkFull, gamesFull, StringComparison.OrdinalIgnoreCase))
-                        break;
-
-                    walk = parent;
-                }
-
-                return firstUnderGames;
+                BuildPs3Ps4RomEntry(gamesDir, scopeDir, entry, platform, results);
             }
         }
         catch (UnauthorizedAccessException) { }
         catch (IOException) { }
+    }
+
+    private static void BuildPs3Ps4RomEntry(
+        string gamesDir,
+        string scopeDir,
+        string representativeFile,
+        string platform,
+        List<LocalRom> results)
+    {
+        string scopeName = Path.GetFileName(scopeDir);
+        string? scopeTitleId = ExtractTitleId(scopeName, platform);
+
+        string rawTitle = scopeName;
+        if (scopeTitleId != null)
+        {
+            string parent = Path.GetDirectoryName(scopeDir) ?? "";
+            if (!string.IsNullOrEmpty(parent) &&
+                !string.Equals(Path.GetFullPath(parent), Path.GetFullPath(gamesDir), StringComparison.OrdinalIgnoreCase))
+            {
+                string parentName = Path.GetFileName(parent);
+                if (!string.IsNullOrWhiteSpace(parentName))
+                    rawTitle = parentName;
+            }
+        }
+
+        var (cleanTitle, regions) = ParseRomTitle(rawTitle);
+        long size = GetDirectorySize(scopeDir);
+        string ext = Path.GetExtension(representativeFile).TrimStart('.').ToLowerInvariant();
+
+        results.Add(new LocalRom
+        {
+            Title     = string.IsNullOrWhiteSpace(cleanTitle) ? rawTitle : cleanTitle,
+            TitleId   = scopeTitleId,
+            Platform  = platform,
+            FilePath  = representativeFile,
+            FileType  = string.IsNullOrEmpty(ext) ? "folder" : ext,
+            SizeBytes = size,
+            Regions   = regions,
+        });
+    }
+
+    private static string? ResolvePs3Ps4ScopeDir(string gamesDir, string filePath, string platform)
+    {
+        string? dir = Path.GetDirectoryName(filePath);
+        if (string.IsNullOrEmpty(dir)) return null;
+
+        string gamesFull = Path.GetFullPath(gamesDir);
+        string? walk = dir;
+        string? firstUnderGames = null;
+
+        while (!string.IsNullOrEmpty(walk))
+        {
+            string walkFull = Path.GetFullPath(walk);
+            string? parent = Path.GetDirectoryName(walkFull);
+            if (!string.IsNullOrEmpty(parent) &&
+                string.Equals(Path.GetFullPath(parent), gamesFull, StringComparison.OrdinalIgnoreCase))
+            {
+                firstUnderGames ??= walkFull;
+            }
+
+            string name = Path.GetFileName(walkFull);
+            if (!string.IsNullOrEmpty(name) && ExtractTitleId(name, platform) != null)
+                return walkFull;
+
+            if (string.Equals(walkFull, gamesFull, StringComparison.OrdinalIgnoreCase))
+                break;
+
+            walk = parent;
+        }
+
+        return firstUnderGames;
     }
 
     // ── TitleID detection ──────────────────────────────────────────────────
