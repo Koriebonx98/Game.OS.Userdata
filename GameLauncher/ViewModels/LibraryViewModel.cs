@@ -79,9 +79,13 @@ public partial class LibraryViewModel : ViewModelBase
     {
         _allGames = games;
 
-        // Rebuild the platform filter list from all game types combined
-        RebuildPlatforms();
-        ApplyFilter();
+        // Force a fresh rebuild even if one is already in-flight so the new game list
+        // is always picked up by the snapshot in ScheduleRebuild.  This prevents the
+        // UI from blocking: all heavy work (BuildMyGamesList, BuildPlatformList,
+        // ApplyFilter) runs on a background thread or at Background UI priority via
+        // ScheduleRebuild, rather than synchronously on the calling thread.
+        _rebuildScheduled = false;
+        ScheduleRebuild();
     }
 
     /// <summary>Called by MainViewModel when the scanner emits new results.</summary>

@@ -2391,8 +2391,28 @@ public partial class GameDetailViewModel : ViewModelBase
                     if (existing != null && string.IsNullOrEmpty(existing.UnlockedAt))
                     {
                         existing.UnlockedAt = DateTime.UtcNow.ToString("o");
-                        RefreshVisibleAchievements();
                     }
+                    else if (existing == null)
+                    {
+                        // Achievement template not yet loaded (user hasn't opened the panel) —
+                        // add a stub so the game info page immediately reflects the new unlock.
+                        Achievements.Add(new Achievement
+                        {
+                            AchievementId = resolvedId,
+                            Name          = resolvedName,
+                            IconUrl       = iconUrl,
+                            UnlockedAt    = DateTime.UtcNow.ToString("o"),
+                        });
+                        HasAchievements = true;
+                    }
+                    // Always recompute the "Unlocked X / Y" label so the game info page
+                    // reflects the new unlock immediately — RefreshVisibleAchievements()
+                    // alone does not update AchievementsLabel.
+                    int unlockedCount = Achievements.Count(a => a.IsUnlocked);
+                    AchievementsLabel = HasAchievements
+                        ? $"🏆  Achievements  ({unlockedCount} / {Achievements.Count})"
+                        : "🏆  Achievements";
+                    RefreshVisibleAchievements();
                 });
             }
             await System.Threading.Tasks.Task.CompletedTask;
