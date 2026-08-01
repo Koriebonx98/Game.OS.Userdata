@@ -2017,6 +2017,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DetailVm.LoadFromLocalGame(game, cloudPlaytime);
         ShowDetail = true;
 
+        // Pre-populate the user's already-unlocked achievements from the cloud library
+        // entry (or the global achievements list) so they survive the async template
+        // re-fetch in EnrichLocalGameDetailAsync — mirrors what OpenDetailFromLocalRom
+        // does for ROM platforms.
+        var preloadAchs = cloudGame?.GameAchievements
+            ?? _achievements
+                .Where(a => string.Equals(a.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                            string.Equals(a.GameTitle, game.Title, StringComparison.OrdinalIgnoreCase))
+                .ToList<Models.Achievement>();
+        if (preloadAchs?.Count > 0)
+            DetailVm.PopulateAchievements(preloadAchs);
+
         // Asynchronously enrich with cover/description/trailer from Games.Database
         _ = EnrichLocalGameDetailAsync(game.Title, "PC", steamAppId: game.SteamAppId);
     }
@@ -2554,8 +2566,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private async Task EnrichLocalGameDetailAsync(string localTitle, string platform,
                                                    string? titleId = null, int steamAppId = 0)
     {
+        // Load cached metadata on a background thread to avoid blocking the UI with file I/O.
         DatabaseGame? dbGame = null;
-        var cached = _metadataCache.LoadCachedGameInfo(platform, titleId, localTitle);
+        var cached = await System.Threading.Tasks.Task.Run(
+            () => _metadataCache.LoadCachedGameInfo(platform, titleId, localTitle))
+            .ConfigureAwait(true);   // resume on UI thread so Dispatcher.Post is safe
         if (cached != null)
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() => DetailVm.EnrichFromDatabaseGame(cached));
