@@ -320,6 +320,13 @@ class Program
         }
         Console.WriteLine();
 
+        // ── PS3/PS4 ROM layout + size-scope checks ─────────────────────────────
+        Console.WriteLine("🎮 PS3/PS4 ROM Layout + Size Scope:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool ps3Ps4LayoutPassed = await TestPs3Ps4RomLayoutAndSizingAsync();
+        if (!ps3Ps4LayoutPassed) passed = false;
+        Console.WriteLine();
+
         // ── ROM Copy/Move Destination Pattern ─────────────────────────────────
         // Verify that RomPathHelper produces destinations that match the scanner's
         // expected Roms/{PlatformFolder}/Games/... layout for every detected ROM.
@@ -1482,6 +1489,124 @@ class Program
             if (cleanRepacks) try { Directory.Delete(repacksLink); } catch { }
             if (cleanRoms)    try { Directory.Delete(romsLink); }    catch { }
         }
+    }
+
+    private static async Task<bool> TestPs3Ps4RomLayoutAndSizingAsync()
+    {
+        bool passed = true;
+        string tempRoot = Path.Combine(Path.GetTempPath(), "GameOS_PS3PS4_" + Path.GetRandomFileName());
+        var scanner = new GameScannerService();
+        List<LocalRom> detectedRoms = new();
+        scanner.RomsUpdated += r => detectedRoms = r;
+
+        static void WriteSizedFile(string path, int size)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllBytes(path, Enumerable.Repeat((byte)0x5A, size).ToArray());
+        }
+
+        try
+        {
+            Directory.CreateDirectory(Path.Combine(tempRoot, "Games"));
+            Directory.CreateDirectory(Path.Combine(tempRoot, "Repacks"));
+
+            // Case 1: Roms/PlayStation 3/Games/{TitleID}/{file} → TitleID folder size
+            string ps3TitleIdDir = Path.Combine(
+                tempRoot, "Roms", "PlayStation 3", "Games", "BLUS12345");
+            WriteSizedFile(Path.Combine(ps3TitleIdDir, "EBOOT.BIN"), 100);
+            WriteSizedFile(Path.Combine(ps3TitleIdDir, "DATA.DAT"), 55); // non-ROM file must still count in folder size
+
+            // Case 2: Roms/PlayStation 3/Games/{GameName}/{file} → GameName folder size
+            string ps3GameNameDir = Path.Combine(
+                tempRoot, "Roms", "PlayStation 3", "Games", "Demon Souls");
+            WriteSizedFile(Path.Combine(ps3GameNameDir, "game.iso"), 120);
+            WriteSizedFile(Path.Combine(ps3GameNameDir, "readme.txt"), 30); // non-ROM file counted in folder size
+
+            // Case 3: Roms/PlayStation 4/Games/{GameName}/{TitleID}/{file} → nested TitleID folder size
+            string ps4TitleIdDir = Path.Combine(
+                tempRoot, "Roms", "PlayStation 4", "Games", "Blood Borne", "CUSA00207");
+            WriteSizedFile(Path.Combine(ps4TitleIdDir, "eboot.bin"), 80);
+            WriteSizedFile(Path.Combine(ps4TitleIdDir, "patch.pkg"), 40);
+            WriteSizedFile(Path.Combine(ps4TitleIdDir, "notes.dat"), 10); // non-ROM file counted in folder size
+
+            await ScanDirectory(scanner, tempRoot);
+
+            var ps3TitleIdRom = detectedRoms.FirstOrDefault(r =>
+                string.Equals(r.Platform, "PS3", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.TitleId, "BLUS12345", StringComparison.OrdinalIgnoreCase));
+            if (ps3TitleIdRom == null || ps3TitleIdRom.SizeBytes != 155)
+            {
+                Console.WriteLine(
+                    $"  ❌  PS3 TitleID layout failed: expected TitleId=BLUS12345 size=155, got {(ps3TitleIdRom == null ? "missing" : $"size={ps3TitleIdRom.SizeBytes}")}");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  PS3 TitleID folder uses folder-size scope (includes non-ROM files)");
+            }
+
+            var ps3GameNameRom = detectedRoms.FirstOrDefault(r =>
+                string.Equals(r.Platform, "PS3", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.Title, "Demon Souls", StringComparison.OrdinalIgnoreCase));
+            if (ps3GameNameRom == null || ps3GameNameRom.SizeBytes != 150)
+            {
+                Console.WriteLine(
+                    $"  ❌  PS3 GameName layout failed: expected title=\"Demon Souls\" size=150, got {(ps3GameNameRom == null ? "missing" : $"size={ps3GameNameRom.SizeBytes}")}");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  PS3 GameName folder uses folder-size scope");
+            }
+
+            var ps4NestedRom = detectedRoms.FirstOrDefault(r =>
+                string.Equals(r.Platform, "PS4", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.Title, "Blood Borne", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.TitleId, "CUSA00207", StringComparison.OrdinalIgnoreCase));
+            if (ps4NestedRom == null || ps4NestedRom.SizeBytes != 130)
+            {
+                Console.WriteLine(
+                    $"  ❌  PS4 nested TitleID layout failed: expected title=\"Blood Borne\" TitleId=CUSA00207 size=130, got {(ps4NestedRom == null ? "missing" : $"size={ps4NestedRom.SizeBytes}")}");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  PS4 nested TitleID folder uses TitleID-size scope");
+            }
+
+            var pkgDetected = detectedRoms.Any(r =>
+                string.Equals(r.Platform, "PS4", StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.TitleId, "CUSA00207", StringComparison.OrdinalIgnoreCase) &&
+                (string.Equals(r.FileType, "pkg", StringComparison.OrdinalIgnoreCase) ||
+                 r.AdditionalPaths.Any(p =>
+                     string.Equals(Path.GetExtension(p), ".pkg", StringComparison.OrdinalIgnoreCase))));
+            if (!pkgDetected)
+            {
+                Console.WriteLine("  ❌  .pkg file was not recognised in PS4 folder-based layout");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  .pkg file recognised in PS4 folder-based layout");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌  PS3/PS4 layout test threw: {ex.Message}");
+            passed = false;
+        }
+        finally
+        {
+            scanner.Dispose();
+            try
+            {
+                if (Directory.Exists(tempRoot))
+                    Directory.Delete(tempRoot, recursive: true);
+            }
+            catch { }
+        }
+
+        return passed;
     }
 
     private static bool TestReadGameOsTitle()
