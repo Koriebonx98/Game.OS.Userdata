@@ -12,10 +12,10 @@ namespace GameLauncher.Services
     /// Checks GitHub Releases for a newer version of the Game.OS launcher and
     /// downloads the release asset to the same directory as the running executable.
     ///
-    /// Version comparison uses the semantic-version tag attached to each GitHub Release
-    /// (e.g. <c>v1.2.0</c>).  The current application version is read from the
-    /// assembly <c>FileVersion</c> attribute so it always stays in sync with the
-    /// published build.
+    /// Version comparison uses the dot-separated tag attached to each GitHub Release
+    /// (e.g. <c>v1.2.0</c> or <c>v1.0.7.6.5.0.9.9.6.5</c>).  The current application
+    /// version is read from the assembly informational version so launcher builds can
+    /// track the repository's multi-part Git tag format.
     ///
     /// The download is placed alongside the exe as
     /// <c>GameOS-Update-{version}.zip</c> (or the asset's original file name if it
@@ -37,29 +37,41 @@ namespace GameLauncher.Services
             Path.GetDirectoryName(System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "",
             ".gameos-last-update-check");
 
-        /// <summary>Minimum interval between GitHub API checks (24 hours).</summary>
-        private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
+        /// <summary>Minimum interval between GitHub API checks (12 hours).</summary>
+        private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(12);
 
         // ── Public surface ─────────────────────────────────────────────────────
 
         /// <summary>
-        /// Returns the current application version as a <see cref="Version"/> object.
-        /// Falls back to <c>0.0.0.0</c> when the version cannot be determined.
+        /// Returns the current application version tag with a leading <c>v</c>.
+        /// Falls back to <c>v0.0.0.0</c> when the version cannot be determined.
         /// </summary>
-        public static Version CurrentVersion
+        public static string CurrentVersionTag
         {
             get
             {
                 try
                 {
+                    var asm = System.Reflection.Assembly.GetEntryAssembly();
+                    if (asm != null)
+                    {
+                        var informational =
+                            System.Reflection.CustomAttributeExtensions
+                                .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>(asm)
+                                ?.InformationalVersion;
+                        if (TryParseVersion(informational, out _, out var informationalTag))
+                            return informationalTag;
+                    }
+
                     var fv = System.Diagnostics.FileVersionInfo.GetVersionInfo(
-                        System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "");
-                    if (!string.IsNullOrEmpty(fv.FileVersion) &&
-                        Version.TryParse(fv.FileVersion, out var v))
-                        return v;
+                        asm?.Location ?? "");
+                    if (TryParseVersion(fv.ProductVersion, out _, out var productTag))
+                        return productTag;
+                    if (TryParseVersion(fv.FileVersion, out _, out var fileTag))
+                        return fileTag;
                 }
                 catch { /* best-effort */ }
-                return new Version(0, 0, 0, 0);
+                return "v0.0.0.0";
             }
         }
 
@@ -91,37 +103,40 @@ namespace GameLauncher.Services
 
                 // Parse the tag (strips leading 'v' / 'V')
                 string tag = release.TagName ?? "";
-                if (!TryParseVersion(tag, out var remoteVersion))
+                if (!TryParseVersion(tag, out var remoteVersion, out var normalisedTag))
                     return new UpdateCheckResult(UpdateCheckStatus.ParseError, tag, null);
 
-                RecordLastChecked(tag);
+                RecordLastChecked(normalisedTag);
 
-                if (remoteVersion <= CurrentVersion)
-                    return new UpdateCheckResult(UpdateCheckStatus.UpToDate, tag, null);
+                if (!TryParseVersion(CurrentVersionTag, out var currentVersion, out _))
+                    currentVersion = new[] { 0, 0, 0, 0 };
+
+                if (CompareVersions(remoteVersion, currentVersion) <= 0)
+                    return new UpdateCheckResult(UpdateCheckStatus.UpToDate, normalisedTag, null);
 
                 // A newer version exists — find a downloadable asset
                 var asset = PickAsset(release);
                 if (asset == null)
-                    return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, tag, null);
+                    return new UpdateCheckResult(UpdateCheckStatus.UpdateAvailable, normalisedTag, null);
 
                 // Determine destination path
                 string exeDir = Path.GetDirectoryName(
                     System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "";
-                string destFileName = SanitiseFileName(asset.Name ?? $"GameOS-Update-{tag}.zip");
+                string destFileName = SanitiseFileName(asset.Name ?? $"GameOS-Update-{normalisedTag}.zip");
                 string destPath     = Path.Combine(exeDir, destFileName);
 
                 // Skip download when the file is already present
                 if (File.Exists(destPath))
-                    return new UpdateCheckResult(UpdateCheckStatus.AlreadyDownloaded, tag, destPath);
+                    return new UpdateCheckResult(UpdateCheckStatus.AlreadyDownloaded, normalisedTag, destPath);
 
                 // Download
                 await DownloadAssetAsync(asset.BrowserDownloadUrl!, destPath, ct)
                     .ConfigureAwait(false);
 
                 DevLogService.Log(
-                    $"[LauncherUpdate] Downloaded v{remoteVersion} to '{destPath}'.");
+                    $"[LauncherUpdate] Downloaded {normalisedTag} to '{destPath}'.");
 
-                return new UpdateCheckResult(UpdateCheckStatus.Downloaded, tag, destPath);
+                return new UpdateCheckResult(UpdateCheckStatus.Downloaded, normalisedTag, destPath);
             }
             catch (Exception ex)
             {
@@ -220,11 +235,49 @@ namespace GameLauncher.Services
             }
         }
 
-        private static bool TryParseVersion(string tag, out Version version)
+        private static int CompareVersions(int[] left, int[] right)
         {
-            version = new Version(0, 0, 0, 0);
-            var clean = tag.TrimStart('v', 'V');
-            return Version.TryParse(clean, out version!);
+            int count = Math.Max(left.Length, right.Length);
+            for (int i = 0; i < count; i++)
+            {
+                int leftPart = i < left.Length ? left[i] : 0;
+                int rightPart = i < right.Length ? right[i] : 0;
+                if (leftPart != rightPart)
+                    return leftPart.CompareTo(rightPart);
+            }
+
+            return 0;
+        }
+
+        private static bool TryParseVersion(string? tag, out int[] version, out string normalisedTag)
+        {
+            version = Array.Empty<int>();
+            normalisedTag = "v0.0.0.0";
+            if (string.IsNullOrWhiteSpace(tag))
+                return false;
+
+            var clean = tag.Trim();
+            int suffixSep = clean.IndexOfAny(['+', '-', ' ']);
+            if (suffixSep >= 0)
+                clean = clean[..suffixSep];
+
+            clean = clean.TrimStart('v', 'V');
+            if (string.IsNullOrWhiteSpace(clean))
+                return false;
+
+            var parts = clean.Split('.', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (parts.Length == 0)
+                return false;
+
+            version = new int[parts.Length];
+            for (int i = 0; i < parts.Length; i++)
+            {
+                if (!int.TryParse(parts[i], out version[i]))
+                    return false;
+            }
+
+            normalisedTag = $"v{string.Join(".", version)}";
+            return true;
         }
 
         private static string SanitiseFileName(string name)

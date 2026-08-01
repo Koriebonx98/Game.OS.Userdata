@@ -122,6 +122,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>Last <c>lastActivityAt</c> value read from sync-signal.json.</summary>
     private string? _lastKnownSyncSignal;
 
+    // ── Launcher update timer ───────────────────────────────────────────────
+    /// <summary>
+    /// Fires every 12 hours while the app is Online after a successful login to
+    /// check GitHub Releases for a newer launcher build.
+    /// </summary>
+    private Timer? _launcherUpdateTimer;
+
     // ── Window minimize/restore actions (wired by MainWindow code-behind) ──
     /// <summary>
     /// Invoked on the UI thread when a game launches and the "Minimize on Game Launch"
@@ -806,9 +813,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (settings.AutoUpdate)
             _ = Services.GitHubDataService.CheckForUpdatesAsync();
 
-        if (settings.AppAutoUpdate)
-            _ = CheckForLauncherUpdateAsync();
-
         _ = Services.SwitchTranslateService.SyncAsync();
         _ = LoginVm.TryAutoLoginAsync();
     }
@@ -992,6 +996,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Start periodic sync check (every 5 minutes while online): re-fetches remote
             // user data and invalidates stale Games.Database caches.
             StartSyncCheckTimer();
+
+            if (Services.AppSettingsService.Load().AppAutoUpdate)
+            {
+                _ = CheckForLauncherUpdateAsync();
+                StartLauncherUpdateTimer();
+            }
 
             // Start the 30-second heartbeat poller that watches sync-signal.json.
             // When another device finishes a play session it writes a new timestamp;
@@ -2924,6 +2934,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _presenceTimer?.Dispose();
         _presenceTimer = null;
 
+        StopLauncherUpdateTimer();
         StopFriendPresencePoller();
         StopOfflineReconnectTimer();
         StopSyncCheckTimer();
@@ -2974,6 +2985,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _presenceTimer?.Dispose();
         _presenceTimer = null;
 
+        StopLauncherUpdateTimer();
         StopFriendPresencePoller();
         StopOfflineReconnectTimer();
         StopSyncCheckTimer();
@@ -3041,6 +3053,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _messagePoller = null;
         _presenceTimer?.Dispose();
         _presenceTimer = null;
+        StopLauncherUpdateTimer();
         StopFriendPresencePoller();
         StopOfflineReconnectTimer();
         StopSyncCheckTimer();
@@ -3294,6 +3307,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _ = _client.UpdatePresenceAsync();
             StartPresenceHeartbeat();
             StartSyncCheckTimer();
+            if (Services.AppSettingsService.Load().AppAutoUpdate)
+            {
+                _ = CheckForLauncherUpdateAsync();
+                StartLauncherUpdateTimer();
+            }
             StartHeartbeatPoller();
             StartMessagePolling();
 
@@ -3345,6 +3363,31 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _syncCheckTimer?.Dispose();
         _syncCheckTimer = null;
+    }
+
+    // ── Periodic launcher update timer ───────────────────────────────────────
+
+    private static readonly TimeSpan LauncherUpdateInterval = TimeSpan.FromHours(12);
+
+    private void StartLauncherUpdateTimer()
+    {
+        _launcherUpdateTimer?.Dispose();
+        _launcherUpdateTimer = new Timer(_ =>
+        {
+            Task.Run(async () =>
+            {
+                try   { await CheckForLauncherUpdateAsync().ConfigureAwait(false); }
+                catch { /* launcher update failure is non-fatal */ }
+            });
+        }, null, LauncherUpdateInterval, LauncherUpdateInterval);
+
+        DevLogService.Log("[LauncherUpdate] Periodic launcher update timer started (every 12 hours).");
+    }
+
+    private void StopLauncherUpdateTimer()
+    {
+        _launcherUpdateTimer?.Dispose();
+        _launcherUpdateTimer = null;
     }
 
     // ── Sync-signal heartbeat poller ──────────────────────────────────────────
@@ -3863,6 +3906,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     IsOfflineMode = true;
+                    StopLauncherUpdateTimer();
                     StopSyncCheckTimer();
                     StopHeartbeatPoller();
                     _messagePoller?.Dispose();

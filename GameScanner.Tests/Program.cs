@@ -516,6 +516,20 @@ class Program
         if (!xeniaDetectPassed) passed = false;
         Console.WriteLine();
 
+        // ── DUCKSTATION PS1 MEMCARD PATH + BACKUP/RESTORE ────────────────────
+        Console.WriteLine("🎮 DuckStation PS1 memcard backup/restore:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool duckStationPassed = await TestDuckStationMemcardBackupRestoreAsync();
+        if (!duckStationPassed) passed = false;
+        Console.WriteLine();
+
+        // ── RPCS3 PROFILE AUTO-DETECTION ──────────────────────────────────────
+        Console.WriteLine("🎮 RPCS3 profile auto-detection:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool rpcs3DetectPassed = TestRpcs3ProfileAutoDetection();
+        if (!rpcs3DetectPassed) passed = false;
+        Console.WriteLine();
+
         // ── SUMMARY ───────────────────────────────────────────────────────────
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
         if (passed)
@@ -2513,6 +2527,148 @@ class Program
         finally
         {
             try { Directory.Delete(tempRoot, true); } catch { }
+        }
+
+        return passed;
+    }
+
+    private static bool TestRpcs3ProfileAutoDetection()
+    {
+        bool passed = true;
+        string tempRoot = Path.Combine(Path.GetTempPath(), "GameOS_Rpcs3Test_" + Path.GetRandomFileName());
+
+        try
+        {
+            string profileId = "00000002";
+            string titleId = "BLUS30305";
+            string saveDir = Path.Combine(tempRoot, "dev_hdd0", "home", profileId, "savedata", titleId);
+            Directory.CreateDirectory(saveDir);
+            File.WriteAllText(Path.Combine(saveDir, "PARAM.SFO"), "dummy");
+
+            string? resolved = EmulatorSavePathResolver.Resolve(
+                platform: "PS3",
+                emulatorName: "RPCS3",
+                saveDataPath: tempRoot,
+                titleId: titleId,
+                profileId: null);
+
+            string expected = saveDir;
+            if (resolved == expected)
+            {
+                Console.WriteLine($"  ✅  Auto-detected RPCS3 profile \"{profileId}\"");
+            }
+            else
+            {
+                Console.WriteLine($"  ❌  Expected \"{expected}\"");
+                Console.WriteLine($"       got     \"{resolved}\"");
+                passed = false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌  RPCS3 auto-detection test threw: {ex.Message}");
+            passed = false;
+        }
+        finally
+        {
+            try { Directory.Delete(tempRoot, true); } catch { }
+        }
+
+        return passed;
+    }
+
+    private static async Task<bool> TestDuckStationMemcardBackupRestoreAsync()
+    {
+        bool passed = true;
+        string tempRoot = Path.Combine(Path.GetTempPath(), "GameOS_DuckStation_" + Guid.NewGuid().ToString("N"));
+        string memcardsDir = Path.Combine(tempRoot, "memcards");
+        string memcardPath = Path.Combine(memcardsDir, "Disney's Tarzan.mcd");
+        string username = "DuckStationUser";
+        string platform = "PS1";
+        string gameTitle = "Disney's Tarzan";
+        var originalSettings = AppSettingsService.Load();
+        var originalConfirmHandler = LudusaviService.RequestNativeConfirmationAsync;
+
+        try
+        {
+            Directory.CreateDirectory(memcardsDir);
+            File.WriteAllText(memcardPath, "ps1-save");
+
+            string? resolved = EmulatorSavePathResolver.Resolve(
+                platform: platform,
+                emulatorName: "DuckStation",
+                saveDataPath: tempRoot,
+                titleId: null,
+                profileId: null,
+                gameTitle: "Disneys Tarzan");
+
+            if (!string.Equals(resolved, memcardPath, StringComparison.OrdinalIgnoreCase))
+            {
+                Console.WriteLine($"  ❌  Expected DuckStation path \"{memcardPath}\", got \"{resolved}\"");
+                return false;
+            }
+
+            AppSettingsService.Save(new AppSettings
+            {
+                RequireCloudSaveConfirmation = false,
+                AllowCloudSaveInAppFallbackConfirmation = true
+            });
+            LudusaviService.RequestNativeConfirmationAsync = null;
+
+            var backup = await LudusaviService.SyncAsync(
+                platform,
+                gameTitle,
+                username,
+                sourceOverridePath: resolved);
+
+            string backupRoot = Path.Combine(UserDataService.GetGameSavesPath(username, platform), gameTitle);
+            string? backedUpFile = Directory.Exists(backupRoot)
+                ? Directory.EnumerateFiles(backupRoot, "*.mcd", SearchOption.AllDirectories).FirstOrDefault()
+                : null;
+
+            if (backup.Kind != LudusaviService.ResultKind.Synced ||
+                string.IsNullOrWhiteSpace(backedUpFile) ||
+                !File.Exists(backedUpFile))
+            {
+                Console.WriteLine($"  ❌  Expected PS1 memcard backup success, got {backup.Kind}");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  Backed up DuckStation .mcd save file");
+            }
+
+            File.Delete(memcardPath);
+
+            var restore = await LudusaviService.RestoreAsync(
+                platform,
+                gameTitle,
+                username,
+                targetOverridePath: memcardPath);
+
+            if (restore.Kind != LudusaviService.ResultKind.Synced ||
+                !File.Exists(memcardPath) ||
+                File.ReadAllText(memcardPath) != "ps1-save")
+            {
+                Console.WriteLine($"  ❌  Expected PS1 memcard restore success, got {restore.Kind}");
+                passed = false;
+            }
+            else
+            {
+                Console.WriteLine("  ✅  Restored DuckStation .mcd save file");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"  ❌  DuckStation memcard backup/restore test threw: {ex.Message}");
+            passed = false;
+        }
+        finally
+        {
+            LudusaviService.RequestNativeConfirmationAsync = originalConfirmHandler;
+            AppSettingsService.Save(originalSettings);
+            try { Directory.Delete(tempRoot, true); } catch { }
+            try { Directory.Delete(UserDataService.GetGameSavesPath(username, platform), true); } catch { }
         }
 
         return passed;

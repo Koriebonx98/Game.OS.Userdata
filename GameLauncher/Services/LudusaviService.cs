@@ -179,6 +179,7 @@ namespace GameLauncher.Services
             {
                 string effectiveSourceOverridePath = sourceOverridePath;
                 if (!Directory.Exists(effectiveSourceOverridePath) &&
+                    !File.Exists(effectiveSourceOverridePath) &&
                     ShouldMirrorXbox360TitleIds(platform, backupTitleIds))
                 {
                     string? altXboxPath = TryResolveAlternateXbox360SavePath(
@@ -228,6 +229,18 @@ namespace GameLauncher.Services
 
                     // For other failures (permission/path/process), surface the error.
                     return result;
+                }
+
+                if (File.Exists(effectiveSourceOverridePath))
+                {
+                    if (ShouldMirrorXbox360TitleIds(platform, backupTitleIds))
+                        return await CopyFileToTitleIdFoldersAsync(
+                            effectiveSourceOverridePath, platformSavesRoot, safeGameTitle, backupTitleIds, gameTitle);
+
+                    string destinationFile = Path.Combine(
+                        gameSavePath,
+                        Path.GetFileName(effectiveSourceOverridePath));
+                    return await CopyFileAsync(effectiveSourceOverridePath, destinationFile, gameTitle);
                 }
 
                 // Path was resolved but the folder doesn't exist yet —
@@ -318,6 +331,9 @@ namespace GameLauncher.Services
             // If ludusavi is not installed we fall back to a plain directory copy.
             if (!string.IsNullOrWhiteSpace(targetOverridePath))
             {
+                if (IsLikelyFilePath(targetOverridePath) || File.Exists(targetOverridePath))
+                    return await RestoreToSingleFileAsync(gameSavePath, targetOverridePath, gameTitle);
+
                 try
                 {
                     Directory.CreateDirectory(targetOverridePath);
@@ -1002,6 +1018,41 @@ namespace GameLauncher.Services
             }
         }
 
+        private static async Task<LudusaviResult> CopyFileToTitleIdFoldersAsync(
+            string sourceFile,
+            string platformSavesRoot,
+            string safeGameTitle,
+            IReadOnlyCollection<string> titleIds,
+            string gameTitle)
+        {
+            try
+            {
+                if (!File.Exists(sourceFile))
+                    return LudusaviResult.NoSaveFound;
+
+                await Task.Run(() =>
+                {
+                    foreach (string titleId in titleIds)
+                    {
+                        string destDir = Path.Combine(platformSavesRoot, safeGameTitle, titleId);
+                        Directory.CreateDirectory(destDir);
+                        string destFile = Path.Combine(destDir, Path.GetFileName(sourceFile));
+                        File.Copy(sourceFile, destFile, overwrite: true);
+                    }
+                });
+
+                DevLogService.Log(
+                    $"[Ludusavi] mirrored file-copy game=\"{gameTitle}\" ids=\"{string.Join(",", titleIds)}\"");
+                return LudusaviResult.Synced;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[Ludusavi] mirrored file-copy failed game=\"{gameTitle}\": {ex.Message}");
+                return LudusaviResult.Error($"Save copy failed: {ex.Message}");
+            }
+        }
+
         /// <summary>
         /// Copies all files and sub-directories from <paramref name="sourceDir"/>
         /// into <paramref name="destDir"/>, mirroring the directory structure.
@@ -1028,6 +1079,78 @@ namespace GameLauncher.Services
                 DevLogService.Log(
                     $"[Ludusavi] direct-copy failed game=\"{gameTitle}\": {ex.Message}");
                 return LudusaviResult.Error($"Save copy failed: {ex.Message}");
+            }
+        }
+
+        private static async Task<LudusaviResult> CopyFileAsync(
+            string sourceFile,
+            string destinationFile,
+            string gameTitle)
+        {
+            try
+            {
+                if (!File.Exists(sourceFile))
+                    return LudusaviResult.NoSaveFound;
+
+                string? destinationDir = Path.GetDirectoryName(destinationFile);
+                if (!string.IsNullOrWhiteSpace(destinationDir))
+                    Directory.CreateDirectory(destinationDir);
+
+                await Task.Run(() => File.Copy(sourceFile, destinationFile, overwrite: true));
+
+                DevLogService.Log(
+                    $"[Ludusavi] direct-file-copy game=\"{gameTitle}\" src=\"{sourceFile}\" dest=\"{destinationFile}\"");
+                return LudusaviResult.Synced;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[Ludusavi] direct-file-copy failed game=\"{gameTitle}\": {ex.Message}");
+                return LudusaviResult.Error($"Save copy failed: {ex.Message}");
+            }
+        }
+
+        private static async Task<LudusaviResult> RestoreToSingleFileAsync(
+            string backupSourceDir,
+            string targetFilePath,
+            string gameTitle)
+        {
+            try
+            {
+                if (!Directory.Exists(backupSourceDir))
+                    return LudusaviResult.NoSaveFound;
+
+                string targetExtension = (Path.GetExtension(targetFilePath) ?? "").Trim();
+                string? sourceFile = Directory
+                    .EnumerateFiles(backupSourceDir, "*", SearchOption.AllDirectories)
+                    .OrderBy(Path.GetFileName)
+                    .FirstOrDefault(path =>
+                        !string.IsNullOrWhiteSpace(targetExtension) &&
+                        string.Equals(Path.GetExtension(path), targetExtension, StringComparison.OrdinalIgnoreCase));
+
+                sourceFile ??= Directory
+                    .EnumerateFiles(backupSourceDir, "*", SearchOption.AllDirectories)
+                    .OrderBy(Path.GetFileName)
+                    .FirstOrDefault();
+
+                if (string.IsNullOrWhiteSpace(sourceFile))
+                    return LudusaviResult.NoSaveFound;
+
+                string? targetDir = Path.GetDirectoryName(targetFilePath);
+                if (!string.IsNullOrWhiteSpace(targetDir))
+                    Directory.CreateDirectory(targetDir);
+
+                await Task.Run(() => File.Copy(sourceFile, targetFilePath, overwrite: true));
+
+                DevLogService.Log(
+                    $"[Ludusavi] restore-file-copy game=\"{gameTitle}\" src=\"{sourceFile}\" dest=\"{targetFilePath}\"");
+                return LudusaviResult.Synced;
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[Ludusavi] restore-file-copy failed game=\"{gameTitle}\": {ex.Message}");
+                return LudusaviResult.Error($"Restore failed: {ex.Message}");
             }
         }
 
@@ -1095,6 +1218,12 @@ namespace GameLauncher.Services
             {
                 return false;
             }
+        }
+
+        private static bool IsLikelyFilePath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path)) return false;
+            return !string.IsNullOrWhiteSpace(Path.GetExtension(path));
         }
 
     }

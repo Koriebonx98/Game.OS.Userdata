@@ -1301,7 +1301,7 @@ public partial class GameDetailViewModel : ViewModelBase
             string statusText = result.Kind switch
             {
                 Services.LudusaviService.ResultKind.Synced       => "✓ Saves synced",
-                Services.LudusaviService.ResultKind.NoSaveFound  => "No saves found for this game",
+                Services.LudusaviService.ResultKind.NoSaveFound  => "No saves found. Check emulator Save Data Path / profile in Settings.",
                 Services.LudusaviService.ResultKind.NotInstalled => "Ludusavi not found — set the path in Settings",
                 Services.LudusaviService.ResultKind.Cancelled    => result.Message,
                 Services.LudusaviService.ResultKind.Error        => $"Sync failed: {result.Message}",
@@ -1342,7 +1342,7 @@ public partial class GameDetailViewModel : ViewModelBase
             // (works for Xenia, RPCS3, Ryujinx, etc. without a ludusavi manifest entry).
             var knownTitleIds = ResolveKnownTitleIdsForCurrentGame();
             string? preferredTitleId = knownTitleIds.FirstOrDefault();
-            string? targetOverridePath = ResolveEmulatorSavePathOverride(preferredTitleId);
+            string? targetOverridePath = ResolveBestEmulatorSavePathOverrideForBackup(knownTitleIds);
 
             var result = await Services.LudusaviService.RestoreAsync(
                 Platform, Title, _currentUsername, targetOverridePath, preferredTitleId);
@@ -1350,7 +1350,7 @@ public partial class GameDetailViewModel : ViewModelBase
             string statusText = result.Kind switch
             {
                 Services.LudusaviService.ResultKind.Synced       => "✓ Saves restored",
-                Services.LudusaviService.ResultKind.NoSaveFound  => "No backup found for this game",
+                Services.LudusaviService.ResultKind.NoSaveFound  => "No backup found. Check emulator Save Data Path / profile in Settings.",
                 Services.LudusaviService.ResultKind.NotInstalled => "Ludusavi not found — set the path in Settings",
                 Services.LudusaviService.ResultKind.Cancelled    => result.Message,
                 Services.LudusaviService.ResultKind.Error        => $"Restore failed: {result.Message}",
@@ -3662,15 +3662,9 @@ public partial class GameDetailViewModel : ViewModelBase
                 // cloud folder so the private repo matches the Steam model:
                 //   Achievements/{platform}/{titleKey}/achievements.json
                 //
-                // For non-PC platforms this runs unconditionally.
-                // For PC games we also persist when at least one Steam-emu unlock was merged
-                // so the unlocked state survives across sessions and cloud syncs without
-                // requiring the user to keep launching the game.
-                bool isPc = string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase);
-                int emuMergedCount = list.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
-                bool shouldPersistPc = isPc && emuMergedCount > 0;
-
-                if ((!isPc || shouldPersistPc) && OnFullAchievementListReadyAsync != null)
+                // Persist for all platforms (including PC) so each game has a full baseline
+                // template in the private repo before per-achievement unlock deltas arrive.
+                if (OnFullAchievementListReadyAsync != null)
                 {
                     string snapshotTitleKey = titleId ?? Title;
                     var snapshotList = list.AsReadOnly();
@@ -4037,7 +4031,8 @@ public partial class GameDetailViewModel : ViewModelBase
             emuSettings.EmulatorName,
             saveRoot,
             titleId,
-            profileId);
+            profileId,
+            Title);
     }
 
     private List<string> ResolveKnownTitleIdsForCurrentGame()
@@ -4078,7 +4073,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 continue;
 
             fallbackPath ??= candidatePath;
-            if (Directory.Exists(candidatePath))
+            if (Directory.Exists(candidatePath) || File.Exists(candidatePath))
                 return candidatePath;
         }
 

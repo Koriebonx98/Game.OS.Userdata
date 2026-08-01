@@ -24,11 +24,11 @@ public partial class SettingsViewModel : ViewModelBase
     // ── Application-wide settings ──────────────────────────────────────────
     /// <summary>Check for Games.Database updates on startup.</summary>
     [ObservableProperty] private bool _autoUpdate = true;
-    /// <summary>Check for Game.OS launcher updates on startup and download them automatically.</summary>
+    /// <summary>Check for Game.OS launcher updates after login and every 12 hours, downloading them automatically.</summary>
     [ObservableProperty] private bool _appAutoUpdate = true;
     /// <summary>Current installed Game.OS launcher version (display only).</summary>
     public string AppVersionLabel =>
-        $"v{Services.LauncherUpdateService.CurrentVersion.ToString(3)}";
+        Services.LauncherUpdateService.CurrentVersionTag;
     /// <summary>Play the Game.OS intro animation when the launcher starts.</summary>
     [ObservableProperty] private bool _showIntroVideo = true;
     /// <summary>Path to a custom intro video file (empty = use built-in animation).</summary>

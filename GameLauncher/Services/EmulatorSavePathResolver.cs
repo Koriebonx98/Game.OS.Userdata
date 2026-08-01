@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace GameLauncher.Services
 {
@@ -94,6 +95,10 @@ namespace GameLauncher.Services
         /// <param name="emulatorName">Emulator label from <see cref="Models.EmulatorSettings.EmulatorName"/>; may be empty.</param>
         /// <param name="saveDataPath">Root save folder from <see cref="Models.EmulatorSettings.SaveDataPath"/>; may be empty.</param>
         /// <param name="titleId">Platform-specific title ID for the game (e.g. "0100ADC022586000" for Switch).</param>
+        /// <param name="gameTitle">
+        /// Game display title used by platforms whose save files are title-based
+        /// rather than TitleID-based (e.g. DuckStation PS1 <c>memcards/{gameTitle}.mcd</c>).
+        /// </param>
         /// <param name="profileId">
         /// Emulator user profile ID; required for Xenia where the canonical save path is
         /// <c>Content/{profileId}/{titleId}/00000001/</c>
@@ -110,15 +115,20 @@ namespace GameLauncher.Services
             string? emulatorName,
             string? saveDataPath,
             string? titleId,
-            string? profileId = null)
+            string? profileId = null,
+            string? gameTitle = null)
         {
             if (string.IsNullOrWhiteSpace(saveDataPath)) return null;
-            if (string.IsNullOrWhiteSpace(titleId))      return null;
+            bool isDuckStation = IsDuckStation(platform, emulatorName);
+            if (!isDuckStation && string.IsNullOrWhiteSpace(titleId)) return null;
 
             // Trim once and reuse throughout the method.
             string safeRoot    = NormalizeSaveRoot(saveDataPath);
-            string safeTitleId = titleId.Trim();
+            string safeTitleId = (titleId ?? "").Trim();
             if (string.IsNullOrWhiteSpace(safeRoot)) return null;
+
+            if (isDuckStation)
+                return ResolveDuckStationMemcardPath(safeRoot, safeTitleId, gameTitle);
 
             // Xenia canonical layout:
             //  - {saveRoot}/Content/{profileId}/{titleId}/
@@ -133,17 +143,14 @@ namespace GameLauncher.Services
             string[] segments = ResolvePattern(platform ?? "", emulatorName);
             if (segments.Length == 0) return null;
 
-            // For patterns that require a {profileId} (RPCS3/PS3), default to the
-            // standard RPCS3 offline profile "00000001" when no profile ID is supplied.
-            // This matches the RPCS3 default save path:
-            //   <saveRoot>/dev_hdd0/home/00000001/savedata/<titleId>/
+            // For patterns that require a {profileId} (RPCS3/PS3), use the supplied
+            // profile when available; otherwise auto-detect from existing save data
+            // and finally fall back to the standard RPCS3 offline profile "00000001".
             bool needsProfile = Array.Exists(segments, s =>
                 string.Equals(s, "{profileId}", StringComparison.OrdinalIgnoreCase));
             if (needsProfile && string.IsNullOrWhiteSpace(profileId))
             {
-                // For Xenia the auto-detect scans the Content folder.  For RPCS3/PS3 the
-                // default profile is always "00000001".
-                profileId = "00000001";
+                profileId = ResolveDefaultProfileId(platform ?? "", emulatorName, safeRoot, safeTitleId);
             }
 
             // Build the path by substituting {titleId} and {profileId} in each segment
@@ -187,6 +194,171 @@ namespace GameLauncher.Services
                    || ext.Equals(".cmd", StringComparison.OrdinalIgnoreCase)
                    || ext.Equals(".sh", StringComparison.OrdinalIgnoreCase)
                    || ext.Equals(".appimage", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsDuckStation(string platform, string? emulatorName)
+        {
+            string platformKey = (platform ?? "").Replace(" ", "", StringComparison.Ordinal).Trim();
+            return platformKey.Equals("ps1", StringComparison.OrdinalIgnoreCase)
+                || (emulatorName ?? "").Contains("duckstation", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string ResolveDefaultProfileId(
+            string platform,
+            string? emulatorName,
+            string saveRoot,
+            string titleId)
+        {
+            string platformKey = (platform ?? "").Replace(" ", "", StringComparison.Ordinal).Trim();
+            bool isRpcs3 =
+                (emulatorName ?? "").Contains("rpcs3", StringComparison.OrdinalIgnoreCase) ||
+                platformKey.Equals("ps3", StringComparison.OrdinalIgnoreCase);
+
+            if (isRpcs3)
+            {
+                string? detected = TryDetectRpcs3ProfileId(saveRoot, titleId);
+                if (!string.IsNullOrWhiteSpace(detected))
+                    return detected;
+            }
+
+            return "00000001";
+        }
+
+        private static string? TryDetectRpcs3ProfileId(string saveRoot, string titleId)
+        {
+            if (string.IsNullOrWhiteSpace(saveRoot) || string.IsNullOrWhiteSpace(titleId))
+                return null;
+
+            try
+            {
+                string rootName = Path.GetFileName(
+                    saveRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+
+                if (rootName.Equals("savedata", StringComparison.OrdinalIgnoreCase))
+                {
+                    string? directProfile = Path.GetFileName(Path.GetDirectoryName(saveRoot) ?? "");
+                    if (!string.IsNullOrWhiteSpace(directProfile))
+                        return directProfile;
+                }
+
+                string homeRoot = Path.Combine(saveRoot, "dev_hdd0", "home");
+                if (!Directory.Exists(homeRoot))
+                    return null;
+
+                foreach (string profileDir in Directory.EnumerateDirectories(homeRoot))
+                {
+                    string candidate = Path.Combine(profileDir, "savedata", titleId);
+                    if (Directory.Exists(candidate))
+                        return Path.GetFileName(profileDir);
+                }
+
+                string? firstProfile = Directory.EnumerateDirectories(homeRoot)
+                    .Select(Path.GetFileName)
+                    .FirstOrDefault(name => !string.IsNullOrWhiteSpace(name));
+                if (!string.IsNullOrWhiteSpace(firstProfile))
+                    return firstProfile;
+            }
+            catch { /* best-effort */ }
+
+            return null;
+        }
+
+        private static string ResolveDuckStationMemcardsRoot(string saveRoot)
+        {
+            string rootName = Path.GetFileName(
+                saveRoot.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+            if (rootName.Equals("memcards", StringComparison.OrdinalIgnoreCase))
+                return saveRoot;
+
+            string memcards = Path.Combine(saveRoot, "memcards");
+            if (Directory.Exists(memcards))
+                return memcards;
+
+            return memcards;
+        }
+
+        private static string? ResolveDuckStationMemcardPath(
+            string saveRoot,
+            string titleId,
+            string? gameTitle)
+        {
+            string memcardsRoot = ResolveDuckStationMemcardsRoot(saveRoot);
+            var identifiers = new List<string>();
+
+            void AddId(string? value)
+            {
+                if (string.IsNullOrWhiteSpace(value)) return;
+                string trimmed = value.Trim();
+                if (!identifiers.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                    identifiers.Add(trimmed);
+            }
+
+            AddId(titleId);
+            AddId(gameTitle);
+
+            if (Directory.Exists(memcardsRoot))
+            {
+                try
+                {
+                    foreach (string file in Directory.EnumerateFiles(memcardsRoot, "*.mcd", SearchOption.TopDirectoryOnly))
+                    {
+                        string stem = Path.GetFileNameWithoutExtension(file);
+                        if (identifiers.Contains(stem, StringComparer.OrdinalIgnoreCase))
+                            return file;
+                    }
+
+                    foreach (string file in Directory.EnumerateFiles(memcardsRoot, "*.mcd", SearchOption.TopDirectoryOnly))
+                    {
+                        string stem = Path.GetFileNameWithoutExtension(file);
+                        string normalizedStem = NormalizeLooseToken(RemoveDuckStationCardSuffix(stem));
+                        foreach (string id in identifiers)
+                        {
+                            if (normalizedStem.Equals(NormalizeLooseToken(id), StringComparison.Ordinal))
+                                return file;
+                        }
+                    }
+                }
+                catch { /* best-effort */ }
+            }
+
+            if (!string.IsNullOrWhiteSpace(gameTitle))
+                return Path.Combine(memcardsRoot, $"{SanitizeFileStem(gameTitle)}.mcd");
+            if (!string.IsNullOrWhiteSpace(titleId))
+                return Path.Combine(memcardsRoot, $"{SanitizeFileStem(titleId)}.mcd");
+
+            return null;
+        }
+
+        private static string RemoveDuckStationCardSuffix(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value;
+            int underscore = value.LastIndexOf('_');
+            if (underscore <= 0 || underscore == value.Length - 1)
+                return value;
+
+            string suffix = value[(underscore + 1)..];
+            return suffix.All(char.IsDigit) ? value[..underscore] : value;
+        }
+
+        private static string NormalizeLooseToken(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            var chars = new List<char>(value.Length);
+            foreach (char c in value.Trim().ToLowerInvariant())
+            {
+                if (char.IsLetterOrDigit(c))
+                    chars.Add(c);
+            }
+            return new string(chars.ToArray());
+        }
+
+        private static string SanitizeFileStem(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return "";
+            string sanitized = value.Trim();
+            foreach (char invalid in Path.GetInvalidFileNameChars())
+                sanitized = sanitized.Replace(invalid, '_');
+            return sanitized;
         }
 
         // Returns null when no profile ID is available and one cannot be auto-detected,
