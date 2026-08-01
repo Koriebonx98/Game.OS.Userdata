@@ -150,7 +150,7 @@ namespace GameLauncher.Services
                 string.Equals(s, "{profileId}", StringComparison.OrdinalIgnoreCase));
             if (needsProfile && string.IsNullOrWhiteSpace(profileId))
             {
-                profileId = ResolveDefaultProfileId(platform, emulatorName, safeRoot, safeTitleId);
+                profileId = ResolveDefaultProfileId(platform ?? "", emulatorName, safeRoot, safeTitleId);
             }
 
             // Build the path by substituting {titleId} and {profileId} in each segment
