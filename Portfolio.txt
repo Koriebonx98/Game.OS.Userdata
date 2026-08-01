@@ -135,3 +135,26 @@ Invites take on a simialr approach as messages (CLient 1 -> Server -> Client 2) 
 - Media:
 
 The Media section is split into 3x "Movies" "Music" "Tv Shows" by looking on "<Root>/Media/$MediaType" with specific patters, this ensures an easy set up for users and makes "Game OS" the all in on experince 
+
+# Recent Changes as of 01/08/2026:
+
+- Fixed PS3/PS4 roms (eboot.bin) to be found corectly and use the "$GameName" on display instead of the "$TitileID" this now finds ps3/4 roms and loads correctly via emu. it also now shows correct file sizes for ps3/4 Games too..
+
+- Added Cloud Save (Backup/Restore) function for ps1 emu and ps3...
+
+- Added more emu settings to add all known platforms and options for "RomType" so users can find emulated gmaes better too
+
+- Added for Game OS App (Store) to display all json files from Game OS Games Db to display so we now have an easier store front 
+
+- Added Steam Emu Ach to merge with Steam APi and exophase so ach are now more unlockable 
+
+- Added suport for GameCube 
+
+# Need Add Still 
+
+- Game Os Input (xinput)
+
+- Game Invite to use ip's 
+
+- when use Pluto (freeze tracking.. wait for pluto to then open mod clients game and track from that (new app run) if bo1 itll use t4, bo1 = t5 and bo2 use t6 )
+allow script before game run to finsih first (Setting to allow delay) 
