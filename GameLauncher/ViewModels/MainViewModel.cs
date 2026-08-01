@@ -460,17 +460,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DetailVm.OnRequestAchievementUnlockAsync = async (platform, gameTitle, achievementId, achievementName, iconUrl) =>
         {
             string queuedUnlockedAt = DateTime.UtcNow.ToString("o");
-            string? queuedTitleId = _library.FirstOrDefault(g =>
+
+            // Resolve the canonical library entry for this game.  When the detail view
+            // has enriched the title (e.g. "Deadpool" → "Deadpool™") the title-based
+            // look-up below can fail, causing the unlock to be stored under the enriched
+            // title while the library entry retains the local folder name.  That mismatch
+            // then makes MergeAchievementsIntoLibrary drop the achievement on every sync.
+            // Fix: prefer a SteamAppId-based match for PC games so we always find the
+            // right entry and can normalise gameTitle to the library's canonical title.
+            var libEntry = _library.FirstOrDefault(g =>
                 string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
-                string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase))
-                ?.TitleId;
+                string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase));
+
+            if (libEntry == null &&
+                string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                DetailVm.CurrentSteamAppId > 0)
+            {
+                libEntry = _library.FirstOrDefault(g =>
+                    string.Equals(g.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                    g.SteamAppId == DetailVm.CurrentSteamAppId);
+            }
+
+            // Use the library entry's title as the canonical game title so that
+            // _achievements and cloud saves always use the same key as _library.
+            string canonicalTitle = libEntry?.Title ?? gameTitle;
+
+            string? queuedTitleId = libEntry?.TitleId
+                ?? _library.FirstOrDefault(g =>
+                    string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase))
+                    ?.TitleId;
             string queuedAchievementId = string.IsNullOrWhiteSpace(achievementId) ? achievementName : achievementId;
 
             try
             {
                 bool MatchesAchievement(Models.Achievement a) =>
                     string.Equals(a.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(a.GameTitle, gameTitle, StringComparison.OrdinalIgnoreCase) &&
+                    (string.Equals(a.GameTitle, canonicalTitle, StringComparison.OrdinalIgnoreCase) ||
+                     string.Equals(a.GameTitle, gameTitle, StringComparison.OrdinalIgnoreCase)) &&
                     (
                         (!string.IsNullOrEmpty(a.AchievementId) &&
                          !string.IsNullOrEmpty(achievementId) &&
@@ -490,23 +517,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     existing.Name          = achievementName;
                     existing.IconUrl       = iconUrl;
                     existing.UnlockedAt    = unlockedAt;
+                    // Normalise GameTitle to canonical so subsequent merges can find it.
+                    existing.GameTitle     = canonicalTitle;
                 }
                 else
                 {
                     _achievements.Add(new Models.Achievement
                     {
                         Platform      = platform,
-                        GameTitle     = gameTitle,
+                        GameTitle     = canonicalTitle,
                         AchievementId = queuedAchievementId,
                         Name          = achievementName,
                         IconUrl       = iconUrl,
                         UnlockedAt    = unlockedAt,
                     });
                 }
-
-                var libEntry = _library.FirstOrDefault(g =>
-                    string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
-                    string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase));
                 if (libEntry != null)
                 {
                     libEntry.GameAchievements ??= new List<Achievement>();
@@ -526,7 +551,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         libEntry.GameAchievements.Add(new Models.Achievement
                         {
                             Platform      = platform,
-                            GameTitle     = gameTitle,
+                            GameTitle     = canonicalTitle,
                             AchievementId = queuedAchievementId,
                             Name          = achievementName,
                             IconUrl       = iconUrl,
@@ -553,7 +578,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         _pendingChanges.EnqueueAchievementUnlock(
                             _profile.Username,
                             platform,
-                            gameTitle,
+                            canonicalTitle,
                             queuedTitleId,
                             queuedAchievementId,
                             achievementName,
@@ -565,13 +590,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 }
 
                 await _client.LogAchievementUnlockAsync(
-                    platform, gameTitle, titleId,
+                    platform, canonicalTitle, titleId,
                     achievementName, iconUrl)
                     .ConfigureAwait(false);
 
                 await _client.SaveAchievementAsync(
                     platform,
-                    gameTitle,
+                    canonicalTitle,
                     queuedTitleId,
                     queuedAchievementId,
                     achievementName,
@@ -587,7 +612,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     _pendingChanges.EnqueueAchievementUnlock(
                         _profile.Username,
                         platform,
-                        gameTitle,
+                        canonicalTitle,
                         queuedTitleId,
                         queuedAchievementId,
                         achievementName,
@@ -652,8 +677,57 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             catch { /* best-effort */ }
         };
 
+        // Keep libEntry.GameAchievements in sync with the template-matched unlock list.
+        // Fired by FetchAndDisplayAchievementsAsync after every merge so that the next
+        // visit to game info preloads the correct, fully-resolved achievement set even
+        // when the enriched title (e.g. "Deadpool™") differs from the library title
+        // (e.g. "Deadpool").  Uses SteamAppId as a fallback key for PC games.
+        DetailVm.OnAchievementsMergedAsync = (platform, gameTitle, unlockedAchs) =>
+        {
+            if (unlockedAchs.Count == 0)
+                return System.Threading.Tasks.Task.CompletedTask;
 
-        // so the stored playtime and status reflect the completed session.
+            // Resolve libEntry: prefer title match, fall back to SteamAppId for PC games.
+            var libEntry = _library.FirstOrDefault(g =>
+                string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(g.Title, gameTitle, StringComparison.OrdinalIgnoreCase));
+
+            if (libEntry == null &&
+                string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                DetailVm.CurrentSteamAppId > 0)
+            {
+                libEntry = _library.FirstOrDefault(g =>
+                    string.Equals(g.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
+                    g.SteamAppId == DetailVm.CurrentSteamAppId);
+            }
+
+            if (libEntry == null)
+                return System.Threading.Tasks.Task.CompletedTask;
+
+            libEntry.GameAchievements ??= new List<Achievement>();
+            foreach (var ach in unlockedAchs)
+            {
+                var existing = libEntry.GameAchievements.FirstOrDefault(a =>
+                    (!string.IsNullOrEmpty(a.AchievementId) && !string.IsNullOrEmpty(ach.AchievementId) &&
+                     string.Equals(a.AchievementId, ach.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(a.Name) && !string.IsNullOrEmpty(ach.Name) &&
+                     string.Equals(a.Name, ach.Name, StringComparison.OrdinalIgnoreCase)));
+                if (existing != null)
+                {
+                    if (string.IsNullOrEmpty(existing.UnlockedAt))
+                        existing.UnlockedAt = ach.UnlockedAt;
+                }
+                else
+                {
+                    libEntry.GameAchievements.Add(CloneAchievement(ach));
+                }
+            }
+
+            if (libEntry.GameAchievements.Count > libEntry.TotalAchievements)
+                libEntry.TotalAchievements = libEntry.GameAchievements.Count;
+
+            return System.Threading.Tasks.Task.CompletedTask;
+        };
         PlaytimeService.SessionCompleted += (platform, title) =>
         {
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -2021,12 +2095,50 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // entry (or the global achievements list) so they survive the async template
         // re-fetch in EnrichLocalGameDetailAsync — mirrors what OpenDetailFromLocalRom
         // does for ROM platforms.
-        var preloadAchs = cloudGame?.GameAchievements
-            ?? _achievements
+        //
+        // Use a union of cloudGame.GameAchievements AND the global _achievements list so
+        // that unlocks stored under either the local folder name or an enriched title are
+        // included.  Without the union, a title mismatch (e.g. "Deadpool" vs "Deadpool™")
+        // causes the 5th achievement to be silently dropped from the preload.
+        List<Models.Achievement> preloadAchs;
+        if (cloudGame != null)
+        {
+            // Start from the library entry's accumulated set (template-matched, cloud-synced).
+            preloadAchs = cloudGame.GameAchievements?.Count > 0
+                ? cloudGame.GameAchievements.ToList()
+                : new List<Models.Achievement>();
+
+            // Supplement with _achievements that match either the local folder name or
+            // the library's canonical title, deduplicating by AchievementId / Name.
+            foreach (var a in _achievements)
+            {
+                if (!string.Equals(a.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (!string.Equals(a.GameTitle, game.Title, StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(a.GameTitle, cloudGame.Title, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (string.IsNullOrEmpty(a.UnlockedAt))
+                    continue;
+
+                bool alreadyPresent = preloadAchs.Any(p =>
+                    (!string.IsNullOrEmpty(p.AchievementId) && !string.IsNullOrEmpty(a.AchievementId) &&
+                     string.Equals(p.AchievementId, a.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                    (!string.IsNullOrEmpty(p.Name) && !string.IsNullOrEmpty(a.Name) &&
+                     string.Equals(p.Name, a.Name, StringComparison.OrdinalIgnoreCase)));
+                if (!alreadyPresent)
+                    preloadAchs.Add(a);
+            }
+        }
+        else
+        {
+            preloadAchs = _achievements
                 .Where(a => string.Equals(a.Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
-                            string.Equals(a.GameTitle, game.Title, StringComparison.OrdinalIgnoreCase))
+                            string.Equals(a.GameTitle, game.Title, StringComparison.OrdinalIgnoreCase) &&
+                            !string.IsNullOrEmpty(a.UnlockedAt))
                 .ToList<Models.Achievement>();
-        if (preloadAchs?.Count > 0)
+        }
+
+        if (preloadAchs.Count > 0)
             DetailVm.PopulateAchievements(preloadAchs);
 
         // Asynchronously enrich with cover/description/trailer from Games.Database

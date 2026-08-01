@@ -1684,6 +1684,22 @@ public partial class GameDetailViewModel : ViewModelBase
     public Func<string, string, string, System.Collections.Generic.IReadOnlyList<Achievement>, System.Threading.Tasks.Task>? OnFullAchievementListReadyAsync { get; set; }
 
     /// <summary>
+    /// Callback wired by MainViewModel to update the in-memory library entry's
+    /// <c>GameAchievements</c> after the full template merge completes.
+    /// Keeps <c>cloudGame.GameAchievements</c> in sync with the template-matched
+    /// unlock list so the next time game info is opened the correct set is preloaded.
+    /// Parameters: (platform, gameTitle, unlockedAchievements)
+    /// </summary>
+    public Func<string, string, System.Collections.Generic.IReadOnlyList<Achievement>, System.Threading.Tasks.Task>? OnAchievementsMergedAsync { get; set; }
+
+    /// <summary>
+    /// Exposes the resolved Steam AppId for the currently-loaded game.
+    /// Used by MainViewModel to find the matching library entry by AppId when
+    /// the enriched game title differs from the local folder name.
+    /// </summary>
+    public int CurrentSteamAppId => _steamAppId;
+
+    /// <summary>
     /// Brings the currently-running game window to the foreground.
     /// Tries the main window handle first; falls back to opening the game folder.
     /// This is a best-effort operation — it may not work on all platforms.
@@ -3640,6 +3656,18 @@ public partial class GameDetailViewModel : ViewModelBase
                             var cloudMatch = knownUnlocked.FirstOrDefault(u =>
                                 emuIdsSet.Contains(u.AchievementId ?? "") &&
                                 string.Equals(u.Name, a.Name, StringComparison.OrdinalIgnoreCase));
+
+                            // If no direct name match, try resolving the raw emu ID through the
+                            // achNameMap to bridge Exophase-format templates where the cloud record
+                            // stored the raw API name as both AchievementId and Name.
+                            if (cloudMatch == null)
+                            {
+                                cloudMatch = knownUnlocked.FirstOrDefault(u =>
+                                    emuIdsSet.Contains(u.AchievementId ?? "") &&
+                                    achNameMap.TryGetValue(u.AchievementId ?? "", out var mappedName) &&
+                                    string.Equals(mappedName, a.Name, StringComparison.OrdinalIgnoreCase));
+                            }
+
                             if (cloudMatch != null)
                             {
                                 a.UnlockedAt = !string.IsNullOrEmpty(cloudMatch.UnlockedAt)
@@ -3686,6 +3714,36 @@ public partial class GameDetailViewModel : ViewModelBase
                     // (e.g. "3 / 98" instead of "3 / 3" when only unlocked were cached)
                     OnAchievementTotalLoaded?.Invoke(snapshotPlatform, snapshotTitle, total);
                 });
+
+                // Notify MainViewModel with the template-matched unlocked list so it can
+                // keep libEntry.GameAchievements in sync.  This ensures the next visit to
+                // game info preloads the full, correctly-mapped achievement set even when
+                // the enriched title differs from the local folder name.
+                if (OnAchievementsMergedAsync != null)
+                {
+                    var unlockedItems = list
+                        .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+                        .Select(a => new Achievement
+                        {
+                            Platform      = snapshotPlatform,
+                            GameTitle     = snapshotTitle,
+                            AchievementId = a.AchievementId,
+                            Name          = a.Name,
+                            IconUrl       = a.IconUrl,
+                            UnlockedAt    = a.UnlockedAt,
+                        })
+                        .ToList()
+                        .AsReadOnly();
+                    _ = System.Threading.Tasks.Task.Run(async () =>
+                    {
+                        try
+                        {
+                            await OnAchievementsMergedAsync(snapshotPlatform, snapshotTitle, unlockedItems)
+                                .ConfigureAwait(false);
+                        }
+                        catch { /* best-effort */ }
+                    });
+                }
 
                 // Mirror the full achievement list (locked + unlocked) to the per-game
                 // cloud folder so the private repo matches the Steam model:
