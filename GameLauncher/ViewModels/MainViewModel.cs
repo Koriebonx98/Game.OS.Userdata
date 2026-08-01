@@ -36,6 +36,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     /// <summary>Timestamp of the last successful periodic sync (used by the Settings label).</summary>
     private DateTime _lastSyncedAt = DateTime.MinValue;
+    /// <summary>Timestamp of the last self-heal run that synced Steam-cached games to the cloud library.</summary>
+    private DateTime _lastSteamHealAt = DateTime.MinValue;
     private readonly SemaphoreSlim _manualSyncSemaphore = new(1, 1);
     private readonly SemaphoreSlim _syncRefreshSemaphore = new(1, 1);
     private CancellationTokenSource? _manualSyncCts;
@@ -2658,8 +2660,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private static List<Game> DeduplicateLibrary(List<Game> library)
     {
-        var seen   = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var result = new List<Game>(library.Count);
+        var seen      = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Track seen SteamAppIds (PC only) so same-game entries with different title
+        // variants (e.g. "Call of Duty®: Black Ops III" vs "Call of Duty: Black Ops III")
+        // are combined into one — the same treatment Xbox 360 games get via title-based dedup.
+        var seenSteamAppIds = new HashSet<long>();
+        var result    = new List<Game>(library.Count);
 
         // Process games with a SteamAppId first so they are preferred over stub entries.
         // Within same-AppId ties, prefer entries that have richer metadata (cover URL).
@@ -2685,22 +2691,40 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (!isDuplicate && canonicalKey != key)
                 isDuplicate = seen.Contains(canonicalKey);
 
+            // Tertiary check: deduplicate by SteamAppId for PC games.
+            // A non-zero AppId is the authoritative identifier for a Steam game, so two
+            // entries that share one (but may differ in title encoding, e.g. ® vs nothing)
+            // are always the same game and must be merged.
+            if (!isDuplicate &&
+                game.SteamAppId.HasValue && game.SteamAppId.Value > 0 &&
+                string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+            {
+                isDuplicate = !seenSteamAppIds.Add(game.SteamAppId.Value);
+            }
+
             if (!isDuplicate)
             {
                 // Register both keys so future duplicates are caught either way
                 seen.Add(canonicalKey);
+                if (game.SteamAppId.HasValue && game.SteamAppId.Value > 0)
+                    seenSteamAppIds.Add(game.SteamAppId.Value); // idempotent if already added above
                 result.Add(game);
             }
             else
             {
-                // Merge useful fields from the duplicate into the already-kept entry
-                var kept = result.FirstOrDefault(g =>
-                    string.Equals(g.Platform, game.Platform, StringComparison.OrdinalIgnoreCase) &&
-                    (string.Equals(g.Title, game.Title, StringComparison.OrdinalIgnoreCase) ||
-                     string.Equals(
-                         Models.PlatformHelper.NormalizeTitleForComparison(g.Title ?? ""),
-                         Models.PlatformHelper.NormalizeTitleForComparison(game.Title ?? ""),
-                         StringComparison.Ordinal)));
+                // Merge useful fields from the duplicate into the already-kept entry.
+                // Match by AppId first (most reliable), then fall back to title.
+                var kept = (game.SteamAppId.HasValue && game.SteamAppId.Value > 0
+                    ? result.FirstOrDefault(g =>
+                          g.SteamAppId.HasValue && g.SteamAppId.Value == game.SteamAppId.Value)
+                    : null)
+                    ?? result.FirstOrDefault(g =>
+                        string.Equals(g.Platform, game.Platform, StringComparison.OrdinalIgnoreCase) &&
+                        (string.Equals(g.Title, game.Title, StringComparison.OrdinalIgnoreCase) ||
+                         string.Equals(
+                             Models.PlatformHelper.NormalizeTitleForComparison(g.Title ?? ""),
+                             Models.PlatformHelper.NormalizeTitleForComparison(game.Title ?? ""),
+                             StringComparison.Ordinal)));
                 if (kept != null)
                 {
                     if (!kept.SteamAppId.HasValue && game.SteamAppId.HasValue)
@@ -3640,6 +3664,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // since it only reads the activity log and updates in-memory game objects.
                 _ = ApplyCloudPlaytimeAsync(_library);
 
+                // Self-healing: ensure the cloud library always contains all Steam games
+                // from the local cache (rate-limited to once per hour).
+                _ = TryHealLibraryFromSteamCacheAsync(_library);
+
                 // Track last sync time for the Settings label
                 _lastSyncedAt = DateTime.UtcNow;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -3822,6 +3850,46 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             System.Diagnostics.Debug.WriteLine(
                 $"[AchievementSync] DetectAndLogNewAchievementsAsync failed: {ex.Message}");
         }
+    }
+
+    /// <summary>
+    /// Self-healing library: compares the locally cached Steam games against the current
+    /// in-memory library and, if any Steam games are missing from the cloud, triggers
+    /// <see cref="SyncSteamOwnedGamesToCloudAsync"/> to repair the gap.
+    /// Rate-limited to once per hour so it does not hammer the cloud API on every periodic sync.
+    /// Called from <see cref="TryRefreshUserDataAsync"/> after the library is refreshed.
+    /// </summary>
+    private async Task TryHealLibraryFromSteamCacheAsync(List<Game> library)
+    {
+        // Rate-limit: only run the heal check once per hour
+        if ((DateTime.UtcNow - _lastSteamHealAt).TotalHours < 1) return;
+
+        try
+        {
+            var cached = Services.SteamGameImportService.LoadCached(_profile?.Username ?? "");
+            if (cached.Count == 0) return;
+
+            // Build a quick lookup of PC titles already in the current library
+            var cloudPcTitles = new HashSet<string>(
+                library
+                    .Where(g => string.Equals(g.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+                    .Select(g => g.Title),
+                StringComparer.OrdinalIgnoreCase);
+
+            // Check if any Steam-cached game is absent from the cloud library
+            bool hasMissing = cached.Any(sg =>
+                !string.IsNullOrWhiteSpace(sg.Name) && !cloudPcTitles.Contains(sg.Name));
+
+            if (!hasMissing) return;
+
+            // Mark the heal time before the async call so concurrent refreshes don't
+            // all pile in at once even if the call is slow.
+            _lastSteamHealAt = DateTime.UtcNow;
+
+            DevLogService.Log($"[SelfHeal] Steam cache has games missing from cloud library — syncing.");
+            await SyncSteamOwnedGamesToCloudAsync(cached).ConfigureAwait(false);
+        }
+        catch { /* best-effort — heal failure must not block periodic sync */ }
     }
 
     /// <summary>
