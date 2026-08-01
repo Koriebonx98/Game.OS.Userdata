@@ -2226,8 +2226,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             .ToList();
         if (achievementSnapshot.Count == 0) return;
 
-        var sources = await Avalonia.Threading.Dispatcher.UIThread
-            .InvokeAsync(() => LibraryVm.GetMyGameSources().ToList());
+        // Fetch both sources and the O(1) card-lookup dictionary in one UI-thread round-trip.
+        var (sources, cardDict) = await Avalonia.Threading.Dispatcher.UIThread
+            .InvokeAsync(() => (
+                LibraryVm.GetMyGameSources().ToList(),
+                LibraryVm.GetMyGameCardsDictionary()));
         if (sources.Count == 0) return;
 
         var unlockCounts = achievementSnapshot
@@ -2250,8 +2253,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             foreach (var source in sources)
             {
-                var card = LibraryVm.FindMyGameCard(source.Title, source.Platform);
-                if (card == null) continue;
+                // O(1) lookup using the pre-built dictionary instead of O(n) linear search.
+                string lookupKey = $"{source.Platform.ToLowerInvariant()}||{source.Title.ToLowerInvariant()}";
+                if (!cardDict.TryGetValue(lookupKey, out var card)) continue;
 
                 totals.TryGetValue(
                     BuildAchievementTotalCacheKey(source.Platform, source.TitleId, source.Title),

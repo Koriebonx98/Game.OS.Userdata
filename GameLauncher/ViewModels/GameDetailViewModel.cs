@@ -2892,17 +2892,13 @@ public partial class GameDetailViewModel : ViewModelBase
         HasMultipleDrives = false;
         DriveLabels.Clear();
 
-        // Always load the full achievement template from the database so the detail view
-        // shows ALL achievements (not just the unlocked subset in GameAchievements).
-        // The known-unlocked list is passed so unlocked state is merged after the fetch.
-        if (!string.IsNullOrEmpty(game.AchievementsUrl))
-            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
-
         PopulatePlaytime(game.Platform, game.Title, game.PlaytimeMinutes);
         ApplyInstallState(localGame, repack, localRom);
         // IsCloudOnly: cloud library entry with no local copy of any kind
         IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
+        // Resolve _steamAppId BEFORE launching FetchAndDisplayAchievementsAsync so the
+        // Steam-emu unlock merge (which checks _steamAppId > 0) runs with the correct value.
         _steamAppId = TryResolveSteamAppId(game, localGame);
 
         // "Install via Steam" shown for Steam-API games not yet installed locally
@@ -2913,6 +2909,14 @@ public partial class GameDetailViewModel : ViewModelBase
         if (IsSteamInstallable) IsCloudOnly = false;
         RefreshDisplayTitleId();
         LoadReviews();
+
+        // Always load the full achievement template from the database so the detail view
+        // shows ALL achievements (not just the unlocked subset in GameAchievements).
+        // The known-unlocked list is passed so unlocked state is merged after the fetch.
+        // NOTE: must be called AFTER _steamAppId, ApplyInstallState, and _driveInstances are
+        // set so the Steam-emu unlock scan has the correct exe path and app ID available.
+        if (!string.IsNullOrEmpty(game.AchievementsUrl))
+            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
@@ -3620,9 +3624,16 @@ public partial class GameDetailViewModel : ViewModelBase
                 // Mirror the full achievement list (locked + unlocked) to the per-game
                 // cloud folder so the private repo matches the Steam model:
                 //   Achievements/{platform}/{titleKey}/achievements.json
-                // Skip PC — Steam's own sync already handles those via AppId-keyed folders.
-                if (!string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase) &&
-                    OnFullAchievementListReadyAsync != null)
+                //
+                // For non-PC platforms this runs unconditionally.
+                // For PC games we also persist when at least one Steam-emu unlock was merged
+                // so the unlocked state survives across sessions and cloud syncs without
+                // requiring the user to keep launching the game.
+                bool isPc = string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase);
+                int emuMergedCount = list.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
+                bool shouldPersistPc = isPc && emuMergedCount > 0;
+
+                if ((!isPc || shouldPersistPc) && OnFullAchievementListReadyAsync != null)
                 {
                     string snapshotTitleKey = titleId ?? Title;
                     var snapshotList = list.AsReadOnly();
@@ -3979,12 +3990,17 @@ public partial class GameDetailViewModel : ViewModelBase
             // which converts executable paths to their containing directory.
             : emuSettings.EmulatorPath;
 
+        // Use RPCS3 profile ID when set; for Xbox 360 use the Xenia profile ID.
+        string? profileId = !string.IsNullOrWhiteSpace(emuSettings.Rpcs3ProfileId)
+            ? emuSettings.Rpcs3ProfileId
+            : emuSettings.XeniaProfileId;
+
         return EmulatorSavePathResolver.Resolve(
             Platform,
             emuSettings.EmulatorName,
             saveRoot,
             titleId,
-            emuSettings.XeniaProfileId);
+            profileId);
     }
 
     private List<string> ResolveKnownTitleIdsForCurrentGame()

@@ -935,43 +935,49 @@ namespace GameLauncher.Models
             return platform.Trim().ToLowerInvariant() switch
             {
                 // ── Verbose RetroArch/Libretro-style names ─────────────────
-                "microsoft - xbox 360"    => "Xbox 360",
-                "microsoft - xbox one"    => "Xbox One",
-                "nintendo - switch"       => "Switch",
-                "sony - playstation"      => "PS1",
-                "sony - playstation 2"    => "PS2",
-                "sony - playstation 3"    => "PS3",
-                "sony - playstation 4"    => "PS4",
-                "sony - playstation 5"    => "PS5",
-                "playstation 3"           => "PS3",
-                "playstation 4"           => "PS4",
-                "playstation 5"           => "PS5",
-                "sony - psp"              => "PSP",
-                "sony - ps vita"          => "PS Vita",
-                "sony - playstation vita" => "PS Vita",
+                "microsoft - xbox 360"          => "Xbox 360",
+                "microsoft - xbox one"          => "Xbox One",
+                "nintendo - switch"             => "Switch",
+                "sony - playstation"            => "PS1",
+                "sony - playstation 2"          => "PS2",
+                "sony - playstation 3"          => "PS3",
+                "sony - playstation 4"          => "PS4",
+                "sony - playstation 5"          => "PS5",
+                "playstation 3"                 => "PS3",
+                "playstation 4"                 => "PS4",
+                "playstation 5"                 => "PS5",
+                "sony - psp"                    => "PSP",
+                "sony - ps vita"                => "PS Vita",
+                "sony - playstation vita"       => "PS Vita",
+                "nintendo - gamecube"           => "GameCube",
+                "nintendo gamecube"             => "GameCube",
+                "nintendo - wii"                => "Wii",
                 // ── Common shortened aliases ───────────────────────────────
-                "pc"                      => "PC",
-                "ps1"                     => "PS1",
-                "ps2"                     => "PS2",
-                "ps3"                     => "PS3",
-                "ps4"                     => "PS4",
-                "ps5"                     => "PS5",
-                "psp"                     => "PSP",
-                "ps vita"                 => "PS Vita",
-                "vita"                    => "PS Vita",
-                "switch"                  => "Switch",
-                "xbox 360"                => "Xbox 360",
-                "xbox360"                 => "Xbox 360",
-                "xbox one"                => "Xbox One",
-                "xbone"                   => "Xbox One",
+                "pc"                            => "PC",
+                "ps1"                           => "PS1",
+                "ps2"                           => "PS2",
+                "ps3"                           => "PS3",
+                "ps4"                           => "PS4",
+                "ps5"                           => "PS5",
+                "psp"                           => "PSP",
+                "ps vita"                       => "PS Vita",
+                "vita"                          => "PS Vita",
+                "switch"                        => "Switch",
+                "xbox 360"                      => "Xbox 360",
+                "xbox360"                       => "Xbox 360",
+                "xbox one"                      => "Xbox One",
+                "xbone"                         => "Xbox One",
+                "gamecube"                      => "GameCube",
+                "gc"                            => "GameCube",
+                "wii"                           => "Wii",
                 // ── Single-character / truncated tags ─────────────────────
                 // "S" → Switch, "2" → PS2, "3" → PS3, "4" → PS4, "5" → PS5
-                "s"                       => "Switch",
-                "2"                       => "PS2",
-                "3"                       => "PS3",
-                "4"                       => "PS4",
-                "5"                       => "PS5",
-                _                         => platform,
+                "s"                             => "Switch",
+                "2"                             => "PS2",
+                "3"                             => "PS3",
+                "4"                             => "PS4",
+                "5"                             => "PS5",
+                _                               => platform,
             };
         }
     }
@@ -1007,6 +1013,18 @@ namespace GameLauncher.Models
         /// the canonical Xenia layout (typically <c>{saveDataPath}/Content/{xeniaProfileId}/{titleId}/</c>).
         /// </summary>
         [JsonPropertyName("xeniaProfileId")] public string  XeniaProfileId { get; set; } = "";
+        /// <summary>
+        /// RPCS3 user profile ID (defaults to "00000001" when empty).
+        /// Used by <c>EmulatorSavePathResolver</c> to locate PS3 saves under
+        /// <c>{saveDataPath}/dev_hdd0/home/{rpcs3ProfileId}/savedata/{titleId}/</c>.
+        /// </summary>
+        [JsonPropertyName("rpcs3ProfileId")] public string  Rpcs3ProfileId { get; set; } = "";
+        /// <summary>
+        /// Additional ROM file extensions recognised by this emulator (e.g. ".rvz", ".gcm").
+        /// Used by the game scanner to detect ROM files for this platform when the extension
+        /// is not in the built-in extension list.  Each entry should start with a leading dot.
+        /// </summary>
+        [JsonPropertyName("romTypes")]       public List<string> RomTypes { get; set; } = new();
     }
 
     // ── Playtime session ─────────────────────────────────────────────────────
