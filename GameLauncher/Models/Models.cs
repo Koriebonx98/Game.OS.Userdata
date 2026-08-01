@@ -427,9 +427,10 @@ namespace GameLauncher.Models
 
         /// <summary>
         /// When <see langword="true"/>, the launcher checks GitHub Releases for a new
-        /// version of Game.OS on startup and downloads the release asset to the same
-        /// directory as the executable, ready for the user to apply the update by
-        /// restarting.  Set to <see langword="false"/> to skip the automatic update check.
+        /// version of Game.OS after a successful login and then every 12 hours while
+        /// online, downloading the release asset to the same directory as the executable,
+        /// ready for the user to apply the update by restarting.  Set to
+        /// <see langword="false"/> to skip the automatic update check.
         /// </summary>
         [JsonPropertyName("appAutoUpdate")] public bool AppAutoUpdate { get; set; } = true;
 
