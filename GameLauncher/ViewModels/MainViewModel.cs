@@ -635,16 +635,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 int localUnlockedCount = localExists ? CountLocalUnlockedAchievements(localPath) : 0;
                 int nowUnlocked = achievements.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
 
-                // Skip the cloud write if nothing has changed since the last write.
+                // Skip if nothing has changed since the last write.
                 if (localExists && nowUnlocked <= localUnlockedCount) return;
+
+                // Always persist to the local JSON first so the unlock is never lost
+                // if the cloud save fails (e.g. offline or network error).
+                WriteLocalPerGameAchievements(localPath, achievements.ToList());
 
                 await _client.SaveFullGameAchievementsAsync(
                     platform, titleKey, gameTitle, achievements).ConfigureAwait(false);
 
-                WriteLocalPerGameAchievements(localPath, achievements.ToList());
                 DevLogService.Log(
                     $"[PerGameAch] Wrote {achievements.Count} achievements " +
-                    $"({nowUnlocked} unlocked) for '{gameTitle}' ({platform}) to cloud.");
+                    $"({nowUnlocked} unlocked) for '{gameTitle}' ({platform}) locally and to cloud.");
             }
             catch { /* best-effort */ }
         };
