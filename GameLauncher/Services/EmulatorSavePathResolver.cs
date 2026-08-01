@@ -310,10 +310,17 @@ namespace GameLauncher.Services
                     foreach (string file in Directory.EnumerateFiles(memcardsRoot, "*.mcd", SearchOption.TopDirectoryOnly))
                     {
                         string stem = Path.GetFileNameWithoutExtension(file);
+                        // Pass 2a: normalize the full stem (minus numeric card suffix)
                         string normalizedStem = NormalizeLooseToken(RemoveDuckStationCardSuffix(stem));
+                        // Pass 2b: also try with region/language parenthetical groups stripped
+                        // e.g. "Yetisports Deluxe (Europe) (En,Fr,De,Es,It)_1" → "Yetisports Deluxe"
+                        string strippedStem = StripParenthesizedSuffixes(RemoveDuckStationCardSuffix(stem));
+                        string normalizedStrippedStem = NormalizeLooseToken(strippedStem);
                         foreach (string id in identifiers)
                         {
-                            if (normalizedStem.Equals(NormalizeLooseToken(id), StringComparison.Ordinal))
+                            string normalizedId = NormalizeLooseToken(id);
+                            if (normalizedStem.Equals(normalizedId, StringComparison.Ordinal) ||
+                                normalizedStrippedStem.Equals(normalizedId, StringComparison.Ordinal))
                                 return file;
                         }
                     }
@@ -338,6 +345,29 @@ namespace GameLauncher.Services
 
             string suffix = value[(underscore + 1)..];
             return suffix.All(char.IsDigit) ? value[..underscore] : value;
+        }
+
+        /// <summary>
+        /// Strips trailing parenthesized groups from a file stem so that region and
+        /// language tags appended by No-Intro / Redump naming conventions are removed
+        /// before a fuzzy title comparison.
+        ///
+        /// Example: "Yetisports Deluxe (Europe) (En,Fr,De,Es,It)" → "Yetisports Deluxe"
+        /// </summary>
+        private static string StripParenthesizedSuffixes(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return value;
+            // Repeatedly remove the last (...) group and any preceding whitespace
+            // until there is nothing more to remove.
+            string result = value.TrimEnd();
+            while (result.EndsWith(')'))
+            {
+                int closeIdx = result.Length - 1;
+                int openIdx  = result.LastIndexOf('(');
+                if (openIdx < 0) break;
+                result = result[..openIdx].TrimEnd();
+            }
+            return result;
         }
 
         private static string NormalizeLooseToken(string value)

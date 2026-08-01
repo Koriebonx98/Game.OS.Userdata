@@ -1289,10 +1289,11 @@ public partial class GameDetailViewModel : ViewModelBase
 
         try
         {
-            // Attempt to resolve the emulator save folder via TitleID so we can
-            // copy saves directly instead of relying on ludusavi's manifest lookup.
+            // Resolve the emulator save folder on a background thread to avoid blocking
+            // the UI while scanning the file system (e.g. DuckStation memcards directory).
             var knownTitleIds = ResolveKnownTitleIdsForCurrentGame();
-            string? sourceOverridePath = ResolveBestEmulatorSavePathOverrideForBackup(knownTitleIds);
+            string? sourceOverridePath = await System.Threading.Tasks.Task.Run(
+                () => ResolveBestEmulatorSavePathOverrideForBackup(knownTitleIds));
             string? preferredTitleId = knownTitleIds.FirstOrDefault();
 
             var result = await Services.LudusaviService.SyncAsync(
@@ -1338,11 +1339,12 @@ public partial class GameDetailViewModel : ViewModelBase
 
         try
         {
-            // Resolve the emulator save folder so we can copy back directly
-            // (works for Xenia, RPCS3, Ryujinx, etc. without a ludusavi manifest entry).
+            // Resolve the emulator save folder on a background thread to avoid blocking
+            // the UI while scanning the file system (e.g. DuckStation memcards directory).
             var knownTitleIds = ResolveKnownTitleIdsForCurrentGame();
+            string? targetOverridePath = await System.Threading.Tasks.Task.Run(
+                () => ResolveBestEmulatorSavePathOverrideForBackup(knownTitleIds));
             string? preferredTitleId = knownTitleIds.FirstOrDefault();
-            string? targetOverridePath = ResolveBestEmulatorSavePathOverrideForBackup(knownTitleIds);
 
             var result = await Services.LudusaviService.RestoreAsync(
                 Platform, Title, _currentUsername, targetOverridePath, preferredTitleId);
