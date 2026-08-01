@@ -449,6 +449,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         // Refresh the displayed list
         LoadReviews();
+        LoadControllerProfiles();
 
         NewReviewNote  = "";
         ReviewStatus   = "✓ Review saved!";
@@ -480,7 +481,152 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void ToggleCompatibilityPanel() => ShowCompatibilityPanel = !ShowCompatibilityPanel;
 
-    // ── Navigation back-action ────────────────────────────────────────────────
+    // ── Per-game controller profiles ──────────────────────────────────────────
+    public System.Collections.ObjectModel.ObservableCollection<Models.ControllerProfile> ControllerProfiles { get; } = new();
+    [ObservableProperty] private bool   _hasControllerProfiles;
+    [ObservableProperty] private bool   _showControllerPanel;
+    [ObservableProperty] private bool   _showNewProfileForm;
+    [ObservableProperty] private bool   _isControllerSyncing;
+    [ObservableProperty] private string _newProfileName        = "";
+    [ObservableProperty] private string _newProfileDescription = "";
+    [ObservableProperty] private string _controllerStatus      = "";
+
+    [RelayCommand]
+    private void ToggleControllerPanel()
+    {
+        ShowControllerPanel = !ShowControllerPanel;
+        if (ShowControllerPanel) LoadControllerProfiles();
+    }
+
+    [RelayCommand]
+    private void ShowCreateProfileForm() => ShowNewProfileForm = true;
+
+    [RelayCommand]
+    private void CancelCreateProfile()
+    {
+        ShowNewProfileForm    = false;
+        NewProfileName        = "";
+        NewProfileDescription = "";
+    }
+
+    [RelayCommand]
+    private void CreateControllerProfile()
+    {
+        if (string.IsNullOrWhiteSpace(NewProfileName)) return;
+
+        var profile = Services.ControllerProfileService.CreateDefaultProfile(_currentUsername);
+        profile.ProfileName  = NewProfileName.Trim();
+        profile.Description  = NewProfileDescription.Trim();
+        profile.Author       = _currentUsername;
+        profile.CreatedAt    = System.DateTime.UtcNow.ToString("o");
+
+        Services.ControllerProfileService.AddOrUpdateProfile(Platform, Title, profile);
+        LoadControllerProfiles();
+
+        NewProfileName        = "";
+        NewProfileDescription = "";
+        ShowNewProfileForm    = false;
+        ControllerStatus      = $"✓ Profile \"{profile.ProfileName}\" created.";
+    }
+
+    [RelayCommand]
+    private void DeleteControllerProfile(string profileName)
+    {
+        Services.ControllerProfileService.DeleteProfile(
+            Platform, Title, profileName, _currentUsername);
+        LoadControllerProfiles();
+        ControllerStatus = $"Profile \"{profileName}\" deleted.";
+    }
+
+    /// <summary>
+    /// Uploads a named profile to the public Games.Database repository so other users
+    /// can discover and download community controller configs.
+    /// The stored entry records the author username, profile name, and description.
+    /// </summary>
+    [RelayCommand]
+    private void UploadProfileToDb(string profileName)
+    {
+        var all     = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        var profile = all.Find(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(p.Author,      _currentUsername, StringComparison.OrdinalIgnoreCase));
+        if (profile == null) return;
+
+        string? titleId  = CurrentTitleId;
+        string  title    = Title;
+        string  platform = Platform;
+
+        ControllerStatus = "Uploading to Games.Database…";
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                await svc.UploadControllerProfileToDatabaseAsync(platform, titleId, title, profile);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    ControllerStatus = $"✓ Profile \"{profileName}\" shared to database.");
+            }
+            catch (Exception ex)
+            {
+                Services.DevLogService.Log($"[ControllerProfile] Upload failed: {ex.Message}");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                    ControllerStatus = $"Upload failed: {ex.Message}");
+            }
+        });
+    }
+
+    /// <summary>
+    /// Syncs all local controller profiles for this game to the user's private cloud
+    /// data repository so they are available on other devices.
+    /// </summary>
+    [RelayCommand]
+    private void SyncProfilesToCloud()
+    {
+        if (string.IsNullOrWhiteSpace(_currentUsername)) return;
+
+        string titleKey = CurrentTitleId ?? Title;
+        string platform = Platform;
+        string username = _currentUsername;
+        var profiles    = Services.ControllerProfileService.LoadProfiles(platform, Title);
+
+        IsControllerSyncing = true;
+        ControllerStatus    = "Syncing to cloud…";
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                await svc.SyncUserControllerProfilesAsync(username, platform, titleKey, profiles);
+
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsControllerSyncing = false;
+                    ControllerStatus    = $"✓ {profiles.Count} profile(s) synced to cloud.";
+                });
+            }
+            catch (Exception ex)
+            {
+                Services.DevLogService.Log($"[ControllerProfile] Sync failed: {ex.Message}");
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    IsControllerSyncing = false;
+                    ControllerStatus    = $"Sync failed: {ex.Message}";
+                });
+            }
+        });
+    }
+
+    private void LoadControllerProfiles()
+    {
+        ControllerProfiles.Clear();
+        var all = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        foreach (var p in all)
+            ControllerProfiles.Add(p);
+        HasControllerProfiles = ControllerProfiles.Count > 0;
+    }
     public System.Action? OnClose { get; set; }
 
     [RelayCommand]
@@ -2906,8 +3052,14 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="game">The cloud library entry.</param>
     /// <param name="localGame">If not null, the game is installed on this drive — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
+    /// <param name="knownUnlockedOverride">
+    /// Optional enriched list of known-unlocked achievements to use instead of
+    /// <see cref="Game.GameAchievements"/> when pre-populating and merging unlocked state.
+    /// Pass this when the caller has a richer set (e.g. union of game.GameAchievements and the
+    /// global <c>_achievements</c> list) to ensure the template merge shows the correct count.
+    /// </param>
     public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null,
-                             LocalRom? localRom = null)
+                             LocalRom? localRom = null, List<Achievement>? knownUnlockedOverride = null)
     {
         ShowSettings    = false;
         ShowModsPanel   = false;
@@ -2932,7 +3084,12 @@ public partial class GameDetailViewModel : ViewModelBase
         PopulateTrailer(game.TrailerUrl);
         ExophaseUrl = game.ExophaseUrl;
         PopulateScreenshots(game.Screenshots);
-        PopulateAchievements(game.GameAchievements);
+        // Use the caller-supplied enriched list when available; fall back to the
+        // achievements stored on the game object.  knownUnlockedOverride is built by
+        // MainViewModel as the union of game.GameAchievements and the global _achievements
+        // list so the template merge has the most complete unlocked-state information.
+        var effectiveKnownUnlocked = knownUnlockedOverride ?? game.GameAchievements;
+        PopulateAchievements(effectiveKnownUnlocked);
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
@@ -2954,6 +3111,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (IsSteamInstallable) IsCloudOnly = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
 
         // Always load the full achievement template from the database so the detail view
         // shows ALL achievements (not just the unlocked subset in GameAchievements).
@@ -2961,7 +3119,7 @@ public partial class GameDetailViewModel : ViewModelBase
         // NOTE: must be called AFTER _steamAppId, ApplyInstallState, and _driveInstances are
         // set so the Steam-emu unlock scan has the correct exe path and app ID available.
         if (!string.IsNullOrEmpty(game.AchievementsUrl))
-            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
+            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, effectiveKnownUnlocked);
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
@@ -3012,6 +3170,7 @@ public partial class GameDetailViewModel : ViewModelBase
         SteamInstallUrl      = "";
         HasSteamLaunchOption = false;
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -3103,6 +3262,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = game.SteamAppId > 0;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     /// <summary>
@@ -3170,6 +3330,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
     public void LoadFromLocalRom(LocalRom rom)
@@ -3227,6 +3388,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = false;
         RefreshDisplayTitleId();
         LoadReviews();
+        LoadControllerProfiles();
     }
 
 
@@ -3604,10 +3766,11 @@ public partial class GameDetailViewModel : ViewModelBase
 
                 if (emuIds.Count > 0)
                 {
-                    // Sentinel timestamp: a valid ISO date that sorts below timed unlocks
-                    // (real timestamps from Steam API / Exophase) but still marks the
-                    // achievement as unlocked.
-                    const string emuFallbackTs = "1970-01-01T00:00:00Z";
+                    // Sentinel timestamp: a valid ISO date that sorts below real unlock times
+                    // (Steam API / Exophase timestamps) but is still treated as unlocked.
+                    // NOTE: must NOT be the Unix epoch ("1970-01-01T00:00:00") because
+                    // Achievement.IsUnlocked explicitly returns false for the epoch sentinel.
+                    const string emuFallbackTs = "2000-01-01T00:00:00Z";
                     int mergedCount = 0;
 
                     // Ensure O(1) Contains lookups for both direct-ID matching (lines below)
@@ -3618,9 +3781,32 @@ public partial class GameDetailViewModel : ViewModelBase
                     // the name-map path is an O(1) lookup per achievement rather than
                     // O(emuIds.Count) — avoids an O(n²) inner loop.
                     var emuDisplayNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    // Pre-build a reverse map (display name → raw ID) for real-timestamp lookups.
+                    var displayNameToRawId = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                     foreach (var kv in achNameMap)
+                    {
                         if (!string.IsNullOrEmpty(kv.Value))
+                        {
                             emuDisplayNames.Add(kv.Value);
+                            displayNameToRawId.TryAdd(kv.Value, kv.Key);
+                        }
+                    }
+
+                    // Build a lookup from raw emu IDs → real timestamp from knownUnlocked so the
+                    // direct/name-map merge paths can preserve the actual unlock time instead of
+                    // using the fallback sentinel (which loses the original timestamp).
+                    var emuIdToRealTs = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (knownUnlocked != null)
+                    {
+                        foreach (var u in knownUnlocked)
+                        {
+                            if (!u.IsUnlocked || string.IsNullOrEmpty(u.UnlockedAt)) continue;
+                            if (!string.IsNullOrEmpty(u.AchievementId) && emuIdsSet.Contains(u.AchievementId))
+                                emuIdToRealTs.TryAdd(u.AchievementId, u.UnlockedAt);
+                            if (!string.IsNullOrEmpty(u.Name) && emuIdsSet.Contains(u.Name))
+                                emuIdToRealTs.TryAdd(u.Name, u.UnlockedAt);
+                        }
+                    }
 
                     foreach (var a in list)
                     {
@@ -3631,7 +3817,10 @@ public partial class GameDetailViewModel : ViewModelBase
                         if (emuIdsSet.Contains(a.AchievementId ?? "") ||
                             emuIdsSet.Contains(a.Name ?? ""))
                         {
-                            a.UnlockedAt = emuFallbackTs;
+                            // Prefer the real timestamp from a previous session if available.
+                            string? matchedId = emuIdsSet.Contains(a.AchievementId ?? "") ? a.AchievementId : a.Name;
+                            a.UnlockedAt = matchedId != null && emuIdToRealTs.TryGetValue(matchedId, out var directRealTs)
+                                ? directRealTs : emuFallbackTs;
                             mergedCount++;
                             continue;
                         }
@@ -3642,7 +3831,10 @@ public partial class GameDetailViewModel : ViewModelBase
                         // the DB achievementId.
                         if (emuDisplayNames.Contains(a.Name ?? ""))
                         {
-                            a.UnlockedAt = emuFallbackTs;
+                            // Prefer the real timestamp from a previous session if available.
+                            string? rawId = displayNameToRawId.TryGetValue(a.Name ?? "", out var rid) ? rid : null;
+                            a.UnlockedAt = rawId != null && emuIdToRealTs.TryGetValue(rawId, out var nameMapRealTs)
+                                ? nameMapRealTs : emuFallbackTs;
                             mergedCount++;
                             continue;
                         }

@@ -189,6 +189,13 @@
                                     IsVisible="{Binding HasExophaseUrl}">
                                 <TextBlock Text="↻" FontSize="14" VerticalAlignment="Center"/>
                             </Button>
+                            <!-- Controller profiles button — always visible for installed games -->
+                            <Button Classes="btn-secondary"
+                                    Padding="14,12"
+                                    ToolTip.Tip="Controller Profiles"
+                                    Command="{Binding ToggleControllerPanelCommand}">
+                                <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
+                            </Button>
                         </StackPanel>
                         <TextBlock Text="{Binding ExophaseSyncStatus}"
                                    FontSize="12"
@@ -1191,6 +1198,136 @@
                                            IsVisible="{Binding ReviewStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                             </StackPanel>
                         </Border>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Controller Profiles section ── -->
+                <Border IsVisible="{Binding ShowControllerPanel}"
+                        Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+
+                        <!-- Section header -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Controller Profiles"
+                                           FontSize="16" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding HasControllerProfiles}">
+                                    <TextBlock Text="{Binding ControllerProfiles.Count}"
+                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn-secondary"
+                                    Padding="14,6"
+                                    Command="{Binding ShowCreateProfileFormCommand}"
+                                    IsVisible="{Binding !ShowNewProfileForm}">
+                                <TextBlock Text="+ New Profile" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- Saved profiles list -->
+                        <ItemsControl ItemsSource="{Binding ControllerProfiles}"
+                                      IsVisible="{Binding HasControllerProfiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#0d1117" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,8">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="{Binding ProfileName}"
+                                                           FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="White"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="12" Foreground="#8b949e"
+                                                           IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                           TextWrapping="Wrap"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                                    <TextBlock FontSize="11" Foreground="#30363d">
+                                                        <TextBlock.Text>
+                                                            <MultiBinding StringFormat="by {0}  ·  {1}">
+                                                                <Binding Path="Author"/>
+                                                                <Binding Path="CreatedAt"/>
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                        Spacing="6" VerticalAlignment="Center">
+                                                <!-- Upload to Games.Database -->
+                                                <Button Classes="btn-secondary" Padding="10,6"
+                                                        ToolTip.Tip="Share to Games.Database"
+                                                        Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).UploadProfileToDbCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                    <TextBlock Text="↑ Share" FontSize="11"/>
+                                                </Button>
+                                                <!-- Delete -->
+                                                <Button Classes="btn-danger" Padding="10,6"
+                                                        ToolTip.Tip="Delete this profile"
+                                                        Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).DeleteControllerProfileCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                    <TextBlock Text="🗑" FontSize="13"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Empty state -->
+                        <TextBlock Text="No profiles yet — create one to start remapping controller buttons for this game."
+                                   FontSize="13" Foreground="#8b949e" TextWrapping="Wrap"
+                                   IsVisible="{Binding !HasControllerProfiles}"/>
+
+                        <!-- New profile form -->
+                        <Border IsVisible="{Binding ShowNewProfileForm}"
+                                Background="#0d1117" CornerRadius="8" Padding="16,14">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="New Controller Profile"
+                                           FontSize="14" FontWeight="SemiBold" Foreground="White"/>
+                                <TextBox Watermark="Profile name (e.g. Navigation, FPS Setup…)"
+                                         Text="{Binding NewProfileName}"
+                                         Background="#161b22" Foreground="White"
+                                         BorderBrush="#30363d" CornerRadius="6"
+                                         Padding="10,8" FontSize="13"/>
+                                <TextBox Watermark="Description (optional)"
+                                         Text="{Binding NewProfileDescription}"
+                                         Background="#161b22" Foreground="White"
+                                         BorderBrush="#30363d" CornerRadius="6"
+                                         Padding="10,8" FontSize="13"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-primary" Padding="16,8"
+                                            Command="{Binding CreateControllerProfileCommand}">
+                                        <TextBlock Text="Create Profile" FontSize="13" FontWeight="SemiBold"/>
+                                    </Button>
+                                    <Button Classes="btn-secondary" Padding="14,8"
+                                            Command="{Binding CancelCreateProfileCommand}">
+                                        <TextBlock Text="Cancel" FontSize="13"/>
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Sync to cloud row -->
+                        <StackPanel Orientation="Horizontal" Spacing="10"
+                                    IsVisible="{Binding HasControllerProfiles}">
+                            <Button Classes="btn-secondary" Padding="14,7"
+                                    IsEnabled="{Binding !IsControllerSyncing}"
+                                    Command="{Binding SyncProfilesToCloudCommand}">
+                                <TextBlock Text="☁ Sync to Cloud" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Status message -->
+                        <TextBlock Text="{Binding ControllerStatus}"
+                                   FontSize="12" Foreground="#3fb950"
+                                   IsVisible="{Binding ControllerStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                     </StackPanel>
                 </Border>

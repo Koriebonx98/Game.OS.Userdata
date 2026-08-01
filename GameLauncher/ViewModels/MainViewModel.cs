@@ -714,7 +714,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                      string.Equals(a.Name, ach.Name, StringComparison.OrdinalIgnoreCase)));
                 if (existing != null)
                 {
-                    if (string.IsNullOrEmpty(existing.UnlockedAt))
+                    // Update when: (a) no timestamp yet, (b) existing is an emu sentinel
+                    // (epoch or "2000-01-01") and we now have a real timestamp — this
+                    // preserves the actual unlock time on subsequent game-info opens.
+                    bool existingIsSentinel =
+                        string.IsNullOrEmpty(existing.UnlockedAt) ||
+                        existing.UnlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase) ||
+                        existing.UnlockedAt.StartsWith("2000-01-01T00:00:00", StringComparison.OrdinalIgnoreCase);
+                    if (existingIsSentinel && ach.IsUnlocked)
                         existing.UnlockedAt = ach.UnlockedAt;
                 }
                 else
@@ -1782,6 +1789,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             MediaVm.EnsureMediaLibraryFresh();
     }
 
+    /// <summary>
+    /// Builds the enriched "known unlocked" achievement list for a cloud library game.
+    /// Takes the union of <see cref="Game.GameAchievements"/> (cloud-synced, may be empty in
+    /// backend mode where <c>GetGameAchievementsAsync</c> returns null) and the global
+    /// <see cref="_achievements"/> list filtered by matching platform + title.  This ensures
+    /// that the detail view's template-merge step in
+    /// <c>FetchAndDisplayAchievementsAsync</c> receives the correct unlocked set even when
+    /// <c>game.GameAchievements</c> is null/empty.
+    /// Returns <c>null</c> if no unlocked achievements are found so the detail view starts
+    /// blank (same behaviour as before when there is genuinely nothing unlocked).
+    /// </summary>
+    private List<Models.Achievement>? BuildKnownUnlockedForGame(Game game)
+    {
+        var preloadAchs = game.GameAchievements?.Count > 0
+            ? game.GameAchievements.ToList()
+            : new List<Models.Achievement>();
+
+        foreach (var a in _achievements)
+        {
+            if (!string.Equals(a.Platform, game.Platform, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!string.Equals(a.GameTitle, game.Title, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (string.IsNullOrEmpty(a.UnlockedAt))
+                continue;
+
+            bool alreadyPresent = preloadAchs.Any(p =>
+                (!string.IsNullOrEmpty(p.AchievementId) && !string.IsNullOrEmpty(a.AchievementId) &&
+                 string.Equals(p.AchievementId, a.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(p.Name) && !string.IsNullOrEmpty(a.Name) &&
+                 string.Equals(p.Name, a.Name, StringComparison.OrdinalIgnoreCase)));
+            if (!alreadyPresent)
+                preloadAchs.Add(a);
+        }
+
+        return preloadAchs.Count > 0 ? preloadAchs : null;
+    }
+
     private void OpenDetailFromGame(Game game)
     {
         // Only match local PC games when the library game is also a PC game.
@@ -1815,7 +1860,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             !string.Equals(game.Platform, "PC", StringComparison.OrdinalIgnoreCase))
             localRom = FindMatchingRom(game.Title, game.Platform, game.TitleId);
 
-        DetailVm.LoadFromGame(game, localGame, repack, localRom);
+        DetailVm.LoadFromGame(game, localGame, repack, localRom, BuildKnownUnlockedForGame(game));
         ShowDetail = true;
 
         // Always enrich achievements for non-PC library games: if AchievementsUrl is
@@ -2244,7 +2289,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             var localRom = localGame == null && repack == null
                 ? FindMatchingRom(cg.Title, cg.Platform, cg.TitleId)
                 : null;
-            DetailVm.LoadFromGame(cg, localGame, repack, localRom);
+            DetailVm.LoadFromGame(cg, localGame, repack, localRom, BuildKnownUnlockedForGame(cg));
         }
         else
         {

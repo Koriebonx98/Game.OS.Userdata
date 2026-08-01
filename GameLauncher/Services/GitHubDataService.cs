@@ -2395,6 +2395,144 @@ namespace GameLauncher.Services
             }
         }
 
+        // ── Controller profile upload to Games.Database ───────────────────────
+
+        /// <summary>
+        /// Uploads a controller profile to the public Games.Database repository at
+        /// <c>Data/{platformFolder}/Games/{titleId}/controller-profiles.json</c>.
+        ///
+        /// Any existing profile from the same author with the same name is replaced;
+        /// all other profiles are preserved so community contributions accumulate.
+        /// The stored entry includes the author username, profile name, and description
+        /// exactly as submitted.
+        /// </summary>
+        /// <param name="platform">Canonical platform name (e.g. "Switch", "PC").</param>
+        /// <param name="titleId">
+        /// The game's title ID used as the folder name under <c>Games/</c>.
+        /// Falls back to a sanitised <paramref name="gameTitle"/> when <c>null</c> or empty.
+        /// </param>
+        /// <param name="gameTitle">Display title (used as folder name when no title ID).</param>
+        /// <param name="profile">The profile to upload; must have Author, ProfileName, Description set.</param>
+        /// <param name="ct">Cancellation token.</param>
+        public async Task UploadControllerProfileToDatabaseAsync(
+            string platform, string? titleId, string gameTitle,
+            Models.ControllerProfile profile, CancellationToken ct = default)
+        {
+            string? folder = PlatformToDbFolder(platform);
+            if (folder == null)
+            {
+                DevLogService.Log($"[ControllerProfileDb] Unknown platform '{platform}' — skipping upload.");
+                return;
+            }
+
+            string idSegment = !string.IsNullOrWhiteSpace(titleId)
+                ? titleId.Trim()
+                : SanitizeDbFolderName(gameTitle);
+
+            if (string.IsNullOrWhiteSpace(idSegment))
+            {
+                DevLogService.Log("[ControllerProfileDb] Cannot determine game folder — skipping upload.");
+                return;
+            }
+
+            string filePath = $"Data/{folder}/Games/{idSegment}/controller-profiles.json";
+            DevLogService.Log(
+                $"[ControllerProfileDb] Uploading profile '{profile.ProfileName}' " +
+                $"by '{profile.Author}' to {filePath}…");
+
+            try
+            {
+                List<Models.ControllerProfile>? existing;
+                string? sha;
+                (existing, sha) = await ReadGamesDatabaseFileAsync<List<Models.ControllerProfile>>(filePath, ct);
+                existing ??= new List<Models.ControllerProfile>();
+
+                // Replace any profile with the same name from the same author
+                existing.RemoveAll(p =>
+                    string.Equals(p.ProfileName, profile.ProfileName, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(p.Author,      profile.Author,      StringComparison.OrdinalIgnoreCase));
+                existing.Add(profile);
+
+                await WriteGamesDatabaseFileAsync(
+                    filePath, existing,
+                    $"Controller profile: '{profile.ProfileName}' by {profile.Author} for '{gameTitle}'",
+                    sha, ct);
+
+                DevLogService.Log(
+                    $"[ControllerProfileDb] Successfully uploaded profile for '{gameTitle}'.");
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log(
+                    $"[ControllerProfileDb] Failed to upload profile for '{gameTitle}': {ex.Message}");
+                throw;
+            }
+        }
+
+        // ── Controller profile sync to/from private user data repo ───────────
+
+        /// <summary>
+        /// Syncs the user's local controller profiles for a game to their private cloud repo.
+        /// Path: <c>accounts/{username}/ControllerProfiles/{platform}/{titleKey}/profiles.json</c>
+        /// </summary>
+        public async Task SyncUserControllerProfilesAsync(
+            string username, string platform, string titleKey,
+            IEnumerable<Models.ControllerProfile> profiles,
+            CancellationToken ct = default)
+        {
+            string userLower    = username.ToLowerInvariant();
+            string platformKey  = string.IsNullOrWhiteSpace(platform)
+                ? "Unknown" : platform.Replace(' ', '_');
+            string titleKeySafe = SanitizeDbFolderName(titleKey);
+            string path = $"accounts/{userLower}/ControllerProfiles/{platformKey}/{titleKeySafe}/profiles.json";
+
+            DevLogService.Log($"[ControllerProfileSync] Syncing profiles for '{titleKey}' ({platform}) to cloud…");
+
+            try
+            {
+                string? sha;
+                (_, sha) = await ReadFileAsync<object>(path, ct);
+
+                var list = profiles.ToList();
+                await WriteFileAsync(path, list,
+                    $"Sync controller profiles for {platform}/{titleKey}",
+                    sha, ct);
+
+                DevLogService.Log($"[ControllerProfileSync] Synced {list.Count} profile(s) for '{titleKey}'.");
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[ControllerProfileSync] Sync failed for '{titleKey}': {ex.Message}");
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// Loads controller profiles for a game from the user's private cloud repo.
+        /// Returns an empty list when no profiles exist in the cloud yet.
+        /// Path: <c>accounts/{username}/ControllerProfiles/{platform}/{titleKey}/profiles.json</c>
+        /// </summary>
+        public async Task<List<Models.ControllerProfile>> LoadUserControllerProfilesAsync(
+            string username, string platform, string titleKey,
+            CancellationToken ct = default)
+        {
+            string userLower    = username.ToLowerInvariant();
+            string platformKey  = string.IsNullOrWhiteSpace(platform)
+                ? "Unknown" : platform.Replace(' ', '_');
+            string titleKeySafe = SanitizeDbFolderName(titleKey);
+            string path = $"accounts/{userLower}/ControllerProfiles/{platformKey}/{titleKeySafe}/profiles.json";
+
+            try
+            {
+                var (profiles, _) = await ReadFileAsync<List<Models.ControllerProfile>>(path, ct);
+                return profiles ?? new List<Models.ControllerProfile>();
+            }
+            catch
+            {
+                return new List<Models.ControllerProfile>();
+            }
+        }
+
         // ── GitHub API response models ─────────────────────────────────────────
         private sealed class GitHubFileResponse
         {

@@ -1185,4 +1185,55 @@ namespace GameLauncher.Models
             (!string.IsNullOrEmpty(StorageType) ? $" · {StorageType}" : "") +
             (!string.IsNullOrEmpty(Emulator) ? $" · {Emulator}" : "");
     }
+
+    // ── Controller profiles ────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Per-event action strings for a single controller button.
+    /// Values follow the Game.OS.Input mapping format:
+    ///   "Empty"            – do nothing
+    ///   "Key:Enter"        – send a single keystroke (+ combos: "Key:Ctrl+Shift+Esc")
+    ///   "Mouse:LeftClick"  – mouse click
+    ///   "Launch:path"      – launch an executable
+    /// </summary>
+    public class ControllerButtonAction
+    {
+        [JsonPropertyName("press")]   public string Press   { get; set; } = "Empty";
+        [JsonPropertyName("hold")]    public string Hold    { get; set; } = "Empty";
+        [JsonPropertyName("release")] public string Release { get; set; } = "Empty";
+        [JsonPropertyName("double")]  public string Double  { get; set; } = "Empty";
+    }
+
+    /// <summary>
+    /// A named controller remapping profile for a specific game.
+    /// Compatible with the Game.OS.Input companion app format (SharpDX.XInput-based).
+    ///
+    /// Stored locally in <c>Data/GameCache/{platform}/{title}/controller-profiles.json</c>.
+    /// Can be synced to the user's private cloud repo and shared to the public Games.Database.
+    /// </summary>
+    public class ControllerProfile
+    {
+        /// <summary>Human-readable name chosen by the author, e.g. "Default" or "FPS Setup".</summary>
+        [JsonPropertyName("profileName")]             public string ProfileName             { get; set; } = "Default";
+        /// <summary>Optional description of what the profile is for.</summary>
+        [JsonPropertyName("description")]             public string Description             { get; set; } = "";
+        /// <summary>Username of the person who created this profile.</summary>
+        [JsonPropertyName("author")]                  public string Author                  { get; set; } = "";
+        [JsonPropertyName("createdAt")]               public string CreatedAt               { get; set; } =
+            DateTime.UtcNow.ToString("o");
+        /// <summary>
+        /// Optional process name filter (e.g. "ryujinx").
+        /// When set and <see cref="ApplyOnlyWhenForeground"/> is <c>true</c>, the profile
+        /// only injects inputs when that process is the foreground window.
+        /// </summary>
+        [JsonPropertyName("processName")]             public string ProcessName             { get; set; } = "";
+        [JsonPropertyName("applyOnlyWhenForeground")] public bool   ApplyOnlyWhenForeground { get; set; } = false;
+        /// <summary>
+        /// Button → action map.  Keys are button names used by SharpDX.XInput / Game.OS.Input:
+        /// A, B, X, Y, DPadUp, DPadDown, DPadLeft, DPadRight,
+        /// LeftShoulder, RightShoulder, LeftTrigger, RightTrigger,
+        /// LeftThumb, RightThumb, Start, Back.
+        /// </summary>
+        [JsonPropertyName("mappings")]                public Dictionary<string, ControllerButtonAction> Mappings { get; set; } = new();
+    }
 }
