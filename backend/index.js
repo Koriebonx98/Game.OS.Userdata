@@ -620,6 +620,15 @@ function normalizePlatformName(platform) {
     }
 }
 
+/// Returns an empty string when <paramref name="value"/> is falsy or is the Unix epoch
+/// sentinel (`1970-01-01T00:00:00…`) used by Steam emulators to indicate a locked
+/// achievement whose timestamp was never set.  Otherwise returns the value unchanged.
+function normaliseUnlockedAt(value) {
+    if (!value || typeof value !== 'string') return '';
+    if (value.startsWith('1970-01-01T00:00:00')) return '';
+    return value;
+}
+
 async function resolveAchievementTitleKey(usernameLower, platform, gameTitle, titleId) {
     const rawTitleId = String(titleId || '').trim();
     if (/^[a-zA-Z0-9_-]+$/.test(rawTitleId)) return rawTitleId;
@@ -2254,7 +2263,7 @@ app.post('/api/me/achievements', authenticateToken, async (req, res) => {
             achievementId: incomingAchievementId,
             name,
             description: description || '',
-            unlockedAt: unlockedAt || new Date().toISOString()
+            unlockedAt: normaliseUnlockedAt(unlockedAt) || new Date().toISOString()
         };
 
         if (existing !== -1) {
@@ -2364,8 +2373,8 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
                  String(e.name || '').toLowerCase() === incomingNameLower));
             const normalizedIncoming = { ...incoming, achievementId: achId };
             if (idx !== -1) {
-                const existingUnlockedAt = typeof merged[idx].unlockedAt === 'string' ? merged[idx].unlockedAt : '';
-                const incomingUnlockedAt = typeof normalizedIncoming.unlockedAt === 'string' ? normalizedIncoming.unlockedAt : '';
+                const existingUnlockedAt = normaliseUnlockedAt(typeof merged[idx].unlockedAt === 'string' ? merged[idx].unlockedAt : '');
+                const incomingUnlockedAt = normaliseUnlockedAt(typeof normalizedIncoming.unlockedAt === 'string' ? normalizedIncoming.unlockedAt : '');
                 const keepUnlockedAt = existingUnlockedAt !== '' ? existingUnlockedAt : incomingUnlockedAt;
                 merged[idx] = { ...merged[idx], ...normalizedIncoming, unlockedAt: keepUnlockedAt };
             } else {
@@ -2387,7 +2396,7 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
                 achievementId: a.achievementId,
                 name: a.name || '',
                 description: a.description || '',
-                unlockedAt: a.unlockedAt || '',
+                unlockedAt: normaliseUnlockedAt(a.unlockedAt) || '',
             });
         }
 
