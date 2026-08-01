@@ -3250,8 +3250,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 $"Fetched {games.Count} games, {achievements.Count} achievements.");
 
             // Enrich platforms
-            var effectiveAchievements = achievements.Count > 0 ? achievements : _achievements;
-
             foreach (var g in games)
                 g.Platform = Models.PlatformHelper.NormalizePlatform(g.Platform);
 
@@ -3732,6 +3730,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // Detect newly-unlocked achievements and log them to the activity feed
                 if (achvChanged && achievements.Count > _achievements.Count)
                     _ = DetectAndLogNewAchievementsAsync(_achievements, achievements);
+
+                var effectiveAchievements = achievements.Count > 0 ? achievements : _achievements;
 
                 if (gamesChanged || achvChanged || playtimeChanged)
                 {
