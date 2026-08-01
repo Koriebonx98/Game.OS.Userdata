@@ -2906,8 +2906,14 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <param name="game">The cloud library entry.</param>
     /// <param name="localGame">If not null, the game is installed on this drive — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
+    /// <param name="knownUnlockedOverride">
+    /// Optional enriched list of known-unlocked achievements to use instead of
+    /// <see cref="Game.GameAchievements"/> when pre-populating and merging unlocked state.
+    /// Pass this when the caller has a richer set (e.g. union of game.GameAchievements and the
+    /// global <c>_achievements</c> list) to ensure the template merge shows the correct count.
+    /// </param>
     public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null,
-                             LocalRom? localRom = null)
+                             LocalRom? localRom = null, List<Achievement>? knownUnlockedOverride = null)
     {
         ShowSettings    = false;
         ShowModsPanel   = false;
@@ -2932,7 +2938,12 @@ public partial class GameDetailViewModel : ViewModelBase
         PopulateTrailer(game.TrailerUrl);
         ExophaseUrl = game.ExophaseUrl;
         PopulateScreenshots(game.Screenshots);
-        PopulateAchievements(game.GameAchievements);
+        // Use the caller-supplied enriched list when available; fall back to the
+        // achievements stored on the game object.  knownUnlockedOverride is built by
+        // MainViewModel as the union of game.GameAchievements and the global _achievements
+        // list so the template merge has the most complete unlocked-state information.
+        var effectiveKnownUnlocked = knownUnlockedOverride ?? game.GameAchievements;
+        PopulateAchievements(effectiveKnownUnlocked);
         IsLocalGame = false;
         HasMultipleDrives = false;
         DriveLabels.Clear();
@@ -2961,7 +2972,7 @@ public partial class GameDetailViewModel : ViewModelBase
         // NOTE: must be called AFTER _steamAppId, ApplyInstallState, and _driveInstances are
         // set so the Steam-emu unlock scan has the correct exe path and app ID available.
         if (!string.IsNullOrEmpty(game.AchievementsUrl))
-            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, game.GameAchievements);
+            _ = FetchAndDisplayAchievementsAsync(game.AchievementsUrl, effectiveKnownUnlocked);
     }
     /// <param name="localGame">If not null, the game is installed — shows Play + ··· buttons.</param>
     /// <param name="repack">If not null (and localGame is null), a repack is available — shows Install button.</param>
