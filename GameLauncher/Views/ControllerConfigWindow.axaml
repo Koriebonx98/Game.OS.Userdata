@@ -1,0 +1,245 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:GameLauncher.ViewModels"
+        x:Class="GameLauncher.Views.ControllerConfigWindow"
+        x:DataType="vm:ControllerConfigViewModel"
+        Title="Controller Configuration"
+        Width="820"
+        Height="620"
+        MinWidth="640"
+        MinHeight="480"
+        CanResize="True"
+        ShowInTaskbar="True"
+        Background="#0d1117"
+        WindowStartupLocation="CenterOwner">
+
+    <Window.Styles>
+        <Style Selector="TextBlock.col-header">
+            <Setter Property="Foreground" Value="#8b949e"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.row-even">
+            <Setter Property="Background" Value="#161b22"/>
+        </Style>
+        <Style Selector="Border.row-odd">
+            <Setter Property="Background" Value="#0d1117"/>
+        </Style>
+        <Style Selector="TextBox.mapping-input">
+            <Setter Property="Background" Value="#21262d"/>
+            <Setter Property="Foreground" Value="#e6edf3"/>
+            <Setter Property="BorderBrush" Value="#30363d"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Padding" Value="6,3"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="MinWidth" Value="140"/>
+        </Style>
+        <Style Selector="TextBox.mapping-input:focus">
+            <Setter Property="BorderBrush" Value="#58a6ff"/>
+        </Style>
+        <Style Selector="TextBlock.btn-label">
+            <Setter Property="Foreground" Value="#e6edf3"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.cc-btn">
+            <Setter Property="Background" Value="#21262d"/>
+            <Setter Property="Foreground" Value="#e6edf3"/>
+            <Setter Property="BorderBrush" Value="#30363d"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="FontSize" Value="13"/>
+        </Style>
+        <Style Selector="Button.cc-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#30363d"/>
+        </Style>
+        <Style Selector="Button.cc-btn-primary /template/ ContentPresenter">
+            <Setter Property="Background" Value="#238636"/>
+        </Style>
+        <Style Selector="Button.cc-btn-primary TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.cc-btn-primary:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2ea043"/>
+        </Style>
+        <Style Selector="Button.cc-btn-danger /template/ ContentPresenter">
+            <Setter Property="Background" Value="#c0392b"/>
+        </Style>
+        <Style Selector="Button.cc-btn-danger TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.cc-btn-danger:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#e74c3c"/>
+        </Style>
+    </Window.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="0">
+
+        <!-- ══════════ HEADER ══════════ -->
+        <Border Grid.Row="0" Background="#161b22"
+                BorderBrush="#21262d" BorderThickness="0,0,0,1"
+                Padding="20,14">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="🎮  Controller Configuration"
+                               FontSize="18" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock FontSize="12" Foreground="#8b949e">
+                        <Run Text="Remap controller buttons to keyboard actions for "/>
+                        <Run Text="{Binding ProfileName}" FontWeight="SemiBold" Foreground="#58a6ff"/>
+                    </TextBlock>
+                </StackPanel>
+                <Button Grid.Column="1" Classes="cc-btn"
+                        Command="{Binding CloseCommand}"
+                        Width="32" Height="32" Padding="0"
+                        VerticalContentAlignment="Center"
+                        HorizontalContentAlignment="Center">✕</Button>
+            </Grid>
+        </Border>
+
+        <!-- ══════════ BODY ══════════ -->
+        <Grid Grid.Row="1" ColumnDefinitions="220,*">
+
+            <!-- LEFT: Profile management panel -->
+            <Border Grid.Column="0"
+                    Background="#0d1117"
+                    BorderBrush="#21262d" BorderThickness="0,0,1,0"
+                    Padding="16,20,16,16">
+                <StackPanel Spacing="12">
+
+                    <TextBlock Text="Profile" Foreground="#8b949e" FontSize="11" FontWeight="SemiBold"/>
+
+                    <!-- Profile name -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Name" Foreground="#8b949e" FontSize="11"/>
+                        <TextBox Text="{Binding ProfileName}"
+                                 Classes="mapping-input"
+                                 Watermark="e.g. Default, FPS Setup…"/>
+                    </StackPanel>
+
+                    <!-- Description -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Description" Foreground="#8b949e" FontSize="11"/>
+                        <TextBox Text="{Binding Description}"
+                                 Classes="mapping-input"
+                                 Watermark="Optional description…"
+                                 AcceptsReturn="False"/>
+                    </StackPanel>
+
+                    <!-- Author -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Author" Foreground="#8b949e" FontSize="11"/>
+                        <TextBox Text="{Binding AuthorName}"
+                                 Classes="mapping-input"
+                                 Watermark="Your username…"/>
+                    </StackPanel>
+
+                    <Rectangle Height="1" Fill="#21262d" Margin="0,4"/>
+
+                    <!-- Saved profiles -->
+                    <TextBlock Text="Saved Profiles" Foreground="#8b949e" FontSize="11" FontWeight="SemiBold"/>
+                    <ListBox ItemsSource="{Binding SavedProfileNames}"
+                             SelectedItem="{Binding SelectedSavedProfile}"
+                             Background="#161b22"
+                             BorderBrush="#21262d" BorderThickness="1"
+                             CornerRadius="4"
+                             MaxHeight="120">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" Foreground="#e6edf3" FontSize="12" Padding="6,3"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Button Classes="cc-btn" HorizontalAlignment="Stretch"
+                            Command="{Binding LoadSelectedProfileCommand}">Load Selected</Button>
+                    <Button Classes="cc-btn cc-btn-danger" HorizontalAlignment="Stretch"
+                            Command="{Binding DeleteSelectedProfileCommand}">Delete Selected</Button>
+
+                    <Rectangle Height="1" Fill="#21262d" Margin="0,4"/>
+
+                    <!-- Presets -->
+                    <TextBlock Text="Presets" Foreground="#8b949e" FontSize="11" FontWeight="SemiBold"/>
+                    <Button Classes="cc-btn" HorizontalAlignment="Stretch"
+                            Command="{Binding ResetToDefaultCommand}">Clear All (Default)</Button>
+                    <Button Classes="cc-btn" HorizontalAlignment="Stretch"
+                            Command="{Binding ResetToNavigationCommand}">Navigation Preset</Button>
+
+                    <!-- Status -->
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Foreground="#3fb950" FontSize="11"
+                               TextWrapping="Wrap"
+                               IsVisible="{Binding StatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                </StackPanel>
+            </Border>
+
+            <!-- RIGHT: Button mapping grid -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*">
+
+                <!-- Column headers -->
+                <Border Grid.Row="0"
+                        Background="#161b22"
+                        BorderBrush="#21262d" BorderThickness="0,0,0,1"
+                        Padding="12,8">
+                    <Grid ColumnDefinitions="180,*,*">
+                        <TextBlock Grid.Column="0" Text="Button" Classes="col-header"/>
+                        <TextBlock Grid.Column="1" Text="Press Action  (e.g. Key:Enter)" Classes="col-header" Margin="8,0,0,0"/>
+                        <TextBlock Grid.Column="2" Text="Hold Action" Classes="col-header" Margin="8,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Mapping rows -->
+                <ScrollViewer Grid.Row="1"
+                              HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding Mappings}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ControllerButtonMappingVm">
+                                <Border Padding="12,6"
+                                        BorderBrush="#21262d" BorderThickness="0,0,0,1">
+                                    <Grid ColumnDefinitions="180,*,*">
+                                        <TextBlock Grid.Column="0"
+                                                   Text="{Binding ButtonLabel}"
+                                                   Classes="btn-label"/>
+                                        <TextBox Grid.Column="1"
+                                                 Text="{Binding PressAction}"
+                                                 Classes="mapping-input"
+                                                 Margin="8,0,4,0"
+                                                 Watermark="Empty"/>
+                                        <TextBox Grid.Column="2"
+                                                 Text="{Binding HoldAction}"
+                                                 Classes="mapping-input"
+                                                 Margin="4,0,0,0"
+                                                 Watermark="Empty"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- ══════════ FOOTER ══════════ -->
+        <Border Grid.Row="2" Background="#161b22"
+                BorderBrush="#21262d" BorderThickness="0,1,0,0"
+                Padding="16,10">
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="Tip: Use Key:Enter, Key:Ctrl+Shift+Esc, Key:Space etc.  Leave Empty for native XInput pass-through."
+                           Foreground="#8b949e" FontSize="11"
+                           VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Classes="cc-btn"
+                        Command="{Binding ResetToDefaultCommand}"
+                        Margin="0,0,8,0">Reset All</Button>
+                <Button Grid.Column="2" Classes="cc-btn"
+                        Command="{Binding CloseCommand}"
+                        Margin="0,0,8,0">Cancel</Button>
+                <Button Grid.Column="3" Classes="cc-btn cc-btn-primary"
+                        Command="{Binding SaveProfileCommand}">💾  Save Profile</Button>
+            </Grid>
+        </Border>
+
+    </Grid>
+</Window>

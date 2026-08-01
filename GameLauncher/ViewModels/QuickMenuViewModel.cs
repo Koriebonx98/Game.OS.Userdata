@@ -380,7 +380,9 @@ public partial class QuickMenuViewModel : ViewModelBase
                 GoToGameOsHomeCommand.Execute(null);
                 break;
             case "friends":
-                OpenFriendsPageCommand.Execute(null);
+                // Navigate to the Friends sub-page within the guide overlay
+                // so the user can browse friends without closing the menu.
+                ActivePage = "friends";
                 break;
             case "inbox":
                 OpenInboxPageCommand.Execute(null);
@@ -540,6 +542,13 @@ public partial class QuickMenuViewModel : ViewModelBase
     [RelayCommand]
     private void OpenFriendsPage()
     {
+        // In XB360 Guide mode, navigate to the Friends sub-page within the overlay.
+        // In all other modes, navigate the launcher and close the menu.
+        if (IsXb360Theme)
+        {
+            ActivePage = "friends";
+            return;
+        }
         OnNavigatePage?.Invoke("friends");
         OnRequestLauncherForeground?.Invoke();
         OnDismiss?.Invoke();

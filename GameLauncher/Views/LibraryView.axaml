@@ -24,7 +24,9 @@
                            Classes="page-subtitle"/>
             </StackPanel>
             <TextBox Grid.Column="1"
+                     Name="LibrarySearchBox"
                      Classes="form-input"
+                     IsTabStop="False"
                      Text="{Binding SearchText}"
                      Watermark="🔍  Search games…"
                      Width="240" VerticalAlignment="Center"/>

@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 
 namespace GameLauncher.Services;
@@ -23,6 +25,10 @@ internal static class NativeMethods
     internal const ushort VK_MEDIA_NEXT_TRACK = 0xB0;
     internal const ushort VK_MEDIA_PREV_TRACK = 0xB1;
     internal const ushort VK_MEDIA_PLAY_PAUSE = 0xB3;
+    // PrintScreen key
+    internal const ushort VK_SNAPSHOT = 0x2C;
+    internal const ushort VK_LWIN     = 0x5B;
+    internal const ushort VK_MENU     = 0x12; // Alt
 
     // SetWindowPos flags
     internal const uint SWP_NOMOVE     = 0x0002;
@@ -63,23 +69,9 @@ internal static class NativeMethods
     {
         var inputs = new INPUT[2];
         inputs[0].type = INPUT_KEYBOARD;
-        inputs[0].u.ki = new KEYBDINPUT
-        {
-            wVk = virtualKey,
-            wScan = 0,
-            dwFlags = 0,
-            time = 0,
-            dwExtraInfo = nint.Zero
-        };
+        inputs[0].u.ki = new KEYBDINPUT { wVk = virtualKey };
         inputs[1].type = INPUT_KEYBOARD;
-        inputs[1].u.ki = new KEYBDINPUT
-        {
-            wVk = virtualKey,
-            wScan = 0,
-            dwFlags = KEYEVENTF_KEYUP,
-            time = 0,
-            dwExtraInfo = nint.Zero
-        };
+        inputs[1].u.ki = new KEYBDINPUT { wVk = virtualKey, dwFlags = KEYEVENTF_KEYUP };
 
         uint sent = SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>());
         if (sent == 0)
@@ -88,8 +80,57 @@ internal static class NativeMethods
             System.Diagnostics.Debug.WriteLine($"[NativeMethods] SendInput failed (VK={virtualKey}, Win32Error={error}).");
             return false;
         }
-
         return true;
+    }
+
+    /// <summary>
+    /// Presses a sequence of virtual keys simultaneously then releases them in reverse order.
+    /// Used for key combinations like Ctrl+Shift+Esc or Win+Alt+PrintScreen.
+    /// </summary>
+    internal static bool SendKeyCombo(params ushort[] virtualKeys)
+    {
+        if (virtualKeys.Length == 0) return false;
+        var inputs = new INPUT[virtualKeys.Length * 2];
+        int sz = Marshal.SizeOf<INPUT>();
+        for (int i = 0; i < virtualKeys.Length; i++)
+        {
+            inputs[i].type = INPUT_KEYBOARD;
+            inputs[i].u.ki = new KEYBDINPUT { wVk = virtualKeys[i] };
+        }
+        for (int i = 0; i < virtualKeys.Length; i++)
+        {
+            int idx = virtualKeys.Length + i;
+            inputs[idx].type = INPUT_KEYBOARD;
+            // Release in reverse order
+            inputs[idx].u.ki = new KEYBDINPUT
+            {
+                wVk = virtualKeys[virtualKeys.Length - 1 - i],
+                dwFlags = KEYEVENTF_KEYUP
+            };
+        }
+        return SendInput((uint)inputs.Length, inputs, sz) > 0;
+    }
+
+    /// <summary>
+    /// Sends a Win+Alt+PrintScreen keystroke combo (Xbox app screenshot).
+    /// </summary>
+    internal static void TakeScreenshot()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        SendKeyCombo(VK_LWIN, VK_MENU, VK_SNAPSHOT);
+    }
+
+    /// <summary>
+    /// Sends a single virtual key down+up to the current foreground window.
+    /// </summary>
+    internal static bool SendSingleKey(ushort virtualKey)
+    {
+        var inputs = new INPUT[2];
+        inputs[0].type = INPUT_KEYBOARD;
+        inputs[0].u.ki = new KEYBDINPUT { wVk = virtualKey };
+        inputs[1].type = INPUT_KEYBOARD;
+        inputs[1].u.ki = new KEYBDINPUT { wVk = virtualKey, dwFlags = KEYEVENTF_KEYUP };
+        return SendInput(2, inputs, Marshal.SizeOf<INPUT>()) > 0;
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -116,6 +157,9 @@ internal static class NativeMethods
     }
 
     // ── XInput ───────────────────────────────────────────────────────────────
+
+    /// <summary>XInput Guide/Home button flag (0x0400) present in the extended state.</summary>
+    internal const ushort XInputGuideMask = 0x0400;
 
     /// <summary>
     /// Snapshot of an XInput controller's button / axis state.
@@ -151,4 +195,12 @@ internal static class NativeMethods
     /// </summary>
     [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState", SetLastError = false)]
     internal static extern uint XInputGetState(uint dwUserIndex, out XINPUT_STATE pState);
+
+    /// <summary>
+    /// Undocumented extended XInput state read that exposes the Guide/Home button (bit 0x0400).
+    /// Available in xinput9_1_0.dll (ordinal 100) on Windows Vista+.
+    /// Falls back gracefully — callers must catch <see cref="Exception"/> and disable on failure.
+    /// </summary>
+    [DllImport("xinput9_1_0.dll", EntryPoint = "#100", SetLastError = false)]
+    internal static extern uint XInputGetStateEx(uint dwUserIndex, out XINPUT_STATE pState);
 }

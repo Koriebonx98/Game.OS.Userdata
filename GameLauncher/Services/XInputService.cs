@@ -8,7 +8,7 @@ namespace GameLauncher.Services;
 /// with latch-based repeat prevention (one callback per press until release).
 /// Supports D-pad, left stick (with dead-zone), face buttons (A / B / X / Y),
 /// shoulder bumpers (LB / RB), analog triggers (LT / RT), Back (Select),
-/// the right stick, and the Start button.
+/// the right stick, Start, Guide (Home/Xbox) and Share buttons.
 /// All calls are safe to make on non-Windows — they become no-ops.
 /// </summary>
 internal sealed class XInputService
@@ -22,6 +22,8 @@ internal sealed class XInputService
     private const ushort BackMask      = 0x0020;
     private const ushort LbMask        = 0x0100;
     private const ushort RbMask        = 0x0200;
+    /// <summary>Guide/Home/Xbox button — bit 0x0400 in the extended XInputGetStateEx state.</summary>
+    private const ushort GuideMask     = 0x0400;
     private const ushort ButtonAMask   = 0x1000;
     private const ushort ButtonBMask   = 0x2000;
     private const ushort ButtonXMask   = 0x4000;
@@ -63,6 +65,19 @@ internal sealed class XInputService
     public Action? OnRt { get; set; }
     /// <summary>Start / Options / Menu button — opens the quick menu.</summary>
     public Action? OnStart { get; set; }
+    /// <summary>
+    /// Guide / Home / Xbox button — opens the quick guide menu.
+    /// Detected via the undocumented XInputGetStateEx (xinput9_1_0.dll ordinal 100).
+    /// Falls back to no-op if the DLL is unavailable.
+    /// </summary>
+    public Action? OnGuide { get; set; }
+    /// <summary>
+    /// Share button (Xbox Series X/S).  Triggers a Win+Alt+PrintScreen screenshot.
+    /// Mapped from the Back+Start combo on older controllers where a dedicated Share
+    /// button is not present; on controllers that report it via XInputGetStateEx it
+    /// fires directly.
+    /// </summary>
+    public Action? OnShare { get; set; }
 
     // ── Internal latch state ──────────────────────────────────────────────────
     private ushort _latchedButtons;
@@ -76,8 +91,10 @@ internal sealed class XInputService
     private bool   _rstickRightLatched;
     private bool   _ltLatched;
     private bool   _rtLatched;
+    private bool   _guideLatched;
     private int    _connectedIndex  = -1;   // cached slot of the connected controller
     private bool   _xinputAvailable = true; // set false if xinput1_4.dll is missing
+    private bool   _xinputExAvailable = true; // set false if xinput9_1_0.dll ordinal 100 is missing
 
     // ── Public API ────────────────────────────────────────────────────────────
 
@@ -107,7 +124,26 @@ internal sealed class XInputService
 
             if (_connectedIndex < 0) { ResetLatches(); return; }
 
-            uint result = NativeMethods.XInputGetState((uint)_connectedIndex, out var state);
+            // Use extended state reader so we can detect the Guide button.
+            uint result;
+            NativeMethods.XINPUT_STATE state;
+            if (_xinputExAvailable)
+            {
+                try
+                {
+                    result = NativeMethods.XInputGetStateEx((uint)_connectedIndex, out state);
+                }
+                catch
+                {
+                    _xinputExAvailable = false;
+                    result = NativeMethods.XInputGetState((uint)_connectedIndex, out state);
+                }
+            }
+            else
+            {
+                result = NativeMethods.XInputGetState((uint)_connectedIndex, out state);
+            }
+
             if (result != 0)
             {
                 // Controller disconnected — clear cached slot and latches
@@ -148,6 +184,9 @@ internal sealed class XInputService
         Fire(b, LbMask,        ref _latchedButtons, OnLb);
         Fire(b, RbMask,        ref _latchedButtons, OnRb);
         Fire(b, StartMask,     ref _latchedButtons, OnStart);
+
+        // Guide / Home / Xbox button (bit 0x0400 from XInputGetStateEx)
+        FireStick((b & GuideMask) != 0, ref _guideLatched, OnGuide);
 
         // Left stick — treated identically to the D-pad
         FireStick(gp.sThumbLY >  StickDeadZone, ref _stickUpLatched,    OnUp);
@@ -204,5 +243,6 @@ internal sealed class XInputService
         _rstickRightLatched = false;
         _ltLatched         = false;
         _rtLatched         = false;
+        _guideLatched      = false;
     }
 }

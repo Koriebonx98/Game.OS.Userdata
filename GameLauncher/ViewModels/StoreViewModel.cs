@@ -255,8 +255,42 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         ApplyFilter();       // always re-apply in case FilterGenre was already "All"
     }
 
-    partial void OnSearchTextChanged(string value)   { DisplayLimit = MaxDisplayedGames; ApplyFilter(); }
+    // Debounce timer — avoids re-filtering on every keystroke when browsing
+    // large platform catalogs (150 k+ entries) which would freeze the UI.
+    private System.Threading.Timer? _searchDebounce;
+    private const int SearchDebounceMs = 300;
+
+    partial void OnSearchTextChanged(string value)
+    {
+        DisplayLimit = MaxDisplayedGames;
+        _searchDebounce?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        _searchDebounce = new System.Threading.Timer(_ =>
+            Avalonia.Threading.Dispatcher.UIThread.Post(ApplyFilter,
+                Avalonia.Threading.DispatcherPriority.Background),
+            null, SearchDebounceMs, System.Threading.Timeout.Infinite);
+    }
+
     partial void OnFilterGenreChanged(string value)  { DisplayLimit = MaxDisplayedGames; ApplyFilter(); }
+
+    /// <summary>
+    /// Cycles between the Games Store tab and the App Store tab.
+    /// Called by the controller LB/RB handler in MainWindow.
+    /// </summary>
+    public void CycleTab()
+    {
+        if (IsGamesTab)
+        {
+            IsGamesTab    = false;
+            IsAppStoreTab = true;
+            if (AllAppStoreEntries.Count == 0)
+                _ = LoadAppStoreAsync();
+        }
+        else
+        {
+            IsGamesTab    = true;
+            IsAppStoreTab = false;
+        }
+    }
 
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
@@ -532,5 +566,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     {
         _loadCts.Cancel();
         _loadCts.Dispose();
+        _searchDebounce?.Change(System.Threading.Timeout.Infinite, System.Threading.Timeout.Infinite);
+        _searchDebounce?.Dispose();
+        _searchDebounce = null;
     }
 }

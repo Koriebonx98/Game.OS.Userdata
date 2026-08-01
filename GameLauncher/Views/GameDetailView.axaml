@@ -1230,6 +1230,19 @@
                             </Button>
                         </Grid>
 
+                        <!-- Active profile indicator -->
+                        <Border Background="#0d2a0d" CornerRadius="6" Padding="10,6"
+                                IsVisible="{Binding HasControllerProfiles}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Active:" Foreground="#8b949e" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding ActiveControllerProfileName}"
+                                           Foreground="#3fb950" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="(injected into game when running)"
+                                           Foreground="#8b949e" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Saved profiles list -->
                         <ItemsControl ItemsSource="{Binding ControllerProfiles}"
                                       IsVisible="{Binding HasControllerProfiles}">
@@ -1259,6 +1272,20 @@
                                             </StackPanel>
                                             <StackPanel Grid.Column="1" Orientation="Horizontal"
                                                         Spacing="6" VerticalAlignment="Center">
+                                               <!-- Activate for injection -->
+                                                <Button Classes="btn-secondary" Padding="10,6"
+                                                       ToolTip.Tip="Use this profile when game is running"
+                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                   <TextBlock Text="▶ Activate" FontSize="11"/>
+                                                </Button>
+                                               <!-- Edit mapping -->
+                                               <Button Classes="btn-secondary" Padding="10,6"
+                                                       ToolTip.Tip="Edit button mappings"
+                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
+                                                       CommandParameter="{Binding ProfileName}">
+                                                   <TextBlock Text="✏ Edit" FontSize="11"/>
+                                               </Button>
                                                 <!-- Upload to Games.Database -->
                                                 <Button Classes="btn-secondary" Padding="10,6"
                                                         ToolTip.Tip="Share to Games.Database"
@@ -1281,36 +1308,94 @@
                         </ItemsControl>
 
                         <!-- Empty state -->
-                        <TextBlock Text="No profiles yet — create one to start remapping controller buttons for this game."
+                        <TextBlock Text="No profiles yet — click '+ New Profile' to create a button mapping for this game."
                                    FontSize="13" Foreground="#8b949e" TextWrapping="Wrap"
                                    IsVisible="{Binding !HasControllerProfiles}"/>
 
-                        <!-- New profile form -->
+                        <!-- ── Button mapping editor form ── -->
                         <Border IsVisible="{Binding ShowNewProfileForm}"
                                 Background="#0d1117" CornerRadius="8" Padding="16,14">
-                            <StackPanel Spacing="10">
-                                <TextBlock Text="New Controller Profile"
-                                           FontSize="14" FontWeight="SemiBold" Foreground="White"/>
-                                <TextBox Watermark="Profile name (e.g. Navigation, FPS Setup…)"
-                                         Text="{Binding NewProfileName}"
-                                         Background="#161b22" Foreground="White"
-                                         BorderBrush="#30363d" CornerRadius="6"
-                                         Padding="10,8" FontSize="13"/>
-                                <TextBox Watermark="Description (optional)"
-                                         Text="{Binding NewProfileDescription}"
-                                         Background="#161b22" Foreground="White"
-                                         BorderBrush="#30363d" CornerRadius="6"
-                                         Padding="10,8" FontSize="13"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
+                            <StackPanel Spacing="12">
+
+                                <TextBlock Text="🎮  Button Mapping Editor"
+                                           FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock FontSize="11" Foreground="#6e7681" TextWrapping="Wrap">
+                                    Assign a keyboard key, mouse button, or media key to each controller input.
+                                    Format: Key:Enter · Key:Ctrl+Shift+Esc · Mouse:LeftClick · Media:PlayPause · Empty
+                                </TextBlock>
+
+                                <!-- Profile name + description -->
+                                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
+                                    <TextBox Grid.Row="0" Grid.Column="0"
+                                             Margin="0,0,6,6"
+                                             Watermark="Profile name (e.g. Navigation, FPS…)"
+                                             Text="{Binding NewProfileName}"
+                                             Background="#161b22" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="10,8" FontSize="13"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Margin="6,0,0,6"
+                                             Watermark="Description (optional)"
+                                             Text="{Binding NewProfileDescription}"
+                                             Background="#161b22" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="10,8" FontSize="13"/>
+                                </Grid>
+
+                                <!-- Column header row -->
+                                <Grid ColumnDefinitions="*,*,*">
+                                    <TextBlock Grid.Column="0" Text="Button"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"/>
+                                    <TextBlock Grid.Column="1" Text="Press action"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
+                                               Margin="6,0,0,0"/>
+                                    <TextBlock Grid.Column="2" Text="Hold action"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
+                                               Margin="6,0,0,0"/>
+                                </Grid>
+
+                                <!-- Per-button rows -->
+                                <ItemsControl ItemsSource="{Binding MappingRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ButtonMappingRowVm">
+                                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,5">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding DisplayName}"
+                                                           FontSize="12" Foreground="#e6edf3"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="1"
+                                                         Margin="6,0,3,0"
+                                                         Text="{Binding PressAction}"
+                                                         Watermark="Empty"
+                                                         Background="#21262d" Foreground="White"
+                                                         BorderBrush="#30363d" CornerRadius="4"
+                                                         Padding="8,5" FontSize="12"
+                                                         FontFamily="Consolas,Courier New,monospace"/>
+                                                <TextBox Grid.Column="2"
+                                                         Margin="3,0,0,0"
+                                                         Text="{Binding HoldAction}"
+                                                         Watermark="Empty"
+                                                         Background="#21262d" Foreground="White"
+                                                         BorderBrush="#30363d" CornerRadius="4"
+                                                         Padding="8,5" FontSize="12"
+                                                         FontFamily="Consolas,Courier New,monospace"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Save / Cancel buttons -->
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
                                     <Button Classes="btn-primary" Padding="16,8"
                                             Command="{Binding CreateControllerProfileCommand}">
-                                        <TextBlock Text="Create Profile" FontSize="13" FontWeight="SemiBold"/>
+                                        <TextBlock Text="💾  Save Profile" FontSize="13" FontWeight="SemiBold"/>
                                     </Button>
                                     <Button Classes="btn-secondary" Padding="14,8"
                                             Command="{Binding CancelCreateProfileCommand}">
                                         <TextBlock Text="Cancel" FontSize="13"/>
                                     </Button>
                                 </StackPanel>
+
                             </StackPanel>
                         </Border>
 
