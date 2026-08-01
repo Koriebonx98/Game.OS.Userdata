@@ -3662,15 +3662,9 @@ public partial class GameDetailViewModel : ViewModelBase
                 // cloud folder so the private repo matches the Steam model:
                 //   Achievements/{platform}/{titleKey}/achievements.json
                 //
-                // For non-PC platforms this runs unconditionally.
-                // For PC games we also persist when at least one Steam-emu unlock was merged
-                // so the unlocked state survives across sessions and cloud syncs without
-                // requiring the user to keep launching the game.
-                bool isPc = string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase);
-                int emuMergedCount = list.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
-                bool shouldPersistPc = isPc && emuMergedCount > 0;
-
-                if ((!isPc || shouldPersistPc) && OnFullAchievementListReadyAsync != null)
+                // Persist for all platforms (including PC) so each game has a full baseline
+                // template in the private repo before per-achievement unlock deltas arrive.
+                if (OnFullAchievementListReadyAsync != null)
                 {
                     string snapshotTitleKey = titleId ?? Title;
                     var snapshotList = list.AsReadOnly();

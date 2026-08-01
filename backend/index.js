@@ -2234,16 +2234,24 @@ app.post('/api/me/achievements', authenticateToken, async (req, res) => {
         const file = await getFile(path);
         const list = file ? [...file.content] : [];
 
+        const incomingAchievementId = String(achievementId);
+        const incomingAchievementName = String(name || '').trim().toLowerCase();
         const existing = list.findIndex(
             a => normalizePlatformName(a.platform) === normalizedPlatform &&
                  (a.gameTitle || '').toLowerCase() === gameTitle.toLowerCase() &&
-                 String(a.achievementId) === String(achievementId)
+                 (
+                     String(a.achievementId) === incomingAchievementId ||
+                     (
+                         incomingAchievementName !== '' &&
+                         String(a.name || '').trim().toLowerCase() === incomingAchievementName
+                     )
+                 )
         );
 
         const entry = {
             platform: normalizedPlatform,
             gameTitle,
-            achievementId: String(achievementId),
+            achievementId: incomingAchievementId,
             name,
             description: description || '',
             unlockedAt: unlockedAt || new Date().toISOString()
@@ -2272,8 +2280,12 @@ app.post('/api/me/achievements', authenticateToken, async (req, res) => {
                 : (Array.isArray(legacyFile?.content) ? legacyFile.content : []);
             const byGameList = [...sourceList];
 
-            const existingByGame = byGameList.findIndex(
-                a => String(a.achievementId) === String(achievementId)
+            const existingByGame = byGameList.findIndex(a =>
+                String(a.achievementId) === incomingAchievementId ||
+                (
+                    incomingAchievementName !== '' &&
+                    String(a.name || '').trim().toLowerCase() === incomingAchievementName
+                )
             );
             if (existingByGame !== -1) {
                 byGameList[existingByGame] = { ...byGameList[existingByGame], ...entry };
@@ -2345,11 +2357,11 @@ app.put('/api/me/achievements/game-template', authenticateToken, async (req, res
                 : String(rawAchievementId);
             if (!achId) return;
             const incomingName = String(incoming?.name || '');
+            const incomingNameLower = incomingName.toLowerCase();
             const idx = merged.findIndex(e =>
                 String(e.achievementId || '') === achId ||
-                (String(e.achievementId || '') === '' &&
-                 incomingName !== '' &&
-                 String(e.name || '').toLowerCase() === incomingName.toLowerCase()));
+                (incomingName !== '' &&
+                 String(e.name || '').toLowerCase() === incomingNameLower));
             const normalizedIncoming = { ...incoming, achievementId: achId };
             if (idx !== -1) {
                 const existingUnlockedAt = typeof merged[idx].unlockedAt === 'string' ? merged[idx].unlockedAt : '';
