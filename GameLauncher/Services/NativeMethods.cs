@@ -114,4 +114,41 @@ internal static class NativeMethods
         public uint time;
         public nint dwExtraInfo;
     }
+
+    // ── XInput ───────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Snapshot of an XInput controller's button / axis state.
+    /// Matches the XINPUT_GAMEPAD Win32 structure exactly.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct XINPUT_GAMEPAD
+    {
+        public ushort wButtons;
+        public byte   bLeftTrigger;
+        public byte   bRightTrigger;
+        public short  sThumbLX;
+        public short  sThumbLY;
+        public short  sThumbRX;
+        public short  sThumbRY;
+    }
+
+    /// <summary>
+    /// Matches the XINPUT_STATE Win32 structure exactly.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct XINPUT_STATE
+    {
+        public uint          dwPacketNumber;
+        public XINPUT_GAMEPAD Gamepad;
+    }
+
+    /// <summary>
+    /// Retrieves the current state of the specified XInput controller.
+    /// Returns 0 (ERROR_SUCCESS) when a controller is connected,
+    /// or 1167 (ERROR_DEVICE_NOT_CONNECTED) otherwise.
+    /// xinput1_4.dll ships with Windows 8+ and all subsequent versions.
+    /// </summary>
+    [DllImport("xinput1_4.dll", EntryPoint = "XInputGetState", SetLastError = false)]
+    internal static extern uint XInputGetState(uint dwUserIndex, out XINPUT_STATE pState);
 }

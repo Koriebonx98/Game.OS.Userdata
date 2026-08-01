@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using GameLauncher.Services;
 using GameLauncher.ViewModels;
 
 namespace GameLauncher.Views;
@@ -28,6 +29,13 @@ public partial class MainWindow : Window
     // restoring the full launcher — mirrors the Steam/NVIDIA overlay pattern).
     private QuickMenuWindow? _quickMenuWindow;
 
+    // ── XInput controller support ────────────────────────────────────────────
+    private readonly XInputService _xinput = new();
+    private readonly DispatcherTimer _xinputPoller = new()
+    {
+        Interval = TimeSpan.FromMilliseconds(150)
+    };
+
     public MainWindow()
     {
         InitializeComponent();
@@ -36,11 +44,14 @@ public partial class MainWindow : Window
         Opened += (_, _) => RefreshGlobalHotkeyPolling();
         Closed += OnMainWindowClosed;
         _globalHotkeyPoller.Tick += OnGlobalHotkeyTick;
+        _xinputPoller.Tick += OnXInputTick;
+        WireXInputCallbacks();
     }
 
     private void OnMainWindowClosed(object? sender, EventArgs e)
     {
         _globalHotkeyPoller.Stop();
+        _xinputPoller.Stop();
         _quickMenuWindow?.Close();
         _quickMenuWindow = null;
     }
@@ -80,11 +91,14 @@ public partial class MainWindow : Window
                 Activate();
             };
             RefreshGlobalHotkeyPolling();
+            if (OperatingSystem.IsWindows() && !_xinputPoller.IsEnabled)
+                _xinputPoller.Start();
         }
         else
         {
             _boundVm = null;
             RefreshGlobalHotkeyPolling();
+            _xinputPoller.Stop();
         }
     }
 
@@ -564,5 +578,207 @@ public partial class MainWindow : Window
         // When the inline quick menu is dismissed, also hide the overlay window if visible.
         if (!_boundVm.ShowQuickMenu)
             _quickMenuWindow?.Hide();
+    }
+
+    // ── XInput controller support ─────────────────────────────────────────────
+
+    /// <summary>
+    /// Wires XInput button callbacks once, mapping each controller button to the
+    /// same navigation actions that the keyboard path uses.
+    /// Console button mapping:
+    ///   D-pad / left stick → directional navigation (Up / Down / Left / Right)
+    ///   A (cross)          → confirm / select   (Enter)
+    ///   B (circle)         → back / cancel      (Escape)
+    ///   X (square)         → secondary action   (X key — open game detail)
+    ///   LB / L1            → previous page      (PageUp)
+    ///   RB / R1            → next page          (PageDown)
+    ///   Start / Menu       → toggle Quick Menu  (≡ Left Ctrl + Left Shift)
+    /// </summary>
+    private void WireXInputCallbacks()
+    {
+        _xinput.OnUp     = () => HandleControllerKey(Key.Up);
+        _xinput.OnDown   = () => HandleControllerKey(Key.Down);
+        _xinput.OnLeft   = () => HandleControllerKey(Key.Left);
+        _xinput.OnRight  = () => HandleControllerKey(Key.Right);
+        _xinput.OnButtonA = () => HandleControllerKey(Key.Enter);
+        _xinput.OnButtonB = () => HandleControllerKey(Key.Escape);
+        _xinput.OnButtonX = () => HandleControllerKey(Key.X);
+        _xinput.OnLb      = () => HandleControllerKey(Key.PageUp);
+        _xinput.OnRb      = () => HandleControllerKey(Key.PageDown);
+
+        // Start → open/toggle the Quick Menu (mirrors the Shift+Ctrl keyboard hotkey)
+        _xinput.OnStart = () =>
+        {
+            if (_boundVm == null) return;
+            bool gameRunning      = _boundVm.DetailVm.IsGameRunning;
+            bool launcherMinimized = WindowState == WindowState.Minimized;
+            bool launcherUnfocused = !IsActive;
+            if (gameRunning || launcherMinimized || launcherUnfocused)
+                OpenGlobalQuickMenu();
+            else
+                _boundVm.ToggleQuickMenu();
+        };
+    }
+
+    /// <summary>
+    /// Called every 150 ms by the XInput poller; delegates to
+    /// <see cref="XInputService.Poll"/> which fires the wired callbacks.
+    /// </summary>
+    private void OnXInputTick(object? sender, EventArgs e)
+    {
+        if (!OperatingSystem.IsWindows() || _boundVm == null) return;
+        _xinput.Poll();
+    }
+
+    /// <summary>
+    /// Handles a virtual key dispatched from the XInput controller, applying
+    /// the same navigation logic as the keyboard handler but without requiring
+    /// a focused window (works even when the launcher is behind a game).
+    /// </summary>
+    private void HandleControllerKey(Key key)
+    {
+        if (_boundVm == null) return;
+        var vm = _boundVm;
+
+        // If the overlay quick menu window is visible, forward all input to its VM.
+        if (_quickMenuWindow?.IsVisible == true)
+        {
+            var qvm = vm.QuickMenuVm;
+            bool isXb360Overlay = qvm.IsXb360Theme;
+            switch (key)
+            {
+                case Key.Left:
+                    if (isXb360Overlay) qvm.MoveXb360Blade(-1); else qvm.MoveHubSelection(-1);
+                    return;
+                case Key.Right:
+                    if (isXb360Overlay) qvm.MoveXb360Blade(1); else qvm.MoveHubSelection(1);
+                    return;
+                case Key.Up:
+                    if (isXb360Overlay) qvm.MoveXb360CenterItem(-1);
+                    return;
+                case Key.Down:
+                    if (isXb360Overlay) qvm.MoveXb360CenterItem(1);
+                    return;
+                case Key.Enter:
+                    qvm.ActivateSelectedHub();
+                    return;
+                case Key.Escape:
+                    if (!qvm.HandleBackNavigation()) qvm.DismissCommand.Execute(null);
+                    return;
+            }
+            return;
+        }
+
+        // While the inline quick menu is open, prioritise its navigation.
+        if (vm.ShowQuickMenu)
+        {
+            bool isXb360QuickMenu = vm.QuickMenuVm.IsXb360Theme;
+            switch (key)
+            {
+                case Key.Left:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                    else vm.QuickMenuVm.MoveHubSelection(-1);
+                    return;
+                case Key.Right:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                    else vm.QuickMenuVm.MoveHubSelection(1);
+                    return;
+                case Key.Up:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(-1);
+                    return;
+                case Key.Down:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(1);
+                    return;
+                case Key.Enter:
+                    vm.QuickMenuVm.ActivateSelectedHub();
+                    return;
+                case Key.Escape:
+                    if (!vm.QuickMenuVm.HandleBackNavigation()) vm.ShowQuickMenu = false;
+                    return;
+            }
+            return;
+        }
+
+        // XB360 dashboard navigation (blade-style carousel)
+        bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        {
+            switch (key)
+            {
+                case Key.Left:  vm.DashboardVm.MoveXb360Blade(-1); return;
+                case Key.Right: vm.DashboardVm.MoveXb360Blade(1);  return;
+                case Key.Up:    vm.DashboardVm.MoveXb360GameFocus(-1); return;
+                case Key.Down:  vm.DashboardVm.MoveXb360GameFocus(1);  return;
+                case Key.Enter: vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null); return;
+            }
+        }
+
+        // PS5 / Switch dashboard navigation
+        bool isPs5OrSwitch =
+            string.Equals(vm.SettingsVm.DesignTheme, "PS5",    StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isPs5OrSwitch && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        {
+            switch (key)
+            {
+                case Key.Right:
+                    vm.DashboardVm.MoveFocus(1);
+                    return;
+                case Key.Left:
+                    if (vm.DashboardVm.HasFocusedCard) { vm.DashboardVm.MoveFocus(-1); return; }
+                    break;
+                case Key.Enter:
+                    if (vm.DashboardVm.HasFocusedCard)
+                    { vm.DashboardVm.PlayFocusedCardCommand.Execute(null); return; }
+                    break;
+                case Key.X:
+                    if (vm.DashboardVm.HasFocusedCard)
+                    { vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null); return; }
+                    break;
+            }
+        }
+
+        // Global navigation — back, page prev/next, nav sidebar, and confirm
+        switch (key)
+        {
+            case Key.Escape:
+                if (vm.ShowDetail)             vm.DetailVm.CloseCommand.Execute(null);
+                else if (vm.ShowFriendProfile) vm.CloseFriendProfileCommand.Execute(null);
+                else if (vm.IsNavExpanded)     vm.IsNavExpanded = false;
+                break;
+
+            case Key.PageUp:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile) NavigatePrev(vm);
+                break;
+
+            case Key.PageDown:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile) NavigateNext(vm);
+                break;
+
+            case Key.Left:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+                    vm.IsNavExpanded = true;
+                break;
+
+            case Key.Right:
+                if (!vm.ShowDetail && !vm.ShowFriendProfile && vm.IsNavExpanded)
+                    vm.IsNavExpanded = false;
+                break;
+
+            case Key.Up:
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+                    NavigatePrev(vm);
+                break;
+
+            case Key.Down:
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+                    NavigateNext(vm);
+                break;
+
+            case Key.Enter:
+                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+                    vm.IsNavExpanded = false;
+                break;
+        }
     }
 }
