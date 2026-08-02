@@ -329,11 +329,12 @@ public partial class MainWindow : Window
             }
         }
 
-        // PS5/Switch dashboard navigation
-        bool isPs5OrSwitch =
+        // Default/PS5/Switch dashboard navigation
+        bool usesCardDashboardNavigation =
+            string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
-        if (vm.IsHome && isPs5OrSwitch && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        if (vm.IsHome && usesCardDashboardNavigation && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {
@@ -397,6 +398,14 @@ public partial class MainWindow : Window
                 // X → cycle platform filter
                 case Key.X when !inSearch:
                     vm.LibraryVm.CyclePlatform(1);
+                    e.Handled = true;
+                    return;
+                case Key.Left when !inSearch:
+                    vm.LibraryVm.MoveGameFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Right when !inSearch:
+                    vm.LibraryVm.MoveGameFocus(1);
                     e.Handled = true;
                     return;
                 // Up/Down → move focused game card
@@ -790,8 +799,8 @@ public partial class MainWindow : Window
     ///   Back / Select      → back / cancel      (Escape)
     ///   LB / L1            → previous page      (PageUp)
     ///   RB / R1            → next page          (PageDown)
-    ///   LT / L2            → previous page      (PageUp — same as LB for menu nav)
-    ///   RT / R2            → next page          (PageDown — same as RB for menu nav)
+    ///   LT / L2            → disabled (reserved; does not page-switch tabs)
+    ///   RT / R2            → disabled (reserved; does not page-switch tabs)
     ///   Start / Menu       → toggle Quick Menu  (≡ Left Ctrl + Left Shift)
     ///   Guide / Home / Xbox → toggle Quick Menu (same as Start)
     ///   Share              → screenshot via Win+Alt+PrintScreen
@@ -809,10 +818,9 @@ public partial class MainWindow : Window
         _xinput.OnBack    = () => HandleControllerKey(Key.Escape);
         _xinput.OnLb      = () => HandleControllerKey(Key.PageUp);
         _xinput.OnRb      = () => HandleControllerKey(Key.PageDown);
-        // Analog triggers act as additional prev/next page buttons for controllers
-        // where the bumpers are awkward or not present.
-        _xinput.OnLt      = () => HandleControllerKey(Key.PageUp);
-        _xinput.OnRt      = () => HandleControllerKey(Key.PageDown);
+        // Leave analog triggers unbound in launcher navigation so LT/RT do not switch tabs/pages.
+        _xinput.OnLt      = null;
+        _xinput.OnRt      = null;
 
         // Start → open/toggle the Quick Menu (mirrors the Shift+Ctrl keyboard hotkey)
         _xinput.OnStart = () =>
@@ -909,6 +917,9 @@ public partial class MainWindow : Window
                 case Key.Enter:
                     qvm.ActivateSelectedHub();
                     return;
+                case Key.Y:
+                    if (isXb360Overlay) qvm.GoToGameOsHomeCommand.Execute(null);
+                    return;
                 case Key.Escape:
                     if (!qvm.HandleBackNavigation()) qvm.DismissCommand.Execute(null);
                     return;
@@ -938,6 +949,9 @@ public partial class MainWindow : Window
                     return;
                 case Key.Enter:
                     vm.QuickMenuVm.ActivateSelectedHub();
+                    return;
+                case Key.Y:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.GoToGameOsHomeCommand.Execute(null);
                     return;
                 case Key.Escape:
                     if (!vm.QuickMenuVm.HandleBackNavigation()) vm.ShowQuickMenu = false;
@@ -1036,11 +1050,12 @@ public partial class MainWindow : Window
             }
         }
 
-        // PS5 / Switch dashboard navigation
-        bool isPs5OrSwitch =
+        // Default / PS5 / Switch dashboard navigation
+        bool usesCardDashboardNavigationController =
+            string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "PS5",    StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
-        if (vm.IsHome && isPs5OrSwitch && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        if (vm.IsHome && usesCardDashboardNavigationController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
             switch (key)
             {
@@ -1087,6 +1102,12 @@ public partial class MainWindow : Window
                     return;
                 case Key.X:
                     vm.LibraryVm.CyclePlatform(1);
+                    return;
+                case Key.Left:
+                    vm.LibraryVm.MoveGameFocus(-1);
+                    return;
+                case Key.Right:
+                    vm.LibraryVm.MoveGameFocus(1);
                     return;
                 case Key.Up:
                     vm.LibraryVm.MoveGameFocus(-1);

@@ -1005,6 +1005,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:LocalGameCardVm">
                             <Button Classes="game-card-btn"
+                                    Classes.focused="{Binding IsFocused}"
                                     Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
                                     CommandParameter="{Binding}">
                                 <StackPanel>

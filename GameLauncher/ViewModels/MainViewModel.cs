@@ -908,8 +908,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] GamesUpdated: {games.Count} local games found.");
             LibraryVm.UpdateLocalGames(games);
             RefreshDashboardLocalGames();
-            // Trigger background metadata caching for the newly found PC games
-            _ = BackgroundCacheLocalGamesAsync();
+            if (BackgroundMetadataCachingEnabled())
+            {
+                // Trigger background metadata caching for the newly found PC games
+                _ = BackgroundCacheLocalGamesAsync();
+            }
         };
         _scanner.RepacksUpdated += repacks =>
         {
@@ -922,8 +925,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found.");
             LibraryVm.UpdateRoms(roms);
             RefreshDashboardLocalGames();
-            // Trigger background metadata caching for the newly found ROMs
-            _ = BackgroundCacheLocalGamesAsync();
+            if (BackgroundMetadataCachingEnabled())
+            {
+                // Trigger background metadata caching for the newly found ROMs
+                _ = BackgroundCacheLocalGamesAsync();
+            }
         };
     }
 
@@ -1121,9 +1127,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Start polling friend presence to fire notifications
             StartFriendPresencePolling();
 
-            // Start periodic sync check (every 5 minutes while online): re-fetches remote
-            // user data and invalidates stale Games.Database caches.
-            StartSyncCheckTimer();
+            // Start periodic sync check only when background sync polling is enabled.
+            if (BackgroundSyncChecksEnabled())
+                StartSyncCheckTimer();
 
             if (Services.AppSettingsService.Load().AppAutoUpdate)
             {
@@ -1131,11 +1137,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 StartLauncherUpdateTimer();
             }
 
-            // Start the 30-second heartbeat poller that watches sync-signal.json.
-            // When another device finishes a play session it writes a new timestamp;
-            // the poller detects the change and immediately refreshes playtime/recently-played
-            // without waiting for the full 5-minute sync tick.
-            StartHeartbeatPoller();
+            // Start the sync-signal heartbeat poller only when background sync polling is enabled.
+            if (BackgroundSyncChecksEnabled())
+                StartHeartbeatPoller();
 
             // Load cloud playtime from the backend and apply it to the library.
             // Cloud data is the source of truth — it overrides the local cache so
@@ -1146,9 +1150,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // immediately pushed to the cloud activity log.
             PlaytimeService.SessionSaved += OnSessionSaved;
 
-            // Start background metadata caching for cloud library games and local games
-            _ = BackgroundCacheLibraryAsync(library);
-            _ = BackgroundCacheLocalGamesAsync();
+            if (BackgroundMetadataCachingEnabled())
+            {
+                // Start background metadata caching for cloud library games and local games
+                _ = BackgroundCacheLibraryAsync(library);
+                _ = BackgroundCacheLocalGamesAsync();
+            }
 
             // Seed any bundled Switch achievement JSON files to the Games.Database if they
             // are not already there (best-effort; runs silently in the background).
@@ -3409,6 +3416,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>Interval used for both the offline reconnect timer and the online sync-check timer.</summary>
     private static readonly TimeSpan PeriodicCheckInterval = TimeSpan.FromMinutes(5);
 
+    private static bool BackgroundSyncChecksEnabled()
+        => Services.AppSettingsService.Load().EnableBackgroundSyncChecks;
+
+    private static bool BackgroundMetadataCachingEnabled()
+        => Services.AppSettingsService.Load().EnableBackgroundMetadataCaching;
+
     /// <summary>
     /// Starts a background timer that fires every 5 minutes while the app is in Offline
     /// Mode.  On each tick it performs a lightweight connectivity check; if the server is
@@ -3529,13 +3542,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             StopOfflineReconnectTimer();
             _ = _client.UpdatePresenceAsync();
             StartPresenceHeartbeat();
-            StartSyncCheckTimer();
+            if (BackgroundSyncChecksEnabled())
+                StartSyncCheckTimer();
             if (Services.AppSettingsService.Load().AppAutoUpdate)
             {
                 _ = CheckForLauncherUpdateAsync();
                 StartLauncherUpdateTimer();
             }
-            StartHeartbeatPoller();
+            if (BackgroundSyncChecksEnabled())
+                StartHeartbeatPoller();
             StartMessagePolling();
 
             // Apply cloud playtime so any sessions played on other devices while this one
