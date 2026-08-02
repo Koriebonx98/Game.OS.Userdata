@@ -518,6 +518,16 @@ public partial class GameDetailViewModel : ViewModelBase
         if (ShowControllerPanel) LoadControllerProfiles();
     }
 
+    /// <summary>
+    /// Reloads the controller profiles list and ensures the panel is visible.
+    /// Called by the view after the editor window saves a profile.
+    /// </summary>
+    public void RefreshControllerProfiles()
+    {
+        ShowControllerPanel = true;
+        LoadControllerProfiles();
+    }
+
     [RelayCommand]
     private void CancelCreateProfile()
     {
@@ -592,10 +602,20 @@ public partial class GameDetailViewModel : ViewModelBase
     private void UploadProfileToDb(string profileName)
     {
         var all     = Services.ControllerProfileService.LoadProfiles(Platform, Title);
+        // Match by name only — allow sharing profiles created by others or when
+        // the logged-in username doesn't exactly match the stored author field.
         var profile = all.Find(p =>
-            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase) &&
-            string.Equals(p.Author,      _currentUsername, StringComparison.OrdinalIgnoreCase));
-        if (profile == null) return;
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase));
+        if (profile == null)
+        {
+            ControllerStatus = $"Profile \"{profileName}\" not found.";
+            return;
+        }
+
+        // Stamp the current username as author when sharing so the uploaded copy
+        // is attributed to whoever is doing the sharing.
+        if (!string.IsNullOrEmpty(_currentUsername))
+            profile.Author = _currentUsername;
 
         string? titleId  = CurrentTitleId;
         string  title    = Title;
@@ -724,9 +744,25 @@ public partial class GameDetailViewModel : ViewModelBase
         ControllerStatus = $"✓ \"{profileName}\" is now the active profile.";
     }
 
+    /// <summary>
+    /// Wired by <see cref="Views.GameDetailView"/> to open the dedicated
+    /// <see cref="Views.ControllerConfigWindow"/> editor for a named profile.
+    /// Arguments: (platform, gameTitle, authorUsername, profileName).
+    /// Falls back to the inline editor when null.
+    /// </summary>
+    public System.Action<string, string, string, string>? OpenControllerEditorRequested { get; set; }
+
     [RelayCommand]
     private void EditControllerProfile(string profileName)
     {
+        // Prefer the dedicated editor window if the view has wired it.
+        if (OpenControllerEditorRequested != null)
+        {
+            OpenControllerEditorRequested(Platform, Title, _currentUsername, profileName);
+            return;
+        }
+
+        // Fallback: open inline form.
         var profiles = Services.ControllerProfileService.LoadProfiles(Platform, Title);
         var profile  = profiles.Find(p =>
             string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase));

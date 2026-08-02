@@ -30,6 +30,7 @@ public partial class GameDetailView : UserControl
         {
             vm.BrowseLaunchPathRequested  = OnBrowseLaunchPathRequested;
             vm.PlayLocalVideoRequested    = OnPlayLocalVideoRequested;
+            vm.OpenControllerEditorRequested = OnOpenControllerEditorRequested;
         }
     }
 
@@ -168,5 +169,33 @@ public partial class GameDetailView : UserControl
         _media = null;
         _libVlc?.Dispose();
         _libVlc = null;
+    }
+
+    // ── Controller editor window ────────────────────────────────────────────
+
+    /// <summary>
+    /// Opens the <see cref="ControllerConfigWindow"/> dedicated editor so the user
+    /// can map or remap buttons for a specific controller profile.
+    /// Called by <see cref="GameDetailViewModel.OpenControllerEditorRequested"/>.
+    /// </summary>
+    private void OnOpenControllerEditorRequested(
+        string platform, string gameTitle, string author, string profileName)
+    {
+        var owner = TopLevel.GetTopLevel(this) as Avalonia.Controls.Window;
+        if (owner == null) return;
+
+        ControllerConfigWindow.OpenForProfile(
+            platform, gameTitle, author, profileName, owner,
+            onProfileActivated: profile =>
+            {
+                // Relay the saved profile back into the game detail VM so it becomes active.
+                if (DataContext is GameDetailViewModel vm)
+                {
+                    Services.ControllerProfileService.AddOrUpdateProfile(platform, gameTitle, profile);
+                    vm.SetActiveControllerProfile(profile);
+                    // Reload the profiles list so the updated profile is shown.
+                    Avalonia.Threading.Dispatcher.UIThread.Post(vm.RefreshControllerProfiles);
+                }
+            });
     }
 }

@@ -105,6 +105,29 @@ public partial class ControllerConfigViewModel : ViewModelBase
         IsDirty = false;
     }
 
+    /// <summary>
+    /// Loads all profiles for the given game and pre-selects the named profile for editing.
+    /// Falls back to <see cref="Load(string,string,string)"/> when the named profile is not found.
+    /// </summary>
+    public void LoadForEdit(string platform, string gameTitle, string author, string profileName)
+    {
+        _platform  = platform;
+        _gameTitle = gameTitle;
+        AuthorName = author;
+
+        RefreshSavedProfiles();
+
+        var profiles = ControllerProfileService.LoadProfiles(_platform, _gameTitle);
+        var profile  = profiles.FirstOrDefault(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase))
+            ?? profiles.FirstOrDefault()
+            ?? ControllerProfileService.CreateDefaultProfile(author);
+
+        ApplyProfile(profile);
+        IsDirty = false;
+        StatusMessage = string.IsNullOrEmpty(profile.ProfileName) ? "" : $"Editing \"{profile.ProfileName}\"";
+    }
+
     // ── Commands ──────────────────────────────────────────────────────────────
 
     [RelayCommand]
