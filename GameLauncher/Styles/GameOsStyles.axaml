@@ -48,6 +48,17 @@
         <Setter Property="Foreground" Value="White"/>
     </Style>
 
+    <!-- Nav-item highlighted by controller/keyboard (proposed selection, not yet confirmed) -->
+    <Style Selector="Button.nav-item.nav-highlighted /template/ ContentPresenter">
+        <Setter Property="Background" Value="#30363d"/>
+    </Style>
+
+    <Style Selector="Button.nav-item.nav-highlighted">
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="BorderBrush" Value="#58a6ff"/>
+        <Setter Property="BorderThickness" Value="0,0,3,0"/>
+    </Style>
+
     <!-- ─── Page titles ─── -->
     <Style Selector="TextBlock.page-title">
         <Setter Property="FontSize" Value="28"/>

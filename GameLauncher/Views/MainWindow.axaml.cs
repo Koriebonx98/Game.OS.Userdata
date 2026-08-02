@@ -111,14 +111,17 @@ public partial class MainWindow : Window
     /// Xbox / PlayStation controllers connected via XInput/DirectInput are reported
     /// as standard keyboard keys by Windows:
     ///   Escape / B-button  → close overlays / go back / close nav menu
-    ///   Enter / A-button   → confirm; when nav open, selects current page and closes nav
-    ///   Left               → open nav sidebar (when not in detail / text input)
+    ///   Enter / A-button   → confirm; when nav open, navigates to highlighted item
+    ///   Left               → open nav sidebar (when not in detail / text input / at dashboard card 0)
     ///   Right              → close nav sidebar (when open)
-    ///   Up / Down          → when nav sidebar is open: navigate up/down through menu items
+    ///   Up / Down          → when nav open: move highlight without switching; on dash: scroll cards;
+    ///                        in library: scroll game list
     ///   PageUp  / LB       → navigate to previous page (always available)
     ///   PageDown / RB      → navigate to next page (always available)
     ///   F5                 → refresh / reload library
     ///   Left Shift + Left Ctrl → toggle Quick Menu overlay
+    ///   Y                  → focus search box (library / store)
+    ///   X                  → cycle filter (library platform / store platform)
     /// </summary>
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
@@ -190,6 +193,38 @@ public partial class MainWindow : Window
             }
         }
 
+        // ── Nav sidebar open: Up/Down move highlight; Enter navigates to highlighted item ──
+        if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        {
+            switch (e.Key)
+            {
+                case Key.Up:
+                    vm.NavHighlightIndex = Math.Max(0, vm.NavHighlightIndex - 1);
+                    e.Handled = true;
+                    return;
+                case Key.Down:
+                    vm.NavHighlightIndex = Math.Min(_navPages.Length - 1, vm.NavHighlightIndex + 1);
+                    e.Handled = true;
+                    return;
+                case Key.Enter:
+                case Key.Space:
+                    // Navigate to highlighted item and close sidebar
+                    vm.NavigateCommand.Execute(_navPages[vm.NavHighlightIndex]);
+                    e.Handled = true;
+                    return;
+                case Key.Escape:
+                case Key.BrowserBack:
+                    vm.IsNavExpanded = false;
+                    e.Handled = true;
+                    return;
+                case Key.Right:
+                    // Right closes the nav sidebar
+                    vm.IsNavExpanded = false;
+                    e.Handled = true;
+                    return;
+            }
+        }
+
         // XB360 dashboard navigation
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
@@ -232,24 +267,32 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.Left:
-                    if (vm.DashboardVm.HasFocusedCard)
+                    // At first card (index 0) or no focused card → open nav menu
+                    if (vm.DashboardVm.SelectedCardIndex <= 0 || !vm.DashboardVm.HasFocusedCard)
                     {
+                        OpenNavWithCurrentHighlight(vm);
+                        e.Handled = true;
+                        return;
+                    }
+                    vm.DashboardVm.MoveFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Down:
+                    // Move to next recent game card (same as Right)
+                    vm.DashboardVm.MoveFocus(1);
+                    e.Handled = true;
+                    return;
+                case Key.Up:
+                    // Move to previous recent game card (same as Left but stays on dash)
+                    if (vm.DashboardVm.SelectedCardIndex > 0)
                         vm.DashboardVm.MoveFocus(-1);
-                        e.Handled = true;
-                        return;
-                    }
-                    else
-                    {
-                        // Auto-select first card instead of dropping through to
-                        // open the nav sidebar (mirrors console carousel behaviour).
-                        vm.DashboardVm.MoveFocus(0);
-                        e.Handled = true;
-                        return;
-                    }
+                    e.Handled = true;
+                    return;
                 case Key.Enter:
+                    // A button on a focused card → open game detail/info page
                     if (vm.DashboardVm.HasFocusedCard)
                     {
-                        vm.DashboardVm.PlayFocusedCardCommand.Execute(null);
+                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
                         e.Handled = true;
                         return;
                     }
@@ -281,6 +324,20 @@ public partial class MainWindow : Window
                     vm.LibraryVm.CyclePlatform(1);
                     e.Handled = true;
                     return;
+                // Up/Down → move focused game card
+                case Key.Up when !inSearch:
+                    vm.LibraryVm.MoveGameFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Down when !inSearch:
+                    vm.LibraryVm.MoveGameFocus(1);
+                    e.Handled = true;
+                    return;
+                // Enter/A → open focused game info
+                case Key.Enter when !inSearch:
+                    vm.LibraryVm.ActivateFocusedGame();
+                    e.Handled = true;
+                    return;
                 // LB (PageUp) → cycle install filter backward; RB (PageDown) → forward
                 case Key.PageUp when !inSearch:
                     vm.LibraryVm.CycleInstallFilter(-1);
@@ -293,14 +350,28 @@ public partial class MainWindow : Window
             }
         }
 
-        // Store controller navigation (LB/RB switch Games / App Store tabs)
+        // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            if (e.Key is Key.PageUp or Key.PageDown)
+            bool inSearch = IsTextInputFocused();
+            switch (e.Key)
             {
-                vm.StoreVm.CycleTab();
-                e.Handled = true;
-                return;
+                // Y → focus search box
+                case Key.Y when !inSearch:
+                    vm.StoreVm.FocusSearchRequested?.Invoke();
+                    e.Handled = true;
+                    return;
+                // X → cycle platform filter
+                case Key.X when !inSearch:
+                    vm.StoreVm.CyclePlatform();
+                    e.Handled = true;
+                    return;
+                // LB/RB → switch Games / App Store tabs
+                case Key.PageUp:
+                case Key.PageDown:
+                    vm.StoreVm.CycleTab();
+                    e.Handled = true;
+                    return;
             }
         }
 
@@ -352,13 +423,13 @@ public partial class MainWindow : Window
                 break;
 
             // Left arrow → open the nav sidebar (when not in a text input and not on the
-            // dashboard — on the dashboard Left is already consumed by game-card scrolling above).
+            // dashboard — on the dashboard Left is consumed by game-card scrolling above).
             case Key.Left:
                 if (!vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused() && !vm.IsHome)
                 {
                     if (!vm.IsNavExpanded)
                     {
-                        vm.IsNavExpanded = true;
+                        OpenNavWithCurrentHighlight(vm);
                         e.Handled = true;
                     }
                 }
@@ -375,34 +446,18 @@ public partial class MainWindow : Window
                     }
                 }
                 break;
-
-            // Up arrow → when nav is open, move to previous menu item
-            case Key.Up:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
-                {
-                    NavigatePrev(vm);
-                    e.Handled = true;
-                }
-                break;
-
-            // Down arrow → when nav is open, move to next menu item
-            case Key.Down:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
-                {
-                    NavigateNext(vm);
-                    e.Handled = true;
-                }
-                break;
-
-            // Enter → when nav is open, select current page and close the sidebar
-            case Key.Enter:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
-                {
-                    vm.IsNavExpanded = false;
-                    e.Handled = true;
-                }
-                break;
         }
+    }
+
+    /// <summary>
+    /// Opens the nav sidebar and initialises the highlight to the currently active page,
+    /// so the user sees their current position when navigating with Up/Down.
+    /// </summary>
+    private static void OpenNavWithCurrentHighlight(MainViewModel vm)
+    {
+        int pageIdx = System.Array.IndexOf(_navPages, vm.ActivePage);
+        vm.NavHighlightIndex = pageIdx >= 0 ? pageIdx : 0;
+        vm.IsNavExpanded = true;
     }
 
     /// <summary>Returns true when a TextBox or similar input control has keyboard focus.</summary>
@@ -841,6 +896,56 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ── Nav sidebar open: Up/Down move highlight; Enter navigates to highlighted item ──
+        if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        {
+            switch (key)
+            {
+                case Key.Up:
+                    vm.NavHighlightIndex = Math.Max(0, vm.NavHighlightIndex - 1);
+                    return;
+                case Key.Down:
+                    vm.NavHighlightIndex = Math.Min(_navPages.Length - 1, vm.NavHighlightIndex + 1);
+                    return;
+                case Key.Enter:
+                case Key.Y:
+                    // Navigate to highlighted item (nav auto-closes via Navigate())
+                    vm.NavigateCommand.Execute(_navPages[vm.NavHighlightIndex]);
+                    return;
+                case Key.Escape:
+                    vm.IsNavExpanded = false;
+                    return;
+                case Key.Right:
+                    vm.IsNavExpanded = false;
+                    return;
+            }
+        }
+
+        // A game is running and the quick menu is closed — block Game OS navigation
+        // and inject the button press into the game via the active controller profile.
+        // The Start / Guide callbacks bypass this guard entirely (handled above through
+        // the OnStart / OnGuide wiring) so they continue to open the Quick Menu.
+        if (vm.DetailVm.IsGameRunning)
+        {
+            string? xInputButtonName = key switch
+            {
+                Key.Up       => "DPadUp",
+                Key.Down     => "DPadDown",
+                Key.Left     => "DPadLeft",
+                Key.Right    => "DPadRight",
+                Key.Enter    => "A",
+                Key.Escape   => "B",
+                Key.X        => "X",
+                Key.Y        => "Y",
+                Key.PageUp   => "LeftShoulder",
+                Key.PageDown => "RightShoulder",
+                _            => null
+            };
+            if (xInputButtonName != null)
+                _controllerInjector.InjectPress(xInputButtonName);
+            return;
+        }
+
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
@@ -868,21 +973,32 @@ public partial class MainWindow : Window
                     vm.DashboardVm.MoveFocus(1);
                     return;
                 case Key.Left:
-                    // Always try to scroll cards left; if already at index 0 this is a no-op.
-                    // Never fall through to open the nav menu on the dashboard.
+                    // At first card (index 0) or no focused card → open nav menu
+                    if (vm.DashboardVm.SelectedCardIndex <= 0 || !vm.DashboardVm.HasFocusedCard)
+                    {
+                        OpenNavWithCurrentHighlight(vm);
+                        return;
+                    }
                     vm.DashboardVm.MoveFocus(-1);
-                    if (!vm.DashboardVm.HasFocusedCard)
-                        vm.DashboardVm.MoveFocus(0); // auto-select first card
+                    return;
+                case Key.Down:
+                    // Move to next recent game card
+                    vm.DashboardVm.MoveFocus(1);
+                    return;
+                case Key.Up:
+                    // Move to previous recent game card
+                    if (vm.DashboardVm.SelectedCardIndex > 0)
+                        vm.DashboardVm.MoveFocus(-1);
                     return;
                 case Key.Enter:
-                case Key.Y:
+                    // A button → open game detail/info page
                     if (vm.DashboardVm.HasFocusedCard)
-                    { vm.DashboardVm.PlayFocusedCardCommand.Execute(null); return; }
-                    break;
+                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
+                    return;
                 case Key.X:
                     if (vm.DashboardVm.HasFocusedCard)
-                    { vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null); return; }
-                    break;
+                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
+                    return;
             }
         }
 
@@ -897,6 +1013,15 @@ public partial class MainWindow : Window
                 case Key.X:
                     vm.LibraryVm.CyclePlatform(1);
                     return;
+                case Key.Up:
+                    vm.LibraryVm.MoveGameFocus(-1);
+                    return;
+                case Key.Down:
+                    vm.LibraryVm.MoveGameFocus(1);
+                    return;
+                case Key.Enter:
+                    vm.LibraryVm.ActivateFocusedGame();
+                    return;
                 case Key.PageUp:
                     vm.LibraryVm.CycleInstallFilter(-1);
                     return;
@@ -906,13 +1031,21 @@ public partial class MainWindow : Window
             }
         }
 
-        // Store controller navigation — LB/RB switch Games / App Store tabs
+        // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            if (key is Key.PageUp or Key.PageDown)
+            switch (key)
             {
-                vm.StoreVm.CycleTab();
-                return;
+                case Key.Y:
+                    Dispatcher.UIThread.Post(() => vm.StoreVm.FocusSearchRequested?.Invoke());
+                    return;
+                case Key.X:
+                    vm.StoreVm.CyclePlatform();
+                    return;
+                case Key.PageUp:
+                case Key.PageDown:
+                    vm.StoreVm.CycleTab();
+                    return;
             }
         }
 
@@ -944,26 +1077,11 @@ public partial class MainWindow : Window
                 // On the dashboard, Left is consumed by card-focus logic above.
                 // Elsewhere, Left opens the nav sidebar.
                 if (!vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.IsHome)
-                    vm.IsNavExpanded = true;
+                    OpenNavWithCurrentHighlight(vm);
                 break;
 
             case Key.Right:
                 if (!vm.ShowDetail && !vm.ShowFriendProfile && vm.IsNavExpanded)
-                    vm.IsNavExpanded = false;
-                break;
-
-            case Key.Up:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
-                    NavigatePrev(vm);
-                break;
-
-            case Key.Down:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
-                    NavigateNext(vm);
-                break;
-
-            case Key.Enter:
-                if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
                     vm.IsNavExpanded = false;
                 break;
         }

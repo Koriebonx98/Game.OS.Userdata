@@ -31,12 +31,14 @@
                            IsVisible="{Binding IsAppStoreTab}"/>
             </StackPanel>
             <TextBox Grid.Column="1"
+                     x:Name="StoreSearchBox"
                      Classes="form-input"
                      Text="{Binding SearchText}"
                      Watermark="🔍  Search store…"
                      Width="240" VerticalAlignment="Center"
                      IsVisible="{Binding IsGamesTab}"/>
             <TextBox Grid.Column="1"
+                     x:Name="AppStoreSearchBox"
                      Classes="form-input"
                      Text="{Binding AppStoreSearchText}"
                      Watermark="🔍  Search apps…"

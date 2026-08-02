@@ -242,6 +242,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsHome}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightDashboard}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="dashboard">
@@ -253,6 +254,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsLibrary}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightLibrary}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="library">
@@ -264,6 +266,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsStore}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightStore}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="store">
@@ -275,6 +278,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsFriends}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightFriends}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="friends">
@@ -286,6 +290,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsInbox}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightInbox}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="inbox">
@@ -297,6 +302,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsProfile}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightProfile}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="profile">
@@ -308,6 +314,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsSettings}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightSettings}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="settings">
@@ -319,6 +326,7 @@
 
                         <Button Classes="nav-item"
                                 Classes.active="{Binding IsMedia}"
+                                Classes.nav-highlighted="{Binding IsNavHighlightMedia}"
                                 HorizontalAlignment="Stretch"
                                 Command="{Binding NavigateCommand}"
                                 CommandParameter="media">

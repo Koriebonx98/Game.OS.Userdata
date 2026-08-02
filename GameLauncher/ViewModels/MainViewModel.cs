@@ -186,6 +186,45 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty] private bool _isOfflineMode = false;
 
+    /// <summary>
+    /// Index (0–7) of the currently highlighted nav-sidebar item when the sidebar is open.
+    /// Maps 1:1 to the nav order: dashboard=0, library=1, store=2, friends=3,
+    /// inbox=4, profile=5, settings=6, media=7.
+    /// Updated by Up/Down without immediately navigating — Enter/A confirms.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightDashboard))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightLibrary))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightStore))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightFriends))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightInbox))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightProfile))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightSettings))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightMedia))]
+    private int _navHighlightIndex = 0;
+
+    public bool IsNavHighlightDashboard => IsNavExpanded && NavHighlightIndex == 0;
+    public bool IsNavHighlightLibrary   => IsNavExpanded && NavHighlightIndex == 1;
+    public bool IsNavHighlightStore     => IsNavExpanded && NavHighlightIndex == 2;
+    public bool IsNavHighlightFriends   => IsNavExpanded && NavHighlightIndex == 3;
+    public bool IsNavHighlightInbox     => IsNavExpanded && NavHighlightIndex == 4;
+    public bool IsNavHighlightProfile   => IsNavExpanded && NavHighlightIndex == 5;
+    public bool IsNavHighlightSettings  => IsNavExpanded && NavHighlightIndex == 6;
+    public bool IsNavHighlightMedia     => IsNavExpanded && NavHighlightIndex == 7;
+
+    partial void OnIsNavExpandedChanged(bool value)
+    {
+        // Refresh highlight bindings when nav opens or closes
+        OnPropertyChanged(nameof(IsNavHighlightDashboard));
+        OnPropertyChanged(nameof(IsNavHighlightLibrary));
+        OnPropertyChanged(nameof(IsNavHighlightStore));
+        OnPropertyChanged(nameof(IsNavHighlightFriends));
+        OnPropertyChanged(nameof(IsNavHighlightInbox));
+        OnPropertyChanged(nameof(IsNavHighlightProfile));
+        OnPropertyChanged(nameof(IsNavHighlightSettings));
+        OnPropertyChanged(nameof(IsNavHighlightMedia));
+    }
+
     public bool IsHome        => ActivePage == "dashboard";
     public bool IsLibrary     => ActivePage == "library";
     public bool IsStore       => ActivePage == "store";
@@ -824,6 +863,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
         LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
+        LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
@@ -1634,10 +1674,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 DevLogService.Log("[Playtime] Cloud activity log is empty — no playtime to apply.");
                 // Still refresh the dashboard so any library changes (new games, etc.) are
                 // reflected with correct (zero) playtime rather than stale data.
+                // Use Background priority so that input events (controller, keyboard) are
+                // not blocked while the dashboard rebuilds its ObservableCollections.
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
-                });
+                }, Avalonia.Threading.DispatcherPriority.Background);
                 return;
             }
             DevLogService.Log($"[Playtime] Cloud activity log has {activity.Count} entries.");
@@ -1670,11 +1712,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             System.Diagnostics.Debug.WriteLine(
                 "[Playtime] Applied cloud playtime totals to library and cache.");
             DevLogService.Log("[Playtime] Applied cloud playtime totals to library and cache.");
+            // Use Background priority so input events (controller / keyboard) are never
+            // blocked by the synchronous ObservableCollection rebuilds inside Load().
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
                 LibraryVm.Load(library);
-            });
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
