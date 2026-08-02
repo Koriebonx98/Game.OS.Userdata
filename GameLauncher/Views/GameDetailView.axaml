@@ -6,6 +6,7 @@
              xmlns:wv="clr-namespace:AvaloniaWebView;assembly=Avalonia.WebView"
              xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
              x:Class="GameLauncher.Views.GameDetailView"
+             x:Name="GameDetailViewRoot"
              x:DataType="vm:GameDetailViewModel"
              Background="#0d1117">
 
@@ -1275,28 +1276,28 @@
                                                <!-- Activate for injection -->
                                                 <Button Classes="btn-secondary" Padding="10,6"
                                                        ToolTip.Tip="Use this profile when game is running"
-                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
+                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
                                                         CommandParameter="{Binding ProfileName}">
                                                    <TextBlock Text="▶ Activate" FontSize="11"/>
                                                 </Button>
                                                <!-- Edit mapping -->
                                                <Button Classes="btn-secondary" Padding="10,6"
                                                        ToolTip.Tip="Edit button mappings"
-                                                       Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
+                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
                                                        CommandParameter="{Binding ProfileName}">
                                                    <TextBlock Text="✏ Edit" FontSize="11"/>
                                                </Button>
                                                 <!-- Upload to Games.Database -->
                                                 <Button Classes="btn-secondary" Padding="10,6"
                                                         ToolTip.Tip="Share to Games.Database"
-                                                        Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).UploadProfileToDbCommand}"
+                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).UploadProfileToDbCommand}"
                                                         CommandParameter="{Binding ProfileName}">
                                                     <TextBlock Text="↑ Share" FontSize="11"/>
                                                 </Button>
                                                 <!-- Delete -->
                                                 <Button Classes="btn-danger" Padding="10,6"
                                                         ToolTip.Tip="Delete this profile"
-                                                        Command="{Binding $parent[UserControl].((vm:GameDetailViewModel)DataContext).DeleteControllerProfileCommand}"
+                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).DeleteControllerProfileCommand}"
                                                         CommandParameter="{Binding ProfileName}">
                                                     <TextBlock Text="🗑" FontSize="13"/>
                                                 </Button>

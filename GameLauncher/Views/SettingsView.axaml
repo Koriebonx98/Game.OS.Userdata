@@ -131,6 +131,17 @@
                     </StackPanel>
                 </Button>
 
+                <Button Classes="settings-nav-item"
+                        Classes.active="{Binding IsControllerSection}"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="controller">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Controller" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
             </StackPanel>
         </Border>
 
@@ -1619,6 +1630,278 @@
                                    VerticalAlignment="Center"
                                    IsVisible="{Binding IsSaveSuccess}"/>
                     </StackPanel>
+
+                </StackPanel>
+
+                <!-- ── Controller Preview ── -->
+                <StackPanel IsVisible="{Binding IsControllerSection}" Spacing="0">
+
+                    <StackPanel.Styles>
+                        <!-- Pressed state: blue (default for most buttons) -->
+                        <Style Selector="Border.cp-btn.cp-active">
+                            <Setter Property="Background" Value="#58a6ff"/>
+                            <Setter Property="BorderBrush" Value="#58a6ff"/>
+                        </Style>
+                        <Style Selector="Border.cp-btn.cp-active TextBlock">
+                            <Setter Property="Foreground" Value="White"/>
+                        </Style>
+                        <!-- Face button: A = green -->
+                        <Style Selector="Border.cp-btn.cp-green.cp-active">
+                            <Setter Property="Background" Value="#3fb950"/>
+                            <Setter Property="BorderBrush" Value="#3fb950"/>
+                        </Style>
+                        <!-- Face button: B = red -->
+                        <Style Selector="Border.cp-btn.cp-red.cp-active">
+                            <Setter Property="Background" Value="#da3633"/>
+                            <Setter Property="BorderBrush" Value="#da3633"/>
+                        </Style>
+                        <!-- Face button: Y / Guide = orange -->
+                        <Style Selector="Border.cp-btn.cp-orange.cp-active">
+                            <Setter Property="Background" Value="#f0883e"/>
+                            <Setter Property="BorderBrush" Value="#f0883e"/>
+                        </Style>
+                        <!-- Connected status indicator -->
+                        <Style Selector="Border.cp-status.cp-active">
+                            <Setter Property="BorderBrush" Value="#2ea043"/>
+                        </Style>
+                        <Style Selector="Ellipse.cp-dot.cp-active">
+                            <Setter Property="Fill" Value="#3fb950"/>
+                        </Style>
+                        <!-- Stick direction indicators -->
+                        <Style Selector="TextBlock.cp-arrow.cp-active">
+                            <Setter Property="Foreground" Value="#58a6ff"/>
+                        </Style>
+                        <!-- Stick click indicator -->
+                        <Style Selector="Ellipse.cp-stick-center.cp-active">
+                            <Setter Property="Fill" Value="#58a6ff"/>
+                        </Style>
+                    </StackPanel.Styles>
+
+                    <TextBlock Text="Controller" Classes="page-title" Margin="0,0,0,4"/>
+                    <TextBlock Text="Live preview — press buttons on your controller to test them."
+                               Classes="page-subtitle" Margin="0,0,0,24"/>
+
+                    <!-- Connection status banner -->
+                    <Border Classes="cp-status" Classes.cp-active="{Binding CtrlConnected}"
+                            CornerRadius="8" Padding="14,10" Margin="0,0,0,20"
+                            Background="#161b22" BorderThickness="1" BorderBrush="#30363d">
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <Ellipse Classes="cp-dot" Classes.cp-active="{Binding CtrlConnected}"
+                                     Width="10" Height="10" Fill="#30363d" VerticalAlignment="Center"/>
+                            <TextBlock Text="{Binding CtrlStatusText}"
+                                       Foreground="#e6edf3" FontSize="13"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Visual gamepad layout -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,20">
+                        <StackPanel Spacing="20">
+
+                            <!-- Top row: LT / LB  ───  RB / RT -->
+                            <Grid ColumnDefinitions="*,*,*,*" HorizontalAlignment="Center" Width="480">
+                                <!-- LT -->
+                                <Border Grid.Column="0" Classes="cp-btn" Classes.cp-active="{Binding CtrlLtDown}"
+                                        CornerRadius="6" Padding="10,6" Margin="4" HorizontalAlignment="Center"
+                                        Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                    <TextBlock Text="LT" FontSize="12" FontWeight="Bold"
+                                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </Border>
+                                <!-- LB -->
+                                <Border Grid.Column="1" Classes="cp-btn" Classes.cp-active="{Binding CtrlLbDown}"
+                                        CornerRadius="6" Padding="10,6" Margin="4" HorizontalAlignment="Center"
+                                        Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                    <TextBlock Text="LB" FontSize="12" FontWeight="Bold"
+                                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </Border>
+                                <!-- RB -->
+                                <Border Grid.Column="2" Classes="cp-btn" Classes.cp-active="{Binding CtrlRbDown}"
+                                        CornerRadius="6" Padding="10,6" Margin="4" HorizontalAlignment="Center"
+                                        Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                    <TextBlock Text="RB" FontSize="12" FontWeight="Bold"
+                                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </Border>
+                                <!-- RT -->
+                                <Border Grid.Column="3" Classes="cp-btn" Classes.cp-active="{Binding CtrlRtDown}"
+                                        CornerRadius="6" Padding="10,6" Margin="4" HorizontalAlignment="Center"
+                                        Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                    <TextBlock Text="RT" FontSize="12" FontWeight="Bold"
+                                               Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+
+                            <!-- Trigger progress bars -->
+                            <Grid ColumnDefinitions="*,40,*" HorizontalAlignment="Center" Width="480">
+                                <StackPanel Grid.Column="0" Spacing="4">
+                                    <TextBlock Text="{Binding CtrlLtValue, StringFormat='LT: {0}/255'}"
+                                               FontSize="11" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <ProgressBar Value="{Binding CtrlLtValue}" Minimum="0" Maximum="255"
+                                                 Height="6" CornerRadius="3"
+                                                 Foreground="#58a6ff" Background="#21262d"/>
+                                </StackPanel>
+                                <StackPanel Grid.Column="2" Spacing="4">
+                                    <TextBlock Text="{Binding CtrlRtValue, StringFormat='RT: {0}/255'}"
+                                               FontSize="11" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <ProgressBar Value="{Binding CtrlRtValue}" Minimum="0" Maximum="255"
+                                                 Height="6" CornerRadius="3"
+                                                 Foreground="#58a6ff" Background="#21262d"/>
+                                </StackPanel>
+                            </Grid>
+
+                            <!-- Main body: Left Stick | D-Pad | Center | Face Buttons | Right Stick -->
+                            <Grid ColumnDefinitions="Auto,Auto,*,Auto,Auto"
+                                  HorizontalAlignment="Center" Width="560" VerticalAlignment="Center">
+
+                                <!-- Left Stick -->
+                                <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Left Stick" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <Grid Width="72" Height="72">
+                                        <Ellipse Width="72" Height="72" Fill="#21262d" Stroke="#30363d" StrokeThickness="1"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlLStickUp}"
+                                                   Text="▲" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlLStickDown}"
+                                                   Text="▼" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlLStickLeft}"
+                                                   Text="◄" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlLStickRight}"
+                                                   Text="►" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <Ellipse Classes="cp-stick-center" Classes.cp-active="{Binding CtrlLsDown}"
+                                                 Width="26" Height="26" Fill="#30363d"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <TextBlock Text="L3" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </StackPanel>
+
+                                <!-- D-Pad -->
+                                <StackPanel Grid.Column="1" Spacing="4" Margin="0,0,12,0" VerticalAlignment="Center">
+                                    <TextBlock Text="D-Pad" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <Grid Width="68" Height="68">
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlDpadUpDown}"
+                                                Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                CornerRadius="3" Background="#21262d" BorderBrush="#30363d" BorderThickness="1"/>
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlDpadDownDown}"
+                                                Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                                CornerRadius="3" Background="#21262d" BorderBrush="#30363d" BorderThickness="1"/>
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlDpadLeftDown}"
+                                                Width="22" Height="22" HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                CornerRadius="3" Background="#21262d" BorderBrush="#30363d" BorderThickness="1"/>
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlDpadRightDown}"
+                                                Width="22" Height="22" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                CornerRadius="3" Background="#21262d" BorderBrush="#30363d" BorderThickness="1"/>
+                                        <Border Width="22" Height="22" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                CornerRadius="3" Background="#161b22" BorderBrush="#30363d" BorderThickness="1"/>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Center buttons: Back / Guide / Start -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="10"
+                                            HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlBackDown}"
+                                                Width="30" Height="30" CornerRadius="15"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="⊟" FontSize="14" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Back" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <Border Classes="cp-btn cp-orange" Classes.cp-active="{Binding CtrlGuideDown}"
+                                                Width="38" Height="38" CornerRadius="19"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="⊙" FontSize="16" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Guide" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="4" HorizontalAlignment="Center">
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlStartDown}"
+                                                Width="30" Height="30" CornerRadius="15"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="⊞" FontSize="14" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <TextBlock Text="Start" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </StackPanel>
+
+                                <!-- Face Buttons: Y / X B / A -->
+                                <StackPanel Grid.Column="3" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Buttons" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <Grid Width="68" Height="68">
+                                        <!-- Y (top) - orange -->
+                                        <Border Classes="cp-btn cp-orange" Classes.cp-active="{Binding CtrlBtnY}"
+                                                Width="24" Height="24" CornerRadius="12"
+                                                HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="Y" FontSize="10" FontWeight="Bold" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <!-- A (bottom) - green -->
+                                        <Border Classes="cp-btn cp-green" Classes.cp-active="{Binding CtrlBtnA}"
+                                                Width="24" Height="24" CornerRadius="12"
+                                                HorizontalAlignment="Center" VerticalAlignment="Bottom"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="A" FontSize="10" FontWeight="Bold" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <!-- X (left) - blue -->
+                                        <Border Classes="cp-btn" Classes.cp-active="{Binding CtrlBtnX}"
+                                                Width="24" Height="24" CornerRadius="12"
+                                                HorizontalAlignment="Left" VerticalAlignment="Center"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="X" FontSize="10" FontWeight="Bold" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <!-- B (right) - red -->
+                                        <Border Classes="cp-btn cp-red" Classes.cp-active="{Binding CtrlBtnB}"
+                                                Width="24" Height="24" CornerRadius="12"
+                                                HorizontalAlignment="Right" VerticalAlignment="Center"
+                                                Background="#21262d" BorderBrush="#30363d" BorderThickness="1">
+                                            <TextBlock Text="B" FontSize="10" FontWeight="Bold" Foreground="#8b949e"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </Grid>
+                                </StackPanel>
+
+                                <!-- Right Stick -->
+                                <StackPanel Grid.Column="4" Spacing="4" Margin="12,0,0,0" VerticalAlignment="Center">
+                                    <TextBlock Text="Right Stick" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                    <Grid Width="72" Height="72">
+                                        <Ellipse Width="72" Height="72" Fill="#21262d" Stroke="#30363d" StrokeThickness="1"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlRStickUp}"
+                                                   Text="▲" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,5,0,0"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlRStickDown}"
+                                                   Text="▼" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlRStickLeft}"
+                                                   Text="◄" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Left" VerticalAlignment="Center" Margin="5,0,0,0"/>
+                                        <TextBlock Classes="cp-arrow" Classes.cp-active="{Binding CtrlRStickRight}"
+                                                   Text="►" FontSize="14" Foreground="#30363d"
+                                                   HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                        <Ellipse Classes="cp-stick-center" Classes.cp-active="{Binding CtrlRsDown}"
+                                                 Width="26" Height="26" Fill="#30363d"
+                                                 HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <TextBlock Text="R3" FontSize="10" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Hint when disconnected -->
+                    <Border Background="#161b22" CornerRadius="8" Padding="14,10" Margin="0,0,0,24"
+                            IsVisible="{Binding !CtrlConnected}">
+                        <TextBlock Text="ℹ  Connect an XInput compatible controller (Xbox, or compatible gamepad). Controller preview requires Windows."
+                                   FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"/>
+                    </Border>
 
                 </StackPanel>
 

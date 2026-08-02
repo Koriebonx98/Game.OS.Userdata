@@ -29,6 +29,91 @@ public partial class ControllerButtonMappingVm : ObservableObject
 /// </summary>
 public partial class ControllerConfigViewModel : ViewModelBase
 {
+    // ── Preset action list (keyboard keys + common combos) shown in the mapping dropdowns ──────
+
+    /// <summary>
+    /// Master list of available action strings shown in the Press/Hold combo boxes.
+    /// Users can also type any custom value since the boxes are editable.
+    /// </summary>
+    public static readonly IReadOnlyList<string> ActionPresets = BuildPresets();
+
+    private static IReadOnlyList<string> BuildPresets()
+    {
+        var list = new List<string>
+        {
+            // ── Pass-through ──────────────────────────────────────────────────────
+            "Empty",
+
+            // ── Common keys ───────────────────────────────────────────────────────
+            "Key:Enter",
+            "Key:Escape",
+            "Key:Space",
+            "Key:Tab",
+            "Key:Backspace",
+            "Key:Delete",
+            "Key:Insert",
+
+            // ── Navigation keys ───────────────────────────────────────────────────
+            "Key:Up",
+            "Key:Down",
+            "Key:Left",
+            "Key:Right",
+            "Key:Home",
+            "Key:End",
+            "Key:PageUp",
+            "Key:PageDown",
+
+            // ── Modifier keys ─────────────────────────────────────────────────────
+            "Key:Ctrl",
+            "Key:Shift",
+            "Key:Alt",
+            "Key:Win",
+
+            // ── Function keys ─────────────────────────────────────────────────────
+            "Key:F1",  "Key:F2",  "Key:F3",  "Key:F4",
+            "Key:F5",  "Key:F6",  "Key:F7",  "Key:F8",
+            "Key:F9",  "Key:F10", "Key:F11", "Key:F12",
+
+            // ── Letter keys ───────────────────────────────────────────────────────
+            "Key:A","Key:B","Key:C","Key:D","Key:E","Key:F","Key:G","Key:H",
+            "Key:I","Key:J","Key:K","Key:L","Key:M","Key:N","Key:O","Key:P",
+            "Key:Q","Key:R","Key:S","Key:T","Key:U","Key:V","Key:W","Key:X",
+            "Key:Y","Key:Z",
+
+            // ── Digit keys ────────────────────────────────────────────────────────
+            "Key:0","Key:1","Key:2","Key:3","Key:4",
+            "Key:5","Key:6","Key:7","Key:8","Key:9",
+
+            // ── Numpad keys ───────────────────────────────────────────────────────
+            "Key:Numpad0","Key:Numpad1","Key:Numpad2","Key:Numpad3","Key:Numpad4",
+            "Key:Numpad5","Key:Numpad6","Key:Numpad7","Key:Numpad8","Key:Numpad9",
+
+            // ── Other keys ────────────────────────────────────────────────────────
+            "Key:PrintScreen",
+            "Key:Pause",
+            "Key:CapsLock",
+            "Key:NumLock",
+            "Key:ScrollLock",
+
+            // ── Common combos ─────────────────────────────────────────────────────
+            "Key:Ctrl+Z",
+            "Key:Ctrl+X",
+            "Key:Ctrl+C",
+            "Key:Ctrl+V",
+            "Key:Ctrl+A",
+            "Key:Ctrl+S",
+            "Key:Ctrl+W",
+            "Key:Ctrl+F4",
+            "Key:Alt+Enter",
+            "Key:Alt+F4",
+            "Key:Ctrl+Shift+Esc",
+            "Key:Win+D",
+            "Key:Win+G",
+        };
+
+        return list.AsReadOnly();
+    }
+
     private string _platform = "";
     private string _gameTitle = "";
 
@@ -103,6 +188,29 @@ public partial class ControllerConfigViewModel : ViewModelBase
 
         ApplyProfile(profile);
         IsDirty = false;
+    }
+
+    /// <summary>
+    /// Loads all profiles for the given game and pre-selects the named profile for editing.
+    /// Falls back to <see cref="Load(string,string,string)"/> when the named profile is not found.
+    /// </summary>
+    public void LoadForEdit(string platform, string gameTitle, string author, string profileName)
+    {
+        _platform  = platform;
+        _gameTitle = gameTitle;
+        AuthorName = author;
+
+        RefreshSavedProfiles();
+
+        var profiles = ControllerProfileService.LoadProfiles(_platform, _gameTitle);
+        var profile  = profiles.FirstOrDefault(p =>
+            string.Equals(p.ProfileName, profileName, StringComparison.OrdinalIgnoreCase))
+            ?? profiles.FirstOrDefault()
+            ?? ControllerProfileService.CreateDefaultProfile(author);
+
+        ApplyProfile(profile);
+        IsDirty = false;
+        StatusMessage = string.IsNullOrEmpty(profile.ProfileName) ? "" : $"Editing \"{profile.ProfileName}\"";
     }
 
     // ── Commands ──────────────────────────────────────────────────────────────

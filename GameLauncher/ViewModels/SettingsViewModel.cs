@@ -392,6 +392,7 @@ public partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsSystemSection))]
     [NotifyPropertyChangedFor(nameof(IsNotificationsSection))]
     [NotifyPropertyChangedFor(nameof(IsDeveloperSection))]
+    [NotifyPropertyChangedFor(nameof(IsControllerSection))]
     private string _selectedSection = "app";
 
     public bool IsAppSection           => SelectedSection == "app";
@@ -404,9 +405,189 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsSystemSection        => SelectedSection == "system";
     public bool IsNotificationsSection => SelectedSection == "notifications";
     public bool IsDeveloperSection     => SelectedSection == "developer";
+    public bool IsControllerSection    => SelectedSection == "controller";
 
     [RelayCommand]
-    private void SelectSection(string section) => SelectedSection = section;
+    private void SelectSection(string section)
+    {
+        SelectedSection = section;
+        if (section == "controller")
+            StartControllerPreview();
+        else
+            StopControllerPreview();
+    }
+
+    // ── Controller Preview section ────────────────────────────────────────
+    /// <summary>True when an XInput controller is connected.</summary>
+    [ObservableProperty] private bool   _ctrlConnected;
+    /// <summary>Short status string shown below the visual preview.</summary>
+    [ObservableProperty] private string _ctrlStatusText = "No controller detected.";
+
+    // Face buttons
+    [ObservableProperty] private bool _ctrlBtnA;
+    [ObservableProperty] private bool _ctrlBtnB;
+    [ObservableProperty] private bool _ctrlBtnX;
+    [ObservableProperty] private bool _ctrlBtnY;
+
+    // Shoulder / Trigger
+    [ObservableProperty] private bool _ctrlLbDown;
+    [ObservableProperty] private bool _ctrlRbDown;
+    [ObservableProperty] private bool _ctrlLtDown;
+    [ObservableProperty] private bool _ctrlRtDown;
+
+    // D-Pad
+    [ObservableProperty] private bool _ctrlDpadUpDown;
+    [ObservableProperty] private bool _ctrlDpadDownDown;
+    [ObservableProperty] private bool _ctrlDpadLeftDown;
+    [ObservableProperty] private bool _ctrlDpadRightDown;
+
+    // Center buttons
+    [ObservableProperty] private bool _ctrlStartDown;
+    [ObservableProperty] private bool _ctrlBackDown;
+    [ObservableProperty] private bool _ctrlGuideDown;
+
+    // Stick clicks
+    [ObservableProperty] private bool _ctrlLsDown;
+    [ObservableProperty] private bool _ctrlRsDown;
+
+    // Stick axis indicators (true = deflected in that direction)
+    [ObservableProperty] private bool _ctrlLStickUp;
+    [ObservableProperty] private bool _ctrlLStickDown;
+    [ObservableProperty] private bool _ctrlLStickLeft;
+    [ObservableProperty] private bool _ctrlLStickRight;
+    [ObservableProperty] private bool _ctrlRStickUp;
+    [ObservableProperty] private bool _ctrlRStickDown;
+    [ObservableProperty] private bool _ctrlRStickLeft;
+    [ObservableProperty] private bool _ctrlRStickRight;
+
+    // Raw trigger values 0-255 for display
+    [ObservableProperty] private int _ctrlLtValue;
+    [ObservableProperty] private int _ctrlRtValue;
+
+    private Avalonia.Threading.DispatcherTimer? _ctrlPreviewTimer;
+    private int  _ctrlConnectedIndex  = -1;
+    private bool _ctrlXInputAvailable = true;
+
+    private void StartControllerPreview()
+    {
+        if (!OperatingSystem.IsWindows()) { CtrlStatusText = "Controller preview requires Windows."; return; }
+        if (_ctrlPreviewTimer?.IsEnabled == true) return;
+        _ctrlPreviewTimer ??= new Avalonia.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        _ctrlPreviewTimer.Tick += OnCtrlPreviewTick;
+        _ctrlPreviewTimer.Start();
+    }
+
+    private void StopControllerPreview()
+    {
+        if (_ctrlPreviewTimer == null) return;
+        _ctrlPreviewTimer.Tick -= OnCtrlPreviewTick;
+        _ctrlPreviewTimer.Stop();
+        ClearCtrlState();
+    }
+
+    private void OnCtrlPreviewTick(object? sender, EventArgs e)
+    {
+        if (!_ctrlXInputAvailable) return;
+        try
+        {
+            // Re-scan for a connected controller when none cached
+            if (_ctrlConnectedIndex < 0)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    if (NativeMethods.XInputGetState((uint)i, out _) == 0)
+                    {
+                        _ctrlConnectedIndex = i;
+                        break;
+                    }
+                }
+            }
+
+            if (_ctrlConnectedIndex < 0)
+            {
+                CtrlConnected = false;
+                CtrlStatusText = "No controller detected. Connect an XInput (Xbox) controller.";
+                ClearCtrlState();
+                return;
+            }
+
+            uint result = NativeMethods.XInputGetState((uint)_ctrlConnectedIndex, out var state);
+            if (result != 0)
+            {
+                _ctrlConnectedIndex = -1;
+                CtrlConnected = false;
+                CtrlStatusText = "Controller disconnected.";
+                ClearCtrlState();
+                return;
+            }
+
+            CtrlConnected = true;
+            CtrlStatusText = $"Controller #{_ctrlConnectedIndex + 1} connected — press any button to test.";
+            UpdateCtrlState(state.Gamepad);
+        }
+        catch (DllNotFoundException)
+        {
+            _ctrlXInputAvailable = false;
+            CtrlStatusText = "XInput not available on this system.";
+        }
+        catch
+        {
+            // Transient — try again next tick
+        }
+    }
+
+    private void UpdateCtrlState(NativeMethods.XINPUT_GAMEPAD gp)
+    {
+        ushort b = gp.wButtons;
+        // XInput bitmasks (matching NativeMethods / XInputService)
+        CtrlDpadUpDown    = (b & 0x0001) != 0;
+        CtrlDpadDownDown  = (b & 0x0002) != 0;
+        CtrlDpadLeftDown  = (b & 0x0004) != 0;
+        CtrlDpadRightDown = (b & 0x0008) != 0;
+        CtrlStartDown     = (b & 0x0010) != 0;
+        CtrlBackDown      = (b & 0x0020) != 0;
+        CtrlLsDown        = (b & 0x0040) != 0;
+        CtrlRsDown        = (b & 0x0080) != 0;
+        CtrlLbDown        = (b & 0x0100) != 0;
+        CtrlRbDown        = (b & 0x0200) != 0;
+        CtrlGuideDown     = (b & 0x0400) != 0;
+        CtrlBtnA          = (b & 0x1000) != 0;
+        CtrlBtnB          = (b & 0x2000) != 0;
+        CtrlBtnX          = (b & 0x4000) != 0;
+        CtrlBtnY          = (b & 0x8000) != 0;
+
+        const byte   trigThres = 30;
+        const short  deadZone  = 8000;
+
+        CtrlLtDown  = gp.bLeftTrigger  >= trigThres;
+        CtrlRtDown  = gp.bRightTrigger >= trigThres;
+        CtrlLtValue = gp.bLeftTrigger;
+        CtrlRtValue = gp.bRightTrigger;
+
+        CtrlLStickUp    = gp.sThumbLY >  deadZone;
+        CtrlLStickDown  = gp.sThumbLY < -deadZone;
+        CtrlLStickLeft  = gp.sThumbLX < -deadZone;
+        CtrlLStickRight = gp.sThumbLX >  deadZone;
+        CtrlRStickUp    = gp.sThumbRY >  deadZone;
+        CtrlRStickDown  = gp.sThumbRY < -deadZone;
+        CtrlRStickLeft  = gp.sThumbRX < -deadZone;
+        CtrlRStickRight = gp.sThumbRX >  deadZone;
+    }
+
+    private void ClearCtrlState()
+    {
+        CtrlBtnA = CtrlBtnB = CtrlBtnX = CtrlBtnY = false;
+        CtrlLbDown = CtrlRbDown = CtrlLtDown = CtrlRtDown = false;
+        CtrlDpadUpDown = CtrlDpadDownDown = CtrlDpadLeftDown = CtrlDpadRightDown = false;
+        CtrlStartDown  = CtrlBackDown = CtrlGuideDown = false;
+        CtrlLsDown     = CtrlRsDown  = false;
+        CtrlLStickUp   = CtrlLStickDown = CtrlLStickLeft = CtrlLStickRight = false;
+        CtrlRStickUp   = CtrlRStickDown = CtrlRStickLeft = CtrlRStickRight = false;
+        CtrlLtValue    = CtrlRtValue = 0;
+    }
 
     // ── Account section ────────────────────────────────────────────────────
     [ObservableProperty] private string _accountUsername   = "";
