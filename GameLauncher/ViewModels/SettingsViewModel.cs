@@ -307,6 +307,79 @@ public partial class SettingsViewModel : ViewModelBase
         Services.NotificationService.ShowMessageNotification("TestFriend", "Hello from Game.OS!");
     }
 
+    // ── Developer: Test Update flow ────────────────────────────────────────
+    /// <summary>True while a test-update download is in progress.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TestUpdateButtonLabel))]
+    private bool _isTestUpdating;
+    public string TestUpdateButtonLabel =>
+        IsTestUpdating ? "⏳  Downloading…" : "🔄  Test Update";
+    /// <summary>Status message shown in the test-update dev card.</summary>
+    [ObservableProperty] private string _testUpdateStatusLabel = "";
+
+    /// <summary>
+    /// Downloads the latest GitHub release asset (bypassing the version check) and
+    /// launches the updater so the developer can verify the full update flow end-to-end.
+    /// </summary>
+    [RelayCommand]
+    private async System.Threading.Tasks.Task TestUpdate()
+    {
+        if (IsTestUpdating) return;
+        IsTestUpdating = true;
+        TestUpdateStatusLabel = "Downloading latest release…";
+        try
+        {
+            // Force download even if the remote version is not newer.
+            var result = await Services.LauncherUpdateService
+                .CheckForAppUpdateAsync(force: true)
+                .ConfigureAwait(true);
+
+            if (result.IsUpdateDownloaded && result.FilePath != null)
+            {
+                TestUpdateStatusLabel = $"✅  Downloaded {result.Tag}. Launching updater…";
+                string? username = GetCurrentUsernameAction?.Invoke();
+                Services.LauncherUpdateService.LaunchUpdater(result.FilePath, username);
+            }
+            else if (result.Status == Services.UpdateCheckStatus.UpToDate)
+            {
+                // Already up-to-date means no new download was made.
+                // Try to find any previously downloaded update zip next to the exe.
+                string exeDir = System.IO.Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "";
+                var zips = System.IO.Directory.GetFiles(exeDir, "GameOS-Update-*.zip");
+                if (zips.Length > 0)
+                {
+                    string zipPath = zips[^1]; // most-recently matched
+                    TestUpdateStatusLabel = $"✅  Using cached update ({System.IO.Path.GetFileName(zipPath)}). Launching updater…";
+                    string? username = GetCurrentUsernameAction?.Invoke();
+                    Services.LauncherUpdateService.LaunchUpdater(zipPath, username);
+                }
+                else
+                {
+                    TestUpdateStatusLabel = $"ℹ  Already on the latest version ({result.Tag}). No update file to test with.";
+                }
+            }
+            else
+            {
+                TestUpdateStatusLabel = result.Status switch
+                {
+                    Services.UpdateCheckStatus.NoRelease   => "ℹ  No releases found on GitHub.",
+                    Services.UpdateCheckStatus.UpdateAvailable => $"ℹ  {result.Tag} available but has no downloadable asset.",
+                    Services.UpdateCheckStatus.Error       => "❌  Download failed. Check Dev.log.",
+                    _                                      => $"ℹ  Status: {result.Status}.",
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            TestUpdateStatusLabel = $"❌  Test failed: {ex.Message}";
+        }
+        finally
+        {
+            IsTestUpdating = false;
+        }
+    }
+
     // ── Active settings section (Steam-style left-nav) ────────────────────
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsAppSection))]

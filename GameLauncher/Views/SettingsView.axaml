@@ -1366,6 +1366,32 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Test Update card -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🔄" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Test Update Flow"
+                                           FontSize="15" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                                Downloads the latest GitHub release asset (ignoring the version check)
+                                and launches the updater window so you can verify the full update flow.
+                                The launcher will relaunch automatically after the updater completes.
+                            </TextBlock>
+                            <Button Classes="btn-secondary" Padding="16,10"
+                                    HorizontalAlignment="Left"
+                                    IsEnabled="{Binding !IsTestUpdating}"
+                                    Command="{Binding TestUpdateCommand}">
+                                <TextBlock Text="{Binding TestUpdateButtonLabel}" FontSize="13" FontWeight="SemiBold"/>
+                            </Button>
+                            <TextBlock Text="{Binding TestUpdateStatusLabel}"
+                                       FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                       IsVisible="{Binding TestUpdateStatusLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Dev.log toggle card -->
                     <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
                         <StackPanel Spacing="16">
