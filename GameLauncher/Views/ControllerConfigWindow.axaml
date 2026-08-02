@@ -26,7 +26,7 @@
         <Style Selector="Border.row-odd">
             <Setter Property="Background" Value="#0d1117"/>
         </Style>
-        <Style Selector="TextBox.mapping-input">
+        <Style Selector="ComboBox.mapping-combo">
             <Setter Property="Background" Value="#21262d"/>
             <Setter Property="Foreground" Value="#e6edf3"/>
             <Setter Property="BorderBrush" Value="#30363d"/>
@@ -35,8 +35,9 @@
             <Setter Property="Padding" Value="6,3"/>
             <Setter Property="FontSize" Value="12"/>
             <Setter Property="MinWidth" Value="140"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
         </Style>
-        <Style Selector="TextBox.mapping-input:focus">
+        <Style Selector="ComboBox.mapping-combo:focus">
             <Setter Property="BorderBrush" Value="#58a6ff"/>
         </Style>
         <Style Selector="TextBlock.btn-label">
@@ -184,7 +185,7 @@
                         Padding="12,8">
                     <Grid ColumnDefinitions="180,*,*">
                         <TextBlock Grid.Column="0" Text="Button" Classes="col-header"/>
-                        <TextBlock Grid.Column="1" Text="Press Action  (e.g. Key:Enter)" Classes="col-header" Margin="8,0,0,0"/>
+                        <TextBlock Grid.Column="1" Text="Press Action" Classes="col-header" Margin="8,0,0,0"/>
                         <TextBlock Grid.Column="2" Text="Hold Action" Classes="col-header" Margin="8,0,0,0"/>
                     </Grid>
                 </Border>
@@ -202,16 +203,20 @@
                                         <TextBlock Grid.Column="0"
                                                    Text="{Binding ButtonLabel}"
                                                    Classes="btn-label"/>
-                                        <TextBox Grid.Column="1"
-                                                 Text="{Binding PressAction}"
-                                                 Classes="mapping-input"
-                                                 Margin="8,0,4,0"
-                                                 Watermark="Empty"/>
-                                        <TextBox Grid.Column="2"
-                                                 Text="{Binding HoldAction}"
-                                                 Classes="mapping-input"
-                                                 Margin="4,0,0,0"
-                                                 Watermark="Empty"/>
+                                        <ComboBox Grid.Column="1"
+                                                  Classes="mapping-combo"
+                                                  IsEditable="True"
+                                                  Text="{Binding PressAction}"
+                                                  ItemsSource="{x:Static vm:ControllerConfigViewModel.ActionPresets}"
+                                                  Margin="8,0,4,0"
+                                                  PlaceholderText="Empty"/>
+                                        <ComboBox Grid.Column="2"
+                                                  Classes="mapping-combo"
+                                                  IsEditable="True"
+                                                  Text="{Binding HoldAction}"
+                                                  ItemsSource="{x:Static vm:ControllerConfigViewModel.ActionPresets}"
+                                                  Margin="4,0,0,0"
+                                                  PlaceholderText="Empty"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -227,7 +232,7 @@
                 Padding="16,10">
             <Grid ColumnDefinitions="*,Auto,Auto,Auto">
                 <TextBlock Grid.Column="0"
-                           Text="Tip: Use Key:Enter, Key:Ctrl+Shift+Esc, Key:Space etc.  Leave Empty for native XInput pass-through."
+                           Text="Select a preset from each dropdown, or type a custom value (e.g. Key:Ctrl+Shift+Esc).  Leave Empty for native XInput pass-through."
                            Foreground="#8b949e" FontSize="11"
                            VerticalAlignment="Center"/>
                 <Button Grid.Column="1" Classes="cc-btn"
