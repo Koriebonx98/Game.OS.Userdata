@@ -26,9 +26,25 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _autoUpdate = true;
     /// <summary>Check for Game.OS launcher updates after login and every 12 hours, downloading them automatically.</summary>
     [ObservableProperty] private bool _appAutoUpdate = true;
+    /// <summary>Apply a downloaded update when the launcher exits.</summary>
+    [ObservableProperty] private bool _updateOnExit = false;
+    /// <summary>Apply a downloaded update when the launcher starts.</summary>
+    [ObservableProperty] private bool _updateOnStart = false;
+    /// <summary>When true, show "Update available" prompt before updating; when false, update silently.</summary>
+    [ObservableProperty] private bool _acceptAutoUpdate = true;
     /// <summary>Current installed Game.OS launcher version (display only).</summary>
     public string AppVersionLabel =>
         Services.LauncherUpdateService.CurrentVersionTag;
+    /// <summary>Latest version available from GitHub (populated after a check).</summary>
+    [ObservableProperty] private string _latestVersionTag = "";
+    /// <summary>Status message shown in the update card after a check or download.</summary>
+    [ObservableProperty] private string _updateCheckStatusLabel = "";
+    /// <summary>True while an update check or download is in progress.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CheckForUpdateButtonLabel))]
+    private bool _isCheckingForUpdate;
+    public string CheckForUpdateButtonLabel =>
+        IsCheckingForUpdate ? "⏳  Checking…" : "🔍  Check for Update";
     /// <summary>Play the Game.OS intro animation when the launcher starts.</summary>
     [ObservableProperty] private bool _showIntroVideo = true;
     /// <summary>Path to a custom intro video file (empty = use built-in animation).</summary>
@@ -170,6 +186,93 @@ public partial class SettingsViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// Action wired by MainViewModel to show the "Update available" prompt.
+    /// Receives the new version tag; returns true when the user chose to update now.
+    /// </summary>
+    public Func<string, Task<bool>>? ShowUpdatePromptAction { get; set; }
+
+    /// <summary>
+    /// Action wired by MainViewModel to get the current user's username
+    /// so the updater can auto-login after applying the update.
+    /// </summary>
+    public Func<string>? GetCurrentUsernameAction { get; set; }
+
+    /// <summary>Manually checks GitHub for a newer version and downloads if available.</summary>
+    [RelayCommand]
+    private async Task CheckForUpdate()
+    {
+        if (IsCheckingForUpdate) return;
+        IsCheckingForUpdate = true;
+        UpdateCheckStatusLabel = "Checking for update…";
+        try
+        {
+            var result = await Services.LauncherUpdateService.CheckForAppUpdateAsync(force: true)
+                .ConfigureAwait(true);
+            UpdateCheckStatusLabel = result.Status switch
+            {
+                Services.UpdateCheckStatus.UpToDate         => $"✅  Already up to date ({result.Tag}).",
+                Services.UpdateCheckStatus.Downloaded        => $"⬇  Update {result.Tag} downloaded. Restart to apply.",
+                Services.UpdateCheckStatus.AlreadyDownloaded => $"⬇  Update {result.Tag} already downloaded. Restart to apply.",
+                Services.UpdateCheckStatus.UpdateAvailable   => $"ℹ  Update {result.Tag} available (no downloadable asset found).",
+                Services.UpdateCheckStatus.NoRelease         => "ℹ  No releases found on GitHub.",
+                Services.UpdateCheckStatus.Error             => "❌  Check failed. See Dev.log for details.",
+                _                                            => "✅  Check complete.",
+            };
+            if (result.Tag != null)
+                LatestVersionTag = result.Tag;
+        }
+        catch (Exception ex)
+        {
+            UpdateCheckStatusLabel = $"❌  Check failed: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingForUpdate = false;
+        }
+    }
+
+    /// <summary>Downloads the latest update (if available) and launches the updater process.</summary>
+    [RelayCommand]
+    private async Task UpdateNow()
+    {
+        if (IsCheckingForUpdate) return;
+        IsCheckingForUpdate = true;
+        UpdateCheckStatusLabel = "Downloading update…";
+        try
+        {
+            var result = await Services.LauncherUpdateService.CheckForAppUpdateAsync(force: true)
+                .ConfigureAwait(true);
+
+            if (result.Status == Services.UpdateCheckStatus.UpToDate)
+            {
+                UpdateCheckStatusLabel = $"✅  Already on the latest version ({result.Tag}).";
+                return;
+            }
+
+            if (result.IsUpdateDownloaded && result.FilePath != null)
+            {
+                UpdateCheckStatusLabel = $"🚀  Launching updater for {result.Tag}…";
+                string? username = GetCurrentUsernameAction?.Invoke();
+                Services.LauncherUpdateService.LaunchUpdater(result.FilePath, username);
+            }
+            else
+            {
+                UpdateCheckStatusLabel = result.Status == Services.UpdateCheckStatus.UpdateAvailable
+                    ? $"ℹ  Update {result.Tag} found but no downloadable asset is attached."
+                    : "❌  Could not download the update. Check your connection.";
+            }
+        }
+        catch (Exception ex)
+        {
+            UpdateCheckStatusLabel = $"❌  Update failed: {ex.Message}";
+        }
+        finally
+        {
+            IsCheckingForUpdate = false;
+        }
+    }
+
     /// <summary>Opens the Steam API key page in the system browser.</summary>
     [RelayCommand]
     private void OpenSteamApiKeyPage()
@@ -202,6 +305,79 @@ public partial class SettingsViewModel : ViewModelBase
         Services.NotificationService.ShowSessionEndedNotification("Test Game", 42);
         await System.Threading.Tasks.Task.Delay(400);
         Services.NotificationService.ShowMessageNotification("TestFriend", "Hello from Game.OS!");
+    }
+
+    // ── Developer: Test Update flow ────────────────────────────────────────
+    /// <summary>True while a test-update download is in progress.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TestUpdateButtonLabel))]
+    private bool _isTestUpdating;
+    public string TestUpdateButtonLabel =>
+        IsTestUpdating ? "⏳  Downloading…" : "🔄  Test Update";
+    /// <summary>Status message shown in the test-update dev card.</summary>
+    [ObservableProperty] private string _testUpdateStatusLabel = "";
+
+    /// <summary>
+    /// Downloads the latest GitHub release asset (bypassing the version check) and
+    /// launches the updater so the developer can verify the full update flow end-to-end.
+    /// </summary>
+    [RelayCommand]
+    private async System.Threading.Tasks.Task TestUpdate()
+    {
+        if (IsTestUpdating) return;
+        IsTestUpdating = true;
+        TestUpdateStatusLabel = "Downloading latest release…";
+        try
+        {
+            // Force download even if the remote version is not newer.
+            var result = await Services.LauncherUpdateService
+                .CheckForAppUpdateAsync(force: true)
+                .ConfigureAwait(true);
+
+            if (result.IsUpdateDownloaded && result.FilePath != null)
+            {
+                TestUpdateStatusLabel = $"✅  Downloaded {result.Tag}. Launching updater…";
+                string? username = GetCurrentUsernameAction?.Invoke();
+                Services.LauncherUpdateService.LaunchUpdater(result.FilePath, username);
+            }
+            else if (result.Status == Services.UpdateCheckStatus.UpToDate)
+            {
+                // Already up-to-date means no new download was made.
+                // Try to find any previously downloaded update zip next to the exe.
+                string exeDir = System.IO.Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "";
+                var zips = System.IO.Directory.GetFiles(exeDir, "GameOS-Update-*.zip");
+                if (zips.Length > 0)
+                {
+                    string zipPath = zips[^1]; // most-recently matched
+                    TestUpdateStatusLabel = $"✅  Using cached update ({System.IO.Path.GetFileName(zipPath)}). Launching updater…";
+                    string? username = GetCurrentUsernameAction?.Invoke();
+                    Services.LauncherUpdateService.LaunchUpdater(zipPath, username);
+                }
+                else
+                {
+                    TestUpdateStatusLabel = $"ℹ  Already on the latest version ({result.Tag}). No update file to test with.";
+                }
+            }
+            else
+            {
+                TestUpdateStatusLabel = result.Status switch
+                {
+                    Services.UpdateCheckStatus.NoRelease   => "ℹ  No releases found on GitHub.",
+                    Services.UpdateCheckStatus.UpdateAvailable => $"ℹ  {result.Tag} available but has no downloadable asset.",
+                    Services.UpdateCheckStatus.Error       => "❌  Download failed. Check Dev.log.",
+                    _                                      => $"ℹ  Status: {result.Status}.",
+                };
+            }
+        }
+        catch (Exception ex)
+        {
+            TestUpdateStatusLabel = $"❌  Test failed: {ex.Message}";
+        }
+        finally
+        {
+            IsTestUpdating = false;
+        }
     }
 
     // ── Active settings section (Steam-style left-nav) ────────────────────
@@ -357,6 +533,9 @@ public partial class SettingsViewModel : ViewModelBase
         LogRepacksScannerAdvanced = appSettings.LogRepacksScannerAdvanced;
         LogLocalSteamScanner      = appSettings.LogLocalSteamScanner;
         LogSteamApiScanner        = appSettings.LogSteamApiScanner;
+        UpdateOnExit              = appSettings.UpdateOnExit;
+        UpdateOnStart             = appSettings.UpdateOnStart;
+        AcceptAutoUpdate          = appSettings.AcceptAutoUpdate;
 
         // ── Startup apps: merge saved entries with the built-in presets ──
         LoadStartupApps(appSettings.StartupApps);
@@ -517,6 +696,9 @@ public partial class SettingsViewModel : ViewModelBase
         {
             AutoUpdate            = AutoUpdate,
             AppAutoUpdate         = AppAutoUpdate,
+            UpdateOnExit          = UpdateOnExit,
+            UpdateOnStart         = UpdateOnStart,
+            AcceptAutoUpdate      = AcceptAutoUpdate,
             ShowIntroVideo        = ShowIntroVideo,
             IntroVideoPath        = IntroVideoPath,
             HasCompletedFirstRunSetup = true,

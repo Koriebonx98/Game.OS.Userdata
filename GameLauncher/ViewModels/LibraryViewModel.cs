@@ -214,6 +214,7 @@ public partial class LibraryViewModel : ViewModelBase
                     // N individual Add events — keeps the UI thread responsive.
                     FilteredMyGames.Reset(filteredMyGames);
                     HasMyGames = FilteredMyGames.Count > 0;
+                    ResetGameFocusAfterRebuild();
 
                     // Small collections can be updated individually without noticeable lag.
                     ApplyNonMyGamesFilter();
@@ -374,6 +375,93 @@ public partial class LibraryViewModel : ViewModelBase
     /// Wired in LibraryView.axaml.cs.
     /// </summary>
     public Action? FocusSearchRequested { get; set; }
+
+    // ── Controller / keyboard game-list focus ──────────────────────────────
+    /// <summary>
+    /// Index of the currently focused game card in <see cref="FilteredMyGames"/>.
+    /// −1 means no card is focused.
+    /// </summary>
+    [ObservableProperty] private int _focusedGameIndex = -1;
+
+    /// <summary>The card currently focused by controller/keyboard navigation, or null.</summary>
+    [ObservableProperty] private LocalGameCardVm? _focusedGame;
+
+    /// <summary>True when a game card in the list has controller/keyboard focus.</summary>
+    [ObservableProperty] private bool _hasFocusedGame;
+
+    /// <summary>
+    /// Invoked when the user presses Enter/A while a game card is focused —
+    /// opens the game-detail overlay for that card.
+    /// Wired by MainViewModel.
+    /// </summary>
+    public Action<LocalGameCardVm>? OpenFocusedGameRequested { get; set; }
+
+    /// <summary>
+    /// Moves the focused game card up (<paramref name="delta"/> = −1) or
+    /// down (<paramref name="delta"/> = +1) in <see cref="FilteredMyGames"/>.
+    /// Auto-selects index 0 when nothing is focused yet (delta ignored).
+    /// </summary>
+    public void MoveGameFocus(int delta)
+    {
+        if (FilteredMyGames.Count == 0)
+        {
+            FocusedGameIndex = -1;
+            FocusedGame = null;
+            HasFocusedGame = false;
+            return;
+        }
+
+        int next;
+        if (FocusedGameIndex < 0)
+            next = 0; // first activation
+        else
+            next = Math.Clamp(FocusedGameIndex + delta, 0, FilteredMyGames.Count - 1);
+
+        SetFocusedGameAt(next);
+    }
+
+    /// <summary>Opens the detail overlay for the currently focused game card.</summary>
+    public void ActivateFocusedGame()
+    {
+        if (FocusedGame != null)
+            OpenFocusedGameRequested?.Invoke(FocusedGame);
+    }
+
+    private void SetFocusedGameAt(int index)
+    {
+        // Clear old IsFocused flag
+        if (FocusedGameIndex >= 0 && FocusedGameIndex < FilteredMyGames.Count)
+            FilteredMyGames[FocusedGameIndex].IsFocused = false;
+
+        if (index < 0 || index >= FilteredMyGames.Count)
+        {
+            FocusedGameIndex = -1;
+            FocusedGame = null;
+            HasFocusedGame = false;
+            return;
+        }
+
+        FocusedGameIndex = index;
+        FocusedGame = FilteredMyGames[index];
+        FocusedGame.IsFocused = true;
+        HasFocusedGame = true;
+    }
+
+    /// <summary>
+    /// Resets game focus to the first card after a list rebuild.
+    /// Called internally whenever FilteredMyGames is replaced.
+    /// </summary>
+    private void ResetGameFocusAfterRebuild()
+    {
+        if (FilteredMyGames.Count > 0)
+            SetFocusedGameAt(0);
+        else
+        {
+            FocusedGameIndex = -1;
+            FocusedGame = null;
+            HasFocusedGame = false;
+        }
+    }
 
     private static readonly string[] _installFilters = { "All", "Installed", "Uninstalled" };
 
@@ -876,6 +964,7 @@ public partial class LibraryViewModel : ViewModelBase
         var filtered = ComputeFilteredMyGames(_allMyGames, plat, search, installStatus);
         FilteredMyGames.Reset(filtered);
         HasMyGames = FilteredMyGames.Count > 0;
+        ResetGameFocusAfterRebuild();
 
         TotalGames = _allMyGames.Count;
     }

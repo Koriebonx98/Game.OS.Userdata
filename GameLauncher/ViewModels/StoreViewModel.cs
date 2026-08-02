@@ -292,6 +292,26 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         }
     }
 
+    /// <summary>
+    /// Invoked by MainWindow when the user presses Y on the controller while in the
+    /// store — should focus the search TextBox so the user can type immediately.
+    /// Wired in StoreView.axaml.cs.
+    /// </summary>
+    public Action? FocusSearchRequested { get; set; }
+
+    /// <summary>
+    /// Cycles the platform filter to the next platform in <see cref="Platforms"/>.
+    /// Called by the X button controller handler in MainWindow.
+    /// </summary>
+    public void CyclePlatform()
+    {
+        if (Platforms.Count == 0) return;
+        var list = Platforms.ToList();
+        int idx = list.IndexOf(SelectedPlatform);
+        if (idx < 0) idx = 0;
+        SelectedPlatform = list[(idx + 1) % list.Count];
+    }
+
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
 

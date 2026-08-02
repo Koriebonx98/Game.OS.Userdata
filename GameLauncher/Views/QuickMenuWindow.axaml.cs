@@ -93,6 +93,13 @@ public partial class QuickMenuWindow : Window
                 if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
                 else vm.MoveHubSelection(1);
                 return;
+            // LB / RB blade navigation in XB360 guide.
+            case Key.PageUp:
+                if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+                return;
+            case Key.PageDown:
+                if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+                return;
             case Key.Up:
                 if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);
                 return;
@@ -102,6 +109,10 @@ public partial class QuickMenuWindow : Window
             case Key.Enter:
             case Key.Space:
                 vm.ActivateSelectedHub();
+                return;
+            // Y button → navigate to Game OS Home / Dashboard.
+            case Key.Y:
+                if (vm.IsXb360Theme) vm.GoToGameOsHomeCommand.Execute(null);
                 return;
             case Key.Escape:
             case Key.BrowserBack:

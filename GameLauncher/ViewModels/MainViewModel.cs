@@ -186,6 +186,45 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     [ObservableProperty] private bool _isOfflineMode = false;
 
+    /// <summary>
+    /// Index (0–7) of the currently highlighted nav-sidebar item when the sidebar is open.
+    /// Maps 1:1 to the nav order: dashboard=0, library=1, store=2, friends=3,
+    /// inbox=4, profile=5, settings=6, media=7.
+    /// Updated by Up/Down without immediately navigating — Enter/A confirms.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightDashboard))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightLibrary))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightStore))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightFriends))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightInbox))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightProfile))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightSettings))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightMedia))]
+    private int _navHighlightIndex = 0;
+
+    public bool IsNavHighlightDashboard => IsNavExpanded && NavHighlightIndex == 0;
+    public bool IsNavHighlightLibrary   => IsNavExpanded && NavHighlightIndex == 1;
+    public bool IsNavHighlightStore     => IsNavExpanded && NavHighlightIndex == 2;
+    public bool IsNavHighlightFriends   => IsNavExpanded && NavHighlightIndex == 3;
+    public bool IsNavHighlightInbox     => IsNavExpanded && NavHighlightIndex == 4;
+    public bool IsNavHighlightProfile   => IsNavExpanded && NavHighlightIndex == 5;
+    public bool IsNavHighlightSettings  => IsNavExpanded && NavHighlightIndex == 6;
+    public bool IsNavHighlightMedia     => IsNavExpanded && NavHighlightIndex == 7;
+
+    partial void OnIsNavExpandedChanged(bool value)
+    {
+        // Refresh highlight bindings when nav opens or closes
+        OnPropertyChanged(nameof(IsNavHighlightDashboard));
+        OnPropertyChanged(nameof(IsNavHighlightLibrary));
+        OnPropertyChanged(nameof(IsNavHighlightStore));
+        OnPropertyChanged(nameof(IsNavHighlightFriends));
+        OnPropertyChanged(nameof(IsNavHighlightInbox));
+        OnPropertyChanged(nameof(IsNavHighlightProfile));
+        OnPropertyChanged(nameof(IsNavHighlightSettings));
+        OnPropertyChanged(nameof(IsNavHighlightMedia));
+    }
+
     public bool IsHome        => ActivePage == "dashboard";
     public bool IsLibrary     => ActivePage == "library";
     public bool IsStore       => ActivePage == "store";
@@ -343,6 +382,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Wire Settings → SyncNow so the Resync button triggers TryRefreshUserDataAsync
         SettingsVm.SyncNowAction = RequestManualSyncAsync;
+
+        // Wire Settings → update prompt so the auto-update can show a dialog from the UI.
+        SettingsVm.GetCurrentUsernameAction = () => _profile?.Username ?? "";
+        SettingsVm.ShowUpdatePromptAction = tag => ShowUpdateAvailableDialogAsync(tag);
 
         // Wire playtime tracking: when a game is launched from the detail view,
         // pass the process to the PlaytimeService to record the session on a
@@ -824,6 +867,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
         LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
+        LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
@@ -1634,10 +1678,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 DevLogService.Log("[Playtime] Cloud activity log is empty — no playtime to apply.");
                 // Still refresh the dashboard so any library changes (new games, etc.) are
                 // reflected with correct (zero) playtime rather than stale data.
+                // Use Background priority so that input events (controller, keyboard) are
+                // not blocked while the dashboard rebuilds its ObservableCollections.
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
-                });
+                }, Avalonia.Threading.DispatcherPriority.Background);
                 return;
             }
             DevLogService.Log($"[Playtime] Cloud activity log has {activity.Count} entries.");
@@ -1670,11 +1716,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             System.Diagnostics.Debug.WriteLine(
                 "[Playtime] Applied cloud playtime totals to library and cache.");
             DevLogService.Log("[Playtime] Applied cloud playtime totals to library and cache.");
+            // Use Background priority so input events (controller / keyboard) are never
+            // blocked by the synchronous ObservableCollection rebuilds inside Load().
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
                 LibraryVm.Load(library);
-            });
+            }, Avalonia.Threading.DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
@@ -3919,14 +3967,21 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     /// <summary>
     /// Checks GitHub Releases for a newer version of the Game.OS launcher.
-    /// When a new release is found, the update asset is downloaded to the exe directory
-    /// and the user receives a toast notification.
+    /// When a new release is found, the update asset is downloaded to the exe directory.
+    /// If AcceptAutoUpdate is enabled, shows an "Update available" dialog.
+    /// Otherwise, applies the update silently based on UpdateOnStart/UpdateOnExit settings.
     /// Runs silently in the background; all errors are swallowed.
     /// </summary>
     private async Task CheckForLauncherUpdateAsync()
     {
         try
         {
+            // Always write/refresh Version.json next to the exe on login.
+            Services.LauncherUpdateService.WriteVersionJson();
+
+            var settings = Services.AppSettingsService.Load();
+            if (!settings.AppAutoUpdate) return;
+
             var result = await Services.LauncherUpdateService
                 .CheckForAppUpdateAsync()
                 .ConfigureAwait(false);
@@ -3934,21 +3989,78 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log(
                 $"[LauncherUpdate] Status={result.Status} Tag={result.Tag ?? "—"} File={result.FilePath ?? "—"}");
 
-            if (result.Status == Services.UpdateCheckStatus.Downloaded)
+            if (result.Status == Services.UpdateCheckStatus.Downloaded ||
+                result.Status == Services.UpdateCheckStatus.AlreadyDownloaded)
             {
-                string tag      = result.Tag ?? "new version";
-                string fileName = result.FilePath != null
-                    ? System.IO.Path.GetFileName(result.FilePath)
-                    : "";
-                string body = string.IsNullOrEmpty(fileName)
-                    ? $"Game.OS {tag} downloaded. Restart to apply."
-                    : $"Game.OS {tag} downloaded ({fileName}). Restart to apply.";
-                Services.NotificationService.ShowDeveloperNotification(
-                    "🔄  Update Ready", body);
+                string tag = result.Tag ?? "new version";
+
+                // Show prompt if AcceptAutoUpdate is enabled; otherwise apply silently on start.
+                if (settings.AcceptAutoUpdate)
+                {
+                    // Post the prompt to the UI thread via SettingsVm action or notification.
+                    if (SettingsVm.ShowUpdatePromptAction != null)
+                    {
+                        bool updateNow = await Avalonia.Threading.Dispatcher.UIThread
+                            .InvokeAsync(() => SettingsVm.ShowUpdatePromptAction(tag))
+                            .ConfigureAwait(false);
+
+                        if (updateNow && result.FilePath != null)
+                        {
+                            Services.LauncherUpdateService.LaunchUpdater(
+                                result.FilePath, _profile?.Username);
+                        }
+                    }
+                    else
+                    {
+                        // Fallback: notify via toast
+                        string fileName = result.FilePath != null
+                            ? System.IO.Path.GetFileName(result.FilePath) : "";
+                        string body = string.IsNullOrEmpty(fileName)
+                            ? $"Game.OS {tag} downloaded. Restart to apply."
+                            : $"Game.OS {tag} downloaded ({fileName}). Restart to apply.";
+                        Services.NotificationService.ShowDeveloperNotification(
+                            "🔄  Update Ready", body);
+                    }
+                }
+                else if (settings.UpdateOnStart && result.FilePath != null)
+                {
+                    // Silent auto-update on start
+                    Services.LauncherUpdateService.LaunchUpdater(
+                        result.FilePath, _profile?.Username);
+                }
+                else
+                {
+                    // Notify without auto-applying
+                    string fileName = result.FilePath != null
+                        ? System.IO.Path.GetFileName(result.FilePath) : "";
+                    string body = string.IsNullOrEmpty(fileName)
+                        ? $"Game.OS {tag} downloaded. Restart to apply."
+                        : $"Game.OS {tag} downloaded ({fileName}). Restart to apply.";
+                    Services.NotificationService.ShowDeveloperNotification(
+                        "🔄  Update Ready", body);
+                }
             }
         }
         catch { /* best-effort — update check must never crash the app */ }
     }
+
+    /// <summary>
+    /// Shows an "Update available" dialog on the UI thread and returns true when the
+    /// user chooses to update now.  Must be called from the UI thread (or via Dispatcher).
+    /// The implementation raises a notification and uses a simple in-app message box
+    /// via <see cref="ShowUpdateDialogRequested"/> so the View can display it.
+    /// </summary>
+    private async Task<bool> ShowUpdateAvailableDialogAsync(string versionTag)
+    {
+        if (ShowUpdateDialogRequested == null) return false;
+        return await ShowUpdateDialogRequested(versionTag).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Raised by <see cref="ShowUpdateAvailableDialogAsync"/> to show a dialog in the View layer.
+    /// Returns true when the user clicks "Update Now".
+    /// </summary>
+    public Func<string, Task<bool>>? ShowUpdateDialogRequested { get; set; }
 
     /// <summary>
     /// Called by the online sync-check timer.  Re-fetches the logged-in user's games
