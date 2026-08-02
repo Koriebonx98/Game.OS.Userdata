@@ -209,10 +209,15 @@
             <Setter Property="Foreground" Value="White"/>
         </Style>
         <Style Selector="Button.xb360-guide-item.cursor /template/ ContentPresenter">
-            <Setter Property="Background" Value="#1d7625"/>
+            <Setter Property="Background" Value="#118714"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-item.cursor">
+            <Setter Property="BorderBrush" Value="#ffd44d"/>
+            <Setter Property="BorderThickness" Value="3"/>
         </Style>
         <Style Selector="Button.xb360-guide-item.cursor TextBlock">
             <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
         </Style>
         <Style Selector="Button.xb360-sub-action-btn">
             <Setter Property="HorizontalAlignment" Value="Stretch"/>

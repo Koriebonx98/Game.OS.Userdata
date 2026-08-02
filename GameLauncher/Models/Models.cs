@@ -598,6 +598,20 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("preferOfflineCachedMetadata")] public bool PreferOfflineCachedMetadata { get; set; } = true;
 
+        /// <summary>
+        /// When <see langword="true"/>, periodically polls cloud userdata updates in the
+        /// background (sync-check + heartbeat). Set to <see langword="false"/> to only
+        /// refresh when the user signs in or manually requests sync.
+        /// </summary>
+        [JsonPropertyName("enableBackgroundSyncChecks")] public bool EnableBackgroundSyncChecks { get; set; } = false;
+
+        /// <summary>
+        /// When <see langword="true"/>, performs background cover/metadata caching after
+        /// login and local scan updates. Set to <see langword="false"/> to avoid startup
+        /// caching passes and keep dashboard rendering responsive.
+        /// </summary>
+        [JsonPropertyName("enableBackgroundMetadataCaching")] public bool EnableBackgroundMetadataCaching { get; set; } = false;
+
         // ── Placeholder future feature ───────────────────────────────────────
 
         /// <summary>
