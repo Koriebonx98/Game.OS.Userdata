@@ -445,6 +445,16 @@
                                     <Rectangle Height="1" Fill="#d7d7d7"/>
 
                                     <Button Classes="xb360-guide-item"
+                                            Classes.cursor="{Binding Xb360CursorAchievements}"
+                                            Command="{Binding OpenAchievementsCommand}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <TextBlock Grid.Column="0" Text="Achievements" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="🏆" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                        </Grid>
+                                    </Button>
+                                    <Rectangle Height="1" Fill="#d7d7d7"/>
+
+                                    <Button Classes="xb360-guide-item"
                                             Classes.cursor="{Binding Xb360CursorInbox}"
                                             Command="{Binding OpenInboxPageCommand}">
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
@@ -504,19 +514,24 @@
                                             <TextBlock Text="Home" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
                                             <Button Classes="xb360-sub-action-btn" Command="{Binding GoToGameOsHomeCommand}">Go to Home</Button>
                                         </StackPanel>
-                                        <StackPanel IsVisible="{Binding Xb360CursorFriends}" Spacing="10">
+
+                                        <!-- Friends detail: keyboard-navigable list + context action panel -->
+                                        <StackPanel IsVisible="{Binding Xb360CursorFriends}" Spacing="6">
                                             <TextBlock Text="Friends" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
                                             <TextBlock Text="{Binding Xb360FriendsCount, StringFormat='{}{0} friends'}" FontSize="13" Foreground="#444"/>
-                                            <!-- Friends list with Invite / Message / View actions -->
-                                            <ItemsControl ItemsSource="{Binding QuickFriends}">
+
+                                            <!-- Friend rows: highlight when Xb360FriendsSubMode is true -->
+                                            <ItemsControl ItemsSource="{Binding Friends}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:FriendPresenceVm">
-                                                        <Border Background="#e8e8e8" CornerRadius="4" Padding="8,6" Margin="0,2">
-                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                        <Border Padding="6,4" Margin="0,1" CornerRadius="4"
+                                                                Background="#e8e8e8">
+                                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
                                                                     <TextBlock Text="{Binding Username}" FontWeight="SemiBold" FontSize="13" Foreground="#1a1a1a"/>
                                                                     <TextBlock Text="{Binding StatusLabel}" FontSize="11" Foreground="#555"/>
                                                                 </StackPanel>
+                                                                <!-- Mouse-click action menu (pointer users) -->
                                                                 <Button Grid.Column="1" Classes="xb360-sub-action-btn" Padding="8,4" FontSize="12">
                                                                     <TextBlock Text="..."/>
                                                                     <Button.Flyout>
@@ -538,7 +553,7 @@
                                                                             <MenuItem Header="Message"
                                                                                       Command="{Binding $parent[UserControl].DataContext.MessageFriendCommand}"
                                                                                       CommandParameter="{Binding Username}"/>
-                                                                            <MenuItem Header="View"
+                                                                            <MenuItem Header="View Profile"
                                                                                       Command="{Binding $parent[UserControl].DataContext.ViewFriendCommand}"
                                                                                       CommandParameter="{Binding Username}"/>
                                                                         </MenuFlyout>
@@ -549,10 +564,77 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+
+                                            <!-- Controller context action panel (shown when Xb360FriendContextMenuOpen) -->
+                                            <Border IsVisible="{Binding Xb360FriendContextMenuOpen}"
+                                                    Background="#f0f0f0"
+                                                    BorderBrush="#5fce7d"
+                                                    BorderThickness="1"
+                                                    CornerRadius="4"
+                                                    Padding="8,6"
+                                                    Margin="0,4,0,0">
+                                                <StackPanel Spacing="4">
+                                                    <TextBlock Text="{Binding Xb360HighlightedFriendUsername}"
+                                                               FontWeight="SemiBold" FontSize="13" Foreground="#1a1a1a"/>
+                                                    <Button Classes="xb360-sub-action-btn"
+                                                            Classes.active="{Binding Xb360FriendContextView}"
+                                                            Command="{Binding ViewFriendCommand}"
+                                                            CommandParameter="{Binding Xb360HighlightedFriendUsername}">View Profile</Button>
+                                                    <Button Classes="xb360-sub-action-btn"
+                                                            Classes.active="{Binding Xb360FriendContextInvite}"
+                                                            Command="{Binding InviteFriendCommand}"
+                                                            CommandParameter="{Binding Xb360HighlightedFriendUsername}">Invite</Button>
+                                                    <Button Classes="xb360-sub-action-btn"
+                                                            Classes.active="{Binding Xb360FriendContextMessage}"
+                                                            Command="{Binding MessageFriendCommand}"
+                                                            CommandParameter="{Binding Xb360HighlightedFriendUsername}">Message</Button>
+                                                    <TextBlock Text="🔴 B  Back" FontSize="11" Foreground="#555"/>
+                                                </StackPanel>
+                                            </Border>
+
                                             <TextBlock Text="{Binding InviteStatusMessage}" Foreground="#555" FontSize="11"
                                                        IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                             <Button Classes="xb360-sub-action-btn" Command="{Binding OpenFriendsPageCommand}">All Friends</Button>
                                         </StackPanel>
+
+                                        <!-- Achievements detail: name, description and icon list -->
+                                        <StackPanel IsVisible="{Binding Xb360CursorAchievements}" Spacing="8">
+                                            <TextBlock Text="Achievements" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
+                                            <TextBlock Text="{Binding AchievementsLabel}" FontSize="13" Foreground="#444"
+                                                       IsVisible="{Binding HasAchievementsProgress}"/>
+                                            <ScrollViewer MaxHeight="340" VerticalScrollBarVisibility="Auto">
+                                                <ItemsControl ItemsSource="{Binding Achievements}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="vm:QuickMenuAchievementVm">
+                                                            <Border Background="#e8e8e8" CornerRadius="4" Padding="8,6" Margin="0,2">
+                                                                <Grid ColumnDefinitions="Auto,*" ColumnSpacing="8">
+                                                                    <TextBlock Grid.Column="0"
+                                                                               Text="{Binding StatusIcon}"
+                                                                               FontSize="18"
+                                                                               VerticalAlignment="Center"/>
+                                                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                                                                        <TextBlock Text="{Binding Name}"
+                                                                                   FontWeight="SemiBold"
+                                                                                   FontSize="13"
+                                                                                   Foreground="#1a1a1a"/>
+                                                                        <TextBlock Text="{Binding Description}"
+                                                                                   FontSize="11"
+                                                                                   Foreground="#555"
+                                                                                   TextWrapping="Wrap"/>
+                                                                        <TextBlock Text="{Binding StatusLabel}"
+                                                                                   FontSize="10"
+                                                                                   Foreground="#777"/>
+                                                                    </StackPanel>
+                                                                </Grid>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                            <TextBlock Text="No achievements loaded." FontSize="12" Foreground="#777"
+                                                       IsVisible="{Binding !HasAchievements}"/>
+                                        </StackPanel>
+
                                         <StackPanel IsVisible="{Binding Xb360CursorInbox}" Spacing="10">
                                             <TextBlock Text="Messages" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
                                             <TextBlock Text="{Binding Xb360MessagesCount, StringFormat='{}{0} unread'}" FontSize="13" Foreground="#444"/>

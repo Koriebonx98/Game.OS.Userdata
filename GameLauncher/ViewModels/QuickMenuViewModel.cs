@@ -27,10 +27,14 @@ public partial class QuickMenuViewModel : ViewModelBase
     // XB360 two-axis navigation arrays
     // Up/Down navigates the center list; Left/Right navigates between blade tabs.
     private static readonly string[] Xb360CenterItemKeys =
-        { "home", "friends", "inbox", "notifications", "recent", "downloads", "exit" };
+        { "home", "friends", "achievements", "inbox", "notifications", "recent", "downloads", "exit" };
 
     private static readonly string[] Xb360BladeOrder =
         { "games", "profile", "main", "media", "settings" };
+
+    // ── Friend context menu options ────────────────────────────────────────
+    private static readonly string[] Xb360FriendContextOptions =
+        { "view", "invite", "message" };
 
     // ── Current game/session ────────────────────────────────────────────────
     [ObservableProperty] private string _currentGameTitle = "";
@@ -72,19 +76,41 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsAchievementsPage  => ActivePage == "achievements";
 
     // ── XB360 two-axis navigation state ────────────────────────────────────
-    // Xb360CenterIndex  = Up/Down cursor within the center item list (0–6).
+    // Xb360CenterIndex  = Up/Down cursor within the center item list (0–7).
     // Xb360BladeId      = Left/Right blade tab: "games"|"profile"|"main"|"media"|"settings".
     [ObservableProperty] private int _xb360CenterIndex;
     [ObservableProperty] private string _xb360BladeId = "main";
 
+    // ── XB360 Friends sub-navigation ───────────────────────────────────────
+    // Xb360FriendsSubMode  = whether keyboard focus is on the right-side friend list.
+    // Xb360SelectedFriendIndex = which friend row is highlighted.
+    // Xb360FriendContextMenuOpen = whether the per-friend action panel is showing.
+    // Xb360FriendContextIndex = which action is highlighted (0=View,1=Invite,2=Message).
+    [ObservableProperty] private bool _xb360FriendsSubMode;
+    [ObservableProperty] private int  _xb360SelectedFriendIndex;
+    [ObservableProperty] private bool _xb360FriendContextMenuOpen;
+    [ObservableProperty] private int  _xb360FriendContextIndex;
+
     // Cursor booleans — used by XAML to highlight the Up/Down position.
     public bool Xb360CursorHome          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 0;
     public bool Xb360CursorFriends       => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 1;
-    public bool Xb360CursorInbox         => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 2;
-    public bool Xb360CursorNotifications => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 3;
-    public bool Xb360CursorRecent        => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 4;
-    public bool Xb360CursorDownloads     => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 5;
-    public bool Xb360CursorExit          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 6;
+    public bool Xb360CursorAchievements  => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 2;
+    public bool Xb360CursorInbox         => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 3;
+    public bool Xb360CursorNotifications => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 4;
+    public bool Xb360CursorRecent        => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 5;
+    public bool Xb360CursorDownloads     => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 6;
+    public bool Xb360CursorExit          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 7;
+
+    // Friend context action booleans — which row is highlighted in the action panel.
+    public bool Xb360FriendContextView    => Xb360FriendContextMenuOpen && Xb360FriendContextIndex == 0;
+    public bool Xb360FriendContextInvite  => Xb360FriendContextMenuOpen && Xb360FriendContextIndex == 1;
+    public bool Xb360FriendContextMessage => Xb360FriendContextMenuOpen && Xb360FriendContextIndex == 2;
+
+    /// <summary>Username of the friend currently highlighted in the friends sub-panel.</summary>
+    public string Xb360HighlightedFriendUsername =>
+        (Xb360SelectedFriendIndex >= 0 && Xb360SelectedFriendIndex < Friends.Count)
+            ? Friends[Xb360SelectedFriendIndex].Username
+            : "";
 
     // Blade-active booleans — used by XAML to highlight the Left/Right blade tab.
     public bool Xb360GamesBladeActive    => IsXb360Theme && Xb360BladeId == "games";
@@ -226,6 +252,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(Xb360CursorHome));
         OnPropertyChanged(nameof(Xb360CursorFriends));
+        OnPropertyChanged(nameof(Xb360CursorAchievements));
         OnPropertyChanged(nameof(Xb360CursorInbox));
         OnPropertyChanged(nameof(Xb360CursorNotifications));
         OnPropertyChanged(nameof(Xb360CursorRecent));
@@ -295,6 +322,21 @@ public partial class QuickMenuViewModel : ViewModelBase
             return true;
         }
 
+        // XB360 friends sub-navigation: context menu open → close it first.
+        if (IsXb360Theme && Xb360FriendsSubMode && Xb360FriendContextMenuOpen)
+        {
+            Xb360FriendContextMenuOpen = false;
+            NotifyXb360FriendContextProps();
+            return true;
+        }
+
+        // XB360 friends sub-navigation: in friend list → return to center item list.
+        if (IsXb360Theme && Xb360FriendsSubMode)
+        {
+            Xb360FriendsSubMode = false;
+            return true;
+        }
+
         // XB360: if a side blade is active, return to the main center list.
         if (IsXb360Theme && Xb360BladeId != "main")
         {
@@ -327,7 +369,83 @@ public partial class QuickMenuViewModel : ViewModelBase
     public void MoveXb360CenterItem(int delta)
     {
         if (!IsXb360Theme || Xb360BladeId != "main") return;
+
+        // When in friends sub-navigation, navigate the friend list instead.
+        if (Xb360FriendsSubMode)
+        {
+            MoveXb360FriendSelection(delta);
+            return;
+        }
+
         Xb360CenterIndex = Math.Clamp(Xb360CenterIndex + delta, 0, Xb360CenterItemKeys.Length - 1);
+    }
+
+    /// <summary>Moves Up/Down within the friends sub-panel.</summary>
+    public void MoveXb360FriendSelection(int delta)
+    {
+        if (!Xb360FriendsSubMode) return;
+        if (Xb360FriendContextMenuOpen)
+        {
+            Xb360FriendContextIndex = Math.Clamp(Xb360FriendContextIndex + delta, 0, Xb360FriendContextOptions.Length - 1);
+            NotifyXb360FriendContextProps();
+            return;
+        }
+        if (Friends.Count == 0) return;
+        Xb360SelectedFriendIndex = Math.Clamp(Xb360SelectedFriendIndex + delta, 0, Friends.Count - 1);
+        OnPropertyChanged(nameof(Xb360HighlightedFriendUsername));
+    }
+
+    /// <summary>Activates (A button) the current item in the friends sub-panel.</summary>
+    public void ActivateXb360FriendItem()
+    {
+        if (!Xb360FriendsSubMode) return;
+
+        if (Xb360FriendContextMenuOpen)
+        {
+            ExecuteXb360FriendContextAction();
+            return;
+        }
+
+        // Open the context menu for the highlighted friend.
+        if (Friends.Count == 0) return;
+        Xb360FriendContextIndex = 0;
+        Xb360FriendContextMenuOpen = true;
+        NotifyXb360FriendContextProps();
+    }
+
+    /// <summary>Executes the currently-highlighted friend context action.</summary>
+    private void ExecuteXb360FriendContextAction()
+    {
+        string username = Xb360HighlightedFriendUsername;
+        if (string.IsNullOrEmpty(username)) return;
+
+        switch (Xb360FriendContextOptions[Xb360FriendContextIndex])
+        {
+            case "view":
+                Xb360FriendContextMenuOpen = false;
+                NotifyXb360FriendContextProps();
+                ViewFriendCommand.Execute(username);
+                break;
+            case "invite":
+                Xb360FriendContextMenuOpen = false;
+                NotifyXb360FriendContextProps();
+                _ = InviteFriendCommand.ExecuteAsync(username);
+                break;
+            case "message":
+                Xb360FriendContextMenuOpen = false;
+                NotifyXb360FriendContextProps();
+                _ = MessageFriendCommand.ExecuteAsync(username);
+                break;
+        }
+    }
+
+    private void NotifyXb360FriendContextProps()
+    {
+        OnPropertyChanged(nameof(Xb360FriendContextMenuOpen));
+        OnPropertyChanged(nameof(Xb360FriendContextView));
+        OnPropertyChanged(nameof(Xb360FriendContextInvite));
+        OnPropertyChanged(nameof(Xb360FriendContextMessage));
+        OnPropertyChanged(nameof(Xb360HighlightedFriendUsername));
     }
 
     /// <summary>Moves the Left/Right selection between XB360 blade tabs.</summary>
@@ -372,6 +490,13 @@ public partial class QuickMenuViewModel : ViewModelBase
                 return;
         }
 
+        // If already in friends sub-navigation, delegate to that handler.
+        if (Xb360FriendsSubMode)
+        {
+            ActivateXb360FriendItem();
+            return;
+        }
+
         // Center list: primary action for cursor item.
         if (Xb360CenterIndex < 0 || Xb360CenterIndex >= Xb360CenterItemKeys.Length) return;
         switch (Xb360CenterItemKeys[Xb360CenterIndex])
@@ -380,9 +505,18 @@ public partial class QuickMenuViewModel : ViewModelBase
                 GoToGameOsHomeCommand.Execute(null);
                 break;
             case "friends":
-                // Navigate to the Friends sub-page within the guide overlay
-                // so the user can browse friends without closing the menu.
-                ActivePage = "friends";
+                // Enter the friends sub-navigation panel.
+                if (Friends.Count > 0)
+                {
+                    Xb360SelectedFriendIndex = 0;
+                    Xb360FriendContextMenuOpen = false;
+                    Xb360FriendsSubMode = true;
+                    NotifyXb360FriendContextProps();
+                    OnPropertyChanged(nameof(Xb360HighlightedFriendUsername));
+                }
+                break;
+            case "achievements":
+                ActivePage = "achievements";
                 break;
             case "inbox":
                 OpenInboxPageCommand.Execute(null);
@@ -807,6 +941,12 @@ public partial class QuickMenuViewModel : ViewModelBase
         SelectedHubIndex = 0;
         Xb360CenterIndex = 0;
         Xb360BladeId = "main";
+        // Reset friends sub-navigation state.
+        Xb360FriendsSubMode = false;
+        Xb360SelectedFriendIndex = 0;
+        Xb360FriendContextMenuOpen = false;
+        Xb360FriendContextIndex = 0;
+        NotifyXb360FriendContextProps();
         CloseChatWindow();
 
         if (IsPlayingGame && sessionStartedAt.HasValue)

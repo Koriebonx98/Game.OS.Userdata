@@ -436,6 +436,27 @@ namespace GameLauncher.Models
         [JsonPropertyName("appAutoUpdate")] public bool AppAutoUpdate { get; set; } = true;
 
         /// <summary>
+        /// When <see langword="true"/>, Game.OS checks for and applies an update when
+        /// the application exits (before closing).
+        /// </summary>
+        [JsonPropertyName("updateOnExit")] public bool UpdateOnExit { get; set; } = false;
+
+        /// <summary>
+        /// When <see langword="true"/>, Game.OS checks for and applies an update when
+        /// the application starts (at login time).
+        /// </summary>
+        [JsonPropertyName("updateOnStart")] public bool UpdateOnStart { get; set; } = false;
+
+        /// <summary>
+        /// When <see langword="true"/>, the launcher shows a prompt ("Update available —
+        /// Update now / Update later") before applying any automatic update.
+        /// When <see langword="false"/> and <see cref="AppAutoUpdate"/> is enabled,
+        /// updates are applied silently based on <see cref="UpdateOnStart"/> /
+        /// <see cref="UpdateOnExit"/> settings.
+        /// </summary>
+        [JsonPropertyName("acceptAutoUpdate")] public bool AcceptAutoUpdate { get; set; } = true;
+
+        /// <summary>
         /// When <see langword="true"/> (the default), the launcher plays the Game.OS
         /// intro animation on startup.  Set to <see langword="false"/> to skip it.
         /// </summary>

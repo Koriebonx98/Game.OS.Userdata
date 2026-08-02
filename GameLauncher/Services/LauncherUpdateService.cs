@@ -43,6 +43,67 @@ namespace GameLauncher.Services
         // ── Public surface ─────────────────────────────────────────────────────
 
         /// <summary>
+        /// Writes a <c>Version.json</c> file next to the running executable containing
+        /// the current version tag.  Called on startup so the version is always
+        /// machine-readable without inspecting assembly metadata.
+        /// </summary>
+        public static void WriteVersionJson()
+        {
+            try
+            {
+                string exeDir = Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "";
+                string path = Path.Combine(exeDir, "Version.json");
+                var obj = new { version = CurrentVersionTag, channel = "stable" };
+                File.WriteAllText(path, JsonSerializer.Serialize(obj,
+                    new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch { /* best-effort */ }
+        }
+
+        /// <summary>
+        /// Launches <c>GameOS.Updater.exe</c> (located next to the running exe) to
+        /// extract the downloaded zip, replace the launcher files, and relaunch Game.OS.
+        /// </summary>
+        /// <param name="zipPath">Full path to the downloaded update zip.</param>
+        /// <param name="username">Username for auto-login after the update completes.</param>
+        public static void LaunchUpdater(string zipPath, string? username = null)
+        {
+            try
+            {
+                string exeDir = Path.GetDirectoryName(
+                    System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "") ?? "";
+
+                // Try both the .exe name (Windows) and bare binary name (Linux/macOS).
+                string updaterExe = Path.Combine(exeDir, "GameOS.Updater.exe");
+                if (!File.Exists(updaterExe))
+                    updaterExe = Path.Combine(exeDir, "GameOS.Updater");
+
+                if (!File.Exists(updaterExe))
+                {
+                    DevLogService.Log("[LauncherUpdate] Updater not found – cannot apply update.");
+                    return;
+                }
+
+                string launcherPath = System.Reflection.Assembly.GetEntryAssembly()?.Location ?? "";
+                var args = $"--zip \"{zipPath}\" --target \"{exeDir}\" --launcher \"{launcherPath}\"";
+                if (!string.IsNullOrWhiteSpace(username))
+                    args += $" --username \"{username}\"";
+
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName        = updaterExe,
+                    Arguments       = args,
+                    UseShellExecute = false,
+                });
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[LauncherUpdate] Failed to launch updater: {ex.Message}");
+            }
+        }
+
+        /// <summary>
         /// Returns the current application version tag with a leading <c>v</c>.
         /// Falls back to <c>v0.0.0.0</c> when the version cannot be determined.
         /// </summary>
@@ -83,17 +144,19 @@ namespace GameLauncher.Services
         /// <para>Calls are rate-limited to once per <see cref="CheckInterval"/>;
         /// duplicate downloads are skipped when the target file already exists.</para>
         /// </summary>
+        /// <param name="force">When <see langword="true"/>, skips the rate-limit check (used by manual "Check for update" button).</param>
         /// <returns>
         /// A <see cref="UpdateCheckResult"/> describing what happened (no update,
         /// update available, download complete, or any error that occurred).
         /// </returns>
         public static async Task<UpdateCheckResult> CheckForAppUpdateAsync(
+            bool force = false,
             CancellationToken ct = default)
         {
             try
             {
-                // Rate-limit: skip if we checked recently
-                if (WasCheckedRecently())
+                // Rate-limit: skip if we checked recently (unless forced by user).
+                if (!force && WasCheckedRecently())
                     return new UpdateCheckResult(UpdateCheckStatus.CheckSkipped, null, null);
 
                 // Fetch the latest release from GitHub
@@ -195,7 +258,20 @@ namespace GameLauncher.Services
         {
             if (release.Assets == null || release.Assets.Length == 0) return null;
 
-            // Prefer a zip that looks like the main launcher package
+            // Prefer an OS-specific zip (windows / linux / osx in the filename).
+            string osSuffix = OperatingSystem.IsWindows() ? "win"
+                            : OperatingSystem.IsMacOS()   ? "osx"
+                            : "linux";
+
+            var osSpecific = release.Assets.FirstOrDefault(a =>
+                a.Name != null &&
+                a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
+                a.Name.Contains(osSuffix, StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrEmpty(a.BrowserDownloadUrl));
+
+            if (osSpecific != null) return osSpecific;
+
+            // Fall back to the first zip regardless of OS label.
             var preferred = release.Assets.FirstOrDefault(a =>
                 a.Name != null &&
                 a.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&

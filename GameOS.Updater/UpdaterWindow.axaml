@@ -1,0 +1,73 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="GameOS.Updater.UpdaterWindow"
+        Title="Game.OS — Updating"
+        WindowState="FullScreen"
+        CanResize="False"
+        ShowInTaskbar="True"
+        SystemDecorations="None"
+        Background="#0a0f1a">
+
+    <Grid RowDefinitions="*,Auto,Auto">
+
+        <!-- Center: Game.OS logo + status -->
+        <StackPanel Grid.Row="0"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Spacing="24">
+
+            <!-- Logo text — replace with an Image if an icon asset is available -->
+            <TextBlock Text="Game.OS"
+                       FontSize="72"
+                       FontWeight="Bold"
+                       Foreground="White"
+                       HorizontalAlignment="Center"
+                       LetterSpacing="6"/>
+
+            <TextBlock Text="Game.OS"
+                       FontSize="18"
+                       Foreground="#8b9bbf"
+                       HorizontalAlignment="Center"
+                       FontWeight="Light"
+                       LetterSpacing="12"/>
+
+            <TextBlock x:Name="StatusText"
+                       Text="Preparing update…"
+                       FontSize="16"
+                       Foreground="#8b9bbf"
+                       HorizontalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Progress bar area -->
+        <Border Grid.Row="1"
+                Margin="80,0,80,0"
+                Padding="0,0,0,16">
+            <StackPanel Spacing="8">
+                <ProgressBar x:Name="ProgressBar"
+                             Minimum="0"
+                             Maximum="100"
+                             Value="0"
+                             Height="8"
+                             CornerRadius="4"
+                             Foreground="#58a6ff"
+                             Background="#1c2333"/>
+                <TextBlock x:Name="ProgressLabel"
+                           Text="0%"
+                           Foreground="#8b9bbf"
+                           FontSize="13"
+                           HorizontalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Bottom info strip -->
+        <Border Grid.Row="2"
+                Background="#060b14"
+                Padding="32,14">
+            <TextBlock x:Name="VersionLabel"
+                       Text="Downloading update…"
+                       Foreground="#4a5568"
+                       FontSize="12"
+                       HorizontalAlignment="Center"/>
+        </Border>
+    </Grid>
+</Window>

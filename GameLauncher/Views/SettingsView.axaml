@@ -222,6 +222,88 @@
 
                             <Rectangle Height="1" Fill="#21262d"/>
 
+                            <!-- Update on Start toggle -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center"
+                                  IsVisible="{Binding AppAutoUpdate}">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Update when start"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                               Text="Automatically check and apply available updates when Game.OS starts (at login)."/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding UpdateOnStart}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <!-- Update on Exit toggle -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center"
+                                  IsVisible="{Binding AppAutoUpdate}">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Update on exit"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                               Text="Automatically apply any downloaded update when Game.OS exits."/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding UpdateOnExit}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <!-- Accept to update (prompt) toggle -->
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center"
+                                  IsVisible="{Binding AppAutoUpdate}">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Accept to update (prompt)"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                               Text="When enabled, shows an 'Update available' dialog so you choose when to update. When disabled, updates are applied silently based on the start/exit settings above."/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding AcceptAutoUpdate}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <!-- Manual update actions -->
+                            <StackPanel Spacing="8" IsVisible="{Binding AppAutoUpdate}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Latest available:"
+                                               FontSize="11" Foreground="#8b949e"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding LatestVersionTag}"
+                                               FontSize="11" Foreground="#58a6ff"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding LatestVersionTag, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                    <TextBlock Text="(not yet checked)"
+                                               FontSize="11" Foreground="#8b949e"
+                                               VerticalAlignment="Center"
+                                               IsVisible="{Binding LatestVersionTag, Converter={x:Static StringConverters.IsNullOrEmpty}}"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-secondary"
+                                            Command="{Binding CheckForUpdateCommand}"
+                                            IsEnabled="{Binding !IsCheckingForUpdate}">
+                                        <TextBlock Text="{Binding CheckForUpdateButtonLabel}"/>
+                                    </Button>
+                                    <Button Classes="btn-primary"
+                                            Command="{Binding UpdateNowCommand}"
+                                            IsEnabled="{Binding !IsCheckingForUpdate}">
+                                        🚀  Update Now
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding UpdateCheckStatusLabel}"
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                           IsVisible="{Binding UpdateCheckStatusLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            </StackPanel>
+
+                            <Rectangle Height="1" Fill="#21262d"/>
+
                             <!-- Intro video toggle -->
                             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                                 <StackPanel Grid.Column="0" Spacing="2">

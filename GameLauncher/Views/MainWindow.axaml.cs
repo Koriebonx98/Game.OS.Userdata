@@ -94,6 +94,67 @@ public partial class MainWindow : Window
                     WindowState = _stateBeforeMinimize;
                 Activate();
             };
+            // Wire the "Update available" dialog so it shows a native message box.
+            vm.ShowUpdateDialogRequested = async tag =>
+            {
+                var dialog = new Avalonia.Controls.Window
+                {
+                    Title           = "Update Available",
+                    Width           = 360,
+                    Height          = 180,
+                    CanResize       = false,
+                    ShowInTaskbar   = false,
+                    WindowStartupLocation = Avalonia.Controls.WindowStartupLocation.CenterOwner,
+                    SystemDecorations = Avalonia.Controls.SystemDecorations.Full,
+                };
+
+                bool updateNow = false;
+                var tcs = new System.Threading.Tasks.TaskCompletionSource<bool>();
+
+                var updateBtn = new Avalonia.Controls.Button
+                {
+                    Content = "Update Now",
+                    Margin  = new Avalonia.Thickness(0, 0, 8, 0),
+                    Padding = new Avalonia.Thickness(16, 8),
+                };
+                var laterBtn = new Avalonia.Controls.Button
+                {
+                    Content = "Update Later",
+                    Padding = new Avalonia.Thickness(16, 8),
+                };
+                updateBtn.Click += (_, _) => { updateNow = true; dialog.Close(); };
+                laterBtn.Click  += (_, _) => { dialog.Close(); };
+                dialog.Closed   += (_, _) => tcs.TrySetResult(updateNow);
+
+                dialog.Content = new Avalonia.Controls.StackPanel
+                {
+                    Margin  = new Avalonia.Thickness(24),
+                    Spacing = 16,
+                    Children =
+                    {
+                        new Avalonia.Controls.TextBlock
+                        {
+                            Text         = $"Game.OS {tag} is available.",
+                            FontSize     = 16,
+                            FontWeight   = Avalonia.Media.FontWeight.SemiBold,
+                            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        },
+                        new Avalonia.Controls.TextBlock
+                        {
+                            Text         = "Do you want to download and install it now?",
+                            TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                        },
+                        new Avalonia.Controls.StackPanel
+                        {
+                            Orientation = Avalonia.Layout.Orientation.Horizontal,
+                            Children    = { updateBtn, laterBtn },
+                        },
+                    },
+                };
+
+                await dialog.ShowDialog(this);
+                return await tcs.Task;
+            };
             RefreshGlobalHotkeyPolling();
             if (OperatingSystem.IsWindows() && !_xinputPoller.IsEnabled)
                 _xinputPoller.Start();
@@ -161,6 +222,15 @@ public partial class MainWindow : Window
                     }
                     e.Handled = true;
                     return;
+                // LB / RB → blade navigation (PageUp = LB, PageDown = RB).
+                case Key.PageUp:
+                    if (!textInputFocused && isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                    e.Handled = true;
+                    return;
+                case Key.PageDown:
+                    if (!textInputFocused && isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                    e.Handled = true;
+                    return;
                 case Key.Up:
                     if (!textInputFocused)
                     {
@@ -178,6 +248,11 @@ public partial class MainWindow : Window
                 case Key.Enter:
                 case Key.Space:
                     if (!textInputFocused) vm.QuickMenuVm.ActivateSelectedHub();
+                    e.Handled = true;
+                    return;
+                // Y button → navigate to Game OS Home / Dashboard.
+                case Key.Y:
+                    if (!textInputFocused && isXb360QuickMenu) vm.QuickMenuVm.GoToGameOsHomeCommand.Execute(null);
                     e.Handled = true;
                     return;
                 case Key.Escape:
