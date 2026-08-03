@@ -38,7 +38,7 @@ public sealed class GameScannerService : IDisposable
 
     // How often the background timer rescans all drives.  Two minutes is short
     // enough to notice a freshly-mounted USB drive without hammering the disk.
-    private static readonly TimeSpan PeriodicInterval = TimeSpan.FromMinutes(2);
+    private static readonly TimeSpan PeriodicInterval = TimeSpan.FromMinutes(60);
 
     // ── Cache paths ───────────────────────────────────────────────────────────
     private static readonly string CacheDir  = Path.Combine(
@@ -1287,9 +1287,11 @@ public sealed class GameScannerService : IDisposable
         // Nintendo Switch
         ".nsp", ".xci", ".nca", ".nsz", ".xcz",
         // Nintendo (other)
-        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro",
+        ".gb", ".gbc", ".gba", ".nes", ".snes", ".ds", ".nds", ".3ds", ".nro", ".wua",
         // Nintendo GameCube / Wii
         ".rvz", ".gcm", ".gcz", ".wbfs", ".wad",
+        // Sega - Genesis
+        ".md", 
         // Other
         ".elf", ".img", ".chd", ".pbp", ".pkg",
     };
