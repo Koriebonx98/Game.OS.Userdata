@@ -801,8 +801,7 @@ public partial class MainWindow : Window
     ///   RB / R1            → next page          (PageDown)
     ///   LT / L2            → disabled (reserved; does not page-switch tabs)
     ///   RT / R2            → disabled (reserved; does not page-switch tabs)
-    ///   Start / Menu       → toggle Quick Menu  (≡ Left Ctrl + Left Shift)
-    ///   Guide / Home / Xbox → toggle Quick Menu (same as Start)
+    ///   Guide / Home / Xbox → toggle Quick Menu (≡ Left Ctrl + Left Shift)
     ///   Share              → screenshot via Win+Alt+PrintScreen
     /// </summary>
     private void WireXInputCallbacks()
@@ -822,20 +821,10 @@ public partial class MainWindow : Window
         _xinput.OnLt      = null;
         _xinput.OnRt      = null;
 
-        // Start → open/toggle the Quick Menu (mirrors the Shift+Ctrl keyboard hotkey)
-        _xinput.OnStart = () =>
-        {
-            if (_boundVm == null) return;
-            bool gameRunning      = _boundVm.DetailVm.IsGameRunning;
-            bool launcherMinimized = WindowState == WindowState.Minimized;
-            bool launcherUnfocused = !IsActive;
-            if (gameRunning || launcherMinimized || launcherUnfocused)
-                OpenGlobalQuickMenu();
-            else
-                _boundVm.ToggleQuickMenu();
-        };
+        // Start does not open the Quick Menu; only Guide / Home / Xbox does.
+        _xinput.OnStart = null;
 
-        // Guide / Home / Xbox button → same behaviour as Start
+        // Guide / Home / Xbox button → open/toggle the Quick Menu
         _xinput.OnGuide = () =>
         {
             if (_boundVm == null) return;
