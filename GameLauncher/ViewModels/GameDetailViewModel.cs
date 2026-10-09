@@ -4067,7 +4067,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (OnAchievementsMergedAsync != null)
                 {
                     var unlockedItems = list
-                        .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+                        .Where(a => a.IsUnlocked)
                         .Select(a => new Achievement
                         {
                             Platform      = snapshotPlatform,

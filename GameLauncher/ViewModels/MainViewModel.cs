@@ -701,7 +701,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     _profile?.Username ?? "", platform, titleKey);
                 bool localExists = File.Exists(localPath);
                 int localUnlockedCount = localExists ? CountLocalUnlockedAchievements(localPath) : 0;
-                int nowUnlocked = achievements.Count(a => !string.IsNullOrEmpty(a.UnlockedAt));
+                int nowUnlocked = achievements.Count(a => a.IsUnlocked);
 
                 // Skip if nothing has changed since the last write.
                 if (localExists && nowUnlocked <= localUnlockedCount) return;
@@ -4696,7 +4696,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             string json = File.ReadAllText(path);
             var opts = new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true };
             var list = System.Text.Json.JsonSerializer.Deserialize<List<Models.Achievement>>(json, opts);
-            return list?.Count(a => !string.IsNullOrEmpty(a.UnlockedAt)) ?? 0;
+            return list?.Count(a => a.IsUnlocked) ?? 0;
         }
         catch
         {
