@@ -3923,7 +3923,7 @@ public partial class GameDetailViewModel : ViewModelBase
                     // (Steam API / Exophase timestamps) but is still treated as unlocked.
                     // NOTE: must NOT be the Unix epoch ("1970-01-01T00:00:00") because
                     // Achievement.IsUnlocked explicitly returns false for the epoch sentinel.
-                    const string emuFallbackTs = "2000-01-01T00:00:00Z";
+                    string emuFallbackTs = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ");
                     int mergedCount = 0;
 
                     // Ensure O(1) Contains lookups for both direct-ID matching (lines below)
@@ -4067,7 +4067,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (OnAchievementsMergedAsync != null)
                 {
                     var unlockedItems = list
-                        .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
+                        .Where(a => a.IsUnlocked)
                         .Select(a => new Achievement
                         {
                             Platform      = snapshotPlatform,

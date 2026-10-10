@@ -49,6 +49,11 @@ namespace GameLauncher.Services
                     string ext = Path.GetExtension(file);
                     string name = Path.GetFileName(file);
 
+                    // stats.json / stats.ini hold numeric counters (not unlock state);
+                    // parsing them would report non-zero stats as unlocked achievements.
+                    if (name.StartsWith("stats.", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     if (string.Equals(ext, ".ini", StringComparison.OrdinalIgnoreCase))
                         ids = ParseIni(file);
                     else if (string.Equals(name, "ColdClientStats.json", StringComparison.OrdinalIgnoreCase))
