@@ -140,6 +140,18 @@ namespace GameLauncher.Services
                 return ResolveXeniaPath(safeRoot, safeTitleId, profileId);
             }
 
+            // Dolphin Wii: <saveRoot>/Wii/title/<high>/<low>/data  (e.g. 00010004524d4345 → 00010004 / 524d4345)
+            if (ConsoleSaveSetHelper.GetKind(platform) == ConsoleSaveSetHelper.Kind.Wii &&
+                ConsoleSaveSetHelper.TrySplitWiiTitleId(safeTitleId, out string wiiHigh, out string wiiLow))
+            {
+                return Path.Combine(safeRoot, "Wii", "title", wiiHigh, wiiLow, "data");
+            }
+
+            // Dolphin GameCube: <saveRoot>/GC/<titleId> is only a marker; the backup helper
+            // scans every region / memory card under GC/ for matching .gci files.
+            if (ConsoleSaveSetHelper.GetKind(platform) == ConsoleSaveSetHelper.Kind.GameCube)
+                return Path.Combine(safeRoot, "GC", safeTitleId);
+
             string[] segments = ResolvePattern(platform ?? "", emulatorName);
             if (segments.Length == 0) return null;
 
