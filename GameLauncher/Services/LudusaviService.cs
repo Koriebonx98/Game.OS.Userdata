@@ -175,6 +175,26 @@ namespace GameLauncher.Services
             // can find the saves on its own — enabling its cloud-sync features.
             // Then let ludusavi run normally.  If ludusavi is not installed we
             // fall back to a plain directory copy.
+            var saveKind = ConsoleSaveSetHelper.GetKind(platform);
+            if (saveKind != ConsoleSaveSetHelper.Kind.None &&
+                !string.IsNullOrWhiteSpace(sourceOverridePath) &&
+                !string.IsNullOrWhiteSpace(titleId))
+            {
+                try
+                {
+                    // PS3 extra folders (TITLEID + LIST-...) are stored alongside the TitleID folder;
+                    // Wii/GameCube keep Dolphin's own sub-folder structure.
+                    string setRoot = Path.Combine(platformSavesRoot, safeGameTitle);
+                    int copied = await Task.Run(() =>
+                        ConsoleSaveSetHelper.Backup(saveKind, titleId, sourceOverridePath, setRoot));
+                    return copied > 0 ? LudusaviResult.Synced : LudusaviResult.NoSaveFound;
+                }
+                catch (Exception ex)
+                {
+                    return LudusaviResult.Error($"Save copy failed: {ex.Message}");
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(sourceOverridePath))
             {
                 string effectiveSourceOverridePath = sourceOverridePath;
@@ -329,6 +349,24 @@ namespace GameLauncher.Services
             // Register the game in the secondary manifest so ludusavi knows where
             // the live save folder is, then let ludusavi perform the restore.
             // If ludusavi is not installed we fall back to a plain directory copy.
+            var restoreKind = ConsoleSaveSetHelper.GetKind(platform);
+            if (restoreKind != ConsoleSaveSetHelper.Kind.None &&
+                !string.IsNullOrWhiteSpace(targetOverridePath) &&
+                !string.IsNullOrWhiteSpace(titleId))
+            {
+                try
+                {
+                    string setRoot = Path.Combine(platformSavesRoot, safeGameTitle);
+                    bool ok = await Task.Run(() =>
+                        ConsoleSaveSetHelper.Restore(restoreKind, titleId, setRoot, targetOverridePath));
+                    return ok ? LudusaviResult.Synced : LudusaviResult.NoSaveFound;
+                }
+                catch (Exception ex)
+                {
+                    return LudusaviResult.Error($"Restore failed: {ex.Message}");
+                }
+            }
+
             if (!string.IsNullOrWhiteSpace(targetOverridePath))
             {
                 if (IsLikelyFilePath(targetOverridePath) || File.Exists(targetOverridePath))

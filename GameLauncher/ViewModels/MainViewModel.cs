@@ -911,7 +911,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (BackgroundMetadataCachingEnabled())
             {
                 // Trigger background metadata caching for the newly found PC games
-                _ = BackgroundCacheLocalGamesAsync();
+                _ = Task.Run(() => BackgroundCacheLocalGamesAsync());
             }
         };
         _scanner.RepacksUpdated += repacks =>
@@ -928,7 +928,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (BackgroundMetadataCachingEnabled())
             {
                 // Trigger background metadata caching for the newly found ROMs
-                _ = BackgroundCacheLocalGamesAsync();
+                _ = Task.Run(() => BackgroundCacheLocalGamesAsync());
             }
         };
     }
@@ -1153,8 +1153,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (BackgroundMetadataCachingEnabled())
             {
                 // Start background metadata caching for cloud library games and local games
-                _ = BackgroundCacheLibraryAsync(library);
-                _ = BackgroundCacheLocalGamesAsync();
+                _ = Task.Run(() => BackgroundCacheLibraryAsync(library));
+                _ = Task.Run(() => BackgroundCacheLocalGamesAsync());
             }
 
             // Seed any bundled Switch achievement JSON files to the Games.Database if they
@@ -1545,7 +1545,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (!isOffline)
         {
             // Asynchronously enrich library games with cover/desc/trailer from Games.Database.
-            _ = EnrichLibraryFromDatabaseAsync(library);
+            _ = Task.Run(() => EnrichLibraryFromDatabaseAsync(library));
 
             // Pre-fetch cover art for the unified My Games cards (scanner may already
             // have found games before login, so enrich what's there right away).
@@ -3562,7 +3562,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _ = BackgroundSyncPerGameAchievementsFromCloudAsync();
 
             // Enrich library in the background
-            _ = EnrichLibraryFromDatabaseAsync(games);
+            _ = Task.Run(() => EnrichLibraryFromDatabaseAsync(games));
 
             System.Diagnostics.Debug.WriteLine(
                 $"[Reconnect] Transitioned to online mode for '{username}'.");

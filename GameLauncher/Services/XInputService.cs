@@ -183,7 +183,8 @@ internal sealed class XInputService
         Fire(b, BackMask,      ref _latchedButtons, OnBack);
         Fire(b, LbMask,        ref _latchedButtons, OnLb);
         Fire(b, RbMask,        ref _latchedButtons, OnRb);
-        Fire(b, StartMask,     ref _latchedButtons, OnStart);
+        // Start is intentionally not polled: it must pass through to games untouched.
+        // Only the Guide / Home / Xbox button opens the Quick Menu.
 
         // Guide / Home / Xbox button (bit 0x0400 from XInputGetStateEx)
         FireStick((b & GuideMask) != 0, ref _guideLatched, OnGuide);
