@@ -6119,6 +6119,37 @@ function _updateModalWishlistBtn(title, platform, game) {
     btn.disabled = false;
 }
 
+function _updateModalFavouriteBtn(title, platform, game) {
+    const wrap = document.getElementById('gameModalFavouriteWrap');
+    const btn  = document.getElementById('gameModalFavouriteBtn');
+    if (!wrap || !btn) return;
+    const user = isLoggedIn() ? getCurrentUser() : null;
+    if (!user || typeof isFavourite !== 'function') { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    btn.dataset.title    = title    || '';
+    btn.dataset.platform = platform || '';
+    btn.dataset.gameJson = game ? JSON.stringify(game) : '';
+    const faved = isFavourite(user.username, platform, title);
+    btn.textContent = faved ? '❤️' : '🤍';
+    btn.title = faved ? 'Remove from Favourites' : 'Add to Favourites';
+    btn.classList.toggle('btn-wishlisted', faved);
+}
+
+function handleModalFavourite() {
+    const user = getCurrentUser();
+    if (!user) { window.location.href = 'login.html'; return; }
+    const btn = document.getElementById('gameModalFavouriteBtn');
+    if (!btn) return;
+    const title    = btn.dataset.title    || '';
+    const platform = btn.dataset.platform || '';
+    if (!title || !platform) return;
+    let game = { title };
+    try { if (btn.dataset.gameJson) game = JSON.parse(btn.dataset.gameJson); } catch (_) {}
+    toggleFavourite(user.username, game, platform);
+    _updateModalFavouriteBtn(title, platform, game);
+    if (typeof renderFavouriteGames === 'function') renderFavouriteGames();
+}
+
 async function handleModalWishlist() {
     const user = getCurrentUser();
     if (!user) { window.location.href = 'login.html'; return; }
@@ -6198,6 +6229,9 @@ function ensureGameModal() {
                     </div>
                     <div id="gameModalWishlistWrap" style="display:none;margin-left:auto;">
                         <button class="btn-modal-wishlist" id="gameModalWishlistBtn" onclick="handleModalWishlist()" title="Add to Wishlist">☆</button>
+                    </div>
+                    <div id="gameModalFavouriteWrap" style="display:none;margin-left:4px;">
+                        <button class="btn-modal-wishlist" id="gameModalFavouriteBtn" onclick="handleModalFavourite()" title="Add to Favourites">🤍</button>
                     </div>
                     <div id="gameModalEditWrap" style="display:none;margin-left:4px;">
                         <button class="btn-modal-edit" id="gameModalEditBtn" onclick="openAdminEditModal()" title="Edit game data (Admin)">✏️ Edit</button>
@@ -6620,6 +6654,8 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
     _updateModalWishlistBtn(title, platform, game);
+
+    _updateModalFavouriteBtn(title, platform, game);
     _updateModalEditBtn();
 
     const bgUrls    = getGameBackgroundUrls(game);
@@ -6657,6 +6693,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
     _updateModalWishlistBtn(title, platform, null);
+    _updateModalFavouriteBtn(title, platform, null);
     _updateModalEditBtn();
     modal.style.display = 'flex';
 
@@ -6679,6 +6716,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
             }
             // Update wishlist button with full game data once loaded
             _updateModalWishlistBtn(title, platform, game);
+            _updateModalFavouriteBtn(title, platform, game);
             _updateModalEditBtn();
         }
 
