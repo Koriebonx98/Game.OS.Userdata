@@ -314,7 +314,8 @@
         // game titles that contain single quotes, double quotes, or other special chars.
         const gameJsonAttr = escapeHtml(JSON.stringify(g));
         const favUser      = _isLoggedIn ? getCurrentUser() : null;
-        const faved        = !!favUser && typeof isFavourite === 'function' && isFavourite(favUser.username, platform, g.Title || g.game_name || g.title || '');
+        const favFn        = typeof window !== 'undefined' ? window.isFavourite : null;
+        const faved        = !!favUser && typeof favFn === 'function' && favFn(favUser.username, platform, g.Title || g.game_name || g.title || '');
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
         const coverIcon    = getPlatformIcon(platform);
