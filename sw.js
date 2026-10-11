@@ -1,5 +1,5 @@
 /* Game OS service worker: offline shell + notification display */
-const CACHE = 'gameos-shell-v4';
+const CACHE = 'gameos-shell-v5';
 const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', e => {
