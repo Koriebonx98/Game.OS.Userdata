@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game OS</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Game OS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <script src="pwa.js"></script>
+</head>
+<body class="app-body">
+    <header class="app-header">
+        <h1>🎮 Game OS</h1>
+        <span id="appUser" class="app-user"></span>
+    </header>
+
+    <main class="app-main">
+        <section id="view-home" class="app-view">
+            <div class="app-stats">
+                <div class="app-stat"><b id="statGames">0</b><span>Games</span></div>
+                <div class="app-stat"><b id="statFavs">0</b><span>Favourites</span></div>
+                <div class="app-stat"><b id="statPlaytime">0h</b><span>Playtime</span></div>
+                <div class="app-stat"><b id="statAch">0</b><span>Achievements</span></div>
+            </div>
+            <h2 class="app-h2">Recently added</h2>
+            <div id="recentList" class="app-list"></div>
+        </section>
+        <section id="view-library" class="app-view" hidden>
+            <input id="libSearch" class="app-search" type="search" placeholder="Search your library…">
+            <div id="libList" class="app-list"></div>
+        </section>
+        <section id="view-favourites" class="app-view" hidden>
+            <div id="favList" class="app-list"></div>
+        </section>
+        <section id="view-alerts" class="app-view" hidden>
+            <div id="notifBox" class="app-card"></div>
+            <div id="alertList" class="app-list"></div>
+        </section>
+    </main>
+
+    <nav class="app-tabbar">
+        <button data-view="home" class="active"><span>🏠</span>Home</button>
+        <button data-view="library"><span>📚</span>Library</button>
+        <button data-view="favourites"><span>❤️</span>Favourites</button>
+        <button data-view="alerts"><span>🔔</span>Alerts<i id="alertBadge" hidden></i></button>
+    </nav>
+
+    <script src="script.js"></script>
+    <script src="favourites.js"></script>
+    <script>
+    (function () {
+        const $ = id => document.getElementById(id);
+        const esc = s => escapeHtml(String(s == null ? '' : s));
+        let user = null, library = [];
+
+        function fmtPlaytime(min) {
+            const h = Math.floor(min / 60);
+            return h >= 1 ? h + 'h' : min + 'm';
+        }
+        function minutesOf(g) {
+            if (typeof g.playtimeMinutes === 'number') return g.playtimeMinutes;
+            if (typeof g.playtime === 'number') return g.playtime;
+            return 0;
+        }
+        function achOf(g) {
+            const a = g.achievementsUnlocked != null ? g.achievementsUnlocked : g.achievements;
+            return typeof a === 'number' ? a : (Array.isArray(a) ? a.length : 0);
+        }
+        function row(g, extra) {
+            const cover = g.coverUrl
+                ? `<img src="${esc(g.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
+            const pt = minutesOf(g), ac = achOf(g);
+            return `<div class="app-row"><div class="app-cover">${cover}</div>
+                <div class="app-row-info"><b>${esc(g.title)}</b>
+                <small>${esc(g.platform)}${pt ? ' · ⏱ ' + fmtPlaytime(pt) : ''}${ac ? ' · 🏆 ' + ac : ''}</small></div>${extra || ''}</div>`;
+        }
+        function empty(msg) { return `<p class="games-list-empty">${msg}</p>`; }
+
+        function renderLibrary() {
+            const q = $('libSearch').value.trim().toLowerCase();
+            const list = library.filter(g => (g.title || '').toLowerCase().includes(q))
+                .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
+            $('libList').innerHTML = list.length ? list.map(g => {
+                const fav = isFavourite(user.username, g.platform, g.title);
+                return row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${fav ? '❤️' : '🤍'}</button>`);
+            }).join('') : empty('No games found.');
+        }
+        function renderFavs() {
+            const favs = getFavourites(user.username);
+            $('favList').innerHTML = favs.length ? favs.map(g =>
+                row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">❤️</button>`)).join('')
+                : empty('No favourites yet. Tap 🤍 on a game in your library.');
+            $('statFavs').textContent = favs.length;
+        }
+        function renderHome() {
+            $('statGames').textContent = library.length;
+            $('statPlaytime').textContent = fmtPlaytime(library.reduce((n, g) => n + minutesOf(g), 0));
+            $('statAch').textContent = library.reduce((n, g) => n + achOf(g), 0);
+            const recent = [...library].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')).slice(0, 5);
+            $('recentList').innerHTML = recent.length ? recent.map(g => row(g)).join('') : empty('Your library is empty.');
+        }
+        function renderAll() { renderHome(); renderLibrary(); renderFavs(); }
+
+        // ── Notifications ──
+        let seenKey;
+        async function pollAlerts(notify) {
+            try {
+                let reqs;
+                if (MODE === 'demo') reqs = getDemoFriendRequests(user.username);
+                else reqs = await getFriendRequestsGitHub(user.username);
+                reqs = reqs || [];
+                const names = reqs.map(r => typeof r === 'string' ? r : (r.from || r.username || ''));
+                $('alertList').innerHTML = names.length
+                    ? names.map(n => `<div class="app-row"><div class="app-cover"><span>👥</span></div><div class="app-row-info"><b>${esc(n)}</b><small>sent you a friend request</small></div></div>`).join('')
+                    : empty('No new alerts.');
+                const badge = $('alertBadge');
+                badge.hidden = !names.length; badge.textContent = names.length;
+                const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
+                const fresh = names.filter(n => !seen.includes(n));
+                if (notify && fresh.length && 'Notification' in window && Notification.permission === 'granted') {
+                    const show = (t, o) => navigator.serviceWorker && navigator.serviceWorker.ready
+                        ? navigator.serviceWorker.ready.then(r => r.showNotification(t, o)) : new Notification(t, o);
+                    fresh.forEach(n => show('Game OS', { body: n + ' sent you a friend request', icon: 'icons/icon-192.png' }));
+                }
+                localStorage.setItem(seenKey, JSON.stringify(names));
+            } catch (_) {}
+        }
+        function renderNotifBox() {
+            const box = $('notifBox');
+            if (!('Notification' in window)) {
+                box.innerHTML = '<p>Live notifications need iOS 16.4+ with Game OS added to your Home Screen.</p>';
+            } else if (Notification.permission === 'granted') {
+                box.innerHTML = '<p>🔔 Live notifications are on.</p>';
+            } else if (Notification.permission === 'denied') {
+                box.innerHTML = '<p>Notifications are blocked. Enable them in Settings.</p>';
+            } else {
+                box.innerHTML = '<button class="btn" id="enableNotif">Enable notifications</button>';
+                $('enableNotif').onclick = () => Notification.requestPermission().then(renderNotifBox);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            try { await modeReady; } catch (_) {}
+            user = isLoggedIn() ? getCurrentUser() : null;
+            if (!user) { location.replace('login.html'); return; }
+            seenKey = 'gameOS_seen_alerts_' + user.username.toLowerCase();
+            $('appUser').textContent = user.username;
+            try {
+                library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
+            } catch (_) { library = []; }
+            renderAll(); renderNotifBox();
+            pollAlerts(false);
+            setInterval(() => pollAlerts(true), 60000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(true); });
+
+            document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => {
+                document.querySelectorAll('.app-tabbar button').forEach(x => x.classList.toggle('active', x === b));
+                document.querySelectorAll('.app-view').forEach(v => v.hidden = v.id !== 'view-' + b.dataset.view);
+            });
+            $('libSearch').addEventListener('input', renderLibrary);
+            document.querySelector('.app-main').addEventListener('click', e => {
+                const b = e.target.closest('.app-fav');
+                if (!b) return;
+                toggleFavourite(user.username, { title: b.dataset.t, coverUrl: (library.find(g => g.title === b.dataset.t && g.platform === b.dataset.p) || {}).coverUrl }, b.dataset.p);
+                renderAll();
+            });
+        });
+    })();
+    </script>
+</body>
+</html>
