@@ -6768,3 +6768,11 @@ function toggleFavourite(username, game, platform) {
     localStorage.setItem(_favKey(username), JSON.stringify(favs));
     return now;
 }
+
+if (typeof globalThis !== 'undefined') {
+    globalThis._favKey = _favKey;
+    globalThis.getFavourites = getFavourites;
+    globalThis._sameGame = _sameGame;
+    globalThis.isFavourite = isFavourite;
+    globalThis.toggleFavourite = toggleFavourite;
+}

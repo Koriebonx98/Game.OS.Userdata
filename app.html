@@ -87,7 +87,9 @@
             const list = library.filter(g => (g.title || '').toLowerCase().includes(q))
                 .sort((a, b) => (a.title || '').localeCompare(b.title || ''));
             $('libList').innerHTML = list.length ? list.map(g => {
-                const fav = (typeof isFavourite === 'function' && isFavourite(user.username, g.platform, g.title));
+                const fav = typeof window !== 'undefined' && typeof window.isFavourite === 'function'
+                ? window.isFavourite(user.username, g.platform, g.title)
+                : false;
                 return row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${fav ? '❤️' : '🤍'}</button>`);
             }).join('') : empty('No games found.');
         }
