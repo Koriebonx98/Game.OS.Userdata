@@ -6100,6 +6100,24 @@ async function _adminScrapeSteamNow() {
 // GAME DETAIL MODAL
 // ============================================================
 
+function _updateModalWishlistBtn(title, platform, game) {
+    const wrap = document.getElementById('gameModalWishlistWrap');
+    const btn  = document.getElementById('gameModalWishlistBtn');
+    if (!wrap || !btn) return;
+    const user = isLoggedIn() ? getCurrentUser() : null;
+    if (!user) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    btn.dataset.title    = title    || '';
+    btn.dataset.platform = platform || '';
+    btn.dataset.gameJson = game ? JSON.stringify(game) : '';
+    const wishlisted = (typeof _myWishlist !== 'undefined' && Array.isArray(_myWishlist)) &&
+        _myWishlist.some(w => (w.platform || '').toLowerCase() === (platform || '').toLowerCase() &&
+                              (w.title || '').toLowerCase() === (title || '').toLowerCase());
+    btn.textContent = wishlisted ? '⭐' : '☆';
+    btn.title = wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist';
+    btn.classList.toggle('btn-wishlisted', wishlisted);
+}
+
 function _updateModalFavouriteBtn(title, platform, game) {
     const wrap = document.getElementById('gameModalFavouriteWrap');
     const btn  = document.getElementById('gameModalFavouriteBtn');
