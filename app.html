@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>Game OS</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.webmanifest">
@@ -38,6 +38,14 @@
         <section id="view-favourites" class="app-view" hidden>
             <div id="favList" class="app-list"></div>
         </section>
+        <section id="view-chats" class="app-view" hidden>
+            <div id="chatList" class="app-list"></div>
+            <div id="chatPane" class="app-chat" hidden>
+                <div class="app-chat-head"><button id="chatBack" class="app-fav">‹</button><b id="chatWith"></b></div>
+                <div id="chatMsgs" class="app-chat-msgs"></div>
+                <form id="chatForm" class="app-chat-form"><input id="chatInput" type="text" placeholder="Message…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
+            </div>
+        </section>
         <section id="view-alerts" class="app-view" hidden>
             <div id="notifBox" class="app-card"></div>
             <div id="alertList" class="app-list"></div>
@@ -48,6 +56,7 @@
         <button data-view="home" class="active"><span>🏠</span>Home</button>
         <button data-view="library"><span>📚</span>Library</button>
         <button data-view="favourites"><span>❤️</span>Favourites</button>
+        <button data-view="chats"><span>💬</span>Chats<i id="chatBadge" hidden></i></button>
         <button data-view="alerts"><span>🔔</span>Alerts<i id="alertBadge" hidden></i></button>
     </nav>
 
@@ -109,29 +118,93 @@
         }
         function renderAll() { renderHome(); renderLibrary(); renderFavs(); }
 
-        // ── Notifications ──
-        let seenKey;
-        async function pollAlerts(notify) {
+        // ── Notifications (friend requests, messages, achievements) ──
+        let seenKey, friends = [], alertItems = [];
+        const store = (k, v) => v === undefined ? JSON.parse(localStorage.getItem(k) || 'null') : localStorage.setItem(k, JSON.stringify(v));
+        function notify(title, body, url) {
+            if (!('Notification' in window) || Notification.permission !== 'granted') return;
+            const o = { body, icon: 'icons/icon-192.png', data: { url: url || 'app.html' } };
+            if (navigator.serviceWorker && navigator.serviceWorker.ready) navigator.serviceWorker.ready.then(r => r.showNotification(title, o));
+            else new Notification(title, o);
+        }
+        const nameOf = f => typeof f === 'string' ? f : (f.username || f.name || f.from || '');
+        async function loadFriends() {
+            try { friends = (MODE === 'demo' ? getDemoFriends(user.username) : await getFriendsGitHub(user.username)).map(nameOf).filter(Boolean); } catch (_) {}
+        }
+        async function fetchMsgs(f) {
+            const r = MODE === 'demo' ? await getMessagesDemo(user.username, f) : await getMessagesGitHub(user.username, f);
+            return r.messages || [];
+        }
+        async function pollAlerts(push) {
             try {
-                let reqs;
-                if (MODE === 'demo') reqs = getDemoFriendRequests(user.username);
-                else reqs = await getFriendRequestsGitHub(user.username);
-                reqs = reqs || [];
-                const names = reqs.map(r => typeof r === 'string' ? r : (r.from || r.username || ''));
-                $('alertList').innerHTML = names.length
-                    ? names.map(n => `<div class="app-row"><div class="app-cover"><span>👥</span></div><div class="app-row-info"><b>${esc(n)}</b><small>sent you a friend request</small></div></div>`).join('')
-                    : empty('No new alerts.');
-                const badge = $('alertBadge');
-                badge.hidden = !names.length; badge.textContent = names.length;
-                const seen = JSON.parse(localStorage.getItem(seenKey) || '[]');
-                const fresh = names.filter(n => !seen.includes(n));
-                if (notify && fresh.length && 'Notification' in window && Notification.permission === 'granted') {
-                    const show = (t, o) => navigator.serviceWorker && navigator.serviceWorker.ready
-                        ? navigator.serviceWorker.ready.then(r => r.showNotification(t, o)) : new Notification(t, o);
-                    fresh.forEach(n => show('Game OS', { body: n + ' sent you a friend request', icon: 'icons/icon-192.png' }));
+                const items = [];
+                const seen = store(seenKey) || {};
+                const next = { req: [], msg: {}, ach: seen.ach };
+                const fresh = [];
+                // friend requests
+                const reqs = (MODE === 'demo' ? getDemoFriendRequests(user.username) : await getFriendRequestsGitHub(user.username)) || [];
+                reqs.map(nameOf).forEach(n => {
+                    items.push({ icon: '👥', t: n, s: 'sent you a friend request' });
+                    next.req.push(n);
+                    if (!(seen.req || []).includes(n)) fresh.push(['Friend request', n + ' sent you a friend request', 'app.html']);
+                });
+                // messages
+                let unreadTotal = 0;
+                const unread = {};
+                for (const f of friends) {
+                    const msgs = await fetchMsgs(f).catch(() => []);
+                    const incoming = msgs.filter(m => (m.from || '').toLowerCase() !== user.username.toLowerCase());
+                    const lastRead = getLastRead(user.username, f);
+                    const n = incoming.filter(m => !lastRead || m.sentAt > lastRead).length;
+                    unread[f] = { n, last: msgs[msgs.length - 1] };
+                    unreadTotal += n;
+                    next.msg[f] = incoming.length;
+                    if (n && seen.msg && incoming.length > (seen.msg[f] || 0)) {
+                        const m = incoming[incoming.length - 1];
+                        fresh.push(['💬 ' + f, m.text, 'app.html#chats']);
+                    }
+                    if (n) items.push({ icon: '💬', t: f, s: n + ' unread message' + (n > 1 ? 's' : '') });
                 }
-                localStorage.setItem(seenKey, JSON.stringify(names));
+                // achievements
+                const total = library.reduce((n, g) => n + achOf(g), 0);
+                next.ach = total;
+                if (seen.ach != null && total > seen.ach) {
+                    const d = total - seen.ach;
+                    fresh.push(['🏆 Achievement unlocked', d + ' new achievement' + (d > 1 ? 's' : '') + ' earned', 'app.html']);
+                    items.unshift({ icon: '🏆', t: 'Achievement unlocked', s: d + ' new achievement' + (d > 1 ? 's' : '') });
+                }
+                store(seenKey, next);
+                alertItems = items; renderChats(unread);
+                $('alertList').innerHTML = items.length ? items.map(i => `<div class="app-row"><div class="app-cover"><span>${i.icon}</span></div><div class="app-row-info"><b>${esc(i.t)}</b><small>${esc(i.s)}</small></div></div>`).join('') : empty('No new alerts.');
+                const badge = $('alertBadge'); badge.hidden = !items.length; badge.textContent = items.length;
+                const cb = $('chatBadge'); cb.hidden = !unreadTotal; cb.textContent = unreadTotal;
+                if (push) fresh.forEach(f => notify(f[0], f[1], f[2]));
             } catch (_) {}
+        }
+        function renderChats(unread) {
+            $('chatList').innerHTML = friends.length ? friends.map(f => {
+                const u = (unread && unread[f]) || {};
+                return `<div class="app-row app-chat-row" data-f="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${esc(u.last ? u.last.text : 'Say hi!')}</small></div>${u.n ? `<span class="app-pill">${u.n}</span>` : ''}</div>`;
+            }).join('') : empty('Add friends on the site to start chatting.');
+        }
+        let chatFriend = null;
+        async function openChat(f) {
+            chatFriend = f;
+            $('chatList').hidden = true; $('chatPane').hidden = false; $('chatWith').textContent = f;
+            const msgs = await fetchMsgs(f).catch(() => []);
+            $('chatMsgs').innerHTML = msgs.map(m => `<div class="app-bubble ${(m.from || '').toLowerCase() === user.username.toLowerCase() ? 'me' : ''}">${esc(m.text)}</div>`).join('') || empty('No messages yet.');
+            $('chatMsgs').scrollTop = 1e9;
+            markConversationRead(user.username, f);
+            pollAlerts(false);
+        }
+        async function sendChat(e) {
+            e.preventDefault();
+            const text = $('chatInput').value.trim();
+            if (!text || !chatFriend) return;
+            $('chatInput').value = '';
+            if (MODE === 'demo') await sendMessageDemo(user.username, chatFriend, text);
+            else await sendMessageGitHub(user.username, chatFriend, text);
+            openChat(chatFriend);
         }
         function renderNotifBox() {
             const box = $('notifBox');
@@ -157,13 +230,18 @@
                 library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
             } catch (_) { library = []; }
             renderAll(); renderNotifBox();
+            await loadFriends(); renderChats();
             pollAlerts(false);
-            setInterval(() => pollAlerts(true), 60000);
+            $('chatList').addEventListener('click', e => { const r = e.target.closest('.app-chat-row'); if (r) openChat(r.dataset.f); });
+            $('chatBack').onclick = () => { chatFriend = null; $('chatPane').hidden = true; $('chatList').hidden = false; };
+            $('chatForm').addEventListener('submit', sendChat);
+            setInterval(() => pollAlerts(true), 30000);
             document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(true); });
 
             document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => {
                 document.querySelectorAll('.app-tabbar button').forEach(x => x.classList.toggle('active', x === b));
                 document.querySelectorAll('.app-view').forEach(v => v.hidden = v.id !== 'view-' + b.dataset.view);
+                window.scrollTo(0, 0);
             });
             $('libSearch').addEventListener('input', renderLibrary);
             document.querySelector('.app-main').addEventListener('click', e => {
