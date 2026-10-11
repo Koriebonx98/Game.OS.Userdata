@@ -941,14 +941,25 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DevLogService.Log("[MainViewModel] BeginStartup — starting deferred startup tasks.");
 
         DevLogService.Log("[Scanner] Starting background game scanner…");
-        _ = _scanner.StartAsync();
+        // Run on the thread pool so cache loading (sync file IO + JSON) never blocks the UI thread.
+        _ = Task.Run(() => _scanner.StartAsync());
 
-        var settings = Services.AppSettingsService.Load();
-        if (settings.AutoUpdate)
-            _ = Services.GitHubDataService.CheckForUpdatesAsync();
-
-        _ = Services.SwitchTranslateService.SyncAsync();
+        _ = Task.Run(() => Services.SwitchTranslateService.SyncAsync());
         _ = LoginVm.TryAutoLoginAsync();
+
+        // Settings load and update check hit disk/network — keep them off the UI thread.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                if (Services.AppSettingsService.Load().AutoUpdate)
+                    await Services.GitHubDataService.CheckForUpdatesAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[MainViewModel] Update check failed: {ex.Message}");
+            }
+        });
     }
 
     /// <summary>
