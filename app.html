@@ -314,6 +314,7 @@
             try {
                 library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
             } catch (_) { library = []; }
+            try { await syncFavourites(user.username); } catch (_) {}
             renderAll(); loadUserAch().then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats();
             pollAlerts(false);

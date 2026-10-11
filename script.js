@@ -6787,7 +6787,34 @@ function toggleFavourite(username, game, platform) {
         favs = favs.filter(f => !_sameGame(f, platform, title));
     }
     localStorage.setItem(_favKey(username), JSON.stringify(favs));
+    _pushFavouritesGitHub(username, favs);
     return now;
+}
+
+// In GitHub mode favourites are saved per account (accounts/<user>/favourites.json), like the wishlist.
+let _favPushChain = Promise.resolve();
+function _pushFavouritesGitHub(username, favs) {
+    if (typeof MODE === 'undefined' || MODE !== 'github') return;
+    const path = `accounts/${username.toLowerCase()}/favourites.json`;
+    _favPushChain = _favPushChain.then(async () => {
+        const file = await githubRead(path);
+        await githubWrite(path, favs, 'Update favourites', file ? file.sha : undefined);
+    }).catch(() => {});
+}
+/** Load favourites saved on the account into the local cache. Returns the favourites list. */
+async function syncFavourites(username) {
+    if (typeof MODE === 'undefined' || MODE !== 'github') return getFavourites(username);
+    try {
+        await _favPushChain;
+        const file = await githubRead(`accounts/${username.toLowerCase()}/favourites.json`);
+        if (file && Array.isArray(file.content)) {
+            localStorage.setItem(_favKey(username), JSON.stringify(file.content));
+            return file.content;
+        }
+        const local = getFavourites(username);
+        if (local.length) _pushFavouritesGitHub(username, local);
+        return local;
+    } catch (_) { return getFavourites(username); }
 }
 
 if (typeof globalThis !== 'undefined') {
@@ -6796,4 +6823,5 @@ if (typeof globalThis !== 'undefined') {
     globalThis._sameGame = _sameGame;
     globalThis.isFavourite = isFavourite;
     globalThis.toggleFavourite = toggleFavourite;
+    globalThis.syncFavourites = syncFavourites;
 }

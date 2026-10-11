@@ -187,6 +187,7 @@
         if (isLoggedIn()) {
             await refreshOwnedGames();
             await refreshWishlist();
+            try { await syncFavourites(getCurrentUser().username); renderFavouriteGames(); } catch (_) {}
         }
     }
 
