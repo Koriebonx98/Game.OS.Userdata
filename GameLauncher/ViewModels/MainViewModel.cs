@@ -1687,10 +1687,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // reflected with correct (zero) playtime rather than stale data.
                 // Use Background priority so that input events (controller, keyboard) are
                 // not blocked while the dashboard rebuilds its ObservableCollections.
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
-                }, Avalonia.Threading.DispatcherPriority.Background);
+                ScheduleDashboardReload();
                 return;
             }
             DevLogService.Log($"[Playtime] Cloud activity log has {activity.Count} entries.");
@@ -1725,11 +1722,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log("[Playtime] Applied cloud playtime totals to library and cache.");
             // Use Background priority so input events (controller / keyboard) are never
             // blocked by the synchronous ObservableCollection rebuilds inside Load().
-            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            {
-                DashboardVm.Load(_profile, library, _achievements, GetDashboardCards());
-                LibraryVm.Load(library);
-            }, Avalonia.Threading.DispatcherPriority.Background);
+            ScheduleDashboardReload();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(library),
+                Avalonia.Threading.DispatcherPriority.Background);
         }
         catch (Exception ex)
         {
@@ -1819,9 +1814,27 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private void RefreshDashboardLocalGames()
     {
         if (!ShowMain) return; // not logged in yet
-        var localCards = GetDashboardCards();
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-            DashboardVm.Load(_profile, _library, _achievements, localCards));
+        ScheduleDashboardReload();
+    }
+
+    private int _dashboardReloadPending;
+
+    /// <summary>
+    /// Coalesces bursts of dashboard refresh requests (scanner, cloud playtime, enrichment)
+    /// into a single Load on the UI thread, avoiding repeated multi-second rebuilds.
+    /// </summary>
+    private void ScheduleDashboardReload()
+    {
+        if (System.Threading.Interlocked.Exchange(ref _dashboardReloadPending, 1) == 1) return;
+        _ = Task.Run(async () =>
+        {
+            await Task.Delay(750).ConfigureAwait(false);
+            System.Threading.Interlocked.Exchange(ref _dashboardReloadPending, 0);
+            var cards = GetDashboardCards();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                DashboardVm.Load(_profile, _library, _achievements, cards),
+                Avalonia.Threading.DispatcherPriority.Background);
+        });
     }
 
     [RelayCommand]
@@ -2895,8 +2908,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         LibraryVm.Load(_library);
                         // Pass localCards so the "Continue Playing" section rebuilds with
                         // newly-enriched cover URLs on cloud game cards.
-                        DashboardVm.Load(_profile, _library, _achievements, GetDashboardCards());
                     });
+                    ScheduleDashboardReload();
                     // Also re-run cover enrichment for any dashboard cards still missing covers
                     _ = EnrichDashboardCoversAsync();
 

@@ -727,7 +727,7 @@ namespace GameLauncher.Services
         {
             try
             {
-                return LoadSessions()
+                return LoadSessionsShared()
                     .Where(s => !s.IsCheckpoint &&
                                 string.Equals(s.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
                                 string.Equals(s.Title,    title,    StringComparison.OrdinalIgnoreCase))
@@ -913,14 +913,37 @@ namespace GameLauncher.Services
             catch { /* best-effort */ }
         }
 
-        private static List<PlaySession> LoadSessions()
+        private static readonly object _sessionsCacheLock = new();
+        private static List<PlaySession>? _sessionsCache;
+        private static DateTime _sessionsCacheStamp;
+        private static long _sessionsCacheLength = -1;
+
+        /// <summary>Returns a private copy of the persisted sessions (safe to mutate).</summary>
+        private static List<PlaySession> LoadSessions() => new(LoadSessionsShared());
+
+        /// <summary>
+        /// Returns the cached sessions list (re-read only when the file changes). Read-only: do not mutate.
+        /// Avoids re-parsing sessions.json once per game card during dashboard loads.
+        /// </summary>
+        private static List<PlaySession> LoadSessionsShared()
         {
             try
             {
-                if (!File.Exists(SessionsFile)) return new List<PlaySession>();
-                var json = File.ReadAllText(SessionsFile);
-                return JsonSerializer.Deserialize<List<PlaySession>>(json)
-                       ?? new List<PlaySession>();
+                var fi = new FileInfo(SessionsFile);
+                if (!fi.Exists) return new List<PlaySession>();
+                lock (_sessionsCacheLock)
+                {
+                    if (_sessionsCache != null &&
+                        _sessionsCacheStamp == fi.LastWriteTimeUtc &&
+                        _sessionsCacheLength == fi.Length)
+                        return _sessionsCache;
+                    var json = File.ReadAllText(SessionsFile);
+                    _sessionsCache = JsonSerializer.Deserialize<List<PlaySession>>(json)
+                                     ?? new List<PlaySession>();
+                    _sessionsCacheStamp  = fi.LastWriteTimeUtc;
+                    _sessionsCacheLength = fi.Length;
+                    return _sessionsCache;
+                }
             }
             catch { return new List<PlaySession>(); }
         }
