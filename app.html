@@ -171,6 +171,7 @@
                 if (seen.ach != null && total > seen.ach) {
                     const d = total - seen.ach;
                     fresh.push(['🏆 Achievement unlocked', d + ' new achievement' + (d > 1 ? 's' : '') + ' earned', 'app.html']);
+                    pushApi('/api/push/notify', { type: 'achievement', text: d + ' new achievement' + (d > 1 ? 's' : '') + ' earned' }).catch(() => {});
                     items.unshift({ icon: '🏆', t: 'Achievement unlocked', s: d + ' new achievement' + (d > 1 ? 's' : '') });
                 }
                 store(seenKey, next);
@@ -204,7 +205,32 @@
             $('chatInput').value = '';
             if (MODE === 'demo') await sendMessageDemo(user.username, chatFriend, text);
             else await sendMessageGitHub(user.username, chatFriend, text);
+            pushApi('/api/push/notify', { type: 'message', toUsername: chatFriend, text }).catch(() => {});
             openChat(chatFriend);
+        }
+        // ── Server push (works when the app is closed) ──
+        const pushBase = () => (localStorage.getItem('gameOS_pushBackendUrl') || localStorage.getItem('gameOS_devBackendUrl') || '').replace(/\/+$/, '');
+        const apiTok = () => localStorage.getItem('gameOS_apiToken_' + user.username.toLowerCase());
+        async function pushApi(path, body) {
+            const base = pushBase(), tok = apiTok();
+            if (!base || !tok) return null;
+            const r = await fetch(base + path, { method: body ? 'POST' : 'GET', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: body ? JSON.stringify(body) : undefined });
+            return r.json();
+        }
+        function b64ToBytes(b) {
+            const p = '='.repeat((4 - b.length % 4) % 4), raw = atob((b + p).replace(/-/g, '+').replace(/_/g, '/'));
+            return Uint8Array.from(raw, c => c.charCodeAt(0));
+        }
+        async function subscribePush() {
+            try {
+                if (!('PushManager' in window) || Notification.permission !== 'granted' || !pushBase() || !apiTok()) return;
+                const reg = await navigator.serviceWorker.ready;
+                const k = await (await fetch(pushBase() + '/api/push/public-key')).json();
+                if (!k.success) return;
+                const sub = (await reg.pushManager.getSubscription()) ||
+                    await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(k.publicKey) });
+                await pushApi('/api/push/subscribe', { subscription: sub.toJSON() });
+            } catch (_) {}
         }
         function renderNotifBox() {
             const box = $('notifBox');
@@ -216,7 +242,7 @@
                 box.innerHTML = '<p>Notifications are blocked. Enable them in Settings.</p>';
             } else {
                 box.innerHTML = '<button class="btn" id="enableNotif">Enable notifications</button>';
-                $('enableNotif').onclick = () => Notification.requestPermission().then(renderNotifBox);
+                $('enableNotif').onclick = () => Notification.requestPermission().then(() => { renderNotifBox(); subscribePush(); });
             }
         }
 
@@ -229,7 +255,7 @@
             try {
                 library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
             } catch (_) { library = []; }
-            renderAll(); renderNotifBox();
+            renderAll(); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats();
             pollAlerts(false);
             $('chatList').addEventListener('click', e => { const r = e.target.closest('.app-chat-row'); if (r) openChat(r.dataset.f); });
