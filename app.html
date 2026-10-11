@@ -33,10 +33,10 @@
         </section>
         <section id="view-library" class="app-view" hidden>
             <input id="libSearch" class="app-search" type="search" placeholder="Search your library…">
-            <div id="libList" class="app-list"></div>
+            <div id="libList" class="app-list app-grid"></div>
         </section>
         <section id="view-favourites" class="app-view" hidden>
-            <div id="favList" class="app-list"></div>
+            <div id="favList" class="app-list app-grid"></div>
         </section>
         <section id="view-chats" class="app-view" hidden>
             <div id="chatList" class="app-list"></div>
@@ -74,16 +74,26 @@
 
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
-            return h >= 1 ? h + 'h' : min + 'm';
+            return h >= 1 ? h + 'h ' + (min % 60) + 'm' : min + 'm';
         }
         function minutesOf(g) {
             if (typeof g.playtimeMinutes === 'number') return g.playtimeMinutes;
             if (typeof g.playtime === 'number') return g.playtime;
+            for (const k of ['playTimeMinutes', 'minutesPlayed', 'playtimeMins']) if (typeof g[k] === 'number') return g[k];
+            for (const k of ['hoursPlayed', 'playtimeHours']) if (typeof g[k] === 'number') return Math.round(g[k] * 60);
+            if (typeof g.playtimeSeconds === 'number') return Math.round(g.playtimeSeconds / 60);
             return 0;
         }
         function achOf(g) {
             const a = g.achievementsUnlocked != null ? g.achievementsUnlocked : g.achievements;
             return typeof a === 'number' ? a : (Array.isArray(a) ? a.length : 0);
+        }
+        function tile(g, extra) {
+            const cover = g.coverUrl
+                ? `<img src="${esc(g.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`
+                : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
+            return `<div class="app-tile" ${g.title && g.platform != null ? `data-open-p="${esc(g.platform)}" data-open-t="${esc(g.title)}"` : ''}><div class="app-tile-cover">${cover}${extra || ''}</div>
+                <b>${esc(g.title)}</b><small>${esc(g.platform)}</small></div>`;
         }
         function row(g, extra) {
             const cover = g.coverUrl
@@ -104,13 +114,13 @@
                 const fav = typeof window !== 'undefined' && typeof window.isFavourite === 'function'
                 ? window.isFavourite(user.username, g.platform, g.title)
                 : false;
-                return row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${fav ? '❤️' : '🤍'}</button>`);
+                return tile(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${fav ? '❤️' : '🤍'}</button>`);
             }).join('') : empty('No games found.');
         }
         function renderFavs() {
             const favs = getFavourites(user.username);
             $('favList').innerHTML = favs.length ? favs.map(g =>
-                row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">❤️</button>`)).join('')
+                tile(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">❤️</button>`)).join('')
                 : empty('No favourites yet. Tap 🤍 on a game in your library.');
             $('statFavs').textContent = favs.length;
         }
@@ -154,7 +164,7 @@
             const cover = g.coverUrl ? `<img src="${esc(g.coverUrl)}" alt="" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
             const pt = minutesOf(g);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
-                <small>${esc(g.platform)}</small>${pt ? `<small>⏱ ${fmtPlaytime(pt)} played</small>` : ''}${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <small>${esc(g.platform)}</small><small>⏱ Playtime: ${pt ? fmtPlaytime(pt) : 'Not played yet'}</small><small>🏆 ${achOf(g)} achievements unlocked</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             const items = await loadGameAchievements(g);
