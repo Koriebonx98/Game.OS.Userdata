@@ -70,7 +70,7 @@
     (function () {
         const $ = id => document.getElementById(id);
         const esc = s => escapeHtml(String(s == null ? '' : s));
-        let user = null, library = [];
+        let user = null, library = [], userAch = null;
 
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -81,7 +81,20 @@
             if (typeof g.playtime === 'number') return g.playtime;
             return 0;
         }
+        const isUnlocked = a => a && a.unlockedAt && !String(a.unlockedAt).startsWith('1970-01-01');
+        const sameGame = (a, g) => String(a.gameTitle || '').toLowerCase() === String(g.title || '').toLowerCase()
+            && (!a.platform || !g.platform || String(a.platform).toLowerCase() === String(g.platform).toLowerCase());
+        async function loadUserAch() {
+            try {
+                const f = MODE === 'demo' ? null : await githubRead('accounts/' + user.username.toLowerCase() + '/achievements.json');
+                userAch = f && Array.isArray(f.content) ? f.content.filter(isUnlocked) : null;
+            } catch (_) { userAch = null; }
+        }
         function achOf(g) {
+            if (userAch) { const n = userAch.filter(a => sameGame(a, g)).length; if (n) return n; }
+            return achBase(g);
+        }
+        function achBase(g) {
             const a = g.achievementsUnlocked != null ? g.achievementsUnlocked : g.achievements;
             return typeof a === 'number' ? a : (Array.isArray(a) ? a.length : 0);
         }
@@ -117,7 +130,7 @@
         function renderHome() {
             $('statGames').textContent = library.length;
             $('statPlaytime').textContent = fmtPlaytime(library.reduce((n, g) => n + minutesOf(g), 0));
-            $('statAch').textContent = library.reduce((n, g) => n + achOf(g), 0);
+            $('statAch').textContent = userAch ? Math.max(userAch.length, 0) : library.reduce((n, g) => n + achBase(g), 0);
             const recent = [...library].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')).slice(0, 5);
             $('recentList').innerHTML = recent.length ? recent.map(g => row(g)).join('') : empty('Your library is empty.');
         }
@@ -132,14 +145,8 @@
                     tpl = Array.isArray(d) ? d : (d.Items || d.achievements || []);
                 } catch (_) {}
             }
-            let mine = [];
-            try {
-                const f = MODE === 'demo' ? null : await githubRead('accounts/' + user.username.toLowerCase() + '/achievements.json');
-                const all = f && Array.isArray(f.content) ? f.content : [];
-                mine = all.filter(a => String(a.gameTitle || '').toLowerCase() === String(g.title || '').toLowerCase()
-                    && (!a.platform || !g.platform || String(a.platform).toLowerCase() === String(g.platform).toLowerCase())
-                    && a.unlockedAt && !String(a.unlockedAt).startsWith('1970-01-01'));
-            } catch (_) {}
+            if (!userAch) await loadUserAch();
+            const mine = (userAch || []).filter(a => sameGame(a, g));
             const items = tpl.map(t => ({ name: t.Name || t.name || '', desc: t.Description || t.description || '', icon: t.iconUrl || t.UrlUnlocked || t.image || '', id: String(t.achievementId || t.apiName || t.id || '').toLowerCase(), at: '' }));
             mine.forEach(u => {
                 const id = String(u.achievementId || '').toLowerCase(), nm = String(u.name || '').toLowerCase();
@@ -154,7 +161,7 @@
             const cover = g.coverUrl ? `<img src="${esc(g.coverUrl)}" alt="" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
             const pt = minutesOf(g);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
-                <small>${esc(g.platform)}</small>${pt ? `<small>⏱ ${fmtPlaytime(pt)} played</small>` : ''}${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <small>${esc(g.platform)}</small><small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             const items = await loadGameAchievements(g);
@@ -307,7 +314,7 @@
             try {
                 library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
             } catch (_) { library = []; }
-            renderAll(); renderNotifBox(); subscribePush();
+            renderAll(); loadUserAch().then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats();
             pollAlerts(false);
             $('chatList').addEventListener('click', e => { const r = e.target.closest('.app-chat-row'); if (r) openChat(r.dataset.f); });
