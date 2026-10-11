@@ -19,6 +19,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const cors = require('cors');
 const cheerio = require('cheerio');
+const webpush = require('web-push');
 require('dotenv').config();
 
 const app = express();
@@ -1311,6 +1312,7 @@ async function handleSendFriendRequest(req, res) {
             sentFile ? sentFile.sha : undefined
         );
 
+        sendPushToUser(friendFile.content.username.toLowerCase(), { title: 'Friend request', body: `${username} sent you a friend request`, url: 'app.html' });
         res.json({ success: true, message: `Friend request sent to ${friendFile.content.username}! Waiting for them to accept.` });
     } catch (err) {
         console.error('Error sending friend request:', err);
@@ -1603,6 +1605,7 @@ app.post('/api/send-message', async (req, res) => {
 
         await putFile(convPath, messages, `Message from ${username} to ${toUsername}`, convFile ? convFile.sha : undefined);
 
+        sendPushToUser(toLower, { title: `💬 ${userFile.content.username}`, body: msgText.slice(0, 140), url: 'app.html#chats' });
         res.json({ success: true, message: 'Message sent' });
     } catch (err) {
         console.error('Error sending message:', err);
@@ -1629,6 +1632,86 @@ app.get('/api/get-messages', async (req, res) => {
     } catch (err) {
         console.error('Error getting messages:', err);
         res.status(500).json({ success: false, message: 'Failed to get messages.' });
+    }
+});
+
+
+// ── Web Push (iOS / PWA notifications) ───────────────────────────────────────
+// Generate keys with: npx web-push generate-vapid-keys
+//   VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT (mailto: or https: URL)
+const VAPID_PUBLIC_KEY  = process.env.VAPID_PUBLIC_KEY  || null;
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || null;
+const PUSH_ENABLED = !!(VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY);
+if (PUSH_ENABLED) {
+    webpush.setVapidDetails(process.env.VAPID_SUBJECT || 'mailto:admin@gameos.local', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY);
+}
+const MAX_PUSH_SUBS = 10;
+
+async function sendPushToUser(usernameLower, payload) {
+    if (!PUSH_ENABLED) return;
+    try {
+        const path = `accounts/${usernameLower}/push_subscriptions.json`;
+        const file = await getFile(path);
+        if (!file || !file.content.length) return;
+        const body = JSON.stringify(payload);
+        const dead = [];
+        await Promise.all(file.content.map(sub => webpush.sendNotification(sub, body).catch(err => {
+            if (err.statusCode === 404 || err.statusCode === 410) dead.push(sub.endpoint);
+        })));
+        if (dead.length) {
+            await putFile(path, file.content.filter(s => !dead.includes(s.endpoint)), `Prune push subscriptions for ${usernameLower}`, file.sha);
+        }
+    } catch (err) {
+        console.error('Push send failed:', err.message);
+    }
+}
+
+app.get('/api/push/public-key', (req, res) => {
+    if (!PUSH_ENABLED) return res.status(503).json({ success: false, message: 'Push not configured' });
+    res.json({ success: true, publicKey: VAPID_PUBLIC_KEY });
+});
+
+app.post('/api/push/subscribe', authenticateToken, async (req, res) => {
+    try {
+        const sub = req.body && req.body.subscription;
+        if (!PUSH_ENABLED) return res.status(503).json({ success: false, message: 'Push not configured' });
+        if (!sub || typeof sub.endpoint !== 'string' || !sub.endpoint.startsWith('https://') ||
+            !sub.keys || typeof sub.keys.p256dh !== 'string' || typeof sub.keys.auth !== 'string') {
+            return res.status(400).json({ success: false, message: 'Invalid subscription' });
+        }
+        const path = `accounts/${req.tokenUser.usernameLower}/push_subscriptions.json`;
+        const file = await getFile(path);
+        const subs = (file ? file.content : []).filter(s => s.endpoint !== sub.endpoint);
+        subs.push({ endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+        await putFile(path, subs.slice(-MAX_PUSH_SUBS), `Push subscription for ${req.tokenUser.usernameLower}`, file ? file.sha : undefined);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error saving push subscription:', err);
+        res.status(500).json({ success: false, message: 'Failed to save subscription.' });
+    }
+});
+
+// Lets the web app trigger a push after it writes data directly to GitHub.
+// type "achievement" notifies the caller; "message" / "invite" notify a friend.
+app.post('/api/push/notify', authenticateToken, async (req, res) => {
+    try {
+        const { type, toUsername, text } = req.body || {};
+        const me = req.tokenUser.usernameLower;
+        const clip = v => String(v == null ? '' : v).slice(0, 140);
+        if (type === 'achievement') {
+            await sendPushToUser(me, { title: '🏆 Achievement unlocked', body: clip(text) || 'You earned an achievement!', url: 'app.html' });
+        } else if (type === 'message' || type === 'invite') {
+            if (!toUsername || !sanitiseUsername(toUsername) || !(await areFriends(me, toUsername.toLowerCase()))) {
+                return res.status(403).json({ success: false, message: 'You can only notify friends' });
+            }
+            await sendPushToUser(toUsername.toLowerCase(), { title: type === 'message' ? `💬 ${req.tokenUser.username || me}` : '🎮 Game invite', body: clip(text), url: 'app.html#chats' });
+        } else {
+            return res.status(400).json({ success: false, message: 'Invalid type' });
+        }
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error sending push:', err);
+        res.status(500).json({ success: false, message: 'Failed to send notification.' });
     }
 });
 

@@ -117,3 +117,10 @@ Passwords are hashed with **bcrypt** (10 rounds) on the server — plain-text pa
 | `POST` | `/api/add-friend` | Add a user to your friends list |
 | `GET`  | `/api/get-friends?username=` | Retrieve a user's friends list |
 | `POST` | `/api/remove-friend` | Remove a user from your friends list |
+
+
+## Web Push (iOS notifications)
+
+Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` (generate with `npx web-push generate-vapid-keys`) and optionally `VAPID_SUBJECT`.
+The mobile web app (`app.html`) subscribes when notifications are enabled and `localStorage.gameOS_pushBackendUrl` (or `gameOS_devBackendUrl`) points at this server.
+Pushes are sent for new messages and friend requests, and `POST /api/push/notify` lets the app trigger message/achievement pushes. Requires iOS 16.4+ with the app on the Home Screen.
