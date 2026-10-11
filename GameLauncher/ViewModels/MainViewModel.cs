@@ -606,6 +606,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         libEntry.TotalAchievements = libEntry.GameAchievements.Count;
                 }
 
+                MarkUnlockInCachedTemplate(platform, libEntry?.SteamAppId, libEntry?.TitleId ?? queuedTitleId,
+                    canonicalTitle,
+                    new Models.Achievement { AchievementId = queuedAchievementId, Name = achievementName, UnlockedAt = unlockedAt });
+
                 if (!string.IsNullOrEmpty(_profile?.Username))
                     _offlineCache.Save(_profile.Username, _profile, _library, _achievements);
 
@@ -825,6 +829,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
 
+        // Keep the Quick Menu achievements in sync when an unlock lands while it is open.
+        DetailVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DetailVm.AchievementsLabel))
+                RefreshQuickMenuAchievementsLive();
+        };
+        LoginVm.OnCachedAutoLogin = () => _ = Task.Run(async () =>
+        {
+            try { await TryReconnectAsync().ConfigureAwait(false); }
+            catch { /* background refresh failure is non-fatal */ }
+        });
+
         // Wire up OpenDetail from child VMs
         DashboardVm.OnOpenDetail        = OpenDetailFromGame;
         DashboardVm.OnOpenStoreDetail   = OpenDetailFromStoreGame;
@@ -941,7 +957,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DevLogService.Log("[MainViewModel] BeginStartup — starting deferred startup tasks.");
 
         DevLogService.Log("[Scanner] Starting background game scanner…");
-        _ = _scanner.StartAsync();
+        _ = Task.Run(() => _scanner.StartAsync());
 
         var settings = Services.AppSettingsService.Load();
         if (settings.AutoUpdate)
@@ -1868,6 +1884,108 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Returns <c>null</c> if no unlocked achievements are found so the detail view starts
     /// blank (same behaviour as before when there is genuinely nothing unlocked).
     /// </summary>
+    private static bool SameAchievement(Models.Achievement a, Models.Achievement b) =>
+        (!string.IsNullOrEmpty(a.AchievementId) && !string.IsNullOrEmpty(b.AchievementId) &&
+         string.Equals(a.AchievementId, b.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+        (!string.IsNullOrEmpty(a.Name) && !string.IsNullOrEmpty(b.Name) &&
+         string.Equals(a.Name, b.Name, StringComparison.OrdinalIgnoreCase));
+
+    private IEnumerable<string> PerGameAchievementKeys(string platform, long? steamAppId, string? titleId, string title)
+    {
+        if (steamAppId.HasValue && steamAppId.Value > 0)
+            yield return steamAppId.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        if (!string.IsNullOrWhiteSpace(titleId)) yield return titleId!;
+        if (!string.IsNullOrWhiteSpace(title))   yield return title;
+    }
+
+    /// <summary>
+    /// Loads the cached FULL achievement list (locked + unlocked) for a game from the local
+    /// per-game cache, or null when none exists.
+    /// </summary>
+    private List<Models.Achievement>? LoadCachedFullAchievements(
+        string platform, long? steamAppId, string? titleId, string title)
+    {
+        var user = _profile?.Username;
+        if (string.IsNullOrEmpty(user)) return null;
+        foreach (var key in PerGameAchievementKeys(platform, steamAppId, titleId, title))
+        {
+            try
+            {
+                string path = GetLocalPerGameAchievementsPath(user, platform, key);
+                if (!File.Exists(path)) continue;
+                var list = System.Text.Json.JsonSerializer.Deserialize<List<Models.Achievement>>(
+                    File.ReadAllText(path),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (list is { Count: > 0 }) return list;
+            }
+            catch { /* ignore corrupt cache */ }
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Layers the known unlocks (Game OS cloud, cached Steam emu / Steam API) over the cached
+    /// full template so the game info card always shows the complete list with unlocks marked.
+    /// Falls back to the unlock list alone when no template cache exists.
+    /// </summary>
+    private List<Models.Achievement>? OverlayUnlocksOnCachedTemplate(
+        string platform, long? steamAppId, string? titleId, string title,
+        List<Models.Achievement>? unlocked)
+    {
+        var template = LoadCachedFullAchievements(platform, steamAppId, titleId, title);
+        if (template == null) return unlocked;
+
+        foreach (var t in template)
+        {
+            t.Platform  = platform;
+            t.GameTitle = title;
+        }
+        if (unlocked != null)
+        {
+            foreach (var u in unlocked.Where(u => !string.IsNullOrEmpty(u.UnlockedAt)))
+            {
+                var match = template.FirstOrDefault(t => SameAchievement(t, u));
+                if (match != null)
+                {
+                    if (!match.IsUnlocked || string.IsNullOrEmpty(match.UnlockedAt))
+                        match.UnlockedAt = u.UnlockedAt;
+                    if (string.IsNullOrEmpty(match.IconUrl)) match.IconUrl = u.IconUrl;
+                }
+                else
+                {
+                    template.Add(CloneAchievement(u));
+                }
+            }
+        }
+        return template;
+    }
+
+    /// <summary>Marks a newly-unlocked achievement in the local per-game full-list cache.</summary>
+    private void MarkUnlockInCachedTemplate(
+        string platform, long? steamAppId, string? titleId, string title,
+        Models.Achievement unlock)
+    {
+        var user = _profile?.Username;
+        if (string.IsNullOrEmpty(user)) return;
+        foreach (var key in PerGameAchievementKeys(platform, steamAppId, titleId, title))
+        {
+            try
+            {
+                string path = GetLocalPerGameAchievementsPath(user, platform, key);
+                if (!File.Exists(path)) continue;
+                var list = System.Text.Json.JsonSerializer.Deserialize<List<Models.Achievement>>(
+                    File.ReadAllText(path),
+                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (list == null) continue;
+                var match = list.FirstOrDefault(a => SameAchievement(a, unlock));
+                if (match == null || match.IsUnlocked) continue;
+                match.UnlockedAt = unlock.UnlockedAt;
+                WriteLocalPerGameAchievements(path, list);
+            }
+            catch { /* best-effort */ }
+        }
+    }
+
     private List<Models.Achievement>? BuildKnownUnlockedForGame(Game game)
     {
         var preloadAchs = game.GameAchievements?.Count > 0
@@ -1892,7 +2010,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 preloadAchs.Add(a);
         }
 
-        return preloadAchs.Count > 0 ? preloadAchs : null;
+        return OverlayUnlocksOnCachedTemplate(
+            game.Platform, game.SteamAppId, game.TitleId, game.Title,
+            preloadAchs.Count > 0 ? preloadAchs : null);
     }
 
     private void OpenDetailFromGame(Game game)
@@ -2020,6 +2140,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Toggles the Quick Menu overlay (shown by Left Shift + Left Ctrl from the main window).
     /// Refreshes content before showing.
     /// </summary>
+    /// <summary>
+    /// Achievements to show in the Quick Menu: the detail view's full template when
+    /// loaded, otherwise the running/open game's library-cached achievements.
+    /// </summary>
+    private IReadOnlyList<Achievement> GetQuickMenuAchievements()
+    {
+        if (DetailVm.Achievements.Count > 0)
+            return DetailVm.Achievements.ToList();
+
+        var title = DetailVm.Title;
+        var platform = DetailVm.Platform;
+        var libEntry = _library?.FirstOrDefault(g =>
+            string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
+        return libEntry?.GameAchievements?.ToList() ?? new List<Achievement>();
+    }
+
+    private void RefreshQuickMenuAchievementsLive()
+    {
+        if (!ShowQuickMenu) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (ShowQuickMenu)
+                QuickMenuVm.UpdateAchievements(GetQuickMenuAchievements());
+        });
+    }
+
     public void ToggleQuickMenu()
     {
         if (ShowQuickMenu)
@@ -2048,12 +2195,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             .ToList();
 
         // Achievement progress for current game
-        int unlocked = 0, total = 0;
-        if (DetailVm.HasAchievements)
-        {
-            unlocked = DetailVm.Achievements.Count(a => a.IsUnlocked);
-            total    = DetailVm.Achievements.Count;
-        }
+        var quickMenuAchs = GetQuickMenuAchievements();
+        int unlocked = quickMenuAchs.Count(a => a.IsUnlocked);
+        int total    = quickMenuAchs.Count;
 
         int unreadCount = InboxVm.PendingInvites.Count + InboxVm.Conversations.Count;
         string? lastMessage = InboxVm.Conversations
@@ -2075,7 +2219,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             lastMessage:           lastMessage,
             unlockedAchievements:  unlocked,
             totalAchievements:     total,
-            achievements:          DetailVm.Achievements,
+            achievements:          quickMenuAchs,
             recentGames:           DashboardVm.Ps5RecentGames.ToList(),
             activePageKey:         ActivePage,
             pendingDownloadCount:  LibraryVm.ReadyToInstall.Count,
@@ -2251,8 +2395,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 .ToList<Models.Achievement>();
         }
 
-        if (preloadAchs.Count > 0)
-            DetailVm.PopulateAchievements(preloadAchs);
+        var fullAchs = OverlayUnlocksOnCachedTemplate(
+            "PC", cloudGame?.SteamAppId ?? game.SteamAppId, cloudGame?.TitleId, cloudGame?.Title ?? game.Title,
+            preloadAchs.Count > 0 ? preloadAchs : null);
+        if (fullAchs is { Count: > 0 })
+            DetailVm.PopulateAchievements(fullAchs);
 
         // Asynchronously enrich with cover/description/trailer from Games.Database
         _ = EnrichLocalGameDetailAsync(game.Title, "PC", steamAppId: game.SteamAppId);

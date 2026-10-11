@@ -48,6 +48,12 @@ public partial class LoginViewModel : ViewModelBase
     /// </summary>
     public System.Action<UserProfile, List<Game>, List<Achievement>, bool>? OnLoginSuccess { get; set; }
 
+    /// <summary>
+    /// Invoked after a cache-first auto-login so the host can start an immediate
+    /// background online refresh (reconnect) without blocking the UI.
+    /// </summary>
+    public System.Action? OnCachedAutoLogin { get; set; }
+
     public LoginViewModel(GameOsClient client, SessionCacheService cache,
                           OfflineDataCacheService offlineCache)
     {
@@ -87,6 +93,28 @@ public partial class LoginViewModel : ViewModelBase
         }
 
         DevLogService.Log($"[AutoLogin] Remembered session found for '{saved.Username}' — attempting online restore.");
+
+        // ── Instant path (console-style) ──────────────────────────────────
+        // When a local cache exists, show the library immediately and refresh from the
+        // server in the background instead of blocking on three sequential network calls.
+        try
+        {
+            var username = saved.Username;
+            var cachedFast = await System.Threading.Tasks.Task.Run(() => _offlineCache.Load(username));
+            if (cachedFast?.Profile != null && cachedFast.Games != null && cachedFast.Achievements != null &&
+                OnCachedAutoLogin != null)
+            {
+                DevLogService.Log($"[AutoLogin] Instant start from cache for '{username}' — refreshing online in background.");
+                EnrichGames(cachedFast.Games);
+                OnLoginSuccess?.Invoke(cachedFast.Profile, cachedFast.Games, cachedFast.Achievements, true);
+                OnCachedAutoLogin();
+                return;
+            }
+        }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[AutoLogin] Instant cache start failed: {ex.Message} — falling back to online restore.");
+        }
 
         IsLoading    = true;
         ErrorMessage = "";

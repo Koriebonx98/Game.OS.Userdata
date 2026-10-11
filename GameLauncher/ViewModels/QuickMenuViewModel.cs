@@ -914,6 +914,31 @@ public partial class QuickMenuViewModel : ViewModelBase
         ChatMessages.Clear();
     }
 
+    /// <summary>Replaces the achievement list and progress label (safe to call while the menu is open).</summary>
+    public void UpdateAchievements(System.Collections.Generic.IReadOnlyList<Achievement> achievements)
+    {
+        int unlocked = achievements.Count(a => a.IsUnlocked);
+        AchievementsUnlocked = unlocked;
+        AchievementsTotal = achievements.Count;
+        HasAchievementsProgress = achievements.Count > 0;
+        AchievementsLabel = achievements.Count > 0
+            ? $"{unlocked} / {achievements.Count} unlocked"
+            : "";
+
+        Achievements.Clear();
+        foreach (var achievement in achievements
+                     .OrderByDescending(a => a.IsUnlocked))
+        {
+            Achievements.Add(new QuickMenuAchievementVm
+            {
+                Name = achievement.Name,
+                Description = achievement.Description,
+                IsUnlocked = achievement.IsUnlocked,
+            });
+        }
+        HasAchievements = Achievements.Count > 0;
+    }
+
     public void Refresh(
         string? currentUsername,
         string? currentGameTitle,
@@ -999,17 +1024,7 @@ public partial class QuickMenuViewModel : ViewModelBase
             ? $"{unlockedAchievements} / {totalAchievements} unlocked"
             : "";
 
-        Achievements.Clear();
-        foreach (var achievement in achievements)
-        {
-            Achievements.Add(new QuickMenuAchievementVm
-            {
-                Name = achievement.Name,
-                Description = achievement.Description,
-                IsUnlocked = achievement.IsUnlocked,
-            });
-        }
-        HasAchievements = Achievements.Count > 0;
+        UpdateAchievements(achievements);
         MediaStatusLabel = "Media controls are ready.";
     }
 
