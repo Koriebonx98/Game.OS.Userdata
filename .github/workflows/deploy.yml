@@ -309,7 +309,7 @@ jobs:
       - name: Copy frontend files to deployment directory
         run: |
           mkdir -p _site
-          cp index.html login.html signup.html account.html games.html friends.html inbox.html profile.html script.js styles.css _site/
+          cp index.html login.html signup.html account.html games.html friends.html inbox.html profile.html script.js favourites.js app.html pwa.js sw.js manifest.webmanifest icons styles.css _site/
           touch _site/.nojekyll
 
       - name: Verify token injection in deployment bundle
