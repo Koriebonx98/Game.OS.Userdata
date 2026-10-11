@@ -808,7 +808,7 @@ async function handleLogin(event) {
     const messageDiv = document.getElementById('loginMessage');
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const rememberMe = document.getElementById('rememberMe').checked;
+    const rememberMe = document.getElementById('rememberMe').checked || document.documentElement.classList.contains('is-standalone');
     
     // Clear previous messages
     clearMessage(messageDiv);
@@ -884,9 +884,11 @@ async function handleLogin(event) {
             updatePresence(username).catch(() => {});
             
             // Redirect after 2 seconds
+            const isStandalone = window.navigator.standalone === true ||
+                (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
             setTimeout(() => {
-                window.location.href = 'index.html';
-            }, 2000);
+                window.location.href = isStandalone ? 'app.html' : 'index.html';
+            }, isStandalone ? 600 : 2000);
         } else {
             // Handle error from backend
             showMessage(messageDiv, 
@@ -6098,6 +6100,46 @@ async function _adminScrapeSteamNow() {
 // GAME DETAIL MODAL
 // ============================================================
 
+function _updateModalFavBtn(title, platform, game) {
+    const wrap = document.getElementById('gameModalFavWrap');
+    const btn  = document.getElementById('gameModalFavBtn');
+    if (!wrap || !btn) return;
+    const user = isLoggedIn() ? getCurrentUser() : null;
+    if (!user) { wrap.style.display = 'none'; return; }
+    wrap.style.display = '';
+    btn.dataset.title    = title    || '';
+    btn.dataset.platform = platform || '';
+    btn.dataset.gameJson = game ? JSON.stringify(game) : '';
+    const faved = isFavourite(user.username, platform, title);
+    btn.textContent = faved ? '❤️' : '🤍';
+    btn.title = faved ? 'Remove from Favourites' : 'Add to Favourites';
+    btn.classList.toggle('btn-wishlisted', faved);
+}
+
+function handleModalFavourite() {
+    const user = getCurrentUser();
+    if (!user) { window.location.href = 'login.html'; return; }
+    const btn = document.getElementById('gameModalFavBtn');
+    if (!btn) return;
+    const title = btn.dataset.title || '', platform = btn.dataset.platform || '';
+    if (!title || !platform) return;
+    let game = {};
+    try { game = btn.dataset.gameJson ? JSON.parse(btn.dataset.gameJson) : {}; } catch (_) { game = {}; }
+    if (!game.title && !game.Title) game.title = title;
+    const now = toggleFavourite(user.username, game, platform);
+    btn.textContent = now ? '❤️' : '🤍';
+    btn.title = now ? 'Remove from Favourites' : 'Add to Favourites';
+    btn.classList.toggle('btn-wishlisted', now);
+    if (typeof renderFavouriteGames === 'function') renderFavouriteGames();
+    if (typeof _currentPlatform !== 'undefined') {
+        if (_currentPlatform === 'ALL' && typeof _allPlatformGames !== 'undefined') {
+            renderBrowseGamesGrouped(_allPlatformGames, document.getElementById('browseSearch').value);
+        } else if (_allBrowseGames.length) {
+            renderBrowseGames(_allBrowseGames);
+        }
+    }
+}
+
 function _updateModalWishlistBtn(title, platform, game) {
     const wrap = document.getElementById('gameModalWishlistWrap');
     const btn  = document.getElementById('gameModalWishlistBtn');
@@ -6196,7 +6238,10 @@ function ensureGameModal() {
                         <h3 class="game-modal-title" id="gameModalTitle"></h3>
                         <p class="game-modal-platform" id="gameModalPlatform"></p>
                     </div>
-                    <div id="gameModalWishlistWrap" style="display:none;margin-left:auto;">
+                    <div id="gameModalFavWrap" style="display:none;margin-left:auto;">
+                        <button class="btn-modal-wishlist" id="gameModalFavBtn" onclick="handleModalFavourite()" title="Add to Favourites">🤍</button>
+                    </div>
+                    <div id="gameModalWishlistWrap" style="display:none;margin-left:4px;">
                         <button class="btn-modal-wishlist" id="gameModalWishlistBtn" onclick="handleModalWishlist()" title="Add to Wishlist">☆</button>
                     </div>
                     <div id="gameModalEditWrap" style="display:none;margin-left:4px;">
@@ -6620,6 +6665,7 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
     _updateModalWishlistBtn(title, platform, game);
+    _updateModalFavBtn(title, platform, game);
     _updateModalEditBtn();
 
     const bgUrls    = getGameBackgroundUrls(game);
@@ -6657,6 +6703,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
     _updateModalWishlistBtn(title, platform, null);
+    _updateModalFavBtn(title, platform, null);
     _updateModalEditBtn();
     modal.style.display = 'flex';
 
@@ -6679,6 +6726,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
             }
             // Update wishlist button with full game data once loaded
             _updateModalWishlistBtn(title, platform, game);
+            _updateModalFavBtn(title, platform, game);
             _updateModalEditBtn();
         }
 
@@ -6715,4 +6763,38 @@ if (typeof module !== 'undefined' && module.exports) {
         logout,
         requireLogin
     };
+}
+
+
+// ============================================================
+// FAVOURITES
+// ============================================================
+// Favourites – stored per user in localStorage (works in demo and GitHub mode).
+function _favKey(username) { return `gameOS_favourites_${username.toLowerCase()}`; }
+function getFavourites(username) {
+    try { return JSON.parse(localStorage.getItem(_favKey(username))) || []; } catch (_) { return []; }
+}
+function _sameGame(a, platform, title) {
+    return a.platform === platform && (a.title || '').toLowerCase() === (title || '').toLowerCase();
+}
+function isFavourite(username, platform, title) {
+    return getFavourites(username).some(f => _sameGame(f, platform, title));
+}
+/** Toggle a favourite; returns true if the game is now a favourite. */
+function toggleFavourite(username, game, platform) {
+    const title = game.Title || game.game_name || game.title || '';
+    let favs = getFavourites(username);
+    const now = !favs.some(f => _sameGame(f, platform, title));
+    if (now) {
+        favs.push({
+            platform, title,
+            titleId: game.TitleID || game.title_id || game.titleid || game.titleId || game.id || null,
+            coverUrl: game.coverUrl || (typeof getGameCoverUrl === 'function' ? getGameCoverUrl(game) : null) || undefined,
+            addedAt: new Date().toISOString()
+        });
+    } else {
+        favs = favs.filter(f => !_sameGame(f, platform, title));
+    }
+    localStorage.setItem(_favKey(username), JSON.stringify(favs));
+    return now;
 }
