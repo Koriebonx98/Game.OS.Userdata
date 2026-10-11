@@ -2306,3 +2306,15 @@ html:has(.app-body) { overscroll-behavior: none; height: 100%; overflow: hidden;
 .app-ach.locked { opacity: .5; }
 .app-ach-icon { width: 48px; height: 48px; border-radius: 10px; background: #312e81 center/cover; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
 .app-ach b { color: #fff; display: block; } .app-ach small { color: var(--text-muted); display: block; }
+
+/* Clear game tiles + edge-to-edge native fit */
+html:has(.app-body), html:has(.app-body) body { background: #060913; }
+.app-body { height: 100vh; height: -webkit-fill-available; height: 100dvh; min-height: 0; }
+.app-tabbar { background: rgba(15,23,42,.97); }
+#libList.app-list, #favList.app-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 12px; }
+#libList .app-row, #favList .app-row { flex-direction: column; align-items: stretch; padding: 8px; position: relative; text-align: center; }
+#libList .app-cover, #favList .app-cover { width: 100%; height: auto; aspect-ratio: 3 / 4; border-radius: 12px; }
+#libList .app-row-info b, #favList .app-row-info b { font-size: .8rem; margin-top: 6px; }
+#libList .app-row-info small, #favList .app-row-info small { font-size: .7rem; }
+#libList .app-fav, #favList .app-fav { position: absolute; top: 12px; right: 12px; padding: 2px 4px; font-size: 1.1rem; background: rgba(0,0,0,.55); border-radius: 10px; }
+.app-hero .app-cover { background-size: cover; }
