@@ -824,6 +824,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         };
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
+        LoginVm.OnCachedAutoLogin = () => _ = Task.Run(async () =>
+        {
+            try { await TryReconnectAsync().ConfigureAwait(false); }
+            catch { /* background refresh failure is non-fatal */ }
+        });
 
         // Wire up OpenDetail from child VMs
         DashboardVm.OnOpenDetail        = OpenDetailFromGame;
@@ -941,7 +946,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DevLogService.Log("[MainViewModel] BeginStartup — starting deferred startup tasks.");
 
         DevLogService.Log("[Scanner] Starting background game scanner…");
-        _ = _scanner.StartAsync();
+        _ = Task.Run(() => _scanner.StartAsync());
 
         var settings = Services.AppSettingsService.Load();
         if (settings.AutoUpdate)
