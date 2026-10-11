@@ -47,6 +47,7 @@ public sealed class GameScannerService : IDisposable
     private static readonly string GameCache  = Path.Combine(CacheDir, "detected_games.json");
     private static readonly string RepackCache= Path.Combine(CacheDir, "detected_repacks.json");
     private static readonly string RomCache   = Path.Combine(CacheDir, "detected_roms.json");
+    private static readonly string DriveCache = Path.Combine(CacheDir, "detected_drives.txt");
 
     // ── Public snapshots ──────────────────────────────────────────────────────
     public IReadOnlyList<LocalGame>   Games   => _games;
@@ -67,7 +68,8 @@ public sealed class GameScannerService : IDisposable
         {
             DevLogService.Log("[Scanner] StartAsync — beginning scan.");
             // Try loading from cache first for faster startup
-            if (TryLoadCache())
+            bool cacheLoaded = TryLoadCache();
+            if (cacheLoaded)
             {
                 DevLogService.Log($"[Scanner] Cache loaded: {_games.Count} games, {_repacks.Count} repacks, {_roms.Count} ROMs.");
                 GamesUpdated?.Invoke(new List<LocalGame>(_games));
@@ -79,8 +81,19 @@ public sealed class GameScannerService : IDisposable
                 DevLogService.Log("[Scanner] No cache found — starting fresh scan.");
             }
 
-            // Always do a fresh scan to stay current
-            await ScanAllDrivesAsync(ct).ConfigureAwait(false);
+            // Like Playnite: when a cache exists and the set of drives is unchanged, trust
+            // it and only drop entries that were removed from disk.  New games are picked
+            // up by the file-system watchers and the periodic rescan, so the expensive full
+            // drive scan only runs on first launch or when a drive was added/removed.
+            if (cacheLoaded && DriveSignatureMatchesCache())
+            {
+                DevLogService.Log("[Scanner] Cache is current — skipping full startup scan.");
+                await PruneMissingCachedEntriesAsync(ct).ConfigureAwait(false);
+            }
+            else
+            {
+                await ScanAllDrivesAsync(ct).ConfigureAwait(false);
+            }
             StartWatchers();
 
             // Kick off the periodic rescan loop (uses the lifetime CTS so it stops on Dispose).
@@ -1909,11 +1922,56 @@ public sealed class GameScannerService : IDisposable
         catch { return false; }
     }
 
+    private static string BuildDriveSignature()
+        => string.Join("|", GetDriveRoots().OrderBy(d => d, StringComparer.OrdinalIgnoreCase));
+
+    private static bool DriveSignatureMatchesCache()
+    {
+        try
+        {
+            return File.Exists(DriveCache) &&
+                   File.ReadAllText(DriveCache) == BuildDriveSignature();
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Removes cached entries whose files/folders no longer exist (cheap existence checks only).</summary>
+    private async Task PruneMissingCachedEntriesAsync(CancellationToken ct)
+    {
+        bool changed = false;
+        await _lock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            await Task.Run(() =>
+            {
+                static bool Exists(string? path)
+                    => string.IsNullOrEmpty(path) || Directory.Exists(path) || File.Exists(path);
+
+                changed |= _games.RemoveAll(g =>
+                    !string.IsNullOrEmpty(g.FolderPath) && !Exists(g.FolderPath)) > 0;
+                changed |= _repacks.RemoveAll(r => !Exists(r.FilePath)) > 0;
+                changed |= _roms.RemoveAll(r => !Exists(r.FilePath)) > 0;
+            }, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            _lock.Release();
+        }
+
+        if (!changed) return;
+        SaveCache();
+        DevLogService.Log($"[Scanner] Pruned removed entries: {_games.Count} games, {_repacks.Count} repacks, {_roms.Count} ROMs.");
+        GamesUpdated?.Invoke(new List<LocalGame>(_games));
+        RepacksUpdated?.Invoke(new List<LocalRepack>(_repacks));
+        RomsUpdated?.Invoke(new List<LocalRom>(_roms));
+    }
+
     private void SaveCache()
     {
         try
         {
             Directory.CreateDirectory(CacheDir);
+            File.WriteAllText(DriveCache, BuildDriveSignature());
             var opts = new JsonSerializerOptions { WriteIndented = true };
             File.WriteAllText(GameCache,   JsonSerializer.Serialize(_games,   opts));
             File.WriteAllText(RepackCache, JsonSerializer.Serialize(_repacks, opts));
