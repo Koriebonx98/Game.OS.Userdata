@@ -6324,14 +6324,19 @@ function _buildAchCard(ach) {
     // load correctly as CSS background-image sources.
     const safeImg = /^https:\/\//i.test(rawImg) ? _toRawUrl(rawImg).replace(/'/g, '') : '';
     const bgStyle = safeImg ? `style="background-image:url('${escapeHtml(safeImg)}')"` : '';
-    return `<div class="ach-card" ${bgStyle} title="${escapeHtml(rawName)}"
+    const unlockedAt = ach._unlockedAt || '';
+    const dateLabel  = unlockedAt ? _formatAchDate(unlockedAt) : '';
+    const stateStyle = ach._userKnown && !unlockedAt ? 'opacity:.45;filter:grayscale(.8);' : '';
+    return `<div class="ach-card" ${bgStyle.replace(/style="/, `style="${stateStyle}`) || (stateStyle ? `style="${stateStyle}"` : '')} title="${escapeHtml(rawName)}"
         data-ach-name="${escapeHtml(rawName)}"
         data-ach-desc="${escapeHtml(rawDesc)}"
         data-ach-img="${escapeHtml(safeImg)}"
+        data-ach-unlocked="${escapeHtml(dateLabel)}"
         onclick="_showAchievementDetail(this)">
         <div class="ach-card-overlay">
-            <div class="ach-card-name">${escapeHtml(rawName)}</div>
+            <div class="ach-card-name">${unlockedAt ? '🏆 ' : ach._userKnown ? '🔒 ' : ''}${escapeHtml(rawName)}</div>
             ${rawDesc ? `<div class="ach-card-desc">${escapeHtml(rawDesc)}</div>` : ''}
+            ${dateLabel ? `<div class="ach-card-desc">Unlocked ${escapeHtml(dateLabel)}</div>` : ''}
         </div>
     </div>`;
 }
@@ -6353,6 +6358,7 @@ function _showAchievementDetail(el) {
             <div class="ach-detail-body">
                 <div class="ach-detail-name">${escapeHtml(name)}</div>
                 ${desc ? `<div class="ach-detail-desc">${escapeHtml(desc)}</div>` : ''}
+                ${el.dataset.achUnlocked ? `<div class="ach-detail-desc">🏆 Unlocked ${escapeHtml(el.dataset.achUnlocked)}</div>` : ''}
             </div>
             <button class="ach-detail-close">Close</button>
         </div>`;
@@ -6371,7 +6377,8 @@ function _renderAchievementsContent(container, content, onlineItems) {
     const url    = container.dataset.achUrl || '';
     const countEl = container.querySelector('.ach-count');
     if (countEl) {
-        countEl.textContent = items.length || '';
+        const unlockedCount = items.filter(a => a._unlockedAt).length;
+        countEl.textContent = items.length ? (unlockedCount ? `${unlockedCount} / ${items.length}` : items.length) : '';
         countEl.style.display = items.length ? '' : 'none';
     }
     if (!items.length) {
@@ -6478,12 +6485,69 @@ async function _loadAchievementsInModal() {
             const resp = await fetch(rawUrl);
             if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
             const data = await resp.json();
-            _modalOnlineAchievements = Array.isArray(data) ? data : (data.Items || []);
+            _modalOnlineAchievements = Array.isArray(data) ? data : (data.Items || data.achievements || []);
         } catch (err) {
             console.error('[Achievements] Failed to load from', rawUrl, err);
         }
     }
+    // Show what we have right away, then overlay the user's real unlocks.
     _renderAchievementsContent(container, content, _modalOnlineAchievements);
+    try {
+        const merged = await _mergeUserAchievements(_modalOnlineAchievements);
+        if (merged && container.isConnected) {
+            _modalOnlineAchievements = merged;
+            _renderAchievementsContent(container, content, merged);
+        }
+    } catch (err) {
+        console.warn('[Achievements] Could not load user unlocks:', err);
+    }
+}
+
+/** Format an ISO unlock timestamp as a local date + time. */
+function _formatAchDate(iso) {
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? '' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+/**
+ * Fetch the signed-in user's synced achievements (accounts/{user}/achievements.json —
+ * written by the launcher when Steam emu / Steam API / ROM unlocks are detected) and
+ * overlay them on the game's full template. Result order: unlocked (newest first, with
+ * date/time), then every locked achievement.  Returns null when there is nothing to merge.
+ */
+async function _mergeUserAchievements(template) {
+    const user = getCurrentUser();
+    if (!user || !user.username || typeof githubRead !== 'function') return null;
+    const file = await githubRead(`accounts/${user.username.toLowerCase()}/achievements.json`);
+    const all  = file && Array.isArray(file.content) ? file.content : [];
+    const title    = String((_currentModalGame && (_currentModalGame.Title || _currentModalGame.game_name || _currentModalGame.title)) || '').toLowerCase();
+    const platform = String(_currentModalPlatform || '').toLowerCase();
+    if (!title) return null;
+    const mine = all.filter(a =>
+        String(a.gameTitle || '').toLowerCase() === title &&
+        (!a.platform || !platform || String(a.platform).toLowerCase() === platform) &&
+        a.unlockedAt && !String(a.unlockedAt).startsWith('1970-01-01'));
+    if (!mine.length) return null;
+
+    const items = template.map(t => ({ ...t, _userKnown: true }));
+    for (const u of mine) {
+        const uid = String(u.achievementId || '').toLowerCase();
+        const uname = String(u.name || '').toLowerCase();
+        const hit = items.find(t =>
+            (uid && String(t.achievementId || t.AchievementId || t.apiName || t.id || '').toLowerCase() === uid) ||
+            (uname && String(t.name || t.Name || '').toLowerCase() === uname));
+        if (hit) {
+            hit._unlockedAt = u.unlockedAt;
+        } else {
+            items.push({ name: u.name || u.achievementId, description: u.description || '',
+                         iconUrl: u.iconUrl || u.achievementIcon || '', _unlockedAt: u.unlockedAt, _userKnown: true });
+        }
+    }
+    const ts = a => a._unlockedAt ? new Date(a._unlockedAt).getTime() || 0 : -1;
+    return items
+        .map((a, i) => ({ a, i }))
+        .sort((x, y) => (ts(y.a) > 0) - (ts(x.a) > 0) || ts(y.a) - ts(x.a) || x.i - y.i)
+        .map(x => x.a);
 }
 
 function _getYouTubeId(urlOrId) {
