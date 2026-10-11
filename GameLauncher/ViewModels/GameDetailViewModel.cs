@@ -4321,12 +4321,25 @@ public partial class GameDetailViewModel : ViewModelBase
     private void RefreshVisibleAchievements()
     {
         VisibleAchievements.Clear();
+        // Always show unlocked achievements first (most recent on top) so live unlocks
+        // that mutate existing entries are reflected in both order and count label.
+        var ordered = Achievements
+            .Select(a => (Achievement: a,
+                          Dt: a.IsUnlocked &&
+                              DateTime.TryParse(a.UnlockedAt, null,
+                                  System.Globalization.DateTimeStyles.RoundtripKind, out var parsed)
+                              ? parsed : DateTime.MinValue))
+            .OrderByDescending(x => x.Achievement.IsUnlocked)
+            .ThenByDescending(x => x.Dt)
+            .Select(x => x.Achievement);
         var source = ShowAllAchievements
-            ? Achievements
-            : Achievements.Take(AchievementsPreviewCount);
+            ? ordered
+            : ordered.Take(AchievementsPreviewCount);
         foreach (var a in source)
             VisibleAchievements.Add(a);
         HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
+        if (HasAchievements)
+            AchievementsLabel = $"🏆  Achievements  ({Achievements.Count(a => a.IsUnlocked)} / {Achievements.Count})";
     }
 
     private void PopulateRegions(List<string>? regions)

@@ -824,6 +824,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         };
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
+
+        // Keep the Quick Menu achievements in sync when an unlock lands while it is open.
+        DetailVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(DetailVm.AchievementsLabel))
+                RefreshQuickMenuAchievementsLive();
+        };
         LoginVm.OnCachedAutoLogin = () => _ = Task.Run(async () =>
         {
             try { await TryReconnectAsync().ConfigureAwait(false); }
@@ -2025,6 +2032,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// Toggles the Quick Menu overlay (shown by Left Shift + Left Ctrl from the main window).
     /// Refreshes content before showing.
     /// </summary>
+    /// <summary>
+    /// Achievements to show in the Quick Menu: the detail view's full template when
+    /// loaded, otherwise the running/open game's library-cached achievements.
+    /// </summary>
+    private IReadOnlyList<Achievement> GetQuickMenuAchievements()
+    {
+        if (DetailVm.Achievements.Count > 0)
+            return DetailVm.Achievements.ToList();
+
+        var title = DetailVm.Title;
+        var platform = DetailVm.Platform;
+        var libEntry = _library?.FirstOrDefault(g =>
+            string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+            string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
+        return libEntry?.GameAchievements?.ToList() ?? new List<Achievement>();
+    }
+
+    private void RefreshQuickMenuAchievementsLive()
+    {
+        if (!ShowQuickMenu) return;
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (ShowQuickMenu)
+                QuickMenuVm.UpdateAchievements(GetQuickMenuAchievements());
+        });
+    }
+
     public void ToggleQuickMenu()
     {
         if (ShowQuickMenu)
@@ -2053,12 +2087,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             .ToList();
 
         // Achievement progress for current game
-        int unlocked = 0, total = 0;
-        if (DetailVm.HasAchievements)
-        {
-            unlocked = DetailVm.Achievements.Count(a => a.IsUnlocked);
-            total    = DetailVm.Achievements.Count;
-        }
+        var quickMenuAchs = GetQuickMenuAchievements();
+        int unlocked = quickMenuAchs.Count(a => a.IsUnlocked);
+        int total    = quickMenuAchs.Count;
 
         int unreadCount = InboxVm.PendingInvites.Count + InboxVm.Conversations.Count;
         string? lastMessage = InboxVm.Conversations
@@ -2080,7 +2111,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             lastMessage:           lastMessage,
             unlockedAchievements:  unlocked,
             totalAchievements:     total,
-            achievements:          DetailVm.Achievements,
+            achievements:          quickMenuAchs,
             recentGames:           DashboardVm.Ps5RecentGames.ToList(),
             activePageKey:         ActivePage,
             pendingDownloadCount:  LibraryVm.ReadyToInstall.Count,
