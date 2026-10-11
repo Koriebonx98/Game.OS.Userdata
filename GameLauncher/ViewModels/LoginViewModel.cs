@@ -79,7 +79,7 @@ public partial class LoginViewModel : ViewModelBase
     /// </summary>
     public async System.Threading.Tasks.Task TryAutoLoginAsync()
     {
-        var saved = _cache.GetRememberedSession();
+        var saved = await System.Threading.Tasks.Task.Run(() => _cache.GetRememberedSession());
         if (saved == null)
         {
             DevLogService.Log("[AutoLogin] No remembered session found — showing login form.");
@@ -122,7 +122,7 @@ public partial class LoginViewModel : ViewModelBase
 
             // Network/server unavailable — attempt offline login from cache
             DevLogService.Log($"[AutoLogin] Network/server unavailable — trying offline cache for '{saved.Username}'.");
-            var cached = _offlineCache.Load(saved.Username);
+            var cached = await System.Threading.Tasks.Task.Run(() => _offlineCache.Load(saved.Username));
             if (cached?.Profile != null && cached.Games != null && cached.Achievements != null)
             {
                 System.Diagnostics.Debug.WriteLine(
