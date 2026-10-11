@@ -2,9 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Game OS – Browse Games</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="Game OS">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0f172a">
+    <script src="pwa.js"></script>
 </head>
 <body>
     <div class="container" style="max-width:1000px;">
@@ -15,6 +23,7 @@
                 <a href="games.html" class="nav-link">🔍 Games</a>
                 <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
                 <a href="games.html?tab=wishlist" class="nav-link">⭐ Wishlist</a>
+                <a href="games.html?tab=favourites" class="nav-link">❤️ Favourites</a>
                 <div id="guestNav" style="display:inline;">
                     <a href="login.html" class="nav-link">Login</a>
                     <a href="signup.html" class="nav-link">Sign Up</a>
@@ -46,6 +55,7 @@
                 <button class="games-tab active" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
                 <button class="games-tab" id="tabOwned" onclick="switchTab('owned')">📚 My Library</button>
                 <button class="games-tab" id="tabWishlist" onclick="switchTab('wishlist')">⭐ Wishlist</button>
+                <button class="games-tab" id="tabFavourites" onclick="switchTab('favourites')">❤️ Favourites</button>
             </div>
 
             <!-- BROWSE TAB -->
@@ -83,6 +93,11 @@
                 <div id="wishlistMessage" class="message"></div>
                 <div id="wishlistGamesList"></div>
             </div>
+
+            <!-- FAVOURITES TAB -->
+            <div id="favouritesPanelWrap" style="display:none;">
+                <div id="favouritesGamesList"></div>
+            </div>
         </main>
 
         <footer>
@@ -92,6 +107,7 @@
     </div>
 
     <script src="script.js"></script>
+    <script src="favourites.js"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
     const PAGE_SIZE      = 100;  // max items rendered at once per view/group
@@ -125,6 +141,7 @@
         if (!loggedIn) {
             document.getElementById('tabOwned').style.display = 'none';
             document.getElementById('tabWishlist').style.display = 'none';
+            document.getElementById('tabFavourites').style.display = 'none';
             document.querySelectorAll('a[href="games.html?tab=library"]').forEach(el => el.style.display = 'none');
             document.querySelectorAll('a[href="games.html?tab=wishlist"]').forEach(el => el.style.display = 'none');
             // Show guest notice
@@ -136,6 +153,9 @@
         const params = new URLSearchParams(window.location.search);
         if (loggedIn && params.get('tab') === 'library') {
             switchTab('owned');
+        }
+        if (loggedIn && params.get('tab') === 'favourites') {
+            switchTab('favourites');
         }
         if (loggedIn && params.get('tab') === 'wishlist') {
             switchTab('wishlist');
@@ -294,6 +314,8 @@
         // accessing dataset.gameJson, so JSON.parse always receives valid JSON even for
         // game titles that contain single quotes, double quotes, or other special chars.
         const gameJsonAttr = escapeHtml(JSON.stringify(g));
+        const favUser      = _isLoggedIn ? getCurrentUser() : null;
+        const faved        = !!favUser && isFavourite(favUser.username, platform, g.Title || g.game_name || g.title || '');
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
         const coverIcon    = getPlatformIcon(platform);
@@ -318,6 +340,14 @@
             </button>`
             : '';
 
+        const favBtnHtml = _isLoggedIn
+            ? `<button class="btn-favourite ${faved ? 'btn-favourited' : ''}"
+                title="${faved ? 'Remove from Favourites' : 'Add to Favourites'}"
+                onclick="event.stopPropagation(); handleToggleFavourite(this.closest('.games-browse-item').dataset.gameJson, this.closest('.games-browse-item').dataset.platform)">
+                ${faved ? '❤️' : '🤍'}
+            </button>`
+            : '';
+
         return `
         <div class="games-browse-item clickable" data-game-json="${gameJsonAttr}" data-platform="${platEsc}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
             ${coverHtml}
@@ -325,6 +355,7 @@
                 <span class="games-browse-title">${title}</span>
                 ${titleId ? `<span class="games-browse-id">${escapeHtml(String(titleId))}</span>` : ''}
             </div>
+            ${favBtnHtml}
             ${wishlistBtnHtml}
             ${addBtnHtml}
         </div>`;
@@ -619,6 +650,62 @@
         }
     }
 
+    // ── Favourites Tab ─────────────────────────────────────────
+    function rerenderBrowse() {
+        if (_currentPlatform === 'ALL') {
+            renderBrowseGamesGrouped(_allPlatformGames, document.getElementById('browseSearch').value);
+        } else if (_allBrowseGames.length) {
+            renderBrowseGames(_allBrowseGames);
+        }
+    }
+
+    function handleToggleFavourite(gameJson, platform) {
+        const user = getCurrentUser();
+        if (!user) { window.location.href = 'login.html'; return; }
+        let game;
+        try { game = JSON.parse(gameJson); } catch (_) { return; }
+        toggleFavourite(user.username, game, platform || _currentPlatform);
+        renderFavouriteGames();
+        rerenderBrowse();
+    }
+
+    function handleRemoveFavourite(platform, title) {
+        const user = getCurrentUser();
+        if (!user) return;
+        toggleFavourite(user.username, { title }, platform);
+        renderFavouriteGames();
+        rerenderBrowse();
+    }
+
+    function renderFavouriteGames() {
+        const user   = getCurrentUser();
+        const listEl = document.getElementById('favouritesGamesList');
+        const favs   = user ? getFavourites(user.username) : [];
+        if (favs.length === 0) {
+            listEl.innerHTML = '<p class="games-list-empty">No favourites yet. Browse games and tap 🤍 to add your favourites!</p>';
+            return;
+        }
+        listEl.innerHTML = favs.map(g => {
+            const plat = g.platform || '';
+            const coverHtml = g.coverUrl
+                ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(g.coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
+                : `<div class="game-cover-icon" style="background:${getPlatformColor(plat)};">${getPlatformIcon(plat)}</div>`;
+            return `
+            <div class="games-browse-item clickable" data-platform="${escapeHtml(plat)}" data-title="${escapeHtml(g.title || '')}"
+                 onclick="openGameModalFromLibrary(this.dataset.title, this.dataset.platform, '${escapeHtml(String(g.titleId || ''))}')">
+                ${coverHtml}
+                <div class="games-browse-info">
+                    <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
+                    <span class="games-browse-id">${escapeHtml(plat)}</span>
+                </div>
+                <button class="btn-remove-game"
+                    onclick="event.stopPropagation(); handleRemoveFavourite(this.closest('.games-browse-item').dataset.platform, this.closest('.games-browse-item').dataset.title)">
+                    💔 Remove
+                </button>
+            </div>`;
+        }).join('');
+    }
+
     // ── Wishlist Tab ───────────────────────────────────────────
     async function refreshWishlist() {
         const user = getCurrentUser();
@@ -747,11 +834,14 @@
         document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse');
         document.getElementById('tabOwned').classList.toggle('active', tab === 'owned');
         document.getElementById('tabWishlist').classList.toggle('active', tab === 'wishlist');
+        document.getElementById('tabFavourites').classList.toggle('active', tab === 'favourites');
+        document.getElementById('favouritesPanelWrap').style.display = tab === 'favourites' ? '' : 'none';
         document.getElementById('browsePanelWrap').style.display  = tab === 'browse'   ? '' : 'none';
         document.getElementById('ownedPanelWrap').style.display   = tab === 'owned'    ? '' : 'none';
         document.getElementById('wishlistPanelWrap').style.display = tab === 'wishlist' ? '' : 'none';
         if (tab === 'owned')    refreshOwnedGames();
         if (tab === 'wishlist') refreshWishlist();
+        if (tab === 'favourites') renderFavouriteGames();
     }
     </script>
 </body>
