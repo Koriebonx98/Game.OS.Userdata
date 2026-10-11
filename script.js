@@ -6105,12 +6105,15 @@ function _updateModalFavouriteBtn(title, platform, game) {
     const btn  = document.getElementById('gameModalFavouriteBtn');
     if (!wrap || !btn) return;
     const user = isLoggedIn() ? getCurrentUser() : null;
-    if (!user || typeof isFavourite !== 'function') { wrap.style.display = 'none'; return; }
+    const favFn = (typeof globalThis !== 'undefined' && typeof globalThis.isFavourite === 'function')
+        ? globalThis.isFavourite
+        : null;
+    if (!user || typeof favFn !== 'function') { wrap.style.display = 'none'; return; }
     wrap.style.display = '';
     btn.dataset.title    = title    || '';
     btn.dataset.platform = platform || '';
     btn.dataset.gameJson = game ? JSON.stringify(game) : '';
-    const faved = isFavourite(user.username, platform, title);
+    const faved = favFn(user.username, platform, title);
     btn.textContent = faved ? '❤️' : '🤍';
     btn.title = faved ? 'Remove from Favourites' : 'Add to Favourites';
     btn.classList.toggle('btn-wishlisted', faved);
