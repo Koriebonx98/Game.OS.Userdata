@@ -6100,12 +6100,12 @@ async function _adminScrapeSteamNow() {
 // GAME DETAIL MODAL
 // ============================================================
 
-function _updateModalFavBtn(title, platform, game) {
-    const wrap = document.getElementById('gameModalFavWrap');
-    const btn  = document.getElementById('gameModalFavBtn');
+function _updateModalFavouriteBtn(title, platform, game) {
+    const wrap = document.getElementById('gameModalFavouriteWrap');
+    const btn  = document.getElementById('gameModalFavouriteBtn');
     if (!wrap || !btn) return;
     const user = isLoggedIn() ? getCurrentUser() : null;
-    if (!user) { wrap.style.display = 'none'; return; }
+    if (!user || typeof isFavourite !== 'function') { wrap.style.display = 'none'; return; }
     wrap.style.display = '';
     btn.dataset.title    = title    || '';
     btn.dataset.platform = platform || '';
@@ -6119,46 +6119,16 @@ function _updateModalFavBtn(title, platform, game) {
 function handleModalFavourite() {
     const user = getCurrentUser();
     if (!user) { window.location.href = 'login.html'; return; }
-    const btn = document.getElementById('gameModalFavBtn');
+    const btn = document.getElementById('gameModalFavouriteBtn');
     if (!btn) return;
-    const title = btn.dataset.title || '', platform = btn.dataset.platform || '';
+    const title    = btn.dataset.title    || '';
+    const platform = btn.dataset.platform || '';
     if (!title || !platform) return;
-    let game = {};
-    try { game = btn.dataset.gameJson ? JSON.parse(btn.dataset.gameJson) : {}; } catch (_) { game = {}; }
-    if (!game.title && !game.Title) game.title = title;
-    const now = toggleFavourite(user.username, game, platform);
-    btn.textContent = now ? '❤️' : '🤍';
-    btn.title = now ? 'Remove from Favourites' : 'Add to Favourites';
-    btn.classList.toggle('btn-wishlisted', now);
+    let game = { title };
+    try { if (btn.dataset.gameJson) game = JSON.parse(btn.dataset.gameJson); } catch (_) {}
+    toggleFavourite(user.username, game, platform);
+    _updateModalFavouriteBtn(title, platform, game);
     if (typeof renderFavouriteGames === 'function') renderFavouriteGames();
-    if (typeof _currentPlatform !== 'undefined') {
-        if (_currentPlatform === 'ALL' && typeof _allPlatformGames !== 'undefined') {
-            renderBrowseGamesGrouped(_allPlatformGames, document.getElementById('browseSearch').value);
-        } else if (_allBrowseGames.length) {
-            renderBrowseGames(_allBrowseGames);
-        }
-    }
-}
-
-function _updateModalWishlistBtn(title, platform, game) {
-    const wrap = document.getElementById('gameModalWishlistWrap');
-    const btn  = document.getElementById('gameModalWishlistBtn');
-    if (!wrap || !btn) return;
-    if (!isLoggedIn()) { wrap.style.display = 'none'; return; }
-    wrap.style.display = '';
-    btn.dataset.title    = title    || '';
-    btn.dataset.platform = platform || '';
-    btn.dataset.gameJson = game ? JSON.stringify(game) : '';
-    const wl = (typeof _myWishlist !== 'undefined') ? _myWishlist : [];
-    const titleLower    = (title    || '').toLowerCase();
-    const platformLower = (platform || '').toLowerCase();
-    const wishlisted = wl.some(
-        w => (w.platform || '').toLowerCase() === platformLower && (w.title || '').toLowerCase() === titleLower
-    );
-    btn.textContent = wishlisted ? '⭐' : '☆';
-    btn.title = wishlisted ? 'Remove from Wishlist' : 'Add to Wishlist';
-    btn.classList.toggle('btn-wishlisted', wishlisted);
-    btn.disabled = false;
 }
 
 async function handleModalWishlist() {
@@ -6238,11 +6208,11 @@ function ensureGameModal() {
                         <h3 class="game-modal-title" id="gameModalTitle"></h3>
                         <p class="game-modal-platform" id="gameModalPlatform"></p>
                     </div>
-                    <div id="gameModalFavWrap" style="display:none;margin-left:auto;">
-                        <button class="btn-modal-wishlist" id="gameModalFavBtn" onclick="handleModalFavourite()" title="Add to Favourites">🤍</button>
-                    </div>
-                    <div id="gameModalWishlistWrap" style="display:none;margin-left:4px;">
+                    <div id="gameModalWishlistWrap" style="display:none;margin-left:auto;">
                         <button class="btn-modal-wishlist" id="gameModalWishlistBtn" onclick="handleModalWishlist()" title="Add to Wishlist">☆</button>
+                    </div>
+                    <div id="gameModalFavouriteWrap" style="display:none;margin-left:4px;">
+                        <button class="btn-modal-wishlist" id="gameModalFavouriteBtn" onclick="handleModalFavourite()" title="Add to Favourites">🤍</button>
                     </div>
                     <div id="gameModalEditWrap" style="display:none;margin-left:4px;">
                         <button class="btn-modal-edit" id="gameModalEditBtn" onclick="openAdminEditModal()" title="Edit game data (Admin)">✏️ Edit</button>
@@ -6665,7 +6635,7 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalPlatform').textContent = platform || '';
 
     _updateModalWishlistBtn(title, platform, game);
-    _updateModalFavBtn(title, platform, game);
+    _updateModalFavouriteBtn(title, platform, game);
     _updateModalEditBtn();
 
     const bgUrls    = getGameBackgroundUrls(game);
@@ -6703,7 +6673,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
     document.getElementById('gameModalBody').innerHTML =
         '<p style="color:#666;font-size:0.9em;">⏳ Loading game details…</p>';
     _updateModalWishlistBtn(title, platform, null);
-    _updateModalFavBtn(title, platform, null);
+    _updateModalFavouriteBtn(title, platform, null);
     _updateModalEditBtn();
     modal.style.display = 'flex';
 
@@ -6726,7 +6696,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
             }
             // Update wishlist button with full game data once loaded
             _updateModalWishlistBtn(title, platform, game);
-            _updateModalFavBtn(title, platform, game);
+            _updateModalFavouriteBtn(title, platform, game);
             _updateModalEditBtn();
         }
 
