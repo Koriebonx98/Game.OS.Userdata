@@ -106,7 +106,7 @@
         </footer>
     </div>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=fav2"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
     const PAGE_SIZE      = 100;  // max items rendered at once per view/group
@@ -314,7 +314,7 @@
         // game titles that contain single quotes, double quotes, or other special chars.
         const gameJsonAttr = escapeHtml(JSON.stringify(g));
         const favUser      = _isLoggedIn ? getCurrentUser() : null;
-        const faved        = !!favUser && isFavourite(favUser.username, platform, g.Title || g.game_name || g.title || '');
+        const faved        = !!favUser && typeof isFavourite === 'function' && isFavourite(favUser.username, platform, g.Title || g.game_name || g.title || '');
         const platEsc      = escapeHtml(platform);
         const coverColor   = getPlatformColor(platform);
         const coverIcon    = getPlatformIcon(platform);
