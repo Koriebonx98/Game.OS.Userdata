@@ -131,7 +131,7 @@
                 ? `<img src="${esc(g.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`
                 : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
             const pt = minutesOf(g), ac = achOf(g);
-            return `<div class="app-row" ${g.title && g.platform != null && !g._noOpen ? `data-open-p="${esc(g.platform)}" data-open-t="${esc(g.title)}"` : ''}><div class="app-cover">${cover}</div>
+            return `<div class="app-row" ${g.title && g.platform != null && !g._noOpen ? `data-open-p="${esc(g.platform)}" data-open-t="${esc(g.title)}"${g._owner ? ' data-open-f="' + esc(g._owner) + '"' : ''}` : ''}><div class="app-cover">${cover}</div>
                 <div class="app-row-info"><b>${esc(g.title)}</b>
                 <small>${esc(g.platform)}${pt ? ' · ⏱ ' + fmtPlaytime(pt) : ''}${ac ? ' · 🏆 ' + ac : ''}</small></div>${extra || ''}</div>`;
         }
@@ -179,7 +179,24 @@
             const recent = [...library].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')).slice(0, 5);
             $('recentList').innerHTML = recent.length ? recent.map(g => row(g)).join('') : empty('Your library is empty.');
         }
-        function findGame(p, t) { return library.find(g => g.title === t && g.platform === p); }
+        function findGame(p, t, f) {
+            const inLib = l => (l || []).find(g => g.title === t && g.platform === p);
+            return inLib(library) || (f && inLib(friendLibs[f])) || inLib(getFavourites(user.username)) || { title: t, platform: p };
+        }
+        function openFromEvent(e) {
+            if (e.target.closest('.app-fav')) return false;
+            const r = e.target.closest('[data-open-t]');
+            if (!r) return false;
+            openGame(findGame(r.dataset.openP, r.dataset.openT, r.dataset.openF));
+            return true;
+        }
+        async function loadWishlist(f) {
+            try {
+                if (MODE === 'demo') return getDemoWishlist(f);
+                const file = await githubRead('accounts/' + f.toLowerCase() + '/wishlist.json');
+                return file && Array.isArray(file.content) ? file.content : [];
+            } catch (_) { return []; }
+        }
         const asDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
         async function loadGameAchievements(g) {
             let tpl = [];
@@ -266,12 +283,20 @@
             const pt = lib.reduce((n, g) => n + minutesOf(g), 0);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover"><span>👤</span></div><div><h2>${esc(f)}</h2><small>🎮 ${lib.length} games</small><small>⏱ ${fmtPlaytime(pt)} played</small></div></div>
                 <button class="btn app-more" id="friendChat">💬 Message</button>
-                <h2 class="app-h2">Recent games</h2><div id="frGames" class="app-list"></div>
-                <h2 class="app-h2">🏆 Recent achievements</h2><div id="frAch"><p class="games-list-empty">Loading…</p></div>`;
+                <div class="app-filters app-fr-tabs"><button class="btn app-more" data-frtab="games">🎮 Games</button><button class="btn app-more" data-frtab="wish">⭐ Wishlist</button><button class="btn app-more" data-frtab="ach">🏆 Achievements</button></div>
+                <div id="frGames" class="app-list"></div>
+                <div id="frWish" class="app-list" hidden><p class="games-list-empty">Loading…</p></div>
+                <div id="frAch" hidden><p class="games-list-empty">Loading…</p></div>`;
+            const frTab = t => { [['games', 'frGames'], ['wish', 'frWish'], ['ach', 'frAch']].forEach(([k, id]) => $(id).hidden = k !== t); };
+            $('detailBody').querySelectorAll('[data-frtab]').forEach(b => b.onclick = () => frTab(b.dataset.frtab));
+            loadWishlist(f).then(w => {
+                if ($('gameDetail').hidden) return;
+                $('frWish').innerHTML = w.length ? w.map(g => row({ title: g.title, platform: g.platform, coverUrl: g.coverUrl || g.cover, _owner: f })).join('') : empty('Wishlist is empty.');
+            });
             $('gameDetail').hidden = false;
             $('friendChat').onclick = () => { $('gameDetail').hidden = true; showView('chats'); openChat(f); };
-            const recent = [...lib].sort((a, b) => (b.lastPlayed || b.addedAt || '').localeCompare(a.lastPlayed || a.addedAt || '')).slice(0, 5);
-            $('frGames').innerHTML = recent.length ? recent.map(g => row({ ...g, _noOpen: true })).join('') : empty('No games yet.');
+            const recent = [...lib].sort((a, b) => (b.lastPlayed || b.addedAt || '').localeCompare(a.lastPlayed || a.addedAt || ''));
+            $('frGames').innerHTML = recent.length ? recent.map(g => row({ ...g, _owner: f })).join('') : empty('No games yet.');
             let ach = [];
             try {
                 const file = MODE === 'demo' ? null : await githubRead('accounts/' + f.toLowerCase() + '/achievements.json');
@@ -279,7 +304,7 @@
             } catch (_) {}
             if ($('gameDetail').hidden) return;
             ach.sort((a, b) => String(b.unlockedAt).localeCompare(String(a.unlockedAt)));
-            $('frAch').innerHTML = ach.length ? `<small style="color:var(--text-muted)">${ach.length} unlocked in total</small>` + ach.slice(0, 10).map(a => {
+            $('frAch').innerHTML = ach.length ? `<small style="color:var(--text-muted)">${ach.length} unlocked in total</small>` + ach.slice(0, 50).map(a => {
                 const ic = a.iconUrl || a.achievementIcon || '';
                 const img = /^https:\/\//i.test(ic) ? `style="background-image:url('${esc(ic.replace(/'/g, ''))}')"` : '';
                 return `<div class="app-ach"><div class="app-ach-icon" ${img}>${img ? '' : '🏆'}</div><div><b>${esc(a.name || a.achievementId || 'Achievement')}</b><small>${esc(a.gameTitle || '')}</small><small>Unlocked ${esc(asDate(a.unlockedAt))}</small></div></div>`;
@@ -431,14 +456,11 @@
             $('achSheetClose').onclick = () => { $('achSheet').hidden = true; };
             $('achSheet').addEventListener('click', e => { if (e.target === $('achSheet')) $('achSheet').hidden = true; });
             document.addEventListener('click', e => { const r = e.target.closest('.app-friend-row'); if (r) openFriend(r.dataset.fr); });
+            $('detailBody').addEventListener('click', e => { if (!e.target.closest('.app-friend-row')) openFromEvent(e); });
             $('detailBack').onclick = () => { $('gameDetail').hidden = true; };
             document.querySelector('.app-main').addEventListener('click', e => {
                 const b = e.target.closest('.app-fav');
-                if (!b) {
-                    const r = e.target.closest('[data-open-t]');
-                    if (r) { const g = findGame(r.dataset.openP, r.dataset.openT); if (g) openGame(g); }
-                    return;
-                }
+                if (!b) { openFromEvent(e); return; }
                 toggleFavourite(user.username, { title: b.dataset.t, coverUrl: (library.find(g => g.title === b.dataset.t && g.platform === b.dataset.p) || {}).coverUrl }, b.dataset.p);
                 renderAll();
             });
