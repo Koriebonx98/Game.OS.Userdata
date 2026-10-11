@@ -52,6 +52,11 @@
         </section>
     </main>
 
+    <div id="gameDetail" class="app-detail" hidden>
+        <div class="app-detail-bar"><button id="detailBack">‹ Back</button></div>
+        <div id="detailBody" class="app-detail-body"></div>
+    </div>
+
     <nav class="app-tabbar">
         <button data-view="home" class="active"><span>🏠</span>Home</button>
         <button data-view="library"><span>📚</span>Library</button>
@@ -85,7 +90,7 @@
                 ? `<img src="${esc(g.coverUrl)}" alt="" loading="lazy" onerror="this.style.display='none'">`
                 : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
             const pt = minutesOf(g), ac = achOf(g);
-            return `<div class="app-row"><div class="app-cover">${cover}</div>
+            return `<div class="app-row" ${g.title && g.platform != null && !g._noOpen ? `data-open-p="${esc(g.platform)}" data-open-t="${esc(g.title)}"` : ''}><div class="app-cover">${cover}</div>
                 <div class="app-row-info"><b>${esc(g.title)}</b>
                 <small>${esc(g.platform)}${pt ? ' · ⏱ ' + fmtPlaytime(pt) : ''}${ac ? ' · 🏆 ' + ac : ''}</small></div>${extra || ''}</div>`;
         }
@@ -115,6 +120,53 @@
             $('statAch').textContent = library.reduce((n, g) => n + achOf(g), 0);
             const recent = [...library].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')).slice(0, 5);
             $('recentList').innerHTML = recent.length ? recent.map(g => row(g)).join('') : empty('Your library is empty.');
+        }
+        function findGame(p, t) { return library.find(g => g.title === t && g.platform === p); }
+        const asDate = iso => { const d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }); };
+        async function loadGameAchievements(g) {
+            let tpl = [];
+            if (g.achievementsUrl && /^https:\/\//i.test(g.achievementsUrl)) {
+                try {
+                    const r = await fetch(g.achievementsUrl.replace(/^https:\/\/github\.com\/([^/]+\/[^/]+)\/blob\//, 'https://raw.githubusercontent.com/$1/'));
+                    const d = await r.json();
+                    tpl = Array.isArray(d) ? d : (d.Items || d.achievements || []);
+                } catch (_) {}
+            }
+            let mine = [];
+            try {
+                const f = MODE === 'demo' ? null : await githubRead('accounts/' + user.username.toLowerCase() + '/achievements.json');
+                const all = f && Array.isArray(f.content) ? f.content : [];
+                mine = all.filter(a => String(a.gameTitle || '').toLowerCase() === String(g.title || '').toLowerCase()
+                    && (!a.platform || !g.platform || String(a.platform).toLowerCase() === String(g.platform).toLowerCase())
+                    && a.unlockedAt && !String(a.unlockedAt).startsWith('1970-01-01'));
+            } catch (_) {}
+            const items = tpl.map(t => ({ name: t.Name || t.name || '', desc: t.Description || t.description || '', icon: t.iconUrl || t.UrlUnlocked || t.image || '', id: String(t.achievementId || t.apiName || t.id || '').toLowerCase(), at: '' }));
+            mine.forEach(u => {
+                const id = String(u.achievementId || '').toLowerCase(), nm = String(u.name || '').toLowerCase();
+                const hit = items.find(t => (id && t.id === id) || (nm && t.name.toLowerCase() === nm));
+                if (hit) { hit.at = u.unlockedAt; if (!hit.icon) hit.icon = u.iconUrl || ''; }
+                else items.push({ name: u.name || u.achievementId || 'Achievement', desc: u.description || '', icon: u.iconUrl || u.achievementIcon || '', id, at: u.unlockedAt });
+            });
+            const ts = a => a.at ? new Date(a.at).getTime() || 0 : -1;
+            return items.sort((x, y) => (ts(y) > 0) - (ts(x) > 0) || ts(y) - ts(x));
+        }
+        async function openGame(g) {
+            const cover = g.coverUrl ? `<img src="${esc(g.coverUrl)}" alt="" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
+            const pt = minutesOf(g);
+            $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
+                <small>${esc(g.platform)}</small>${pt ? `<small>⏱ ${fmtPlaytime(pt)} played</small>` : ''}${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>`;
+            $('gameDetail').hidden = false;
+            const items = await loadGameAchievements(g);
+            if ($('gameDetail').hidden) return;
+            const done = items.filter(a => a.at).length;
+            $('detailAch').innerHTML = items.length
+                ? `<small style="color:var(--text-muted)">${done} / ${items.length} unlocked</small><div class="app-ach-progress"><div style="width:${Math.round(done / items.length * 100)}%"></div></div>` +
+                  items.map(a => {
+                      const img = /^https:\/\//i.test(a.icon) ? `style="background-image:url('${esc(a.icon.replace(/'/g, ''))}')"` : '';
+                      return `<div class="app-ach ${a.at ? '' : 'locked'}"><div class="app-ach-icon" ${img}>${img ? '' : (a.at ? '🏆' : '🔒')}</div><div><b>${esc(a.name)}</b>${a.desc ? `<small>${esc(a.desc)}</small>` : ''}${a.at ? `<small>Unlocked ${esc(asDate(a.at))}</small>` : ''}</div></div>`;
+                  }).join('')
+                : empty('No achievements synced for this game yet.');
         }
         function renderAll() { renderHome(); renderLibrary(); renderFavs(); }
 
@@ -270,9 +322,14 @@
                 window.scrollTo(0, 0);
             });
             $('libSearch').addEventListener('input', renderLibrary);
+            $('detailBack').onclick = () => { $('gameDetail').hidden = true; };
             document.querySelector('.app-main').addEventListener('click', e => {
                 const b = e.target.closest('.app-fav');
-                if (!b) return;
+                if (!b) {
+                    const r = e.target.closest('[data-open-t]');
+                    if (r) { const g = findGame(r.dataset.openP, r.dataset.openT); if (g) openGame(g); }
+                    return;
+                }
                 toggleFavourite(user.username, { title: b.dataset.t, coverUrl: (library.find(g => g.title === b.dataset.t && g.platform === b.dataset.p) || {}).coverUrl }, b.dataset.p);
                 renderAll();
             });
