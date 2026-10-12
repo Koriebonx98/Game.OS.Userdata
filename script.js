@@ -3856,15 +3856,34 @@ async function _scrapeExophaseClientSide(exophaseUrl) {
         html = await resp.text();
     } catch (_directErr) {
         // Direct fetch blocked by CORS — retry via a public CORS proxy.
-        try {
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(exophaseUrl)}`;
-            const resp = await fetch(proxyUrl);
-            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-            html = await resp.text();
-            usedProxy = true;
-        } catch (proxyErr) {
+        const enc = encodeURIComponent(exophaseUrl);
+        const proxies = [
+            `https://api.allorigins.win/raw?url=${enc}`,
+            `https://corsproxy.io/?${enc}`,
+            `https://api.codetabs.com/v1/proxy?quest=${enc}`,
+            `https://thingproxy.freeboard.io/fetch/${exophaseUrl}`,
+        ];
+        const errors = [];
+        for (const proxyUrl of proxies) {
+            try {
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => ctrl.abort(), 15000);
+                let resp;
+                try { resp = await fetch(proxyUrl, { signal: ctrl.signal }); }
+                finally { clearTimeout(timer); }
+                if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+                const text = await resp.text();
+                if (!text || !_parseExophaseHtml(text).length) throw new Error('no achievements in response');
+                html = text;
+                usedProxy = true;
+                break;
+            } catch (proxyErr) {
+                errors.push(`${new URL(proxyUrl).hostname}: ${proxyErr.message}`);
+            }
+        }
+        if (html === undefined) {
             throw new Error(
-                `Could not fetch the Exophase page (direct and proxy both failed): ${proxyErr.message}.`
+                `Could not fetch the Exophase page (direct and all proxies failed): ${errors.join('; ')}.`
             );
         }
     }
