@@ -67,12 +67,12 @@
         </section>
         <section id="view-friends" class="app-view" hidden>
             <div id="notifBox" class="app-card"></div>
-            <h2 class="app-h2">Inbox</h2>
-            <div id="alertList" class="app-list"></div>
-            <h2 class="app-h2">Friends</h2>
+            <div class="app-fr-head"><h2 class="app-h2">Friends</h2><button class="btn app-more" id="addFriendBtn">➕ Add</button></div>
+            <form id="addFriendForm" class="app-chat-form" hidden><input id="addFriendInput" type="text" placeholder="Username…" autocomplete="off" autocapitalize="none"><button class="btn" type="submit">Add</button></form>
+            <small id="addFriendMsg" class="app-count"></small>
+            <div id="reqList" class="app-list"></div>
             <div id="chatList" class="app-list"></div>
-            <h2 class="app-h2" id="frActH">Friend achievements</h2>
-            <div id="friendActivity" class="app-list"></div>
+            <div id="alertList" hidden></div><div id="friendActivity" hidden></div>
             <div id="chatPane" class="app-chat" hidden>
                 <div class="app-chat-head"><button id="chatBack" class="app-fav">‹</button><b id="chatWith"></b></div>
                 <div id="chatMsgs" class="app-chat-msgs"></div>
@@ -295,17 +295,7 @@
             renderFriends();
             Promise.all(friends.map(async f => { friendAch[f] = await loadAchFor(f); })).then(renderFriends);
         }
-        function renderFriends() {
-            renderChats(lastUnread);
-            const feed = [];
-            friends.forEach(f => (friendAch[f] || []).forEach(a => feed.push({ f, a })));
-            feed.sort((x, y) => String(y.a.unlockedAt).localeCompare(String(x.a.unlockedAt)));
-            $('friendActivity').innerHTML = feed.length ? feed.slice(0, 20).map(({ f, a }) => {
-                const ic = a.iconUrl || a.achievementIcon || '';
-                const img = /^https:\/\//i.test(ic) ? `style="background-image:url('${esc(ic.replace(/'/g, ''))}')"` : '';
-                return `<div class="app-ach"><div class="app-ach-icon" ${img}>${img ? '' : '🏆'}</div><div><b>${esc(f)} unlocked ${esc(a.name || a.achievementId || 'an achievement')}</b><small>${esc(a.gameTitle || '')}</small><small>${esc(asDate(a.unlockedAt))}</small></div></div>`;
-            }).join('') : empty(friends.length ? 'No friend achievements yet.' : 'Add friends on the site to see their achievements.');
-        }
+        function renderFriends() { renderChats(lastUnread); }
         async function openFriend(f) {
             returnFriend = null;
             const lib = friendLibs[f] || [];
@@ -334,11 +324,30 @@
             const ach = [...(friendAch[f] || [])];
             if ($('gameDetail').hidden) return;
             ach.sort((a, b) => String(b.unlockedAt).localeCompare(String(a.unlockedAt)));
-            $('frAch').innerHTML = ach.length ? `<small style="color:var(--text-muted)">${ach.length} unlocked in total</small>` + ach.slice(0, 50).map(a => {
-                const ic = a.iconUrl || a.achievementIcon || '';
-                const img = /^https:\/\//i.test(ic) ? `style="background-image:url('${esc(ic.replace(/'/g, ''))}')"` : '';
-                return `<div class="app-ach"><div class="app-ach-icon" ${img}>${img ? '' : '🏆'}</div><div><b>${esc(a.name || a.achievementId || 'Achievement')}</b><small>${esc(a.gameTitle || '')}</small><small>Unlocked ${esc(asDate(a.unlockedAt))}</small></div></div>`;
-            }).join('') : empty('No achievements to show.');
+            const groups = {};
+            ach.forEach(a => { const k = (a.gameTitle || 'Unknown') + '|' + (a.platform || ''); (groups[k] = groups[k] || { title: a.gameTitle || 'Unknown', platform: a.platform || '', n: 0 }).n++; });
+            const gl = Object.values(groups).sort((x, y) => y.n - x.n);
+            $('frAch').innerHTML = gl.length ? `<small style="color:var(--text-muted)">${ach.length} unlocked in total · tap a game to compare</small><div class="app-list">` + gl.map(g =>
+                `<div class="app-row" data-cmp-t="${esc(g.title)}" data-cmp-p="${esc(g.platform)}"><div class="app-cover"><span>🏆</span></div><div class="app-row-info"><b>${esc(g.title)}</b><small>${g.n} unlocked by ${esc(f)} · ⚖️ Compare</small></div></div>`).join('') + '</div>' : empty('No achievements to show.');
+            $('frAch').onclick = e => { const r = e.target.closest('[data-cmp-t]'); if (r) compareGame(f, r.dataset.cmpT, r.dataset.cmpP); };
+        }
+        async function compareGame(f, title, platform) {
+            const base = findGame(platform, title, f) || { title, platform };
+            $('achSheetTitle').textContent = '⚖️ ' + title;
+            $('achSheetBody').innerHTML = '<p class="games-list-empty">Loading…</p>';
+            $('achSheet').hidden = false;
+            const [mine, theirs] = await Promise.all([loadGameAchievements({ ...base, _owner: undefined }), loadGameAchievements({ ...base, _owner: f })]);
+            const key = a => (a.id || a.name || '').toLowerCase();
+            const mm = new Map(mine.map(a => [key(a), a]));
+            const all = [...theirs];
+            mine.forEach(a => { if (!theirs.some(t => key(t) === key(a))) all.push({ ...a, at: '' }); });
+            const mAt = a => (mm.get(key(a)) || {}).at, tAt = a => (theirs.find(t => key(t) === key(a)) || {}).at;
+            const myN = all.filter(mAt).length, thN = all.filter(tAt).length;
+            const mark = at => at ? '✅' : '🔒';
+            $('achSheetBody').innerHTML = `<div class="app-cmp-head"><span>You: ${myN}/${all.length}</span><span>${esc(f)}: ${thN}/${all.length}</span></div>` + (all.length ? all.map(a => {
+                const img = /^https:\/\//i.test(a.icon || '') ? `style="background-image:url('${esc(a.icon.replace(/'/g, ''))}')"` : '';
+                return `<div class="app-ach"><div class="app-ach-icon" ${img}>${img ? '' : '🏆'}</div><div><b>${esc(a.name)}</b>${a.desc ? `<small>${esc(a.desc)}</small>` : ''}<small>You ${mark(mAt(a))}${mAt(a) ? ' ' + esc(asDate(mAt(a))) : ''} · ${esc(f)} ${mark(tAt(a))}${tAt(a) ? ' ' + esc(asDate(tAt(a))) : ''}</small></div></div>`;
+            }).join('') : empty('No achievements to compare.'));
         }
         // ── Store (browse Games.Database and add to library) ──
         let storeGames = [], storePlat = '';
@@ -435,7 +444,7 @@
                     items.unshift({ icon: '🏆', t: 'Achievement unlocked', s: d + ' new achievement' + (d > 1 ? 's' : '') });
                 }
                 store(seenKey, next);
-                alertItems = items; renderChats(unread); renderFriends();
+                alertItems = items; renderReqs(reqs.map(nameOf)); renderChats(unread); renderFriends();
                 $('alertList').innerHTML = items.length ? items.map(i => `<div class="app-row"><div class="app-cover"><span>${i.icon}</span></div><div class="app-row-info"><b>${esc(i.t)}</b><small>${esc(i.s)}</small></div></div>`).join('') : empty('No new alerts.');
                 const cb = $('alertBadge'); const nb = items.length; cb.hidden = !nb; cb.textContent = nb;
                 if (push) fresh.forEach(f => notify(f[0], f[1], f[2]));
@@ -445,8 +454,26 @@
             lastUnread = unread || {};
             $('chatList').innerHTML = friends.length ? friends.map(f => {
                 const u = (unread && unread[f]) || {};
-                return `<div class="app-row app-chat-row" data-f="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${esc(u.last ? u.last.text : 'Say hi!')}${friendAch[f] ? ' · 🏆 ' + friendAch[f].length : ''}</small></div>${u.n ? `<span class="app-pill">${u.n}</span>` : ''}<button class="app-fav app-friend-row" data-fr="${esc(f)}" aria-label="View ${esc(f)}">👤</button></div>`;
-            }).join('') : empty('Add friends on the site to start chatting.');
+                return `<div class="app-row app-friend-row" data-fr="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${(friendLibs[f] || []).length} games${friendAch[f] ? ' · 🏆 ' + friendAch[f].length : ''}</small></div>${u.n ? `<span class="app-pill">${u.n}</span>` : ''}</div>`;
+            }).join('') : empty('No friends yet. Tap Add to find some.');
+        }
+        function renderReqs(reqs) {
+            $('reqList').innerHTML = reqs.map(n => `<div class="app-row"><div class="app-cover"><span>👥</span></div><div class="app-row-info"><b>${esc(n)}</b><small>Friend request</small></div><button class="btn app-more" data-accept="${esc(n)}">Accept</button></div>`).join('');
+        }
+        async function addFriend(e) {
+            e.preventDefault();
+            const name = $('addFriendInput').value.trim();
+            if (!name) return;
+            $('addFriendMsg').textContent = 'Sending…';
+            try {
+                const r = MODE === 'demo' ? await addFriendDemo(user.username, name) : await addFriendGitHub(user.username, name);
+                $('addFriendMsg').textContent = r && r.message ? r.message : (r && r.success ? 'Request sent!' : 'Could not add friend');
+                if (r && r.success) { $('addFriendInput').value = ''; await loadFriends(); pollAlerts(false); }
+            } catch (_) { $('addFriendMsg').textContent = 'Could not add friend'; }
+        }
+        async function acceptReq(n) {
+            try { if (MODE === 'demo') await acceptFriendRequestDemo(user.username, n); else await acceptFriendRequestGitHub(user.username, n); } catch (_) {}
+            await loadFriends(); pollAlerts(false);
         }
         let chatFriend = null;
         async function openChat(f) {
@@ -519,7 +546,10 @@
             if (typeof syncFavourites === 'function') syncFavourites(user.username).then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats(); renderFriends(); initStore();
             pollAlerts(false);
-            $('chatList').addEventListener('click', e => { if (e.target.closest('.app-friend-row')) return; const r = e.target.closest('.app-chat-row'); if (r) openChat(r.dataset.f); });
+            
+            $('addFriendBtn').onclick = () => { $('addFriendForm').hidden = !$('addFriendForm').hidden; };
+            $('addFriendForm').addEventListener('submit', addFriend);
+            $('reqList').addEventListener('click', e => { const b = e.target.closest('[data-accept]'); if (b) acceptReq(b.dataset.accept); });
             $('chatBack').onclick = () => { chatFriend = null; $('chatPane').hidden = true; $('chatList').hidden = false; };
             $('chatForm').addEventListener('submit', sendChat);
             setInterval(() => pollAlerts(true), 30000);
