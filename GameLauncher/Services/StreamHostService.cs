@@ -195,6 +195,7 @@ namespace GameLauncher.Services
                         await Respond(stream, 200, "text/plain", "gameos-stream");
                         return;
                     }
+                    var qp = ParseQuery(query);
                     if (!PinMatches(pin))
                     {
                         await Respond(stream, 401, "text/html", "<h3>Wrong or missing PIN</h3>");
@@ -202,8 +203,18 @@ namespace GameLauncher.Services
                     }
                     if (path == "/" || path == "/index.html")
                         await Respond(stream, 200, "text/html; charset=utf-8", ViewerHtml(pin));
+                    else if (path == "/speedtest")
+                    {
+                        int kb = qp.TryGetValue("kb", out var kbs) && int.TryParse(kbs, out var k) ? Math.Clamp(k, 1, 8192) : 1024;
+                        await Respond(stream, 200, "application/octet-stream", new string('0', kb * 1024));
+                    }
                     else if (path == "/stream")
-                        await StreamMjpeg(stream, ct);
+                    {
+                        int fps = qp.TryGetValue("fps", out var f) && int.TryParse(f, out var fv) ? ClampFrameRate(fv) : _frameRate;
+                        int w = qp.TryGetValue("w", out var ws) && int.TryParse(ws, out var wv) ? ClampMaxWidth(wv) : _maxWidth;
+                        int jq = qp.TryGetValue("q", out var qs) && int.TryParse(qs, out var qv) ? ClampJpegQuality(qv) : _jpegQuality;
+                        await StreamMjpeg(stream, ct, fps, w, jq);
+                    }
                     else if (path == "/audio")
                         await StreamAudio(client, request, ct);
                     else
@@ -211,6 +222,40 @@ namespace GameLauncher.Services
                 }
                 catch { /* client disconnected */ }
             }
+        }
+
+        private static Dictionary<string, string> ParseQuery(string query)
+        {
+            var d = new Dictionary<string, string>();
+            foreach (var kv in query.Split('&', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var p = kv.Split('=', 2);
+                if (p.Length == 2) d[p[0]] = Uri.UnescapeDataString(p[1]);
+            }
+            return d;
+        }
+
+        /// <summary>Rates a connection from measured throughput (Mbps) and latency (ms).</summary>
+        public static string RateConnection(double mbps, double latencyMs) =>
+            mbps >= 20 && latencyMs <= 40 ? "Good" :
+            mbps >= 8 && latencyMs <= 100 ? "OK" : "Bad";
+
+        /// <summary>Measures capture+encode speed with the current settings and rates whether this PC can sustain them.</summary>
+        public static async Task<string> RunLocalTestAsync()
+        {
+            if (!OperatingSystem.IsWindows()) return "Connection test needs Windows screen capture.";
+            return await Task.Run(() =>
+            {
+                const int frames = 10;
+                long bytes = 0; var sw = System.Diagnostics.Stopwatch.StartNew();
+                for (int i = 0; i < frames; i++) bytes += CaptureJpeg(_maxWidth, _jpegQuality).Length;
+                double perFrameMs = sw.Elapsed.TotalMilliseconds / frames;
+                double achievableFps = 1000 / Math.Max(1, perFrameMs);
+                double neededMbps = bytes / (double)frames * 8 * _frameRate / 1_000_000;
+                string rating = achievableFps >= _frameRate ? (neededMbps <= 20 ? "Good" : "OK") : "Bad";
+                return $"{rating}: encode {perFrameMs:F0} ms/frame (~{achievableFps:F0} fps possible, target {_frameRate}). " +
+                       $"Needs ~{neededMbps:F1} Mbps Wi-Fi. Test on iPhone/iPad from the stream page for real network speed.";
+            });
         }
 
         private static bool PinMatches(string pin) =>
@@ -225,7 +270,7 @@ namespace GameLauncher.Services
             await s.WriteAsync(b);
         }
 
-        private static async Task StreamMjpeg(NetworkStream s, CancellationToken ct)
+        private static async Task StreamMjpeg(NetworkStream s, CancellationToken ct, int frameRate, int maxWidth, int jpegQuality)
         {
             if (!RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
@@ -237,11 +282,11 @@ namespace GameLauncher.Services
             while (!ct.IsCancellationRequested)
             {
                 var started = Environment.TickCount64;
-                byte[] jpg = CaptureJpeg(_maxWidth, _jpegQuality);
+                byte[] jpg = CaptureJpeg(maxWidth, jpegQuality);
                 await s.WriteAsync(Encoding.ASCII.GetBytes($"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {jpg.Length}\r\n\r\n"), ct);
                 await s.WriteAsync(jpg, ct);
                 await s.WriteAsync(Encoding.ASCII.GetBytes("\r\n"), ct);
-                int wait = 1000 / _frameRate - (int)(Environment.TickCount64 - started);
+                int wait = 1000 / frameRate - (int)(Environment.TickCount64 - started);
                 if (wait > 0) await Task.Delay(wait, ct);
             }
         }
@@ -436,11 +481,28 @@ button,a{color:#fff;background:rgba(0,0,0,.72);border:1px solid #777;padding:8px
 #audioStatus{align-self:center;font-size:12px;text-shadow:0 1px 3px #000}
 body.immersive #controls{opacity:.25;transition:opacity .2s}body.immersive #controls:active{opacity:1}
 </style></head>
-<body><div id='controls'><a href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><span id='audioStatus' role='status'></span></div>
+<body><div id='controls'><a href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><button id='cfg'>Settings</button><span id='audioStatus' role='status'></span></div>
+<div id='panel' hidden style='position:fixed;z-index:3;inset:auto 8px 8px 8px;background:rgba(20,20,24,.95);border:1px solid #555;border-radius:16px;padding:12px;font-size:14px'>
+<label>FPS <select id='sFps'><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option></select></label>
+<label>Width <select id='sW'><option>640</option><option>854</option><option>1280</option><option>1920</option></select></label>
+<label>Quality <select id='sQ'><option>35</option><option>50</option><option>60</option><option>75</option><option>90</option></select></label>
+<div style='margin-top:8px'><button id='sApply'>Apply</button> <button id='sTest'>Test connection</button></div><div id='sRes' style='margin-top:6px'></div></div>
 <img id='s' alt='Connecting…'>
 <script>
 var s=document.getElementById('s'), audioButton=document.getElementById('audio'), status=document.getElementById('audioStatus');
-function go(){s.src='/stream?pin=" + Uri.EscapeDataString(pin) + @"&t='+Date.now();}
+var pinQ='" + Uri.EscapeDataString(pin) + @"';
+var cfg=JSON.parse(localStorage.getItem('gameOS_stream_cfg')||'{}');
+function go(){var a='';if(cfg.fps)a+='&fps='+cfg.fps;if(cfg.w)a+='&w='+cfg.w;if(cfg.q)a+='&q='+cfg.q;s.src='/stream?pin='+pinQ+a+'&t='+Date.now();}
+var wl=null;async function keepAwake(){try{if(navigator.wakeLock&&document.visibilityState==='visible')wl=await navigator.wakeLock.request('screen')}catch(e){}}
+keepAwake();document.addEventListener('visibilitychange',keepAwake);document.addEventListener('click',keepAwake);
+['sFps','sW','sQ'].forEach(function(id,i){var k=['fps','w','q'][i];if(cfg[k])document.getElementById(id).value=cfg[k]});
+document.getElementById('cfg').onclick=function(){var p=document.getElementById('panel');p.hidden=!p.hidden};
+document.getElementById('sApply').onclick=function(){cfg={fps:sFps.value,w:sW.value,q:sQ.value};localStorage.setItem('gameOS_stream_cfg',JSON.stringify(cfg));go();document.getElementById('panel').hidden=true};
+document.getElementById('sTest').onclick=async function(){var r=document.getElementById('sRes');r.textContent='Testing…';try{
+ var lat=[];for(var i=0;i<5;i++){var t=performance.now();await fetch('/ping?t='+Date.now(),{cache:'no-store'});lat.push(performance.now()-t)}
+ var l=Math.min.apply(null,lat),t0=performance.now(),b=await (await fetch('/speedtest?pin='+pinQ+'&kb=2048&t='+Date.now(),{cache:'no-store'})).arrayBuffer();
+ var mbps=b.byteLength*8/1e6/((performance.now()-t0)/1000);var q=mbps>=20&&l<=40?'Good':mbps>=8&&l<=100?'OK':'Bad';
+ r.textContent=q+' connection — '+mbps.toFixed(1)+' Mbps, '+l.toFixed(0)+' ms latency'}catch(e){r.textContent='Test failed'}};
 s.onerror=function(){setTimeout(go,1500)};go();
 var ctx=null,socket=null,nextAt=0;
 audioButton.onclick=async function(){
