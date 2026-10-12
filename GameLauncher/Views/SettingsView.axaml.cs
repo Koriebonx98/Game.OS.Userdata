@@ -1,3 +1,4 @@
+using System;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using GameLauncher.ViewModels;
@@ -22,6 +23,29 @@ public partial class SettingsView : UserControl
             vm.PickIntroVideoFromGalleryRequested = OnPickIntroVideoFromGalleryRequested;
             vm.BrowseStartupAppRequested          = OnBrowseStartupAppRequested;
             vm.BrowseNewStartupAppRequested       = OnBrowseNewStartupAppRequested;
+        }
+    }
+
+    private async void OnCopyStreamAddressClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await CopyStreamValueAsync(vm => vm.StreamAddress);
+
+    private async void OnCopyStreamPinClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
+        await CopyStreamValueAsync(vm => vm.StreamPin);
+
+    private async System.Threading.Tasks.Task CopyStreamValueAsync(Func<SettingsViewModel, string> getValue)
+    {
+        if (DataContext is not SettingsViewModel vm ||
+            TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
+            return;
+
+        try
+        {
+            await clipboard.SetTextAsync(getValue(vm));
+            vm.StreamCopyStatus = "Copied to clipboard.";
+        }
+        catch
+        {
+            vm.StreamCopyStatus = "Could not access the clipboard.";
         }
     }
 

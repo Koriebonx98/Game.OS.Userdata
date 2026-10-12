@@ -21,8 +21,21 @@ public partial class SettingsViewModel : ViewModelBase
     // ── Platform emulator groups ───────────────────────────────────────────
     public ObservableCollection<EmulatorPlatformGroupVm> EmulatorGroups { get; } = new();
 
-    /// <summary>Address and PIN to enter in the iOS web app to stream this PC.</summary>
-    public string StreamInfo => StreamHostService.InfoText;
+    /// <summary>PC network address to enter in the iOS web app.</summary>
+    [ObservableProperty] private string _streamAddress = "Loading…";
+    /// <summary>PIN required to connect to this PC's stream.</summary>
+    [ObservableProperty] private string _streamPin = "Loading…";
+    /// <summary>Current status of the PC streaming host.</summary>
+    [ObservableProperty] private string _streamHostStatus = "";
+    /// <summary>Result of copying a stream connection value.</summary>
+    [ObservableProperty] private string _streamCopyStatus = "";
+    [ObservableProperty] private int _streamFrameRate = 20;
+    [ObservableProperty] private int _streamMaxWidth = 1280;
+    [ObservableProperty] private int _streamJpegQuality = 60;
+    [ObservableProperty] private bool _streamAudioEnabled = true;
+    public IReadOnlyList<int> StreamFrameRateOptions { get; } = new[] { 10, 15, 20, 30, 60 };
+    public IReadOnlyList<int> StreamResolutionOptions { get; } = new[] { 640, 854, 1280, 1920 };
+    public IReadOnlyList<int> StreamQualityOptions { get; } = new[] { 35, 50, 60, 75, 90 };
 
     // ── Application-wide settings ──────────────────────────────────────────
     /// <summary>Check for Games.Database updates on startup.</summary>
@@ -667,6 +680,15 @@ public partial class SettingsViewModel : ViewModelBase
         Load();
     }
 
+    [RelayCommand]
+    public void RefreshStreamInfo()
+    {
+        StreamAddress = StreamHostService.AddressText;
+        StreamPin = StreamHostService.IsRunning ? StreamHostService.Pin : "Unavailable";
+        StreamHostStatus = StreamHostService.StatusText;
+        StreamCopyStatus = "";
+    }
+
     public void Load()
     {
         EmulatorGroups.Clear();
@@ -706,6 +728,10 @@ public partial class SettingsViewModel : ViewModelBase
         EnableGlobalQuickMenuHotkey = appSettings.EnableGlobalQuickMenuHotkey;
         CompatibilityOverlayMode   = appSettings.CompatibilityOverlayMode;
         PreferOfflineCachedMetadata = appSettings.PreferOfflineCachedMetadata;
+        StreamFrameRate = StreamHostService.ClampFrameRate(appSettings.StreamFrameRate);
+        StreamMaxWidth = StreamHostService.ClampMaxWidth(appSettings.StreamMaxWidth);
+        StreamJpegQuality = StreamHostService.ClampJpegQuality(appSettings.StreamJpegQuality);
+        StreamAudioEnabled = appSettings.StreamAudioEnabled;
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
@@ -883,6 +909,10 @@ public partial class SettingsViewModel : ViewModelBase
             UpdateOnExit          = UpdateOnExit,
             UpdateOnStart         = UpdateOnStart,
             AcceptAutoUpdate      = AcceptAutoUpdate,
+            StreamFrameRate      = StreamHostService.ClampFrameRate(StreamFrameRate),
+            StreamMaxWidth       = StreamHostService.ClampMaxWidth(StreamMaxWidth),
+            StreamJpegQuality    = StreamHostService.ClampJpegQuality(StreamJpegQuality),
+            StreamAudioEnabled   = StreamAudioEnabled,
             ShowIntroVideo        = ShowIntroVideo,
             IntroVideoPath        = IntroVideoPath,
             HasCompletedFirstRunSetup = true,
@@ -928,6 +958,8 @@ public partial class SettingsViewModel : ViewModelBase
             }).ToList(),
         });
 
+        StreamHostService.Configure(StreamFrameRate, StreamMaxWidth, StreamJpegQuality, StreamAudioEnabled);
+        RefreshStreamInfo();
         StatusMessage = "✅ Settings saved!";
         IsSaveSuccess = true;
         ShowFirstRunSetupBanner = false;

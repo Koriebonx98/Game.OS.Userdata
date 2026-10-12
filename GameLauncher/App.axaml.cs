@@ -71,6 +71,7 @@ public partial class App : Application
             DevLogService.Log("[App] MainWindow constructed OK.");
             desktop.MainWindow = mainWindow;
             StreamHostService.Start();
+            mainVm.SettingsVm.RefreshStreamInfo();
             desktop.Exit += (_, _) => StreamHostService.Stop();
 
             // Resolve the intro video path:
