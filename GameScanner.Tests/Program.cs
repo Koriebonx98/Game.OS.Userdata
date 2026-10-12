@@ -1374,8 +1374,7 @@ class Program
                     Directory.CreateSymbolicLink(gamesLink, gamesDir);
                     cleanLink = true;
                 }
-                // Force a fresh scan because the test changes the contents behind the same drive root.
-                await scanner.RescanAsync();
+                await scanner.StartAsync();
             }
             finally
             {
