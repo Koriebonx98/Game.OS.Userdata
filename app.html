@@ -18,6 +18,7 @@
     <header class="app-header">
         <h1>🎮 Game OS</h1>
         <span id="appUser" class="app-user"></span>
+        <button id="logoutBtn" class="app-fav" style="margin-left:8px" aria-label="Log out">⏻ Log out</button>
     </header>
 
     <main class="app-main">
@@ -98,7 +99,7 @@
     (function () {
         const $ = id => document.getElementById(id);
         const esc = s => escapeHtml(String(s == null ? '' : s));
-        let user = null, library = [], userAch = null;
+        let user = null, library = [], userAch = null, friendAch = {}, returnFriend = null;
 
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -112,6 +113,12 @@
         const isUnlocked = a => a && a.unlockedAt && !String(a.unlockedAt).startsWith('1970-01-01');
         const sameGame = (a, g) => String(a.gameTitle || '').toLowerCase() === String(g.title || '').toLowerCase()
             && (!a.platform || !g.platform || String(a.platform).toLowerCase() === String(g.platform).toLowerCase());
+        async function loadAchFor(name) {
+            try {
+                const f = MODE === 'demo' ? null : await githubRead('accounts/' + name.toLowerCase() + '/achievements.json');
+                return f && Array.isArray(f.content) ? f.content.filter(isUnlocked) : null;
+            } catch (_) { return null; }
+        }
         async function loadUserAch() {
             try {
                 const f = MODE === 'demo' ? null : await githubRead('accounts/' + user.username.toLowerCase() + '/achievements.json');
@@ -119,6 +126,11 @@
             } catch (_) { userAch = null; }
         }
         function achOf(g) {
+            if (g._owner) {
+                const fa = friendAch[g._owner];
+                if (fa) return fa.filter(a => sameGame(a, g)).length;
+                return achBase(g);
+            }
             if (userAch) { const n = userAch.filter(a => sameGame(a, g)).length; if (n) return n; }
             return achBase(g);
         }
@@ -187,7 +199,8 @@
             if (e.target.closest('.app-fav')) return false;
             const r = e.target.closest('[data-open-t]');
             if (!r) return false;
-            openGame(findGame(r.dataset.openP, r.dataset.openT, r.dataset.openF));
+            const g = findGame(r.dataset.openP, r.dataset.openT, r.dataset.openF);
+            openGame(r.dataset.openF ? { ...g, _owner: r.dataset.openF } : g);
             return true;
         }
         async function loadWishlist(f) {
@@ -207,8 +220,10 @@
                     tpl = Array.isArray(d) ? d : (d.Items || d.achievements || []);
                 } catch (_) {}
             }
-            if (!userAch) await loadUserAch();
-            const mine = (userAch || []).filter(a => sameGame(a, g));
+            let src;
+            if (g._owner) { if (!friendAch[g._owner]) friendAch[g._owner] = await loadAchFor(g._owner); src = friendAch[g._owner]; }
+            else { if (!userAch) await loadUserAch(); src = userAch; }
+            const mine = (src || []).filter(a => sameGame(a, g));
             const items = tpl.map(t => ({ name: t.Name || t.name || '', desc: t.Description || t.description || '', icon: t.iconUrl || t.UrlUnlocked || t.image || '', id: String(t.achievementId || t.apiName || t.id || '').toLowerCase(), at: '' }));
             mine.forEach(u => {
                 const id = String(u.achievementId || '').toLowerCase(), nm = String(u.name || '').toLowerCase();
@@ -220,10 +235,11 @@
             return items.sort((x, y) => (ts(y) > 0) - (ts(x) > 0) || ts(y) - ts(x));
         }
         async function openGame(g) {
+            returnFriend = g._owner || null;
             const cover = g.coverUrl ? `<img src="${esc(g.coverUrl)}" alt="" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(g.platform || ''))}</span>`;
             const pt = minutesOf(g);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
-                <small>${esc(g.platform)}</small><small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <small>${esc(g.platform)}</small>${g._owner ? `<small>👤 ${esc(g._owner)}'s copy</small>` : ''}<small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
@@ -271,14 +287,16 @@
             }));
             friendsLoaded = true;
             renderFriends();
+            Promise.all(friends.map(async f => { friendAch[f] = await loadAchFor(f); })).then(renderFriends);
         }
         function renderFriends() {
             $('friendList').innerHTML = friends.length ? friends.map(f => {
                 const lib = friendLibs[f] || [];
-                return `<div class="app-row app-friend-row" data-fr="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${lib.length} game${lib.length === 1 ? '' : 's'}</small></div><span>›</span></div>`;
+                return `<div class="app-row app-friend-row" data-fr="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${lib.length} game${lib.length === 1 ? '' : 's'}${friendAch[f] ? ' · 🏆 ' + friendAch[f].length : ''}</small></div><span>›</span></div>`;
             }).join('') : empty('Add friends on the site to see them here.');
         }
         async function openFriend(f) {
+            returnFriend = null;
             const lib = friendLibs[f] || [];
             const pt = lib.reduce((n, g) => n + minutesOf(g), 0);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover"><span>👤</span></div><div><h2>${esc(f)}</h2><small>🎮 ${lib.length} games</small><small>⏱ ${fmtPlaytime(pt)} played</small></div></div>
@@ -287,8 +305,12 @@
                 <div id="frGames" class="app-list"></div>
                 <div id="frWish" class="app-list" hidden><p class="games-list-empty">Loading…</p></div>
                 <div id="frAch" hidden><p class="games-list-empty">Loading…</p></div>`;
-            const frTab = t => { [['games', 'frGames'], ['wish', 'frWish'], ['ach', 'frAch']].forEach(([k, id]) => $(id).hidden = k !== t); };
+            const frTab = t => {
+                [['games', 'frGames'], ['wish', 'frWish'], ['ach', 'frAch']].forEach(([k, id]) => $(id).hidden = k !== t);
+                $('detailBody').querySelectorAll('[data-frtab]').forEach(b => b.classList.toggle('active', b.dataset.frtab === t));
+            };
             $('detailBody').querySelectorAll('[data-frtab]').forEach(b => b.onclick = () => frTab(b.dataset.frtab));
+            frTab('games');
             loadWishlist(f).then(w => {
                 if ($('gameDetail').hidden) return;
                 $('frWish').innerHTML = w.length ? w.map(g => row({ title: g.title, platform: g.platform, coverUrl: g.coverUrl || g.cover, _owner: f })).join('') : empty('Wishlist is empty.');
@@ -297,11 +319,8 @@
             $('friendChat').onclick = () => { $('gameDetail').hidden = true; showView('chats'); openChat(f); };
             const recent = [...lib].sort((a, b) => (b.lastPlayed || b.addedAt || '').localeCompare(a.lastPlayed || a.addedAt || ''));
             $('frGames').innerHTML = recent.length ? recent.map(g => row({ ...g, _owner: f })).join('') : empty('No games yet.');
-            let ach = [];
-            try {
-                const file = MODE === 'demo' ? null : await githubRead('accounts/' + f.toLowerCase() + '/achievements.json');
-                if (file && Array.isArray(file.content)) ach = file.content.filter(isUnlocked);
-            } catch (_) {}
+            if (!friendAch[f]) friendAch[f] = await loadAchFor(f);
+            const ach = [...(friendAch[f] || [])];
             if ($('gameDetail').hidden) return;
             ach.sort((a, b) => String(b.unlockedAt).localeCompare(String(a.unlockedAt)));
             $('frAch').innerHTML = ach.length ? `<small style="color:var(--text-muted)">${ach.length} unlocked in total</small>` + ach.slice(0, 50).map(a => {
@@ -457,7 +476,12 @@
             $('achSheet').addEventListener('click', e => { if (e.target === $('achSheet')) $('achSheet').hidden = true; });
             document.addEventListener('click', e => { const r = e.target.closest('.app-friend-row'); if (r) openFriend(r.dataset.fr); });
             $('detailBody').addEventListener('click', e => { if (!e.target.closest('.app-friend-row')) openFromEvent(e); });
-            $('detailBack').onclick = () => { $('gameDetail').hidden = true; };
+            $('detailBack').onclick = () => {
+                $('achSheet').hidden = true;
+                if (returnFriend) { const f = returnFriend; returnFriend = null; openFriend(f); }
+                else $('gameDetail').hidden = true;
+            };
+            $('logoutBtn').onclick = () => { if (confirm('Log out of Game OS?')) { localStorage.setItem('gameOS_lastUser', user.username); logout(); } };
             document.querySelector('.app-main').addEventListener('click', e => {
                 const b = e.target.closest('.app-fav');
                 if (!b) { openFromEvent(e); return; }

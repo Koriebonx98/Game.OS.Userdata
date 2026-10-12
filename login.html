@@ -75,6 +75,16 @@
                     </div>
                     
                     <button type="submit" class="btn btn-primary btn-block">Login</button>
+                    <script>
+                    (function () {
+                        var u = localStorage.getItem('gameOS_lastUser');
+                        if (!u) return;
+                        var e = document.getElementById('loginEmail'), p = document.getElementById('loginPassword');
+                        e.value = u; document.getElementById('rememberMe').checked = true;
+                        e.setAttribute('autocomplete', 'username');
+                        p.focus();
+                    })();
+                    </script>
                     
                     <div class="form-footer">
                         <p>Don't have an account? <a href="signup.html" class="link">Sign up here</a></p>
