@@ -21,8 +21,14 @@ public partial class SettingsViewModel : ViewModelBase
     // ── Platform emulator groups ───────────────────────────────────────────
     public ObservableCollection<EmulatorPlatformGroupVm> EmulatorGroups { get; } = new();
 
-    /// <summary>Address and PIN to enter in the iOS web app to stream this PC.</summary>
-    public string StreamInfo => StreamHostService.InfoText;
+    /// <summary>PC network address to enter in the iOS web app.</summary>
+    [ObservableProperty] private string _streamAddress = "Loading…";
+    /// <summary>PIN required to connect to this PC's stream.</summary>
+    [ObservableProperty] private string _streamPin = "Loading…";
+    /// <summary>Current status of the PC streaming host.</summary>
+    [ObservableProperty] private string _streamHostStatus = "";
+    /// <summary>Result of copying a stream connection value.</summary>
+    [ObservableProperty] private string _streamCopyStatus = "";
 
     // ── Application-wide settings ──────────────────────────────────────────
     /// <summary>Check for Games.Database updates on startup.</summary>
@@ -665,6 +671,15 @@ public partial class SettingsViewModel : ViewModelBase
     public SettingsViewModel()
     {
         Load();
+    }
+
+    [RelayCommand]
+    public void RefreshStreamInfo()
+    {
+        StreamAddress = StreamHostService.AddressText;
+        StreamPin = StreamHostService.IsRunning ? StreamHostService.Pin : "Unavailable";
+        StreamHostStatus = StreamHostService.StatusText;
+        StreamCopyStatus = "";
     }
 
     public void Load()

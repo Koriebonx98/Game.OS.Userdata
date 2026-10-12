@@ -40,6 +40,13 @@ namespace GameLauncher.Services
 
         public static string Pin => _pin;
         public static int Port => _port;
+        public static bool IsRunning => _listener != null;
+        public static string AddressText => _listener == null
+            ? "Unavailable"
+            : string.Join("  •  ", GetLanAddresses().Select(a => $"{a}:{_port}"));
+        public static string StatusText => _listener != null
+            ? "Ready — connect your iPhone or iPad to the same Wi-Fi network."
+            : _status;
 
         /// <summary>Human-readable status for the settings page.</summary>
         public static string InfoText => _listener == null

@@ -316,10 +316,49 @@
                             <Rectangle Height="1" Fill="#21262d"/>
 
                             <!-- PC streaming to the iOS web app -->
-                            <StackPanel Spacing="2">
-                                <TextBlock Text="Stream to iOS web app" FontSize="13" Foreground="#e6edf3"/>
-                                <TextBlock Text="{Binding StreamInfo}" TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
-                            </StackPanel>
+                            <Border Background="#13243a"
+                                    BorderBrush="#1f6feb"
+                                    BorderThickness="1"
+                                    CornerRadius="10"
+                                    Padding="20"
+                                    Margin="0,0,0,8">
+                                <StackPanel Spacing="12">
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Stream to iOS web app"
+                                                   FontSize="16" FontWeight="Bold" Foreground="White"/>
+                                        <TextBlock Text="{Binding StreamHostStatus}"
+                                                   TextWrapping="Wrap" FontSize="11" Foreground="#c9d1d9"/>
+                                        <TextBlock Text="On your iPhone or iPad, open the Game OS web app → Profile → Settings → PC game streaming. Enter the address and PIN below. Both devices must be on the same Wi-Fi network."
+                                                   TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+
+                                    <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="PC address" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="0" Grid.Column="1" Classes="form-input"
+                                                 Text="{Binding StreamAddress}" IsReadOnly="True"
+                                                 MinWidth="210" FontSize="12"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="PIN" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
+                                        <TextBox Grid.Row="1" Grid.Column="1" Classes="form-input"
+                                                 Text="{Binding StreamPin}" IsReadOnly="True"
+                                                 MinWidth="210" FontSize="12"/>
+                                    </Grid>
+
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="btn-secondary"
+                                                Content="Refresh address"
+                                                Command="{Binding RefreshStreamInfoCommand}"/>
+                                        <Button Classes="btn-secondary"
+                                                Content="Copy address"
+                                                Click="OnCopyStreamAddressClicked"/>
+                                        <Button Classes="btn-secondary"
+                                                Content="Copy PIN"
+                                                Click="OnCopyStreamPinClicked"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding StreamCopyStatus}"
+                                               FontSize="11" Foreground="#8b949e"
+                                               IsVisible="{Binding StreamCopyStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                </StackPanel>
+                            </Border>
 
                             <!-- Intro video toggle -->
                             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
