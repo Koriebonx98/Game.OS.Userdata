@@ -40,6 +40,20 @@ public static class XeniaLogReaderService
         new(@"achievement\s+unlocked[:\s]+(?:(\d+)\s+)?(.+)",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// Newer Xenia format: "Player: Name Unlocked Achievement: My Achievement".
+    /// Groups: 1 = (unused numeric ID), 2 = achievement name.
+    /// </summary>
+    private static readonly Regex _unlockPatternNew =
+        new(@"unlocked\s+achievement[:\s]+(?:(\d+)\s+)?(.+)",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static Match MatchUnlock(string line)
+    {
+        var m = _unlockPattern.Match(line);
+        return m.Success ? m : _unlockPatternNew.Match(line);
+    }
+
     // ── Log directory discovery ─────────────────────────────────────────────
 
     /// <summary>
@@ -170,7 +184,7 @@ public static class XeniaLogReaderService
         {
             foreach (string line in File.ReadLines(logPath))
             {
-                var m = _unlockPattern.Match(line);
+                var m = MatchUnlock(line);
                 if (!m.Success) continue;
                 var (id, name) = ParseMatch(m);
                 if (!string.IsNullOrEmpty(name))
@@ -215,7 +229,7 @@ public static class XeniaLogReaderService
             string? line;
             while ((line = reader.ReadLine()) != null)
             {
-                var m = _unlockPattern.Match(line);
+                var m = MatchUnlock(line);
                 if (m.Success)
                 {
                     var (id, name) = ParseMatch(m);
