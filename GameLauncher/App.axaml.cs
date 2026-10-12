@@ -70,6 +70,8 @@ public partial class App : Application
             }
             DevLogService.Log("[App] MainWindow constructed OK.");
             desktop.MainWindow = mainWindow;
+            StreamHostService.Start();
+            desktop.Exit += (_, _) => StreamHostService.Stop();
 
             // Resolve the intro video path:
             //   1. Default fixed location  — Data/Intro/Intro.mp4 (matches PS5 OS reference)

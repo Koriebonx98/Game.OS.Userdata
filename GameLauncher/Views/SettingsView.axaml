@@ -315,6 +315,12 @@
 
                             <Rectangle Height="1" Fill="#21262d"/>
 
+                            <!-- PC streaming to the iOS web app -->
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Stream to iOS web app" FontSize="13" Foreground="#e6edf3"/>
+                                <TextBlock Text="{Binding StreamInfo}" TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
+                            </StackPanel>
+
                             <!-- Intro video toggle -->
                             <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
                                 <StackPanel Grid.Column="0" Spacing="2">
