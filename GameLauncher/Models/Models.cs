@@ -456,6 +456,15 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("acceptAutoUpdate")] public bool AcceptAutoUpdate { get; set; } = true;
 
+        /// <summary>Maximum capture rate for the local PC stream.</summary>
+        [JsonPropertyName("streamFrameRate")] public int StreamFrameRate { get; set; } = 20;
+        /// <summary>Maximum output width for the local PC stream.</summary>
+        [JsonPropertyName("streamMaxWidth")] public int StreamMaxWidth { get; set; } = 1280;
+        /// <summary>JPEG quality from 30 (lower bandwidth) to 90 (higher quality).</summary>
+        [JsonPropertyName("streamJpegQuality")] public int StreamJpegQuality { get; set; } = 60;
+        /// <summary>Whether desktop loopback audio is available to stream clients.</summary>
+        [JsonPropertyName("streamAudioEnabled")] public bool StreamAudioEnabled { get; set; } = true;
+
         /// <summary>
         /// When <see langword="true"/> (the default), the launcher plays the Game.OS
         /// intro animation on startup.  Set to <see langword="false"/> to skip it.

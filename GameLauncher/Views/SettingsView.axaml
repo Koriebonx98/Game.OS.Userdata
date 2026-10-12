@@ -332,6 +332,27 @@
                                                    TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
                                     </StackPanel>
 
+                                    <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
+                                        <StackPanel Grid.Row="0" Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="Frame rate (FPS)" FontSize="11" Foreground="#8b949e"/>
+                                            <ComboBox ItemsSource="{Binding StreamFrameRateOptions}" SelectedItem="{Binding StreamFrameRate}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="0" Grid.Column="1" Spacing="4">
+                                            <TextBlock Text="Resolution (max width)" FontSize="11" Foreground="#8b949e"/>
+                                            <ComboBox ItemsSource="{Binding StreamResolutionOptions}" SelectedItem="{Binding StreamMaxWidth}"/>
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="1" Grid.Column="0" Spacing="4">
+                                            <TextBlock Text="Image quality" FontSize="11" Foreground="#8b949e"/>
+                                            <ComboBox ItemsSource="{Binding StreamQualityOptions}" SelectedItem="{Binding StreamJpegQuality}"/>
+                                        </StackPanel>
+                                        <CheckBox Grid.Row="1" Grid.Column="1"
+                                                  Content="Include desktop audio"
+                                                  IsChecked="{Binding StreamAudioEnabled}"
+                                                  VerticalAlignment="Center"/>
+                                    </Grid>
+                                    <TextBlock Text="Save Settings to apply stream quality changes. Audio capture is supported on Windows."
+                                               TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
+
                                     <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="8">
                                         <TextBlock Grid.Row="0" Grid.Column="0" Text="PC address" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
                                         <TextBox Grid.Row="0" Grid.Column="1" Classes="form-input"
