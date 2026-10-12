@@ -3242,8 +3242,31 @@ const STEAMGRID_KEY = (() => {
     ).join('');
 })();
 
+let _discoveredPlatformsPromise = null;
+
+// Discovers every {Platform}.Games.json in the Games.Database repo so newly added
+// platforms appear automatically. Falls back to the built-in list on any error.
 async function fetchGamesDbPlatforms() {
-    return [...GAMES_DB_PLATFORMS];
+    if (!_discoveredPlatformsPromise) {
+        _discoveredPlatformsPromise = (async () => {
+            try {
+                const resp = await fetch('https://api.github.com/repos/Koriebonx98/Games.Database/contents/',
+                    { headers: { Accept: 'application/vnd.github.v3+json' } });
+                if (!resp.ok) return null;
+                const entries = await resp.json();
+                const found = (Array.isArray(entries) ? entries : [])
+                    .map(e => e && e.name)
+                    .filter(n => typeof n === 'string' && /\.Games\.json$/i.test(n))
+                    .map(n => n.slice(0, -'.Games.json'.length))
+                    .filter(Boolean);
+                return found.length ? found : null;
+            } catch { return null; }
+        })();
+    }
+    const found = await _discoveredPlatformsPromise;
+    if (!found) { _discoveredPlatformsPromise = null; return [...GAMES_DB_PLATFORMS]; }
+    const rest = found.filter(p => p !== 'PC').sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+    return found.includes('PC') ? ['PC', ...rest] : rest;
 }
 
 /**
