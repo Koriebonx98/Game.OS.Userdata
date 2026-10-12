@@ -259,6 +259,17 @@ namespace GameLauncher.Services
                 return;
             }
 
+            string? key = request.Split("\r\n", StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Split(':', 2))
+                .Where(parts => parts.Length == 2 && parts[0].Trim().Equals("Sec-WebSocket-Key", StringComparison.OrdinalIgnoreCase))
+                .Select(parts => parts[1].Trim())
+                .FirstOrDefault();
+            if (string.IsNullOrEmpty(key))
+            {
+                await Respond(client.GetStream(), 400, "text/plain", "WebSocket upgrade required.");
+                return;
+            }
+
             WasapiLoopbackCapture capture;
             try
             {
@@ -279,17 +290,6 @@ namespace GameLauncher.Services
                 return;
             }
 
-            string? key = request.Split("\r\n", StringSplitOptions.RemoveEmptyEntries)
-                .Select(line => line.Split(':', 2))
-                .Where(parts => parts.Length == 2 && parts[0].Trim().Equals("Sec-WebSocket-Key", StringComparison.OrdinalIgnoreCase))
-                .Select(parts => parts[1].Trim())
-                .FirstOrDefault();
-            if (string.IsNullOrEmpty(key))
-            {
-                await Respond(client.GetStream(), 400, "text/plain", "WebSocket upgrade required.");
-                return;
-            }
-
             string accept = Convert.ToBase64String(SHA1.HashData(Encoding.ASCII.GetBytes(
                 key + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11")));
             byte[] response = Encoding.ASCII.GetBytes(
@@ -300,11 +300,24 @@ namespace GameLauncher.Services
             await stream.WriteAsync(response, ct);
 
             var format = capture.WaveFormat;
-            bool isFloat = format.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32;
-            bool isPcm16 = format.Encoding == WaveFormatEncoding.Pcm && format.BitsPerSample == 16;
+            var standardFormat = format is WaveFormatExtensible extensible
+                ? extensible.ToStandardWaveFormat()
+                : format;
+            bool isFloat = standardFormat.Encoding == WaveFormatEncoding.IeeeFloat && format.BitsPerSample == 32;
+            bool isPcm16 = standardFormat.Encoding == WaveFormatEncoding.Pcm && format.BitsPerSample == 16;
             if (!isFloat && !isPcm16)
             {
                 await SendWebSocketFrame(stream, 0x1, Encoding.UTF8.GetBytes("{\"error\":\"Unsupported desktop audio format.\"}"), ct);
+                lock (AudioLock)
+                {
+                    if (AudioClients.IsEmpty && _audioCapture == capture)
+                    {
+                        capture.DataAvailable -= OnAudioDataAvailable;
+                        capture.StopRecording();
+                        capture.Dispose();
+                        _audioCapture = null;
+                    }
+                }
                 return;
             }
 
