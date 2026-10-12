@@ -104,7 +104,12 @@
                 <input id="streamAddr" class="app-search" type="text" placeholder="PC address, e.g. 192.168.1.20:47632" autocapitalize="none" autocorrect="off">
                 <input id="streamPin" class="app-search" type="text" inputmode="numeric" placeholder="PIN" autocomplete="off">
                 <button id="streamBtn" class="btn app-more">Start streaming</button>
+                <button id="streamTestBtn" class="btn app-more">Test connection</button>
                 <small id="streamMsg" class="app-count"></small>
+                <b>Stream settings</b>
+                <select id="streamFps" class="app-search"><option value="10">10 fps</option><option value="15">15 fps</option><option value="20">20 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select>
+                <select id="streamW" class="app-search"><option value="640">640 px</option><option value="854">854 px</option><option value="1280">1280 px</option><option value="1920">1920 px</option></select>
+                <select id="streamQ" class="app-search"><option value="35">Quality 35</option><option value="50">Quality 50</option><option value="60">Quality 60</option><option value="75">Quality 75</option><option value="90">Quality 90</option></select>
             </div>
         </section>
     </main>
@@ -667,6 +672,25 @@
             ['libPlatform', 'libSort', 'libShow'].forEach(id => $(id).addEventListener('change', renderLibrary));
             $('streamAddr').value = localStorage.getItem('gameOS_stream_addr') || '';
             $('streamPin').value = localStorage.getItem('gameOS_stream_pin') || '';
+            const sc = JSON.parse(localStorage.getItem('gameOS_stream_cfg') || '{}');
+            $('streamFps').value = sc.fps || '20'; $('streamW').value = sc.w || '1280'; $('streamQ').value = sc.q || '60';
+            const saveCfg = () => localStorage.setItem('gameOS_stream_cfg', JSON.stringify({ fps: $('streamFps').value, w: $('streamW').value, q: $('streamQ').value }));
+            ['streamFps', 'streamW', 'streamQ'].forEach(id => $(id).addEventListener('change', saveCfg));
+            $('streamTestBtn').onclick = async () => {
+                const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                const pin = $('streamPin').value.trim(), msg = $('streamMsg');
+                if (!addr || !pin) { msg.textContent = 'Enter the PC address and PIN.'; return; }
+                msg.textContent = 'Testing…';
+                try {
+                    const base = 'http://' + addr, lat = [];
+                    for (let i = 0; i < 5; i++) { const t = performance.now(); await fetch(base + '/ping?t=' + Date.now(), { cache: 'no-store', mode: 'no-cors' }); lat.push(performance.now() - t); }
+                    const l = Math.min(...lat), t0 = performance.now();
+                    const b = await (await fetch(base + '/speedtest?pin=' + encodeURIComponent(pin) + '&kb=2048', { cache: 'no-store' })).arrayBuffer();
+                    const mbps = b.byteLength * 8 / 1e6 / ((performance.now() - t0) / 1000);
+                    const q = mbps >= 20 && l <= 40 ? 'Good' : mbps >= 8 && l <= 100 ? 'OK' : 'Bad';
+                    msg.textContent = q + ' connection — ' + mbps.toFixed(1) + ' Mbps, ' + l.toFixed(0) + ' ms';
+                } catch (e) { msg.textContent = 'Test failed — open the stream page and use its Test connection button.'; }
+            };
             $('streamBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
                 const pin = $('streamPin').value.trim();
@@ -676,6 +700,7 @@
                 localStorage.setItem('gameOS_stream_pin', pin);
                 msg.textContent = '';
                 // The launcher serves its own viewer page (plain http), avoiding mixed-content blocks.
+                saveCfg();
                 location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin);
             };
             $('settingsNotifBtn').onclick = async () => {

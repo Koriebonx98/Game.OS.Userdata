@@ -375,6 +375,9 @@
                                                 Content="Copy PIN"
                                                 Click="OnCopyStreamPinClicked"/>
                                     </StackPanel>
+                                    <Button Classes="btn-secondary" Content="Test connection"
+                                            Command="{Binding TestStreamConnectionCommand}"/>
+                                    <TextBlock Text="{Binding StreamTestResult}" FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                                     <TextBlock Text="{Binding StreamCopyStatus}"
                                                FontSize="11" Foreground="#8b949e"
                                                IsVisible="{Binding StreamCopyStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>

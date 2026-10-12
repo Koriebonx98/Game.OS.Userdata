@@ -689,6 +689,16 @@ public partial class SettingsViewModel : ViewModelBase
         StreamCopyStatus = "";
     }
 
+    [ObservableProperty] private string _streamTestResult = "";
+
+    [RelayCommand]
+    public async Task TestStreamConnection()
+    {
+        StreamTestResult = "Testing…";
+        StreamHostService.Configure(StreamFrameRate, StreamMaxWidth, StreamJpegQuality, StreamAudioEnabled);
+        StreamTestResult = await StreamHostService.RunLocalTestAsync();
+    }
+
     public void Load()
     {
         EmulatorGroups.Clear();
