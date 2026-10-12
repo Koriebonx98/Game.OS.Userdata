@@ -21,6 +21,9 @@ public partial class SettingsViewModel : ViewModelBase
     // ── Platform emulator groups ───────────────────────────────────────────
     public ObservableCollection<EmulatorPlatformGroupVm> EmulatorGroups { get; } = new();
 
+    /// <summary>Address and PIN to enter in the iOS web app to stream this PC.</summary>
+    public string StreamInfo => StreamHostService.InfoText;
+
     // ── Application-wide settings ──────────────────────────────────────────
     /// <summary>Check for Games.Database updates on startup.</summary>
     [ObservableProperty] private bool _autoUpdate = true;

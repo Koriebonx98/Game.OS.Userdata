@@ -100,7 +100,11 @@
             </div>
             <div class="app-card">
                 <b>PC game streaming</b>
-                <p>PC streaming is not available yet. Secure pairing, PC screen capture, and a WebRTC video transport need to be added before this can connect safely.</p>
+                <p>Stream your PC screen over Wi-Fi. In the Game OS launcher on your PC, open Settings to see its address and PIN, then enter them here.</p>
+                <input id="streamAddr" class="app-search" type="text" placeholder="PC address, e.g. 192.168.1.20:47632" autocapitalize="none" autocorrect="off">
+                <input id="streamPin" class="app-search" type="text" inputmode="numeric" placeholder="PIN" autocomplete="off">
+                <button id="streamBtn" class="btn app-more">Start streaming</button>
+                <small id="streamMsg" class="app-count"></small>
             </div>
         </section>
     </main>
@@ -661,6 +665,19 @@
             document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => showView(b.dataset.view));
             $('libSearch').addEventListener('input', renderLibrary);
             ['libPlatform', 'libSort', 'libShow'].forEach(id => $(id).addEventListener('change', renderLibrary));
+            $('streamAddr').value = localStorage.getItem('gameOS_stream_addr') || '';
+            $('streamPin').value = localStorage.getItem('gameOS_stream_pin') || '';
+            $('streamBtn').onclick = async () => {
+                const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+                const pin = $('streamPin').value.trim();
+                const msg = $('streamMsg');
+                if (!/^[\w.\-]+(:\d{1,5})?$/.test(addr) || !pin) { msg.textContent = 'Enter the PC address and PIN.'; return; }
+                localStorage.setItem('gameOS_stream_addr', addr);
+                localStorage.setItem('gameOS_stream_pin', pin);
+                msg.textContent = '';
+                // The launcher serves its own viewer page (plain http), avoiding mixed-content blocks.
+                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin);
+            };
             $('settingsNotifBtn').onclick = async () => {
                 if (!('Notification' in window)) return;
                 await Notification.requestPermission();
