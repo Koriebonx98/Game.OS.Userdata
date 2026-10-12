@@ -2344,3 +2344,9 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .app-fr-head { display: flex; align-items: center; justify-content: space-between; }
 .app-fr-head .btn { margin: 0; padding: 6px 14px; }
 .app-cmp-head { display: flex; justify-content: space-between; font-weight: 600; margin-bottom: 8px; }
+
+.app-list[hidden], .app-fr-tabs[hidden], #frSecFriends[hidden] { display: none; }
+.app-fr-sections { margin-bottom: 10px; }
+.app-fr-sections .btn { position: relative; }
+.app-fr-sections .app-pill { margin-left: 6px; }
+.app-fr-sections { grid-template-columns: repeat(2, 1fr); }

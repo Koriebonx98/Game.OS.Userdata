@@ -67,11 +67,13 @@
         </section>
         <section id="view-friends" class="app-view" hidden>
             <div id="notifBox" class="app-card"></div>
-            <div class="app-fr-head"><h2 class="app-h2">Friends</h2><button class="btn app-more" id="addFriendBtn">➕ Add</button></div>
+            <div class="app-filters app-fr-tabs app-fr-sections"><button class="btn app-more active" data-frsec="friends">👥 Friends</button><button class="btn app-more" data-frsec="messages">💬 Messages<span id="msgSecBadge" class="app-pill" hidden></span></button></div>
+            <div id="frSecFriends"><div class="app-fr-head"><h2 class="app-h2">Friends</h2><button class="btn app-more" id="addFriendBtn">➕ Add</button></div>
             <form id="addFriendForm" class="app-chat-form" hidden><input id="addFriendInput" type="text" placeholder="Username…" autocomplete="off" autocapitalize="none"><button class="btn" type="submit">Add</button></form>
             <small id="addFriendMsg" class="app-count"></small>
             <div id="reqList" class="app-list"></div>
-            <div id="chatList" class="app-list"></div>
+            <div id="friendList" class="app-list"></div></div>
+            <div id="chatList" class="app-list" hidden></div>
             <div id="alertList" hidden></div><div id="friendActivity" hidden></div>
             <div id="chatPane" class="app-chat" hidden>
                 <div class="app-chat-head"><button id="chatBack" class="app-fav">‹</button><b id="chatWith"></b></div>
@@ -300,7 +302,7 @@
             returnFriend = null;
             const lib = friendLibs[f] || [];
             const pt = lib.reduce((n, g) => n + minutesOf(g), 0);
-            $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover"><span>👤</span></div><div><h2>${esc(f)}</h2><small>🎮 ${lib.length} games</small><small>⏱ ${fmtPlaytime(pt)} played</small></div></div>
+            $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover"><span>👤</span></div><div><h2>${esc(f)}</h2><small>🎮 ${lib.length} games</small><small>⏱ ${fmtPlaytime(pt)} played</small><small id="frAchTotal">🏆 … achievements</small></div></div>
                 <button class="btn app-more" id="friendChat">💬 Message</button>
                 <div class="app-filters app-fr-tabs"><button class="btn app-more" data-frtab="games">🎮 Games</button><button class="btn app-more" data-frtab="wish">⭐ Wishlist</button><button class="btn app-more" data-frtab="ach">🏆 Achievements</button></div>
                 <div id="frGames" class="app-list"></div>
@@ -314,6 +316,8 @@
             frTab('games');
             loadWishlist(f).then(w => {
                 if ($('gameDetail').hidden) return;
+                const wt = $('detailBody').querySelector('[data-frtab="wish"]');
+                if (wt) wt.textContent = '⭐ Wishlist (' + w.length + ')';
                 $('frWish').innerHTML = w.length ? w.map(g => row({ title: g.title, platform: g.platform, coverUrl: g.coverUrl || g.cover, _owner: f })).join('') : empty('Wishlist is empty.');
             });
             $('gameDetail').hidden = false;
@@ -323,6 +327,9 @@
             if (!friendAch[f]) friendAch[f] = await loadAchFor(f);
             const ach = [...(friendAch[f] || [])];
             if ($('gameDetail').hidden) return;
+            $('frAchTotal').textContent = '🏆 ' + ach.length + ' achievement' + (ach.length === 1 ? '' : 's');
+            const achTab = $('detailBody').querySelector('[data-frtab="ach"]');
+            if (achTab) achTab.textContent = '🏆 Achievements (' + ach.length + ')';
             ach.sort((a, b) => String(b.unlockedAt).localeCompare(String(a.unlockedAt)));
             const groups = {};
             ach.forEach(a => { const k = (a.gameTitle || 'Unknown') + '|' + (a.platform || ''); (groups[k] = groups[k] || { title: a.gameTitle || 'Unknown', platform: a.platform || '', n: 0 }).n++; });
@@ -452,10 +459,21 @@
         }
         function renderChats(unread) {
             lastUnread = unread || {};
-            $('chatList').innerHTML = friends.length ? friends.map(f => {
-                const u = (unread && unread[f]) || {};
-                return `<div class="app-row app-friend-row" data-fr="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${(friendLibs[f] || []).length} games${friendAch[f] ? ' · 🏆 ' + friendAch[f].length : ''}</small></div>${u.n ? `<span class="app-pill">${u.n}</span>` : ''}</div>`;
+            $('friendList').innerHTML = friends.length ? friends.map(f => {
+                return `<div class="app-row app-friend-row" data-fr="${esc(f)}"><div class="app-cover"><span>👤</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${(friendLibs[f] || []).length} games${friendAch[f] ? ' · 🏆 ' + friendAch[f].length : ''}</small></div></div>`;
             }).join('') : empty('No friends yet. Tap Add to find some.');
+            $('chatList').innerHTML = friends.length ? friends.map(f => {
+                const u = lastUnread[f] || {};
+                return `<div class="app-row" data-chat-fr="${esc(f)}"><div class="app-cover"><span>💬</span></div><div class="app-row-info"><b>${esc(f)}</b><small>${u.n ? u.n + ' unread message' + (u.n > 1 ? 's' : '') : 'Tap to chat'}</small></div>${u.n ? `<span class="app-pill">${u.n}</span>` : ''}</div>`;
+            }).join('') : empty('No friends to message yet.');
+            const total = Object.values(lastUnread).reduce((n, u) => n + ((u && u.n) || 0), 0);
+            $('msgSecBadge').hidden = !total; $('msgSecBadge').textContent = total;
+        }
+        function showFrSection(sec) {
+            document.querySelectorAll('[data-frsec]').forEach(b => b.classList.toggle('active', b.dataset.frsec === sec));
+            $('frSecFriends').hidden = sec !== 'friends';
+            $('chatList').hidden = sec !== 'messages';
+            $('chatPane').hidden = true; chatFriend = null;
         }
         function renderReqs(reqs) {
             $('reqList').innerHTML = reqs.map(n => `<div class="app-row"><div class="app-cover"><span>👥</span></div><div class="app-row-info"><b>${esc(n)}</b><small>Friend request</small></div><button class="btn app-more" data-accept="${esc(n)}">Accept</button></div>`).join('');
@@ -478,7 +496,7 @@
         let chatFriend = null;
         async function openChat(f) {
             chatFriend = f;
-            $('chatList').hidden = true; $('chatPane').hidden = false; $('chatWith').textContent = f;
+            $('chatList').hidden = true; $('frSecFriends').hidden = true; document.querySelectorAll('[data-frsec]').forEach(b => b.classList.toggle('active', b.dataset.frsec === 'messages')); $('chatPane').hidden = false; $('chatWith').textContent = f;
             const msgs = await fetchMsgs(f).catch(() => []);
             $('chatMsgs').innerHTML = msgs.map(m => `<div class="app-bubble ${(m.from || '').toLowerCase() === user.username.toLowerCase() ? 'me' : ''}">${esc(m.text)}</div>`).join('') || empty('No messages yet.');
             $('chatMsgs').scrollTop = 1e9;
@@ -550,7 +568,9 @@
             $('addFriendBtn').onclick = () => { $('addFriendForm').hidden = !$('addFriendForm').hidden; };
             $('addFriendForm').addEventListener('submit', addFriend);
             $('reqList').addEventListener('click', e => { const b = e.target.closest('[data-accept]'); if (b) acceptReq(b.dataset.accept); });
-            $('chatBack').onclick = () => { chatFriend = null; $('chatPane').hidden = true; $('chatList').hidden = false; };
+            $('chatBack').onclick = () => showFrSection('messages');
+            document.querySelectorAll('[data-frsec]').forEach(b => b.onclick = () => showFrSection(b.dataset.frsec));
+            $('chatList').addEventListener('click', e => { const r = e.target.closest('[data-chat-fr]'); if (r) openChat(r.dataset.chatFr); });
             $('chatForm').addEventListener('submit', sendChat);
             setInterval(() => pollAlerts(true), 30000);
             document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(true); });
