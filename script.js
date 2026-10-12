@@ -1038,6 +1038,7 @@ function getCurrentUser() {
  * Logout user
  */
 function logout() {
+    try { const u = getCurrentUser(); if (u && u.username) localStorage.setItem('gameOS_lastUser', u.username); } catch (_) {}
     localStorage.removeItem('gameOSUser');
     sessionStorage.removeItem('gameOSUser');
     window.location.href = 'login.html';
