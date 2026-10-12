@@ -31,6 +31,8 @@
             </div>
             <h2 class="app-h2">Recently added</h2>
             <div id="recentList" class="app-list"></div>
+            <h2 class="app-h2">Recently played</h2>
+            <div id="recentPlayedList" class="app-list"></div>
         </section>
         <section id="view-library" class="app-view" hidden>
             <input id="libSearch" class="app-search" type="search" placeholder="Search your library…">
@@ -41,10 +43,12 @@
                     <option value="playtime">Most playtime</option>
                     <option value="achievements">Most achievements</option>
                     <option value="recent">Recently added</option>
+                    <option value="played">Recently played</option>
                 </select>
                 <select id="libShow" aria-label="Show">
                     <option value="">All games</option>
                     <option value="played">Played</option>
+                    <option value="recentPlayed">Recently played</option>
                     <option value="unplayed">Not played</option>
                     <option value="ach">With achievements</option>
                     <option value="fav">Favourites</option>
@@ -79,6 +83,28 @@
                 <form id="chatForm" class="app-chat-form"><input id="chatInput" type="text" placeholder="Message…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
             </div>
         </section>
+        <section id="view-profile" class="app-view" hidden>
+            <h2 class="app-h2">My Profile</h2>
+            <div id="profileSummary" class="app-card"></div>
+            <a id="profilePageLink" class="btn app-more app-page-link" href="profile.html">View full profile</a>
+        </section>
+        <section id="view-settings" class="app-view" hidden>
+            <h2 class="app-h2">Settings</h2>
+            <div class="app-card">
+                <b>Account</b>
+                <p>Update your account details and password on the account page.</p>
+                <a id="accountPageLink" class="btn app-more app-page-link" href="account.html">Open account settings</a>
+            </div>
+            <div class="app-card">
+                <b>Notifications</b>
+                <p id="settingsNotifStatus">Check notification permission for this device.</p>
+                <button id="settingsNotifBtn" class="btn app-more">Enable notifications</button>
+            </div>
+            <div class="app-card">
+                <b>PC game streaming</b>
+                <p>PC streaming is not available yet. Secure pairing, PC screen capture, and a WebRTC video transport need to be added before this can connect safely.</p>
+            </div>
+        </section>
     </main>
 
     <div id="gameDetail" class="app-detail" hidden>
@@ -98,6 +124,8 @@
         <button data-view="favourites"><span>❤️</span>Favourites</button>
         <button data-view="store"><span>🛒</span>Store</button>
         <button data-view="friends"><span>👥</span>Friends<i id="alertBadge" hidden></i></button>
+        <button data-view="profile"><span>👤</span>Profile</button>
+        <button data-view="settings"><span>⚙️</span>Settings</button>
     </nav>
 
     <script src="script.js"></script>
@@ -106,6 +134,7 @@
         const $ = id => document.getElementById(id);
         const esc = s => escapeHtml(String(s == null ? '' : s));
         let user = null, library = [], userAch = null, friendAch = {}, returnFriend = null;
+        let activityLog = [];
 
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -151,9 +180,42 @@
             const pt = minutesOf(g), ac = achOf(g);
             return `<div class="app-row" ${g.title && g.platform != null && !g._noOpen ? `data-open-p="${esc(g.platform)}" data-open-t="${esc(g.title)}"${g._owner ? ' data-open-f="' + esc(g._owner) + '"' : ''}` : ''}><div class="app-cover">${cover}</div>
                 <div class="app-row-info"><b>${esc(g.title)}</b>
-                <small>${esc(g.platform)}${pt ? ' · ⏱ ' + fmtPlaytime(pt) : ''}${ac ? ' · 🏆 ' + ac : ''}</small></div>${extra || ''}</div>`;
+                <small>${esc(g.platform)}${pt ? ' · ⏱ ' + fmtPlaytime(pt) : ''}${ac ? ' · 🏆 ' + ac : ''}${g.lastPlayedAt ? ' · Played ' + esc(relativeTime(g.lastPlayedAt)) : ''}</small></div>${extra || ''}</div>`;
         }
         function empty(msg) { return `<p class="games-list-empty">${msg}</p>`; }
+        function relativeTime(value) {
+            const time = Date.parse(value);
+            if (!Number.isFinite(time)) return '';
+            const minutes = Math.max(0, Math.floor((Date.now() - time) / 60000));
+            if (minutes < 1) return 'just now';
+            if (minutes < 60) return minutes + 'm ago';
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return hours + 'h ago';
+            const days = Math.floor(hours / 24);
+            return days < 30 ? days + 'd ago' : new Date(time).toLocaleDateString();
+        }
+        function applyPlayHistory() {
+            const latestByGame = new Map();
+            for (const event of Array.isArray(activityLog) ? activityLog : []) {
+                if (event.type && event.type !== 'playtime') continue;
+                const title = String(event.gameTitle || '').trim().toLowerCase();
+                const platform = String(event.platform || '').trim().toLowerCase();
+                const playedAt = event.sessionEnd || event.loggedAt || event.sessionStart;
+                if (!title || !playedAt || !Number.isFinite(Date.parse(playedAt))) continue;
+                const key = platform + '\u0000' + title;
+                if (!latestByGame.has(key) || Date.parse(playedAt) > Date.parse(latestByGame.get(key)))
+                    latestByGame.set(key, playedAt);
+            }
+            library.forEach(game => {
+                const key = String(game.platform || '').trim().toLowerCase() + '\u0000' +
+                    String(game.title || '').trim().toLowerCase();
+                const fromActivity = latestByGame.get(key);
+                const recorded = game.lastPlayedAt || game.lastPlayed || '';
+                const fromGame = Number.isFinite(Date.parse(recorded)) ? recorded : '';
+                game.lastPlayedAt = fromActivity && (!fromGame || Date.parse(fromActivity) > Date.parse(fromGame))
+                    ? fromActivity : fromGame;
+            });
+        }
 
         let libPlatform = '', libSort = 'name', libShow = '';
         function fillPlatforms() {
@@ -174,8 +236,11 @@
                 name: (a, b) => (a.title || '').localeCompare(b.title || ''),
                 playtime: (a, b) => minutesOf(b) - minutesOf(a) || (a.title || '').localeCompare(b.title || ''),
                 achievements: (a, b) => achOf(b) - achOf(a) || (a.title || '').localeCompare(b.title || ''),
-                recent: (a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')
+                recent: (a, b) => (b.addedAt || '').localeCompare(a.addedAt || ''),
+                played: (a, b) => (b.lastPlayedAt || '').localeCompare(a.lastPlayedAt || '') ||
+                    (a.title || '').localeCompare(b.title || '')
             }[libSort];
+            if (libShow === 'recentPlayed') list = list.filter(g => !!g.lastPlayedAt);
             list.sort(cmp);
             $('libCount').textContent = list.length + ' game' + (list.length === 1 ? '' : 's') + ' · ⏱ ' + fmtPlaytime(list.reduce((n, g) => n + minutesOf(g), 0)) + ' · 🏆 ' + list.reduce((n, g) => n + achOf(g), 0);
             const plats = [...new Set(library.map(g => g.platform).filter(Boolean))].sort();
@@ -196,6 +261,41 @@
             $('statAch').textContent = userAch ? Math.max(userAch.length, 0) : library.reduce((n, g) => n + achBase(g), 0);
             const recent = [...library].sort((a, b) => (b.addedAt || '').localeCompare(a.addedAt || '')).slice(0, 5);
             $('recentList').innerHTML = recent.length ? recent.map(g => row(g)).join('') : empty('Your library is empty.');
+            const played = library.filter(g => g.lastPlayedAt && Number.isFinite(Date.parse(g.lastPlayedAt)))
+                .sort((a, b) => Date.parse(b.lastPlayedAt) - Date.parse(a.lastPlayedAt)).slice(0, 5);
+            $('recentPlayedList').innerHTML = played.length
+                ? played.map(g => row(g)).join('')
+                : empty('No play sessions recorded yet.');
+        }
+        function renderProfile() {
+            const params = new URLSearchParams();
+            params.set('user', user.username);
+            $('profilePageLink').href = 'profile.html?' + params.toString();
+            $('accountPageLink').href = 'account.html';
+            const email = user.email ? `<small>${esc(user.email)}</small>` : '';
+            const joined = user.created_at || user.createdAt;
+            const memberSince = joined && Number.isFinite(Date.parse(joined))
+                ? new Date(joined).toLocaleDateString() : '—';
+            const platforms = new Set(library.map(g => g.platform).filter(Boolean)).size;
+            $('profileSummary').innerHTML = `<div class="app-profile-head"><div class="app-profile-avatar">👤</div><div><b>${esc(user.username)}</b>${email}<small>Member since ${esc(memberSince)}</small></div></div>
+                <div class="app-profile-stats"><span><b>${library.length}</b>Games</span><span><b>${platforms}</b>Platforms</span><span><b>${fmtPlaytime(library.reduce((n, g) => n + minutesOf(g), 0))}</b>Playtime</span></div>`;
+        }
+        function renderSettingsNotifications() {
+            const status = $('settingsNotifStatus');
+            const button = $('settingsNotifBtn');
+            if (!('Notification' in window)) {
+                status.textContent = 'Notifications are not supported in this browser.';
+                button.hidden = true;
+            } else if (Notification.permission === 'granted') {
+                status.textContent = 'Notifications are enabled on this device.';
+                button.hidden = true;
+            } else if (Notification.permission === 'denied') {
+                status.textContent = 'Notifications are blocked. Change this site’s permission in iOS Settings.';
+                button.hidden = true;
+            } else {
+                status.textContent = 'Allow notifications to receive Game OS alerts.';
+                button.hidden = false;
+            }
         }
         function findGame(p, t, f) {
             const inLib = l => (l || []).find(g => g.title === t && g.platform === p);
@@ -542,6 +642,12 @@
             try {
                 library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
             } catch (_) { library = []; }
+            try {
+                activityLog = MODE === 'demo' ? [] : await getActivityLogGitHub(user.username);
+            } catch (_) { activityLog = []; }
+            applyPlayHistory();
+            renderProfile();
+            renderSettingsNotifications();
             fillPlatforms(); renderAll(); loadUserAch().then(renderAll);
             if (typeof syncFavourites === 'function') syncFavourites(user.username).then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats(); renderFriends(); initStore();
@@ -558,6 +664,12 @@
             document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => showView(b.dataset.view));
             $('libSearch').addEventListener('input', renderLibrary);
             ['libPlatform', 'libSort', 'libShow'].forEach(id => $(id).addEventListener('change', renderLibrary));
+            $('settingsNotifBtn').onclick = async () => {
+                if (!('Notification' in window)) return;
+                await Notification.requestPermission();
+                renderSettingsNotifications();
+                subscribePush();
+            };
             $('libGroups').addEventListener('click', e => { const c = e.target.closest('[data-plat]'); if (c) { $('libPlatform').value = c.dataset.plat; renderLibrary(); } });
             $('achSheetClose').onclick = () => { $('achSheet').hidden = true; };
             $('achSheet').addEventListener('click', e => { if (e.target === $('achSheet')) $('achSheet').hidden = true; });

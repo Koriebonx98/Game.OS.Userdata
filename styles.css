@@ -2245,6 +2245,16 @@ header nav { display: flex; flex-wrap: wrap; gap: 6px; }
 .app-stat b { font-size: 1.8rem; color: #fff; }
 .app-stat span { color: var(--text-muted); font-size: .85rem; }
 .app-card { padding: 14px; margin-bottom: 12px; }
+.app-card p { color: var(--text-muted); font-size: .9rem; line-height: 1.5; margin: 8px 0 12px; }
+.app-profile-head { display: flex; align-items: center; gap: 12px; }
+.app-profile-avatar { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: linear-gradient(135deg, #6c63ff, #00b4d8); font-size: 1.5rem; }
+.app-profile-head b, .app-profile-head small { display: block; }
+.app-profile-head b { color: #fff; font-size: 1.1rem; }
+.app-profile-head small { color: var(--text-muted); margin-top: 3px; }
+.app-profile-stats { display: flex; justify-content: space-around; gap: 8px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border-color); text-align: center; }
+.app-profile-stats span { display: flex; flex-direction: column; gap: 4px; color: var(--text-muted); font-size: .78rem; }
+.app-profile-stats b { color: #fff; font-size: 1.05rem; }
+.app-page-link { display: inline-flex; align-items: center; justify-content: center; padding: 10px 14px; color: #fff; text-decoration: none; }
 .app-search { width: 100%; box-sizing: border-box; padding: 12px 14px; margin-bottom: 12px; font-size: 16px; background: var(--bg-card); color: #fff; border: 1px solid var(--border-color); border-radius: 12px; }
 .app-list { display: flex; flex-direction: column; gap: 10px; }
 .app-row { display: flex; align-items: center; gap: 12px; padding: 10px; }
@@ -2254,8 +2264,9 @@ header nav { display: flex; flex-wrap: wrap; gap: 6px; }
 .app-row-info b { color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .app-row-info small { color: var(--text-muted); }
 .app-fav { background: none; border: none; font-size: 1.4rem; padding: 8px; cursor: pointer; }
-.app-tabbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; background: rgba(30,41,59,.95); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border-color); padding-bottom: env(safe-area-inset-bottom); z-index: 20; }
-.app-tabbar button { flex: 1; position: relative; background: none; border: none; color: var(--text-muted); padding: 10px 0; font-size: .7rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.app-tabbar { position: fixed; left: 0; right: 0; bottom: 0; display: flex; overflow-x: auto; background: rgba(30,41,59,.95); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-top: 1px solid var(--border-color); padding-bottom: env(safe-area-inset-bottom); z-index: 20; scrollbar-width: none; }
+.app-tabbar::-webkit-scrollbar { display: none; }
+.app-tabbar button { flex: 1 0 52px; position: relative; background: none; border: none; color: var(--text-muted); padding: 10px 2px; font-size: .7rem; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; }
 .app-tabbar button span { font-size: 1.35rem; }
 .app-tabbar button.active { color: var(--primary-color); }
 .app-tabbar i { position: absolute; top: 4px; left: 55%; background: var(--danger-color); color: #fff; font-style: normal; font-size: .65rem; min-width: 16px; border-radius: 8px; padding: 1px 4px; }
