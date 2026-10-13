@@ -117,16 +117,20 @@ namespace GameLauncher.Services
                 }
             }
             catch { }
-            if (_pin.Length == 0)
+            if (_pin.Length == 0) RegeneratePin();
+        }
+
+        /// <summary>Creates a new random 6-digit PIN and persists it; existing viewers must re-enter it.</summary>
+        public static string RegeneratePin()
+        {
+            _pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            try
             {
-                _pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
-                    File.WriteAllText(ConfigPath, JsonSerializer.Serialize(new { pin = _pin, port = _port }));
-                }
-                catch { }
+                Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
+                File.WriteAllText(ConfigPath, JsonSerializer.Serialize(new { pin = _pin, port = _port }));
             }
+            catch { }
+            return _pin;
         }
 
         private static IEnumerable<string> GetLanAddresses()
@@ -265,7 +269,7 @@ namespace GameLauncher.Services
         private static async Task Respond(NetworkStream s, int code, string type, string body)
         {
             var b = Encoding.UTF8.GetBytes(body);
-            var h = Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {(code == 200 ? "OK" : "Error")}\r\nContent-Type: {type}\r\nContent-Length: {b.Length}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
+            var h = Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {(code == 200 ? "OK" : "Error")}\r\nContent-Type: {type}\r\nContent-Length: {b.Length}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
             await s.WriteAsync(h);
             await s.WriteAsync(b);
         }
@@ -278,7 +282,7 @@ namespace GameLauncher.Services
                 return;
             }
             await s.WriteAsync(Encoding.ASCII.GetBytes(
-                "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"), ct);
+                "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"), ct);
             while (!ct.IsCancellationRequested)
             {
                 var started = Environment.TickCount64;

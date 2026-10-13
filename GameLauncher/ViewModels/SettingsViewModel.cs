@@ -689,6 +689,12 @@ public partial class SettingsViewModel : ViewModelBase
         StreamCopyStatus = "";
     }
 
+    [RelayCommand]
+    public void RegenerateStreamPin()
+    {
+        if (StreamHostService.IsRunning) StreamPin = StreamHostService.RegeneratePin();
+    }
+
     [ObservableProperty] private string _streamTestResult = "";
 
     [RelayCommand]
