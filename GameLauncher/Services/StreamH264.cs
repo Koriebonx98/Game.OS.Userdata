@@ -21,6 +21,33 @@ namespace GameLauncher.Services
         /// <summary>Codec string the viewer passes to Media Source Extensions (constrained baseline, level 4.2).</summary>
         private const string H264Codec = "avc1.42E02A";
 
+        private static readonly string FfmpegDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GameOS", "ffmpeg");
+        private static int _ffmpegDownloadStarted;
+
+        /// <summary>Downloads ffmpeg via the Xabe.FFmpeg.Downloader NuGet package (once, in the background) if none is found.</summary>
+        public static void EnsureFfmpegAsync()
+        {
+            if (!OperatingSystem.IsWindows() || FindFfmpeg() != null) return;
+            if (Interlocked.Exchange(ref _ffmpegDownloadStarted, 1) == 1) return;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    Directory.CreateDirectory(FfmpegDir);
+                    DevLogService.Log("[Stream] Downloading ffmpeg for H.264 streaming…");
+                    await Xabe.FFmpeg.Downloader.FFmpegDownloader.GetLatestVersion(Xabe.FFmpeg.Downloader.FFmpegVersion.Official, FfmpegDir);
+                    _ffmpegPath = null;
+                    DevLogService.Log(FindFfmpeg() != null ? "[Stream] ffmpeg ready." : "[Stream] ffmpeg download finished but ffmpeg.exe not found.");
+                }
+                catch (Exception ex)
+                {
+                    DevLogService.Log("[Stream] ffmpeg download failed: " + ex.Message);
+                    Interlocked.Exchange(ref _ffmpegDownloadStarted, 0);
+                }
+            });
+        }
+
         private static string? FindFfmpeg()
         {
             if (_ffmpegPath != null) return _ffmpegPath.Length == 0 ? null : _ffmpegPath;
@@ -29,6 +56,7 @@ namespace GameLauncher.Services
             {
                 Path.Combine(AppContext.BaseDirectory, exe),
                 Path.Combine(AppContext.BaseDirectory, "ffmpeg", exe),
+                Path.Combine(FfmpegDir, exe),
                 Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GameOS", exe)
             };
             foreach (var dir in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(Path.PathSeparator, StringSplitOptions.RemoveEmptyEntries))
@@ -99,9 +127,10 @@ namespace GameLauncher.Services
                 $"Sec-WebSocket-Accept: {accept}\r\n\r\n"), ct);
 
             string? ffmpeg = OperatingSystem.IsWindows() ? FindFfmpeg() : null;
+            if (ffmpeg == null) EnsureFfmpegAsync();
             if (ffmpeg == null)
             {
-                await SendWebSocketFrame(net, 0x1, Encoding.UTF8.GetBytes("{\"error\":\"H.264 needs ffmpeg.exe next to the launcher or on PATH.\"}"), ct);
+                await SendWebSocketFrame(net, 0x1, Encoding.UTF8.GetBytes("{\"error\":\"H.264 is preparing (ffmpeg is downloading); using MJPEG for now.\"}"), ct);
                 return;
             }
 

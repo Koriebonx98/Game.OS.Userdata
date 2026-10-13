@@ -87,6 +87,7 @@ namespace GameLauncher.Services
                 _listener = new TcpListener(IPAddress.Any, _port);
                 _listener.Start();
                 _ = Task.Run(() => AcceptLoop(_cts.Token));
+                EnsureFfmpegAsync();
                 DevLogService.Log($"[Stream] Listening on port {_port}. PIN {_pin}");
             }
             catch (Exception ex)
