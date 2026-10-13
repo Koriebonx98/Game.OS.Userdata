@@ -27,7 +27,7 @@ namespace GameLauncher.Services
     /// Uses a raw <see cref="TcpListener"/> so no Windows URL-ACL/admin rights are needed.
     /// Capture is currently Windows-only (GDI).
     /// </summary>
-    public static class StreamHostService
+    public static partial class StreamHostService
     {
         public const int DefaultPort = 47632;
 
@@ -87,6 +87,7 @@ namespace GameLauncher.Services
                 _listener = new TcpListener(IPAddress.Any, _port);
                 _listener.Start();
                 _ = Task.Run(() => AcceptLoop(_cts.Token));
+                EnsureFfmpegAsync();
                 DevLogService.Log($"[Stream] Listening on port {_port}. PIN {_pin}");
             }
             catch (Exception ex)
@@ -117,16 +118,20 @@ namespace GameLauncher.Services
                 }
             }
             catch { }
-            if (_pin.Length == 0)
+            if (_pin.Length == 0) RegeneratePin();
+        }
+
+        /// <summary>Creates a new random 6-digit PIN and persists it; existing viewers must re-enter it.</summary>
+        public static string RegeneratePin()
+        {
+            _pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            try
             {
-                _pin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
-                try
-                {
-                    Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
-                    File.WriteAllText(ConfigPath, JsonSerializer.Serialize(new { pin = _pin, port = _port }));
-                }
-                catch { }
+                Directory.CreateDirectory(Path.GetDirectoryName(ConfigPath)!);
+                File.WriteAllText(ConfigPath, JsonSerializer.Serialize(new { pin = _pin, port = _port }));
             }
+            catch { }
+            return _pin;
         }
 
         private static IEnumerable<string> GetLanAddresses()
@@ -215,6 +220,13 @@ namespace GameLauncher.Services
                         int jq = qp.TryGetValue("q", out var qs) && int.TryParse(qs, out var qv) ? ClampJpegQuality(qv) : _jpegQuality;
                         await StreamMjpeg(stream, ct, fps, w, jq);
                     }
+                    else if (path == "/video")
+                    {
+                        int fps = qp.TryGetValue("fps", out var f2) && int.TryParse(f2, out var fv2) ? ClampFrameRate(fv2) : _frameRate;
+                        int w = qp.TryGetValue("w", out var ws2) && int.TryParse(ws2, out var wv2) ? ClampMaxWidth(wv2) : _maxWidth;
+                        int jq = qp.TryGetValue("q", out var qs2) && int.TryParse(qs2, out var qv2) ? ClampJpegQuality(qv2) : _jpegQuality;
+                        await StreamH264(client, request, ct, fps, w, jq);
+                    }
                     else if (path == "/audio")
                         await StreamAudio(client, request, ct);
                     else
@@ -265,7 +277,7 @@ namespace GameLauncher.Services
         private static async Task Respond(NetworkStream s, int code, string type, string body)
         {
             var b = Encoding.UTF8.GetBytes(body);
-            var h = Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {(code == 200 ? "OK" : "Error")}\r\nContent-Type: {type}\r\nContent-Length: {b.Length}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
+            var h = Encoding.ASCII.GetBytes($"HTTP/1.1 {code} {(code == 200 ? "OK" : "Error")}\r\nContent-Type: {type}\r\nContent-Length: {b.Length}\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n");
             await s.WriteAsync(h);
             await s.WriteAsync(b);
         }
@@ -278,7 +290,7 @@ namespace GameLauncher.Services
                 return;
             }
             await s.WriteAsync(Encoding.ASCII.GetBytes(
-                "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"), ct);
+                "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"), ct);
             while (!ct.IsCancellationRequested)
             {
                 var started = Environment.TickCount64;
@@ -487,7 +499,7 @@ body.immersive #controls{opacity:.25;transition:opacity .2s}body.immersive #cont
 <label>Width <select id='sW'><option>640</option><option>854</option><option>1280</option><option>1920</option></select></label>
 <label>Quality <select id='sQ'><option>35</option><option>50</option><option>60</option><option>75</option><option>90</option></select></label>
 <div style='margin-top:8px'><button id='sApply'>Apply</button> <button id='sTest'>Test connection</button></div><div id='sRes' style='margin-top:6px'></div></div>
-<img id='s' alt='Connecting…'>
+<img id='s' alt='Connecting…'><video id='v' muted playsinline autoplay disablepictureinpicture style='display:none;width:100%;height:100%;object-fit:contain;background:#000'></video>
 <script>
 var s=document.getElementById('s'), audioButton=document.getElementById('audio'), status=document.getElementById('audioStatus');
 var pinQ='" + Uri.EscapeDataString(pin) + @"';
@@ -503,7 +515,34 @@ document.getElementById('sTest').onclick=async function(){var r=document.getElem
  var l=Math.min.apply(null,lat),t0=performance.now(),b=await (await fetch('/speedtest?pin='+pinQ+'&kb=2048&t='+Date.now(),{cache:'no-store'})).arrayBuffer();
  var mbps=b.byteLength*8/1e6/((performance.now()-t0)/1000);var q=mbps>=20&&l<=40?'Good':mbps>=8&&l<=100?'OK':'Bad';
  r.textContent=q+' connection — '+mbps.toFixed(1)+' Mbps, '+l.toFixed(0)+' ms latency'}catch(e){r.textContent='Test failed'}};
-s.onerror=function(){setTimeout(go,1500)};go();
+var vid=document.getElementById('v'),vws=null,vgen=0;
+function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
+function startVideo(){
+ var gen=++vgen;if(vws){try{vws.close()}catch(e){}vws=null}
+ var MS=window.ManagedMediaSource||window.MediaSource;
+ if(!MS){startMjpeg();return}
+ var a='';if(cfg.fps)a+='&fps='+cfg.fps;if(cfg.w)a+='&w='+cfg.w;if(cfg.q)a+='&q='+cfg.q;
+ var ms=new MS(),sb=null,queue=[],got=false,ws=new WebSocket('ws://'+location.host+'/video?pin='+pinQ+a);vws=ws;ws.binaryType='arraybuffer';
+ var fb=setTimeout(function(){if(!got&&gen===vgen){try{ws.close()}catch(e){}startMjpeg()}},6000);
+ function pump(){if(!sb||sb.updating||!queue.length)return;try{
+  if(queue.length>60){queue.length=0;return}
+  sb.appendBuffer(queue.shift())}catch(e){queue.length=0}}
+ function live(){try{var b=vid.buffered;if(b.length){var e=b.end(b.length-1);if(e-vid.currentTime>.3)vid.currentTime=e-.05;if(vid.paused)vid.play().catch(function(){});
+  if(b.start(0)<vid.currentTime-4&&!sb.updating)sb.remove(0,vid.currentTime-2)}}catch(e){}}
+ vid.disableRemotePlayback=true;vid.src=URL.createObjectURL(ms);
+ ws.onmessage=function(e){
+  if(gen!==vgen)return;
+  if(typeof e.data==='string'){var m=JSON.parse(e.data);if(m.error){clearTimeout(fb);startMjpeg();return}
+   var open=function(){sb=ms.addSourceBuffer('video/mp4; codecs=""'+m.codec+'""');sb.mode='sequence';sb.onupdateend=function(){live();pump()};pump()};
+   if(ms.readyState==='open')open();else ms.addEventListener('sourceopen',open,{once:true});return}
+  if(!got){got=true;clearTimeout(fb);s.style.display='none';vid.style.display='block'}
+  queue.push(e.data);pump()};
+ ws.onclose=function(){if(gen===vgen&&got)setTimeout(startVideo,1000)};
+ ws.onerror=function(){if(!got&&gen===vgen){clearTimeout(fb);startMjpeg()}};
+}
+s.onerror=function(){setTimeout(go,1500)};
+document.getElementById('sApply').addEventListener('click',function(){startVideo()});
+startVideo();
 var ctx=null,socket=null,nextAt=0;
 audioButton.onclick=async function(){
  if(socket){socket.close();socket=null;if(ctx){await ctx.close();ctx=null}audioButton.textContent='Enable audio';status.textContent='';return}

@@ -374,6 +374,9 @@
                                         <Button Classes="btn-secondary"
                                                 Content="Copy PIN"
                                                 Click="OnCopyStreamPinClicked"/>
+                                        <Button Classes="btn-secondary"
+                                                Content="New PIN"
+                                                Command="{Binding RegenerateStreamPinCommand}"/>
                                     </StackPanel>
                                     <Button Classes="btn-secondary" Content="Test connection"
                                             Command="{Binding TestStreamConnectionCommand}"/>
