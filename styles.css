@@ -2280,7 +2280,7 @@ header nav { display: flex; flex-wrap: wrap; gap: 6px; }
 .app-stat { background: linear-gradient(145deg, var(--bg-card), rgba(99,102,241,.15)); }
 .app-row { transition: transform .1s; } .app-row:active { transform: scale(.98); }
 .app-pill { background: var(--danger-color); color: #fff; border-radius: 12px; padding: 2px 8px; font-size: .75rem; }
-.app-chat { display: flex; flex-direction: column; height: calc(100dvh - 190px - env(safe-area-inset-bottom)); }
+.app-chat { position: fixed; inset: 0; z-index: 70; display: flex; flex-direction: column; padding: calc(env(safe-area-inset-top) + 12px) 14px calc(env(safe-area-inset-bottom) + 12px); background: #0b1020; }
 .app-chat[hidden] { display: none; }
 .app-chat-head { display: flex; align-items: center; gap: 8px; color: #fff; }
 .app-chat-msgs { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding: 8px 0; }
