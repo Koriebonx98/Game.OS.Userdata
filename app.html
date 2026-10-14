@@ -366,13 +366,7 @@
             if (!items.length) $('detailAch').innerHTML = empty('No achievements synced for this game yet.');
             else {
                 $('detailAch').innerHTML = `<small style="color:var(--text-muted)">${done} / ${items.length} unlocked</small><div class="app-ach-progress"><div style="width:${Math.round(done / items.length * 100)}%"></div></div>` +
-                    items.slice(0, 5).map(achHtml).join('') +
-                    (items.length > 5 ? `<button class="btn app-more" id="achMore">View all ${items.length} achievements</button>` : '');
-                if (items.length > 5) $('achMore').onclick = () => {
-                    $('achSheetTitle').textContent = '🏆 ' + g.title + ' (' + done + '/' + items.length + ')';
-                    $('achSheetBody').innerHTML = items.map(achHtml).join('');
-                    $('achSheet').hidden = false;
-                };
+                    items.map(achHtml).join('');
             }
             if (!friendsLoaded) await loadFriends();
             const owners = friends.filter(f => (friendLibs[f] || []).some(x => (x.title || '').toLowerCase() === (g.title || '').toLowerCase() && (!x.platform || !g.platform || x.platform === g.platform)));
@@ -475,7 +469,12 @@
             $('storeList').addEventListener('click', async e => {
                 const rm = e.target.closest('[data-store-rm]');
                 if (rm) { const g = storeGames[+rm.dataset.storeRm]; if (g) removeFromLibrary(storePlat, gTitle(g), rm); return; }
-                const b = e.target.closest('[data-store-add]'); if (!b) return;
+                const b = e.target.closest('[data-store-add]');
+                if (!b) {
+                    const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen];
+                    if (og) openGame({ title: gTitle(og), platform: storePlat, coverUrl: getGameCoverUrl(og) || '' });
+                    return;
+                }
                 const g = storeGames[+b.dataset.storeAdd]; if (!g) return;
                 b.disabled = true; b.textContent = '⏳';
                 try {
@@ -525,7 +524,7 @@
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(storePlat))}</span>`;
-                return `<div class="app-row"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-more" data-store-rm="${i}">🗑️ Remove</button>` : `<button class="btn" data-store-add="${i}">＋ Add</button>`}</div>`;
+                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {
