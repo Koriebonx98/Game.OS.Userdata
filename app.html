@@ -77,11 +77,6 @@
             <div id="reqList" class="app-list"></div>
             <div id="chatList" class="app-list"></div>
             <div id="alertList" hidden></div><div id="friendActivity" hidden></div>
-            <div id="chatPane" class="app-chat" hidden>
-                <div class="app-chat-head"><button id="chatBack" class="app-fav">‹</button><b id="chatWith"></b></div>
-                <div id="chatMsgs" class="app-chat-msgs"></div>
-                <form id="chatForm" class="app-chat-form"><input id="chatInput" type="text" placeholder="Message…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
-            </div>
         </section>
         <section id="view-profile" class="app-view" hidden>
             <h2 class="app-h2">My Profile</h2>
@@ -124,6 +119,12 @@
             <div id="achSheetBody" class="app-sheet-body"></div>
         </div>
     </div>
+
+    <div id="chatPane" class="app-chat" hidden>
+                <div class="app-chat-head"><button id="chatBack" class="app-fav">‹</button><b id="chatWith"></b></div>
+                <div id="chatMsgs" class="app-chat-msgs"></div>
+                <form id="chatForm" class="app-chat-form"><input id="chatInput" type="text" placeholder="Message…" autocomplete="off"><button class="btn" type="submit">Send</button></form>
+            </div>
 
     <nav class="app-tabbar">
         <button data-view="home" class="active"><span>🏠</span>Home</button>
@@ -252,7 +253,7 @@
             const plats = [...new Set(library.map(g => g.platform).filter(Boolean))].sort();
             $('libGroups').innerHTML = plats.length > 1 ? ['', ...plats].map(p => `<button class="app-chip ${p === libPlatform ? 'active' : ''}" data-plat="${esc(p)}">${p ? esc(p) : 'All'}</button>`).join('') : '';
             $('libList').innerHTML = list.length ? list.map(g =>
-                row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${isFav(g) ? '❤️' : '🤍'}</button>`)).join('') : empty('No games found.');
+                row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${isFav(g) ? '❤️' : '🤍'}</button><button class="app-fav app-del" data-p="${esc(g.platform)}" data-t="${esc(g.title)}" aria-label="Remove from library">🗑️</button>`)).join('') : empty('No games found.');
         }
         function renderFavs() {
             const favs = getFavourites(user.username);
@@ -308,7 +309,7 @@
             return inLib(library) || (f && inLib(friendLibs[f])) || inLib(getFavourites(user.username)) || { title: t, platform: p };
         }
         function openFromEvent(e) {
-            if (e.target.closest('.app-fav')) return false;
+            if (e.target.closest('.app-fav, .app-del')) return false;
             const r = e.target.closest('[data-open-t]');
             if (!r) return false;
             const g = findGame(r.dataset.openP, r.dataset.openT, r.dataset.openF);
@@ -423,7 +424,7 @@
                 $('frWish').innerHTML = w.length ? w.map(g => row({ title: g.title, platform: g.platform, coverUrl: g.coverUrl || g.cover, _owner: f })).join('') : empty('Wishlist is empty.');
             });
             $('gameDetail').hidden = false;
-            $('friendChat').onclick = () => { $('gameDetail').hidden = true; showView('friends'); openChat(f); };
+            $('friendChat').onclick = () => { openChat(f); };
             const recent = [...lib].sort((a, b) => (b.lastPlayed || b.addedAt || '').localeCompare(a.lastPlayed || a.addedAt || ''));
             $('frGames').innerHTML = recent.length ? recent.map(g => row({ ...g, _owner: f })).join('') : empty('No games yet.');
             if (!friendAch[f]) friendAch[f] = await loadAchFor(f);
@@ -472,6 +473,8 @@
             };
             $('storeSearch').addEventListener('input', renderStore);
             $('storeList').addEventListener('click', async e => {
+                const rm = e.target.closest('[data-store-rm]');
+                if (rm) { const g = storeGames[+rm.dataset.storeRm]; if (g) removeFromLibrary(storePlat, gTitle(g), rm); return; }
                 const b = e.target.closest('[data-store-add]'); if (!b) return;
                 const g = storeGames[+b.dataset.storeAdd]; if (!g) return;
                 b.disabled = true; b.textContent = '⏳';
@@ -484,6 +487,30 @@
                 } catch (_) { b.disabled = false; b.textContent = '＋ Add'; }
             });
             renderStore();
+        }
+        async function removeFromLibrary(platform, title, btn) {
+            if (!confirm('Remove "' + title + '" from your library?')) return;
+            if (btn) btn.disabled = true;
+            try {
+                const r = MODE === 'demo' ? removeGameDemo(user.username, platform, title) : await removeGameGitHub(user.username, platform, title);
+                if (r && r.success === false) throw new Error(r.message);
+                library = library.filter(g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()));
+                fillPlatforms(); renderAll(); renderStore();
+            } catch (_) { if (btn) btn.disabled = false; alert('Could not remove the game. Please try again.'); }
+        }
+        // Reload library, play history and achievements so data is never stale
+        let refreshing = false;
+        async function refreshData() {
+            if (refreshing || !user) return;
+            refreshing = true;
+            try {
+                const lib = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
+                const log = MODE === 'demo' ? [] : await getActivityLogGitHub(user.username).catch(() => activityLog);
+                library = lib; activityLog = log;
+                applyPlayHistory();
+                await loadUserAch();
+                fillPlatforms(); renderAll(); renderProfile(); renderStore();
+            } catch (_) {} finally { refreshing = false; }
         }
         function renderStore() {
             const term = $('storeSearch').value.trim().toLowerCase();
@@ -498,7 +525,7 @@
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(storePlat))}</span>`;
-                return `<div class="app-row"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${owned.has(t.toLowerCase()) ? '<span>✅</span>' : `<button class="btn" data-store-add="${i}">＋ Add</button>`}</div>`;
+                return `<div class="app-row"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-more" data-store-rm="${i}">🗑️ Remove</button>` : `<button class="btn" data-store-add="${i}">＋ Add</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {
@@ -584,7 +611,7 @@
         let chatFriend = null;
         async function openChat(f) {
             chatFriend = f;
-            $('chatList').hidden = true; $('chatPane').hidden = false; $('chatWith').textContent = f;
+            $('chatPane').hidden = false; $('chatWith').textContent = f;
             const msgs = await fetchMsgs(f).catch(() => []);
             $('chatMsgs').innerHTML = msgs.map(m => `<div class="app-bubble ${(m.from || '').toLowerCase() === user.username.toLowerCase() ? 'me' : ''}">${esc(m.text)}</div>`).join('') || empty('No messages yet.');
             $('chatMsgs').scrollTop = 1e9;
@@ -657,15 +684,20 @@
             fillPlatforms(); renderAll(); loadUserAch().then(renderAll);
             if (typeof syncFavourites === 'function') syncFavourites(user.username).then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats(); renderFriends(); initStore();
+            setInterval(() => { if (chatFriend && !document.hidden) fetchMsgs(chatFriend).then(msgs => {
+                $('chatMsgs').innerHTML = msgs.map(m => `<div class="app-bubble ${(m.from || '').toLowerCase() === user.username.toLowerCase() ? 'me' : ''}">${esc(m.text)}</div>`).join('') || empty('No messages yet.');
+                markConversationRead(user.username, chatFriend);
+            }).catch(() => {}); }, 5000);
             pollAlerts(false);
             
             $('addFriendBtn').onclick = () => { $('addFriendForm').hidden = !$('addFriendForm').hidden; };
             $('addFriendForm').addEventListener('submit', addFriend);
             $('reqList').addEventListener('click', e => { const b = e.target.closest('[data-accept]'); if (b) acceptReq(b.dataset.accept); });
-            $('chatBack').onclick = () => { chatFriend = null; $('chatPane').hidden = true; $('chatList').hidden = false; };
+            $('chatBack').onclick = () => { chatFriend = null; $('chatPane').hidden = true; };
             $('chatForm').addEventListener('submit', sendChat);
-            setInterval(() => pollAlerts(true), 30000);
-            document.addEventListener('visibilitychange', () => { if (!document.hidden) pollAlerts(true); });
+            setInterval(() => { pollAlerts(true); if (!document.hidden) refreshData(); }, 30000);
+            document.addEventListener('visibilitychange', () => { if (!document.hidden) { pollAlerts(true); refreshData(); } });
+            window.addEventListener('focus', refreshData);
 
             document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => showView(b.dataset.view));
             $('libSearch').addEventListener('input', renderLibrary);
@@ -721,6 +753,8 @@
             };
             $('logoutBtn').onclick = () => { if (confirm('Log out of Game OS?')) { localStorage.setItem('gameOS_lastUser', user.username); logout(); } };
             document.querySelector('.app-main').addEventListener('click', e => {
+                const d = e.target.closest('.app-del');
+                if (d) { removeFromLibrary(d.dataset.p, d.dataset.t, d); return; }
                 const b = e.target.closest('.app-fav');
                 if (!b) { openFromEvent(e); return; }
                 toggleFavourite(user.username, { title: b.dataset.t, coverUrl: (library.find(g => g.title === b.dataset.t && g.platform === b.dataset.p) || {}).coverUrl }, b.dataset.p);
