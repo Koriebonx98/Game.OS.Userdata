@@ -65,6 +65,11 @@
             <div class="app-filters">
                 <select id="storePlatform" aria-label="Platform"><option value="">Select a platform…</option></select>
             </div>
+            <div id="adminTools" class="app-filters" hidden>
+                <button class="btn app-more" id="admAddGame">➕ Add game</button>
+                <button class="btn app-more" id="admAddSteam">🎮 Add Steam game</button>
+                <button class="btn app-more" id="admAddPlat">🖥️ Add platform</button>
+            </div>
             <input id="storeSearch" class="app-search" type="search" placeholder="Search the store…">
             <div id="storeCount" class="app-count"></div>
             <div id="storeList" class="app-list"></div>
@@ -353,9 +358,11 @@
             const pt = minutesOf(g);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
                 <small>${esc(g.platform)}</small>${g._owner ? `<small>👤 ${esc(g._owner)}'s copy</small>` : ''}<small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <button class="btn app-more" id="detailFull">ℹ️ Full game info (description, trailer, screenshots)</button>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
+            $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
             const items = await loadGameAchievements(g);
             if ($('gameDetail').hidden) return;
             const done = items.filter(a => a.at).length;
@@ -366,7 +373,13 @@
             if (!items.length) $('detailAch').innerHTML = empty('No achievements synced for this game yet.');
             else {
                 $('detailAch').innerHTML = `<small style="color:var(--text-muted)">${done} / ${items.length} unlocked</small><div class="app-ach-progress"><div style="width:${Math.round(done / items.length * 100)}%"></div></div>` +
-                    items.map(achHtml).join('');
+                    items.slice(0, 5).map(achHtml).join('') +
+                    (items.length > 5 ? `<button class="btn app-more" id="achMore">Show all ${items.length} achievements (locked &amp; unlocked)</button>` : '');
+                if (items.length > 5) $('achMore').onclick = () => {
+                    $('achSheetTitle').textContent = '🏆 ' + g.title + ' (' + done + '/' + items.length + ')';
+                    $('achSheetBody').innerHTML = items.map(achHtml).join('');
+                    $('achSheet').hidden = false;
+                };
             }
             if (!friendsLoaded) await loadFriends();
             const owners = friends.filter(f => (friendLibs[f] || []).some(x => (x.title || '').toLowerCase() === (g.title || '').toLowerCase() && (!x.platform || !g.platform || x.platform === g.platform)));
@@ -453,6 +466,27 @@
         // ── Store (browse Games.Database and add to library) ──
         let storeGames = [], storePlat = '';
         const gTitle = g => g.Title || g.game_name || g.title || '';
+        function initAdminTools() {
+            if (!isAdminUser()) return;
+            $('adminTools').hidden = false;
+            $('admAddGame').onclick = () => storePlat ? openAddPcGameModal(storePlat) : alert('Pick a platform first.');
+            $('admAddSteam').onclick = () => openAddSteamGameModal();
+            $('admAddPlat').onclick = async () => {
+                const name = (prompt('New platform name (e.g. Sega Saturn):') || '').trim();
+                if (!name) return;
+                if (!/^[A-Za-z0-9 ._+&-]{1,40}$/.test(name)) { alert('Invalid platform name.'); return; }
+                try {
+                    await _gamesDbWriteFile(name, { Games: [] }, 'Add platform: ' + name);
+                    _discoveredPlatformsPromise = null;
+                    $('storePlatform').insertAdjacentHTML('beforeend', `<option value="${esc(name)}">${esc(getPlatformIcon(name))} ${esc(name)}</option>`);
+                    $('storePlatform').value = name; $('storePlatform').onchange();
+                } catch (err) { alert('Failed to add platform: ' + err.message); }
+            };
+            document.addEventListener('click', e => {
+                const im = e.target.closest('.game-modal-bg-img');
+                if (im) window.open(im.src, '_blank', 'noopener');
+            });
+        }
         async function initStore() {
             try {
                 const plats = await fetchGamesDbPlatforms();
@@ -467,12 +501,14 @@
             };
             $('storeSearch').addEventListener('input', renderStore);
             $('storeList').addEventListener('click', async e => {
+                const ed = e.target.closest('[data-store-edit]');
+                if (ed) { const g = storeGames[+ed.dataset.storeEdit]; if (g) openAdminEditModal(g, storePlat); return; }
                 const rm = e.target.closest('[data-store-rm]');
                 if (rm) { const g = storeGames[+rm.dataset.storeRm]; if (g) removeFromLibrary(storePlat, gTitle(g), rm); return; }
                 const b = e.target.closest('[data-store-add]');
                 if (!b) {
                     const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen];
-                    if (og) openGame({ title: gTitle(og), platform: storePlat, coverUrl: getGameCoverUrl(og) || '' });
+                    if (og) openGameModal(og, storePlat);
                     return;
                 }
                 const g = storeGames[+b.dataset.storeAdd]; if (!g) return;
@@ -524,7 +560,7 @@
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(storePlat))}</span>`;
-                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
+                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {
@@ -682,7 +718,7 @@
             renderSettingsNotifications();
             fillPlatforms(); renderAll(); loadUserAch().then(renderAll);
             if (typeof syncFavourites === 'function') syncFavourites(user.username).then(renderAll); renderNotifBox(); subscribePush();
-            await loadFriends(); renderChats(); renderFriends(); initStore();
+            await loadFriends(); renderChats(); renderFriends(); initStore(); initAdminTools();
             setInterval(() => { if (chatFriend && !document.hidden) fetchMsgs(chatFriend).then(msgs => {
                 $('chatMsgs').innerHTML = msgs.map(m => `<div class="app-bubble ${(m.from || '').toLowerCase() === user.username.toLowerCase() ? 'me' : ''}">${esc(m.text)}</div>`).join('') || empty('No messages yet.');
                 markConversationRead(user.username, chatFriend);

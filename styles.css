@@ -2360,3 +2360,4 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .app-tabbar button span { font-size: 1.2rem; }
 
 .app-store-btn { width: auto !important; min-width: 0; flex: 0 0 auto; padding: 4px 10px; font-size: .9rem; line-height: 1.2; }
+.game-modal-bg-img{cursor:zoom-in}
