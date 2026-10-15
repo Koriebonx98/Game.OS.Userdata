@@ -268,7 +268,20 @@ It is XOR-hex-encoded in the deployed `script.js` so the raw token is never pres
 
 ## 🚀 Setup Instructions
 
-### Local Development:
+### Local Development (Windows – VBScript launcher):
+
+The quickest way to get the full backend running on Windows is to use the included VBScript launcher:
+
+1. Copy `backend\.env.example` to `backend\.env` and fill in your GitHub token and repository details (see **Going Live** above).
+2. Double-click **`StartServer.vbs`** in the repository root.
+   - The script checks that Node.js is installed, installs npm dependencies on first run, and starts the backend server in an elevated Command Prompt.
+   - It then opens **`launch-local.html`** in your default browser.
+3. `launch-local.html` checks that the server is reachable, saves the local backend URL to `localStorage`, and redirects to `index.html` — taking the site out of demo mode automatically.
+4. Log in with the **Admin.GameOS** account (`Admin.GameOS` / `GameOS2026`) and change the password via Account Settings.
+
+> **Prerequisites:** Node.js v18+ must be installed ([nodejs.org](https://nodejs.org)).
+
+### Local Development (manual / cross-platform):
 
 1. **Clone the repository**:
    ```bash
@@ -390,6 +403,8 @@ Game.OS.Userdata/
 ├── profile.html        # Public user profile / game library view
 ├── script.js           # Main JavaScript logic
 ├── styles.css          # Styling and responsive design
+├── StartServer.vbs     # Windows VBScript: start local backend + open browser
+├── launch-local.html   # Browser helper: connects site to local backend
 ├── backend/            # Optional Node.js backend server
 │   ├── index.js
 │   ├── package.json

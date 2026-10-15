@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game.OS – Connecting to Local Backend</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0d0d1a;
+            color: #e0e0e0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+        }
+        .card {
+            background: #1a1a2e;
+            border: 1px solid #2a2a4a;
+            border-radius: 12px;
+            padding: 40px 48px;
+            max-width: 520px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        .logo { font-size: 2.5rem; margin-bottom: 12px; }
+        h1 { font-size: 1.5rem; color: #a78bfa; margin-bottom: 8px; }
+        .subtitle { font-size: 0.95rem; color: #888; margin-bottom: 28px; }
+        .status-box {
+            background: #0d0d1a;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            padding: 16px 20px;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        .status-line {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 0;
+            font-size: 0.9rem;
+        }
+        .status-line .icon { font-size: 1.1rem; min-width: 24px; text-align: center; }
+        .status-line.ok   .icon::before { content: '✅'; }
+        .status-line.warn .icon::before { content: '⚠️'; }
+        .status-line.err  .icon::before { content: '❌'; }
+        .status-line.info .icon::before { content: 'ℹ️'; }
+        .status-line.spin .icon::before { content: '⏳'; }
+        #statusMsg { margin-top: 20px; font-size: 0.95rem; min-height: 1.4em; }
+        #statusMsg.ok   { color: #4ade80; }
+        #statusMsg.warn { color: #facc15; }
+        #statusMsg.err  { color: #f87171; }
+        #statusMsg.spin { color: #a78bfa; }
+        .admin-box {
+            background: #12122a;
+            border: 1px solid #3b3b6a;
+            border-radius: 8px;
+            padding: 14px 20px;
+            margin-top: 20px;
+            text-align: left;
+            display: none;
+        }
+        .admin-box h3 { font-size: 0.85rem; color: #a78bfa; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px; }
+        .cred { display: flex; justify-content: space-between; align-items: center; padding: 4px 0; font-size: 0.88rem; }
+        .cred span:first-child { color: #888; }
+        .cred code { background: #1f1f3a; padding: 2px 8px; border-radius: 4px; color: #e2e8f0; font-family: 'Consolas', monospace; }
+        .cred-note { margin-top: 6px; font-size: 0.8rem; color: #666; }
+        #redirectMsg { margin-top: 16px; font-size: 0.88rem; color: #666; }
+        .btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 28px;
+            background: #6d28d9;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn:hover { background: #7c3aed; }
+        .btn.secondary { background: #1f2937; border: 1px solid #374151; }
+        .btn.secondary:hover { background: #374151; }
+        .error-help { margin-top: 20px; font-size: 0.85rem; color: #888; line-height: 1.6; display: none; text-align: left; }
+        .error-help code { background: #1f1f3a; padding: 2px 6px; border-radius: 4px; color: #a78bfa; font-size: 0.82rem; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <div class="logo">🎮</div>
+    <h1>Game.OS Local Backend</h1>
+    <p class="subtitle">Connecting the site to your local server…</p>
+
+    <div class="status-box" id="checkList">
+        <div class="status-line spin" id="chkServer"><span class="icon"></span>Checking local server on port 3000…</div>
+        <div class="status-line info" id="chkStorage" style="display:none"><span class="icon"></span>Setting dev backend URL in browser storage…</div>
+        <div class="status-line info" id="chkAdmin" style="display:none"><span class="icon"></span>Admin account ready</div>
+    </div>
+
+    <div id="statusMsg" class="spin">Contacting http://localhost:3000…</div>
+
+    <div class="admin-box" id="adminBox">
+        <h3>🛡 Admin Account</h3>
+        <div class="cred"><span>Username</span><code>Admin.GameOS</code></div>
+        <div class="cred"><span>Password</span><code>GameOS2026</code></div>
+        <div class="cred-note">Change the password after your first login via Account Settings.</div>
+    </div>
+
+    <div id="redirectMsg"></div>
+
+    <div class="error-help" id="errorHelp">
+        <strong>Server not running?</strong> Start it with <code>StartServer.vbs</code> or run
+        these commands in a terminal:<br><br>
+        <code>cd backend</code><br>
+        <code>npm install</code><br>
+        <code>npm start</code><br><br>
+        Make sure <code>backend/.env</code> exists. Copy <code>backend/.env.example</code> to
+        <code>backend/.env</code> and fill in your GitHub token and repository details.
+    </div>
+
+    <div id="btnArea" style="display:none">
+        <a href="index.html" class="btn" id="continueBtn">Continue to Game.OS →</a>
+        <br>
+        <a href="#" class="btn secondary" id="retryBtn" onclick="location.reload(); return false;" style="margin-top:10px;">Retry</a>
+    </div>
+</div>
+
+<script>
+(async function () {
+    const BACKEND_URL  = 'http://localhost:3000';
+    const LS_KEY       = 'gameOS_devBackendUrl';
+    const REDIRECT_TO  = 'index.html';
+    const HEALTH_PATH  = '/health';
+
+    const chkServer  = document.getElementById('chkServer');
+    const chkStorage = document.getElementById('chkStorage');
+    const chkAdmin   = document.getElementById('chkAdmin');
+    const statusMsg  = document.getElementById('statusMsg');
+    const adminBox   = document.getElementById('adminBox');
+    const redirectMsg= document.getElementById('redirectMsg');
+    const btnArea    = document.getElementById('btnArea');
+    const errorHelp  = document.getElementById('errorHelp');
+
+    function setLine(el, type, text) {
+        el.className = `status-line ${type}`;
+        el.style.display = '';
+        el.innerHTML = `<span class="icon"></span>${text}`;
+    }
+
+    // Step 1 – probe the local backend health endpoint
+    let serverOk = false;
+    try {
+        const ctrl = new AbortController();
+        const timeoutId  = setTimeout(() => ctrl.abort(), 6000);
+        const resp = await fetch(BACKEND_URL + HEALTH_PATH, { signal: ctrl.signal });
+        clearTimeout(timeoutId);
+        serverOk = resp.ok;
+    } catch (_) {
+        serverOk = false;
+    }
+
+    if (!serverOk) {
+        setLine(chkServer, 'err', 'Local server not reachable on port 3000');
+        statusMsg.className = 'err';
+        statusMsg.textContent = '❌ Could not connect to http://localhost:3000. Is the backend server running?';
+        errorHelp.style.display = '';
+        btnArea.style.display   = '';
+        return;
+    }
+
+    setLine(chkServer, 'ok', 'Local server is running on port 3000 ✓');
+
+    // Step 2 – store the dev backend URL in localStorage
+    setLine(chkStorage, 'spin', 'Setting dev backend URL in browser storage…');
+    try {
+        localStorage.setItem(LS_KEY, BACKEND_URL);
+        setLine(chkStorage, 'ok', 'Dev backend URL saved to localStorage ✓');
+    } catch (e) {
+        setLine(chkStorage, 'warn', 'Could not write to localStorage – site will stay in demo mode');
+        statusMsg.className = 'warn';
+        statusMsg.textContent = '⚠️ localStorage is unavailable. Open this page from a local web server (e.g. python -m http.server 8080).';
+        btnArea.style.display = '';
+        return;
+    }
+
+    // Step 3 – show admin credentials
+    setLine(chkAdmin, 'ok', 'Admin account initialised (Admin.GameOS) ✓');
+    adminBox.style.display = '';
+
+    statusMsg.className = 'ok';
+    statusMsg.textContent = '✅ Connected to local backend. Redirecting to Game.OS…';
+
+    // Redirect after a short delay so the user can read the admin credentials
+    let secs = 5;
+    redirectMsg.textContent = `Redirecting in ${secs}s…`;
+    const timer = setInterval(() => {
+        secs--;
+        if (secs <= 0) {
+            clearInterval(timer);
+            window.location.href = REDIRECT_TO;
+        } else {
+            redirectMsg.textContent = `Redirecting in ${secs}s…`;
+        }
+    }, 1000);
+
+    btnArea.style.display = '';
+    document.getElementById('continueBtn').onclick = function () {
+        clearInterval(timer);
+        window.location.href = REDIRECT_TO;
+    };
+})();
+</script>
+</body>
+</html>
