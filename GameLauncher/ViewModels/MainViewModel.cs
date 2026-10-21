@@ -302,6 +302,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
+        Services.DatabaseContributionQueue.Start();
 
         LoginVm        = new LoginViewModel(_client, _sessionCache, _offlineCache);
         DashboardVm    = new DashboardViewModel();
@@ -1288,16 +1289,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // users who have the same game can benefit from the metadata.
                 if (added > 0)
                 {
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            var ghSvc = new Services.GitHubDataService();
-                            await ghSvc.ContributeSteamGamesToDatabaseAsync(steamGames)
-                                       .ConfigureAwait(false);
-                        }
-                        catch { /* best-effort */ }
-                    });
+                    foreach (var sg in steamGames)
+                        Services.DatabaseContributionQueue.EnqueueSteamGame(sg.AppId, sg.Name);
                 }
 
                 // Refresh the library view with the updated data
@@ -1470,16 +1463,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                             // Trigger workflow to add new Steam games to the public Games.Database.
                             // ContributeSteamGamesToDatabaseAsync filters to truly new games internally.
-                            _ = Task.Run(async () =>
-                            {
-                                try
-                                {
-                                    var ghSvc = new Services.GitHubDataService();
-                                    await ghSvc.ContributeSteamGamesToDatabaseAsync(steamGames)
-                                               .ConfigureAwait(false);
-                                }
-                                catch { /* best-effort */ }
-                            });
+                            foreach (var sg in steamGames)
+                                Services.DatabaseContributionQueue.EnqueueSteamGame(sg.AppId, sg.Name);
 
                             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                             {
