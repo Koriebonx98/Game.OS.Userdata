@@ -206,11 +206,12 @@
             const days = Math.floor(hours / 24);
             return days < 30 ? days + 'd ago' : new Date(time).toLocaleDateString();
         }
+        const normTitle = t => String(t || '').toLowerCase().replace(/[™®©]/g, '').replace(/[^a-z0-9]+/g, '');
         function applyPlayHistory() {
             const latestByGame = new Map();
             for (const event of Array.isArray(activityLog) ? activityLog : []) {
                 if (event.type && event.type !== 'playtime') continue;
-                const title = String(event.gameTitle || '').trim().toLowerCase();
+                const title = normTitle(event.gameTitle);
                 const platform = String(event.platform || '').trim().toLowerCase();
                 const playedAt = event.sessionEnd || event.loggedAt || event.sessionStart;
                 if (!title || !playedAt || !Number.isFinite(Date.parse(playedAt))) continue;
@@ -220,7 +221,7 @@
             }
             library.forEach(game => {
                 const key = String(game.platform || '').trim().toLowerCase() + '\u0000' +
-                    String(game.title || '').trim().toLowerCase();
+                    normTitle(game.title);
                 const fromActivity = latestByGame.get(key);
                 const recorded = game.lastPlayedAt || game.lastPlayed || '';
                 const fromGame = Number.isFinite(Date.parse(recorded)) ? recorded : '';

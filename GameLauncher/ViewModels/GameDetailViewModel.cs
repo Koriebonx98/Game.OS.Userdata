@@ -4054,6 +4054,30 @@ public partial class GameDetailViewModel : ViewModelBase
                 string snapshotTitle    = Title;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
+                    // Re-apply any unlocks that happened live (e.g. Steam emu notification
+                    // during a session) while this template fetch was in flight, so they
+                    // are not wiped when the list is replaced.
+                    foreach (var live in (snapshotTitle == Title && snapshotPlatform == Platform
+                        ? Achievements.Where(x => x.IsUnlocked).ToList()
+                        : new List<Achievement>()))
+                    {
+                        var match = list.FirstOrDefault(a =>
+                            (!string.IsNullOrEmpty(a.AchievementId) && !string.IsNullOrEmpty(live.AchievementId) &&
+                             string.Equals(a.AchievementId, live.AchievementId, StringComparison.OrdinalIgnoreCase)) ||
+                            (!string.IsNullOrEmpty(a.Name) && !string.IsNullOrEmpty(live.Name) &&
+                             string.Equals(a.Name, live.Name, StringComparison.OrdinalIgnoreCase)));
+                        if (match == null)
+                            list.Add(new Achievement
+                            {
+                                AchievementId = live.AchievementId,
+                                Name          = live.Name,
+                                Description   = live.Description,
+                                IconUrl       = live.IconUrl,
+                                UnlockedAt    = live.UnlockedAt,
+                            });
+                        else if (string.IsNullOrEmpty(match.UnlockedAt))
+                            match.UnlockedAt = live.UnlockedAt;
+                    }
                     PopulateAchievements(list);
                     // Notify MainViewModel so the library card denominator can be updated
                     // (e.g. "3 / 98" instead of "3 / 3" when only unlocked were cached)
