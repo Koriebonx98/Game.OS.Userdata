@@ -456,6 +456,8 @@
             const all = [...theirs];
             mine.forEach(a => { if (!theirs.some(t => key(t) === key(a))) all.push({ ...a, at: '' }); });
             const mAt = a => (mm.get(key(a)) || {}).at, tAt = a => (theirs.find(t => key(t) === key(a)) || {}).at;
+            const rank = a => (mAt(a) ? 1 : 0) + (tAt(a) ? 1 : 0);
+            all.sort((x, y) => rank(y) - rank(x));
             const myN = all.filter(mAt).length, thN = all.filter(tAt).length;
             const mark = at => at ? '✅' : '🔒';
             $('achSheetBody').innerHTML = `<div class="app-cmp-head"><span>You: ${myN}/${all.length}</span><span>${esc(f)}: ${thN}/${all.length}</span></div>` + (all.length ? all.map(a => {
