@@ -524,6 +524,22 @@ public partial class LibraryViewModel : ViewModelBase
 
     // ── Private helpers ────────────────────────────────────────────────────
 
+    /// <summary>True when a local ROM matches the cloud game by platform + TitleID or fuzzy title.</summary>
+    private static bool IsRomInstalled(List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game g)
+    {
+        string stripped = PlatformHelper.StripSpecialSymbols(g.Title);
+        foreach (var r in roms)
+        {
+            if (!string.Equals(PlatformHelper.NormalizePlatform(r.Platform), normalizedPlatform, StringComparison.OrdinalIgnoreCase))
+                continue;
+            if (!string.IsNullOrEmpty(r.TitleId) && string.Equals(r.TitleId, g.TitleId, StringComparison.OrdinalIgnoreCase))
+                return true;
+            if (string.Equals(PlatformHelper.StripSpecialSymbols(r.Title), stripped, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
     /// <summary>Rebuilds _allMyGames from the current three source lists.</summary>
     private void RebuildMyGames()
     {
@@ -561,14 +577,20 @@ public partial class LibraryViewModel : ViewModelBase
             StringComparer.OrdinalIgnoreCase);
 
         // Cloud library games
+        var seenCloud = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in _allGames)
         {
             string normalizedPlatform = GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform);
+            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.StripSpecialSymbols(g.Title))) continue;
             bool isInstalled = false;
             if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
             {
                 isInstalled = (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
                            || localTitlesStripped.Contains(PlatformHelper.StripSpecialSymbols(g.Title));
+            }
+            else
+            {
+                isInstalled = IsRomInstalled(_allRoms, normalizedPlatform, g);
             }
             _allMyGames.Add(new LocalGameCardVm
             {
@@ -649,11 +671,11 @@ public partial class LibraryViewModel : ViewModelBase
         {
             // Deduplicate by TitleID when the ROM has one (folder-based PS3/PS4/Switch)
             if (!string.IsNullOrEmpty(r.TitleId) &&
-                cloudByPlatformTitleId.TryGetValue(r.Platform, out var cloudTitleIds) &&
+                cloudByPlatformTitleId.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitleIds) &&
                 cloudTitleIds.Contains(r.TitleId))
                 continue;
 
-            if (cloudByPlatform.TryGetValue(r.Platform, out var cloudTitles) &&
+            if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
                 (cloudTitles.Contains(r.Title) ||
                  cloudTitles.Any(ct => string.Equals(
                      PlatformHelper.StripSpecialSymbols(ct),
@@ -712,9 +734,11 @@ public partial class LibraryViewModel : ViewModelBase
             StringComparer.OrdinalIgnoreCase);
 
         // ── ALL cloud library games (first, so they sort to the top before dedup below) ──
+        var seenCloud = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var g in allGames)
         {
             string normalizedPlatform = PlatformHelper.NormalizePlatform(g.Platform);
+            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.StripSpecialSymbols(g.Title))) continue;
             bool isInstalled = false;
             if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
             {
@@ -722,6 +746,10 @@ public partial class LibraryViewModel : ViewModelBase
                 // found by SteamAppId (most reliable) or by stripped title as a fallback.
                 isInstalled = (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
                            || localTitlesStripped.Contains(PlatformHelper.StripSpecialSymbols(g.Title));
+            }
+            else
+            {
+                isInstalled = IsRomInstalled(roms, normalizedPlatform, g);
             }
 
             result.Add(new LocalGameCardVm
@@ -789,11 +817,11 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var r in roms)
         {
             if (!string.IsNullOrEmpty(r.TitleId) &&
-                cloudByPlatformTitleId.TryGetValue(r.Platform, out var cloudTitleIds) &&
+                cloudByPlatformTitleId.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitleIds) &&
                 cloudTitleIds.Contains(r.TitleId))
                 continue;
 
-            if (cloudByPlatform.TryGetValue(r.Platform, out var cloudTitles) &&
+            if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
                 (cloudTitles.Contains(r.Title) ||
                  cloudTitles.Any(ct => string.Equals(
                      PlatformHelper.StripSpecialSymbols(ct),
