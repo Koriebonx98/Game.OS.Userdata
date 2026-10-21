@@ -18,6 +18,7 @@
     <Compile Include="../GameLauncher/Services/StorageHelpers.cs" />
     <Compile Include="../GameLauncher/Services/OfflineDataCacheService.cs" />
     <Compile Include="../GameLauncher/Services/PendingChangesService.cs" />
+    <Compile Include="../GameLauncher/Services/DatabaseContributionQueue.cs" />
     <Compile Include="../GameLauncher/GameOsClient.cs" />
     <Compile Include="../GameLauncher/Models/Models.cs" />
   </ItemGroup>
