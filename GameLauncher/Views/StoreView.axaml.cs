@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.VisualTree;
 using GameLauncher.Models;
 using GameLauncher.ViewModels;
@@ -12,6 +13,7 @@ public partial class StoreView : UserControl
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
+        SizeChanged += (_, _) => UpdateStoreGridColumns();
     }
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
@@ -20,7 +22,20 @@ public partial class StoreView : UserControl
         {
             vm.FocusSearchRequested = FocusSearchBox;
             vm.FocusStoreGameRequested = FocusStoreGame;
+            UpdateStoreGridColumns();
         }
+    }
+
+    private void UpdateStoreGridColumns()
+    {
+        if (DataContext is StoreViewModel vm)
+            vm.UpdateStoreGridColumnCount(Bounds.Width);
+    }
+
+    private void OnStorePointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (DataContext is StoreViewModel vm)
+            vm.ClearStoreGameFocus();
     }
 
     private void FocusStoreGame(StoreGame game)

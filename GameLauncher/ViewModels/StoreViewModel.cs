@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using GameLauncher.Models;
+using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
@@ -30,6 +31,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private string _browseCountLabel = "";
     [ObservableProperty] private int _focusedStoreGameIndex = -1;
     [ObservableProperty] private StoreGame? _focusedStoreGame;
+    [ObservableProperty] private int _storeGridColumnCount = 1;
 
     /// <summary>Platforms available in the Games.Database (plus "All" for the curated catalog).</summary>
     public ObservableCollection<string> Platforms { get; } = new()
@@ -302,7 +304,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// </summary>
     public Action? FocusSearchRequested { get; set; }
 
-    public void MoveStoreGameFocus(int delta)
+    public void MoveStoreGameFocus(int delta, bool vertical = false)
     {
         if (!IsGamesTab) return;
 
@@ -312,18 +314,24 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        int next = FocusedStoreGameIndex < 0
-            ? 0
-            : Math.Clamp(FocusedStoreGameIndex + delta, 0, FilteredStore.Count - 1);
+        int offset = vertical ? delta * StoreGridColumnCount : delta;
+        int next = CardFocusService.Move(FocusedStoreGameIndex, FilteredStore.Count, offset);
         SetFocusedStoreGameAt(next);
         if (FocusedStoreGame != null)
             FocusStoreGameRequested?.Invoke(FocusedStoreGame);
     }
 
-    public void ActivateFocusedStoreGame()
+    public void ClearStoreGameFocus()
     {
-        if (IsGamesTab && FocusedStoreGame != null)
-            OnOpenDetail?.Invoke(FocusedStoreGame);
+        SetFocusedStoreGameAt(-1);
+    }
+
+    public void UpdateStoreGridColumnCount(double viewWidth)
+    {
+        const double horizontalPadding = 64;
+        const double cardWidthAndMargin = 212;
+        StoreGridColumnCount = Math.Max(
+            1, (int)Math.Floor((Math.Max(0, viewWidth - horizontalPadding) + 12) / cardWidthAndMargin));
     }
 
     private void SetFocusedStoreGameAt(int index)
@@ -333,7 +341,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
         if (index < 0 || index >= FilteredStore.Count)
         {
-            FocusedStoreGameIndex = -1;
+            FocusedStoreGameIndex = CardFocusService.Reset();
             FocusedStoreGame = null;
             return;
         }
@@ -477,10 +485,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     private void ApplyFilter()
     {
-        if (FocusedStoreGame != null)
-            FocusedStoreGame.IsFocused = false;
-        FocusedStoreGame = null;
-        FocusedStoreGameIndex = -1;
+        ClearStoreGameFocus();
         FilteredStore.Clear();
         var results = _allStore.AsEnumerable();
 
@@ -511,8 +516,6 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 ? $"Showing {shown:N0} of {total:N0} games — use search to filter or load more below"
                 : $"{total:N0} game{(total == 1 ? "" : "s")}";
 
-        if (FilteredStore.Count > 0)
-            SetFocusedStoreGameAt(0);
     }
 
     /// <summary>Appends the next page of games to the current filtered view.</summary>

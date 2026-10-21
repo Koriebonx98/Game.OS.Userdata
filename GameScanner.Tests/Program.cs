@@ -426,6 +426,13 @@ class Program
         if (!titleKeyPassed) passed = false;
         Console.WriteLine();
 
+        // ── STORE CARD FOCUS TESTS ─────────────────────────────────────────────
+        Console.WriteLine("🎮 Store Card Focus Movement:");
+        Console.WriteLine("───────────────────────────────────────────────────────────────");
+        bool storeFocusPassed = TestCardFocusService();
+        if (!storeFocusPassed) passed = false;
+        Console.WriteLine();
+
         // ── STEAM ACF PRIORITY OVER FOLDER NAME ───────────────────────────────
         Console.WriteLine("🏷️  Steam ACF Name Priority (ACF name overrides folder name):");
         Console.WriteLine("───────────────────────────────────────────────────────────────");
@@ -1212,6 +1219,43 @@ class Program
                 Console.WriteLine($"  ❌  Distinct titles matched: \"{left}\" and \"{right}\"");
                 passed = false;
             }
+        }
+
+        return passed;
+    }
+
+    private static bool TestCardFocusService()
+    {
+        var cases = new[]
+        {
+            ("empty results", -1, 0, 1, -1),
+            ("first forward move", -1, 4, 1, 0),
+            ("first backward move", -1, 4, -1, 0),
+            ("lower boundary", 0, 4, -1, 0),
+            ("upper boundary", 3, 4, 1, 3),
+            ("vertical row move", 1, 8, 4, 5),
+        };
+
+        bool passed = true;
+        foreach (var (name, current, count, offset, expected) in cases)
+        {
+            int actual = CardFocusService.Move(current, count, offset);
+            if (actual == expected)
+                Console.WriteLine($"  ✅  {name}: {actual}");
+            else
+            {
+                Console.WriteLine($"  ❌  {name}: expected {expected}, got {actual}");
+                passed = false;
+            }
+        }
+
+        int reset = CardFocusService.Reset();
+        if (reset == -1)
+            Console.WriteLine("  ✅  reset focus index: -1");
+        else
+        {
+            Console.WriteLine($"  ❌  reset focus index: expected -1, got {reset}");
+            passed = false;
         }
 
         return passed;

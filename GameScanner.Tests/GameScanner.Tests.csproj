@@ -10,6 +10,7 @@
     <!-- Share the scanner and models source directly (no Avalonia/UI dependency needed) -->
     <Compile Include="../GameLauncher/GameScannerService.cs" />
     <Compile Include="../GameLauncher/Models/Models.cs" />
+    <Compile Include="../GameLauncher/Services/CardFocusService.cs" />
     <Compile Include="../GameLauncher/Services/RomPathHelper.cs" />
     <Compile Include="../GameLauncher/Services/AppSettingsService.cs" />
     <Compile Include="../GameLauncher/Services/DevLogService.cs" />

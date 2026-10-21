@@ -7,7 +7,8 @@
              x:DataType="vm:StoreViewModel"
              Background="#0d1117">
 
-    <StackPanel Margin="32,28,32,28" Spacing="0">
+    <StackPanel Margin="32,28,32,28" Spacing="0"
+                PointerPressed="OnStorePointerPressed">
 
         <!-- Header -->
         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">

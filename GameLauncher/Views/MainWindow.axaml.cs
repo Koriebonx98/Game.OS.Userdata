@@ -449,17 +449,19 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.Left when !inSearch:
-                case Key.Up when !inSearch:
                     vm.StoreVm.MoveStoreGameFocus(-1);
                     e.Handled = true;
                     return;
                 case Key.Right when !inSearch:
-                case Key.Down when !inSearch:
                     vm.StoreVm.MoveStoreGameFocus(1);
                     e.Handled = true;
                     return;
-                case Key.Enter when !inSearch:
-                    vm.StoreVm.ActivateFocusedStoreGame();
+                case Key.Up when !inSearch:
+                    vm.StoreVm.MoveStoreGameFocus(-1, vertical: true);
+                    e.Handled = true;
+                    return;
+                case Key.Down when !inSearch:
+                    vm.StoreVm.MoveStoreGameFocus(1, vertical: true);
                     e.Handled = true;
                     return;
             }
@@ -1137,15 +1139,16 @@ public partial class MainWindow : Window
                     vm.StoreVm.CycleTab();
                     return;
                 case Key.Left:
-                case Key.Up:
                     vm.StoreVm.MoveStoreGameFocus(-1);
                     return;
                 case Key.Right:
-                case Key.Down:
                     vm.StoreVm.MoveStoreGameFocus(1);
                     return;
-                case Key.Enter:
-                    vm.StoreVm.ActivateFocusedStoreGame();
+                case Key.Up:
+                    vm.StoreVm.MoveStoreGameFocus(-1, vertical: true);
+                    return;
+                case Key.Down:
+                    vm.StoreVm.MoveStoreGameFocus(1, vertical: true);
                     return;
             }
         }
