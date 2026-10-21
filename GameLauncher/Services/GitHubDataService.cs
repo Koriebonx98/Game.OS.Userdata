@@ -2272,30 +2272,16 @@ namespace GameLauncher.Services
             string filePath = $"Data/PC/Games/{appId}/achievements.json";
             string achUrl   = $"{GamesDbRawBase}/Data/PC/Games/{appId}/achievements.json";
 
-            try
-            {
-                // Check whether the file already exists (get SHA for update, or null for create)
-                var (existing, sha) = await ReadGamesDatabaseFileAsync<object>(filePath, ct)
-                    .ConfigureAwait(false);
-
-                // Do not overwrite an already-present achievements file
-                if (existing != null) return achUrl;
-
-                await WriteGamesDatabaseFileAsync(
-                    filePath, dbAchievements,
-                    $"Add Steam achievements for {gameTitle} (AppId {appId})",
-                    sha, ct).ConfigureAwait(false);
-
-                DevLogService.Log(
-                    $"[GamesDB] Uploaded {achievements.Count} achievements for '{gameTitle}' (AppId {appId}).");
-                return achUrl;
-            }
-            catch (Exception ex)
-            {
-                DevLogService.Log(
-                    $"[GamesDB] Failed to upload achievements for '{gameTitle}': {ex.Message}");
-                return null;
-            }
+            // Queue the upload: a background task flushes the queue in one batch every few
+            // minutes (create-only, de-duplicated by path) to reduce GitHub write traffic.
+            bool queued = DatabaseContributionQueue.EnqueueFile(
+                filePath, dbAchievements,
+                $"Add Steam achievements for {gameTitle} (AppId {appId})");
+            DevLogService.Log(queued
+                ? $"[GamesDB] Queued {achievements.Count} achievements for '{gameTitle}' (AppId {appId})."
+                : $"[GamesDB] Achievements for '{gameTitle}' (AppId {appId}) already queued.");
+            await Task.CompletedTask;
+            return achUrl;
         }
 
         // ── Review upload to Games.Database ──────────────────────────────────

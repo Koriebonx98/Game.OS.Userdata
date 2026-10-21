@@ -402,6 +402,7 @@
                 <StackPanel Orientation="Horizontal">
                     <!-- Store card -->
                     <Button Classes="game-card-btn ps5-game-card-btn"
+                            Classes.focused="{Binding IsStoreFocused}"
                             Command="{Binding OpenFeaturedDetailCommand}">
                         <StackPanel>
                             <Border Height="120" ClipToBounds="True" CornerRadius="10" Background="#1F1F1F">
@@ -447,6 +448,7 @@
 
                     <!-- All games card -->
                     <Button Classes="game-card-btn ps5-game-card-btn"
+                            Classes.focused="{Binding IsAllGamesFocused}"
                             Command="{Binding NavigateToAllGamesCommand}">
                         <StackPanel>
                             <Border Height="120" ClipToBounds="True" CornerRadius="10" Background="#1F1F1F">
