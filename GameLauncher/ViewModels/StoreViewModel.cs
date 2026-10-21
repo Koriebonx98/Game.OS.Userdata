@@ -304,6 +304,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     public void MoveStoreGameFocus(int delta)
     {
+        if (!IsGamesTab) return;
+
         if (FilteredStore.Count == 0)
         {
             SetFocusedStoreGameAt(-1);
@@ -320,7 +322,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     public void ActivateFocusedStoreGame()
     {
-        if (FocusedStoreGame != null)
+        if (IsGamesTab && FocusedStoreGame != null)
             OnOpenDetail?.Invoke(FocusedStoreGame);
     }
 

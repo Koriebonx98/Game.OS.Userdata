@@ -1175,6 +1175,7 @@ class Program
         {
             ("Call of Duty: Vanguard (1.16.0.12345)", "Call of Duty: Vanguard"),
             ("Call of Duty: Black Ops (MP,Zm,SP)",    "Call of Duty: Black Ops"),
+            ("Call of Duty - World at War",           "Call of Duty: World at War"),
             ("LEGO® Batman™ 3: Beyond Gotham",        "LEGO Batman 3 Beyond Gotham"),
         };
 
@@ -1189,6 +1190,26 @@ class Program
             else
             {
                 Console.WriteLine($"  ❌  Key mismatch: \"{left}\" ({leftKey}) vs \"{right}\" ({rightKey})");
+                passed = false;
+            }
+        }
+
+        var distinctPairs = new[]
+        {
+            ("Forza Horizon", "Forza Horizon 2"),
+        };
+        foreach (var (left, right) in distinctPairs)
+        {
+            if (!string.Equals(
+                    PlatformHelper.NormalizeTitleForComparison(left),
+                    PlatformHelper.NormalizeTitleForComparison(right),
+                    StringComparison.Ordinal))
+            {
+                Console.WriteLine($"  ✅  \"{left}\" ≠ \"{right}\"");
+            }
+            else
+            {
+                Console.WriteLine($"  ❌  Distinct titles matched: \"{left}\" and \"{right}\"");
                 passed = false;
             }
         }

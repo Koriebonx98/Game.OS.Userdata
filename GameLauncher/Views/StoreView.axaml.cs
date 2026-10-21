@@ -28,7 +28,11 @@ public partial class StoreView : UserControl
         var button = this.GetVisualDescendants()
             .OfType<Button>()
             .FirstOrDefault(candidate => ReferenceEquals(candidate.DataContext, game));
-        button?.Focus();
+        if (button != null)
+        {
+            button.Focus();
+            button.BringIntoView();
+        }
     }
 
     private void FocusSearchBox()

@@ -524,27 +524,36 @@ public partial class LibraryViewModel : ViewModelBase
 
     // ── Private helpers ────────────────────────────────────────────────────
 
-    /// <summary>True when a local ROM matches the cloud game by platform + TitleID or fuzzy title.</summary>
-    private static bool IsRomInstalled(List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game g)
-        => FindMatchingRom(roms, normalizedPlatform, g) != null;
+    private static (Dictionary<string, LocalRom> ByTitleId, Dictionary<string, LocalRom> ByTitle)
+        BuildRomLookups(IEnumerable<LocalRom> roms)
+    {
+        var byTitleId = new Dictionary<string, LocalRom>(StringComparer.OrdinalIgnoreCase);
+        var byTitle = new Dictionary<string, LocalRom>(StringComparer.OrdinalIgnoreCase);
+        foreach (var rom in roms)
+        {
+            string platform = PlatformHelper.NormalizePlatform(rom.Platform);
+            if (!string.IsNullOrEmpty(rom.TitleId))
+                byTitleId.TryAdd($"{platform}|{rom.TitleId}", rom);
+            string titleKey = PlatformHelper.NormalizeTitleForComparison(rom.Title);
+            if (!string.IsNullOrEmpty(titleKey))
+                byTitle.TryAdd($"{platform}|{titleKey}", rom);
+        }
+        return (byTitleId, byTitle);
+    }
 
     private static LocalRom? FindMatchingRom(
-        List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game game)
+        (Dictionary<string, LocalRom> ByTitleId, Dictionary<string, LocalRom> ByTitle) roms,
+        string normalizedPlatform,
+        GameLauncher.Models.Game game)
     {
-        foreach (var r in roms)
-        {
-            if (!string.Equals(PlatformHelper.NormalizePlatform(r.Platform), normalizedPlatform, StringComparison.OrdinalIgnoreCase))
-                continue;
-            if (!string.IsNullOrEmpty(r.TitleId) &&
-                string.Equals(r.TitleId, game.TitleId, StringComparison.OrdinalIgnoreCase))
-                return r;
-            if (string.Equals(
-                    PlatformHelper.NormalizeTitleForComparison(r.Title),
-                    PlatformHelper.NormalizeTitleForComparison(game.Title),
-                    StringComparison.Ordinal))
-                return r;
-        }
-        return null;
+        if (!string.IsNullOrEmpty(game.TitleId) &&
+            roms.ByTitleId.TryGetValue($"{normalizedPlatform}|{game.TitleId}", out var byTitleId))
+            return byTitleId;
+
+        string titleKey = PlatformHelper.NormalizeTitleForComparison(game.Title);
+        return roms.ByTitle.TryGetValue($"{normalizedPlatform}|{titleKey}", out var byTitle)
+            ? byTitle
+            : null;
     }
 
     /// <summary>Rebuilds _allMyGames from the current three source lists.</summary>
@@ -571,18 +580,14 @@ public partial class LibraryViewModel : ViewModelBase
                 .Where(g => g.SteamAppId.HasValue && g.SteamAppId.Value > 0)
                 .Select(g => g.SteamAppId!.Value));
 
-        cloudByPlatform.TryGetValue("PC", out var cloudPcTitles);
-        var cloudPcStripped = cloudPcTitles != null
-            ? new HashSet<string>(
-                cloudPcTitles.Select(PlatformHelper.NormalizeTitleForComparison),
-                StringComparer.OrdinalIgnoreCase)
-            : null;
+        cloudByPlatform.TryGetValue("PC", out var cloudPcTitleKeys);
+        var romLookups = BuildRomLookups(_allRoms);
 
         // Build install-status lookup sets for local PC games
         var localSteamAppIds = new HashSet<long>(
             _allLocalGames.Where(g => g.SteamAppId > 0).Select(g => (long)g.SteamAppId));
-        var localTitlesStripped = new HashSet<string>(
-            _allLocalGames.Select(g => PlatformHelper.StripSpecialSymbols(g.Title)),
+        var localTitleKeys = new HashSet<string>(
+            _allLocalGames.Select(g => PlatformHelper.NormalizeTitleForComparison(g.Title)),
             StringComparer.OrdinalIgnoreCase);
 
         // Cloud library games
@@ -591,17 +596,11 @@ public partial class LibraryViewModel : ViewModelBase
         {
             string normalizedPlatform = GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform);
             if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.NormalizeTitleForComparison(g.Title))) continue;
-            var matchingRom = FindMatchingRom(_allRoms, normalizedPlatform, g);
-            bool isInstalled = false;
-            if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
-            {
-                isInstalled = (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
-                           || localTitlesStripped.Contains(PlatformHelper.StripSpecialSymbols(g.Title));
-            }
-            else
-            {
-                isInstalled = IsRomInstalled(_allRoms, normalizedPlatform, g);
-            }
+            var matchingRom = FindMatchingRom(romLookups, normalizedPlatform, g);
+            bool isInstalled = string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase)
+                ? (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
+                    || localTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))
+                : matchingRom != null;
             _allMyGames.Add(new LocalGameCardVm
             {
                 Title            = g.Title,
@@ -618,9 +617,8 @@ public partial class LibraryViewModel : ViewModelBase
         // Local PC games NOT already represented in the cloud library
         foreach (var g in _allLocalGames)
         {
-            if (cloudPcTitles != null &&
-                (cloudPcTitles.Contains(g.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))))
+            if (cloudPcTitleKeys != null &&
+                cloudPcTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title)))
                 continue;
             if (g.SteamAppId > 0 && cloudSteamAppIds.Contains(g.SteamAppId))
                 continue;
@@ -646,9 +644,8 @@ public partial class LibraryViewModel : ViewModelBase
             if (GameScannerService.RepackMatchesInstalledTitle(r.Title, installedTitles))
                 continue;
 
-            if (cloudPcTitles != null &&
-                (cloudPcTitles.Contains(r.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title))))
+            if (cloudPcTitleKeys != null &&
+                cloudPcTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title)))
                 continue;
 
             _allMyGames.Add(new LocalGameCardVm
@@ -724,12 +721,8 @@ public partial class LibraryViewModel : ViewModelBase
                     StringComparer.OrdinalIgnoreCase),
                 StringComparer.OrdinalIgnoreCase);
 
-        cloudByPlatform.TryGetValue("PC", out var cloudPcTitles);
-        var cloudPcStripped = cloudPcTitles != null
-            ? new HashSet<string>(
-                cloudPcTitles.Select(PlatformHelper.NormalizeTitleForComparison),
-                StringComparer.OrdinalIgnoreCase)
-            : null;
+        cloudByPlatform.TryGetValue("PC", out var cloudPcTitleKeys);
+        var romLookups = BuildRomLookups(roms);
 
         var cloudSteamAppIds = new HashSet<long>(
             allGames
@@ -740,8 +733,8 @@ public partial class LibraryViewModel : ViewModelBase
         // These let us mark cloud PC entries as Installed/Not Installed.
         var localSteamAppIds = new HashSet<long>(
             localGames.Where(g => g.SteamAppId > 0).Select(g => (long)g.SteamAppId));
-        var localTitlesStripped = new HashSet<string>(
-            localGames.Select(g => PlatformHelper.StripSpecialSymbols(g.Title)),
+        var localTitleKeys = new HashSet<string>(
+            localGames.Select(g => PlatformHelper.NormalizeTitleForComparison(g.Title)),
             StringComparer.OrdinalIgnoreCase);
 
         // ── ALL cloud library games (first, so they sort to the top before dedup below) ──
@@ -750,19 +743,11 @@ public partial class LibraryViewModel : ViewModelBase
         {
             string normalizedPlatform = PlatformHelper.NormalizePlatform(g.Platform);
             if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.NormalizeTitleForComparison(g.Title))) continue;
-            var matchingRom = FindMatchingRom(roms, normalizedPlatform, g);
-            bool isInstalled = false;
-            if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
-            {
-                // A cloud PC game counts as locally installed when a matching local game is
-                // found by SteamAppId (most reliable) or by stripped title as a fallback.
-                isInstalled = (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
-                           || localTitlesStripped.Contains(PlatformHelper.StripSpecialSymbols(g.Title));
-            }
-            else
-            {
-                isInstalled = IsRomInstalled(roms, normalizedPlatform, g);
-            }
+            var matchingRom = FindMatchingRom(romLookups, normalizedPlatform, g);
+            bool isInstalled = string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase)
+                ? (g.SteamAppId > 0 && localSteamAppIds.Contains(g.SteamAppId.Value))
+                    || localTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))
+                : matchingRom != null;
 
             result.Add(new LocalGameCardVm
             {
@@ -780,9 +765,8 @@ public partial class LibraryViewModel : ViewModelBase
         // ── Local PC games NOT already represented in the cloud library ───────
         foreach (var g in localGames)
         {
-            if (cloudPcTitles != null &&
-                (cloudPcTitles.Contains(g.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))))
+            if (cloudPcTitleKeys != null &&
+                cloudPcTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title)))
                 continue;
 
             if (g.SteamAppId > 0 && cloudSteamAppIds.Contains(g.SteamAppId))
@@ -805,9 +789,8 @@ public partial class LibraryViewModel : ViewModelBase
 
             // Also skip if the cloud library already has a matching PC entry — clicking the
             // cloud card already handles the repack install path via OpenDetailFromGame.
-            if (cloudPcTitles != null &&
-                (cloudPcTitles.Contains(r.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title))))
+            if (cloudPcTitleKeys != null &&
+                cloudPcTitleKeys.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title)))
                 continue;
 
             result.Add(new LocalGameCardVm
