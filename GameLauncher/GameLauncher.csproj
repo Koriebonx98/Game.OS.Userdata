@@ -4,10 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.7</Version>
-    <FileVersion>1.0.7.6</FileVersion>
-    <AssemblyVersion>1.0.7.6</AssemblyVersion>
-    <InformationalVersion>v1.0.7.6.5.0.9.9.6.5</InformationalVersion>
+    <Version>1.0.8</Version>
+    <FileVersion>1.0.8.0</FileVersion>
+    <AssemblyVersion>1.0.8.0</AssemblyVersion>
+    <InformationalVersion>v1.0.8.0</InformationalVersion>
     
     
     <RootNamespace>GameLauncher</RootNamespace>
