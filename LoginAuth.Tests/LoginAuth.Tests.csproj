@@ -11,6 +11,7 @@
     <Compile Include="../GameLauncher/Services/AppSettingsService.cs" />
     <Compile Include="../GameLauncher/Services/DevLogService.cs" />
     <Compile Include="../GameLauncher/Services/GitHubDataService.cs" />
+    <Compile Include="../GameLauncher/Services/DatabaseContributionQueue.cs" />
     <Compile Include="../GameLauncher/Services/SteamGameImportService.cs" />
     <Compile Include="../GameLauncher/Services/UserDataService.cs" />
     <Compile Include="../GameLauncher/Services/BackendApiService.cs" />
