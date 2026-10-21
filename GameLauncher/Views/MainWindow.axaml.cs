@@ -344,7 +344,7 @@ public partial class MainWindow : Window
                     return;
                 case Key.Left:
                     // At first card (index 0) or no focused card → open nav menu
-                    if (vm.DashboardVm.SelectedCardIndex <= 0 || !vm.DashboardVm.HasFocusedCard)
+                    if (vm.DashboardVm.IsAtFirstTile)
                     {
                         OpenNavWithCurrentHighlight(vm);
                         e.Handled = true;
@@ -360,27 +360,19 @@ public partial class MainWindow : Window
                     return;
                 case Key.Up:
                     // Move to previous recent game card (same as Left but stays on dash)
-                    if (vm.DashboardVm.SelectedCardIndex > 0)
+                    if (!vm.DashboardVm.IsAtFirstTile)
                         vm.DashboardVm.MoveFocus(-1);
                     e.Handled = true;
                     return;
                 case Key.Enter:
                     // A button on a focused card → open game detail/info page
-                    if (vm.DashboardVm.HasFocusedCard)
-                    {
-                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
-                        e.Handled = true;
-                        return;
-                    }
-                    break;
+                    vm.DashboardVm.ActivateFocusedTile();
+                    e.Handled = true;
+                    return;
                 case Key.X:
-                    if (vm.DashboardVm.HasFocusedCard)
-                    {
-                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
-                        e.Handled = true;
-                        return;
-                    }
-                    break;
+                    vm.DashboardVm.ActivateFocusedTile();
+                    e.Handled = true;
+                    return;
             }
         }
 
@@ -1053,7 +1045,7 @@ public partial class MainWindow : Window
                     return;
                 case Key.Left:
                     // At first card (index 0) or no focused card → open nav menu
-                    if (vm.DashboardVm.SelectedCardIndex <= 0 || !vm.DashboardVm.HasFocusedCard)
+                    if (vm.DashboardVm.IsAtFirstTile)
                     {
                         OpenNavWithCurrentHighlight(vm);
                         return;
@@ -1066,13 +1058,12 @@ public partial class MainWindow : Window
                     return;
                 case Key.Up:
                     // Move to previous recent game card
-                    if (vm.DashboardVm.SelectedCardIndex > 0)
+                    if (!vm.DashboardVm.IsAtFirstTile)
                         vm.DashboardVm.MoveFocus(-1);
                     return;
                 case Key.Enter:
                     // A button → open game detail/info page
-                    if (vm.DashboardVm.HasFocusedCard)
-                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
+                    vm.DashboardVm.ActivateFocusedTile();
                     return;
                 case Key.X:
                     if (vm.DashboardVm.HasFocusedCard)

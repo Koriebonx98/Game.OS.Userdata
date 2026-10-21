@@ -604,7 +604,7 @@ public partial class DashboardViewModel : ViewModelBase
         }
 
         // ── Initialize PS5 focused card ──────────────────────────────────────
-        SelectedCardIndex = Ps5RecentGames.Count > 0 ? 0 : -1;
+        SelectedCardIndex = -1; // Store card is highlighted first
         UpdateFocusedCard();
 
         // ── Initialize XB360 blade and focus ─────────────────────────────────
@@ -710,13 +710,28 @@ public partial class DashboardViewModel : ViewModelBase
     public Action<string>? OnNavigateToPage { get; set; }
     public Action<string>? OnNavigateToMediaSection { get; set; }
 
+    [ObservableProperty] private bool _isStoreFocused = true;
+    [ObservableProperty] private bool _isAllGamesFocused;
+
+    /// <summary>True when the first (Store) tile is highlighted.</summary>
+    public bool IsAtFirstTile => SelectedCardIndex < 0;
+
+    /// <summary>
+    /// Moves the highlight across the whole strip: Store (-1), recent games (0..n-1), All Games (n).
+    /// </summary>
     public void MoveFocus(int delta)
     {
-        if (Ps5RecentGames.Count == 0) return;
-        int next = SelectedCardIndex + delta;
-        next = Math.Clamp(next, 0, Ps5RecentGames.Count - 1);
+        int next = Math.Clamp(SelectedCardIndex + delta, -1, Ps5RecentGames.Count);
         SelectedCardIndex = next;
         UpdateFocusedCard();
+    }
+
+    /// <summary>Activates the currently highlighted tile (Store, game detail or All Games).</summary>
+    public void ActivateFocusedTile()
+    {
+        if (IsAllGamesFocused) NavigateToAllGames();
+        else if (IsStoreFocused) OpenFeaturedDetail();
+        else OpenFocusedCardDetail();
     }
 
     private void UpdateFocusedCard()
@@ -724,6 +739,9 @@ public partial class DashboardViewModel : ViewModelBase
         // Clear old focus
         foreach (var c in Ps5RecentGames)
             c.IsFocused = false;
+
+        IsStoreFocused    = SelectedCardIndex < 0;
+        IsAllGamesFocused = SelectedCardIndex >= Ps5RecentGames.Count;
 
         if (SelectedCardIndex < 0 || SelectedCardIndex >= Ps5RecentGames.Count)
         {
