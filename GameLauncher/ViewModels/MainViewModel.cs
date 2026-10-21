@@ -2051,6 +2051,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DetailVm.LoadFromGame(game, localGame, repack, localRom, BuildKnownUnlockedForGame(game));
         ShowDetail = true;
 
+        // Always re-check the cloud so the info page never shows stale unlock state
+        // (e.g. an unlock synced from another session since the library was loaded).
+        _ = RefreshDetailAchievementsFromCloudAsync(game);
+
         // Always enrich achievements for non-PC library games: if AchievementsUrl is
         // already set, the function checks !HasAchievements before re-fetching so it's
         // a no-op when achievements already loaded.  This also catches the case where
@@ -4882,6 +4886,72 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             File.WriteAllText(path, json);
         }
         catch { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// Pulls the latest per-game achievement list (locked + unlocked) from the user's cloud
+    /// and merges any newer unlocks into the open detail view and the local offline cache.
+    /// Never downgrades an already-unlocked achievement; silently does nothing when offline.
+    /// </summary>
+    private async Task RefreshDetailAchievementsFromCloudAsync(Models.Game game)
+    {
+        try
+        {
+            string? user = _profile?.Username;
+            if (string.IsNullOrEmpty(user)) return;
+            string platform = Models.PlatformHelper.NormalizePlatform(game.Platform);
+
+            List<Models.Achievement>? cloud = null;
+            string? usedKey = null;
+            foreach (var key in PerGameAchievementKeys(platform, game.SteamAppId, game.TitleId, game.Title))
+            {
+                var list = await _client.GetGameAchievementsAsync(platform, key).ConfigureAwait(false);
+                if (list is { Count: > 0 }) { cloud = list; usedKey = key; break; }
+            }
+            if (cloud == null || usedKey == null) return;
+
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                game.GameAchievements = cloud;
+                if (cloud.Count > game.TotalAchievements) game.TotalAchievements = cloud.Count;
+
+                // Only touch the detail view if it still shows this game.
+                if (!ShowDetail || !string.Equals(
+                        Models.PlatformHelper.StripSpecialSymbols(DetailVm.Title),
+                        Models.PlatformHelper.StripSpecialSymbols(game.Title),
+                        StringComparison.OrdinalIgnoreCase))
+                    return;
+
+                var merged = DetailVm.Achievements.ToList();
+                bool changed = false;
+                foreach (var c in cloud.Where(c => c.IsUnlocked))
+                {
+                    var match = merged.FirstOrDefault(a => SameAchievement(a, c));
+                    if (match == null)
+                    {
+                        merged.Add(CloneAchievement(c));
+                        changed = true;
+                    }
+                    else if (!match.IsUnlocked)
+                    {
+                        match.UnlockedAt = c.UnlockedAt;
+                        changed = true;
+                    }
+                }
+                if (merged.Count == 0)
+                {
+                    merged = cloud.Select(CloneAchievement).ToList();
+                    changed = true;
+                }
+                if (changed) DetailVm.PopulateAchievements(merged);
+            });
+
+            // Refresh the offline cache so offline sessions show the latest state.
+            string localPath = GetLocalPerGameAchievementsPath(user, platform, usedKey);
+            if (!File.Exists(localPath) || CountLocalUnlockedAchievements(localPath) < cloud.Count(a => a.IsUnlocked))
+                WriteLocalPerGameAchievements(localPath, cloud);
+        }
+        catch { /* best-effort — offline falls back to cached data */ }
     }
 
     /// <summary>
