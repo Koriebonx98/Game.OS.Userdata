@@ -28,6 +28,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool   _isLoading        = false;
     [ObservableProperty] private string _loadingMessage   = "";
     [ObservableProperty] private string _browseCountLabel = "";
+    [ObservableProperty] private int _focusedStoreGameIndex = -1;
+    [ObservableProperty] private StoreGame? _focusedStoreGame;
 
     /// <summary>Platforms available in the Games.Database (plus "All" for the curated catalog).</summary>
     public ObservableCollection<string> Platforms { get; } = new()
@@ -98,6 +100,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     /// <summary>Invoked when the user clicks a store game card.</summary>
     public Action<StoreGame>? OnOpenDetail { get; set; }
+    public Action<StoreGame>? FocusStoreGameRequested { get; set; }
 
     public void Load(List<StoreGame> store, List<Game> library,
                      UserProfile profile, GameOsClient client, bool isAdmin,
@@ -299,6 +302,45 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// </summary>
     public Action? FocusSearchRequested { get; set; }
 
+    public void MoveStoreGameFocus(int delta)
+    {
+        if (FilteredStore.Count == 0)
+        {
+            SetFocusedStoreGameAt(-1);
+            return;
+        }
+
+        int next = FocusedStoreGameIndex < 0
+            ? 0
+            : Math.Clamp(FocusedStoreGameIndex + delta, 0, FilteredStore.Count - 1);
+        SetFocusedStoreGameAt(next);
+        if (FocusedStoreGame != null)
+            FocusStoreGameRequested?.Invoke(FocusedStoreGame);
+    }
+
+    public void ActivateFocusedStoreGame()
+    {
+        if (FocusedStoreGame != null)
+            OnOpenDetail?.Invoke(FocusedStoreGame);
+    }
+
+    private void SetFocusedStoreGameAt(int index)
+    {
+        if (FocusedStoreGame != null)
+            FocusedStoreGame.IsFocused = false;
+
+        if (index < 0 || index >= FilteredStore.Count)
+        {
+            FocusedStoreGameIndex = -1;
+            FocusedStoreGame = null;
+            return;
+        }
+
+        FocusedStoreGameIndex = index;
+        FocusedStoreGame = FilteredStore[index];
+        FocusedStoreGame.IsFocused = true;
+    }
+
     /// <summary>
     /// Cycles the platform filter to the next platform in <see cref="Platforms"/>.
     /// Called by the X button controller handler in MainWindow.
@@ -433,6 +475,10 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     private void ApplyFilter()
     {
+        if (FocusedStoreGame != null)
+            FocusedStoreGame.IsFocused = false;
+        FocusedStoreGame = null;
+        FocusedStoreGameIndex = -1;
         FilteredStore.Clear();
         var results = _allStore.AsEnumerable();
 
@@ -462,6 +508,9 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             : shown < total
                 ? $"Showing {shown:N0} of {total:N0} games — use search to filter or load more below"
                 : $"{total:N0} game{(total == 1 ? "" : "s")}";
+
+        if (FilteredStore.Count > 0)
+            SetFocusedStoreGameAt(0);
     }
 
     /// <summary>Appends the next page of games to the current filtered view.</summary>

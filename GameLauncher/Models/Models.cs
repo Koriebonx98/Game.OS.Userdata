@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Text.Json.Serialization;
@@ -337,8 +338,10 @@ namespace GameLauncher.Models
     }
 
     /// <summary>A store entry shown in the Games Store screen.</summary>
-    public class StoreGame
+    public class StoreGame : INotifyPropertyChanged
     {
+        private bool _isFocused;
+
         public string        Title           { get; set; } = "";
         public string        Platform        { get; set; } = "";
         public string        Genre           { get; set; } = "";
@@ -357,6 +360,20 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
         public string?       StorePageUrl    { get; set; }
+        [JsonIgnore]
+        public bool IsFocused
+        {
+            get => _isFocused;
+            set
+            {
+                if (_isFocused == value) return;
+                _isFocused = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsFocused)));
+            }
+        }
+
+        public event PropertyChangedEventHandler? PropertyChanged;
+
         public string        RatingStars     =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));

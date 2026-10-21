@@ -2427,7 +2427,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void OpenDetailFromMyGameCard(LocalGameCardVm card)
     {
-        if (card.SourceGame != null)
+        if (card.SourceCloudGame != null)
+        {
+            // Prefer the cloud record on a merged ROM card so the detail view includes
+            // the game's achievement catalogue as well as its locally detected ROM.
+            OpenDetailFromGame(card.SourceCloudGame);
+        }
+        else if (card.SourceGame != null)
         {
             OpenDetailFromLocalGame(card.SourceGame);
         }
@@ -2438,11 +2444,6 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         else if (card.SourceRom != null)
         {
             OpenDetailFromLocalRom(card.SourceRom);
-        }
-        else if (card.SourceCloudGame != null)
-        {
-            // Cloud library game shown in "Continue Playing" — open via standard cloud detail flow
-            OpenDetailFromGame(card.SourceCloudGame);
         }
     }
 
@@ -2464,7 +2465,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DetailVm.LoadFromLocalGame(card.SourceGame, cloudPlaytime);
         }
 
-        else if (card.SourceRom != null)
+        else if (card.SourceRom != null && card.SourceCloudGame == null)
         {
             DetailVm.LoadFromLocalRom(card.SourceRom);
         }

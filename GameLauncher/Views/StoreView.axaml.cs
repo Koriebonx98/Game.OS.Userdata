@@ -1,5 +1,8 @@
 using Avalonia.Controls;
+using Avalonia.VisualTree;
+using GameLauncher.Models;
 using GameLauncher.ViewModels;
+using System.Linq;
 
 namespace GameLauncher.Views;
 
@@ -14,7 +17,18 @@ public partial class StoreView : UserControl
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
         if (DataContext is StoreViewModel vm)
+        {
             vm.FocusSearchRequested = FocusSearchBox;
+            vm.FocusStoreGameRequested = FocusStoreGame;
+        }
+    }
+
+    private void FocusStoreGame(StoreGame game)
+    {
+        var button = this.GetVisualDescendants()
+            .OfType<Button>()
+            .FirstOrDefault(candidate => ReferenceEquals(candidate.DataContext, game));
+        button?.Focus();
     }
 
     private void FocusSearchBox()

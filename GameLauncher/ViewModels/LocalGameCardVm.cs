@@ -37,7 +37,7 @@ public partial class LocalGameCardVm : ViewModelBase
     /// <summary>Gradient placeholder background used while <see cref="CoverUrl"/> is not yet available.</summary>
     [ObservableProperty] private string  _coverGradient = "#0d1117,#1f2937";
 
-    // ── Source objects (exactly one is non-null) ──────────────────────────────
+    // ── Source objects ────────────────────────────────────────────────────────
 
     /// <summary>Non-null when this entry represents a locally installed game folder.</summary>
     public LocalGame?   SourceGame      { get; init; }
@@ -48,7 +48,7 @@ public partial class LocalGameCardVm : ViewModelBase
     /// <summary>Non-null when this entry represents a ROM file.</summary>
     public LocalRom?    SourceRom       { get; init; }
 
-    /// <summary>Non-null when this entry represents a cloud library game with recorded playtime.</summary>
+    /// <summary>Non-null when this entry represents a cloud library game with recorded playtime or achievements.</summary>
     public Game?        SourceCloudGame { get; init; }
 
     /// <summary>

@@ -526,18 +526,25 @@ public partial class LibraryViewModel : ViewModelBase
 
     /// <summary>True when a local ROM matches the cloud game by platform + TitleID or fuzzy title.</summary>
     private static bool IsRomInstalled(List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game g)
+        => FindMatchingRom(roms, normalizedPlatform, g) != null;
+
+    private static LocalRom? FindMatchingRom(
+        List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game game)
     {
-        string stripped = PlatformHelper.StripSpecialSymbols(g.Title);
         foreach (var r in roms)
         {
             if (!string.Equals(PlatformHelper.NormalizePlatform(r.Platform), normalizedPlatform, StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (!string.IsNullOrEmpty(r.TitleId) && string.Equals(r.TitleId, g.TitleId, StringComparison.OrdinalIgnoreCase))
-                return true;
-            if (string.Equals(PlatformHelper.StripSpecialSymbols(r.Title), stripped, StringComparison.OrdinalIgnoreCase))
-                return true;
+            if (!string.IsNullOrEmpty(r.TitleId) &&
+                string.Equals(r.TitleId, game.TitleId, StringComparison.OrdinalIgnoreCase))
+                return r;
+            if (string.Equals(
+                    PlatformHelper.NormalizeTitleForComparison(r.Title),
+                    PlatformHelper.NormalizeTitleForComparison(game.Title),
+                    StringComparison.Ordinal))
+                return r;
         }
-        return false;
+        return null;
     }
 
     /// <summary>Rebuilds _allMyGames from the current three source lists.</summary>
@@ -554,7 +561,9 @@ public partial class LibraryViewModel : ViewModelBase
                      StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 grp => grp.Key,
-                grp => new HashSet<string>(grp.Select(g => g.Title), StringComparer.OrdinalIgnoreCase),
+                grp => new HashSet<string>(
+                    grp.Select(g => PlatformHelper.NormalizeTitleForComparison(g.Title)),
+                    StringComparer.OrdinalIgnoreCase),
                 StringComparer.OrdinalIgnoreCase);
 
         var cloudSteamAppIds = new HashSet<long>(
@@ -565,7 +574,7 @@ public partial class LibraryViewModel : ViewModelBase
         cloudByPlatform.TryGetValue("PC", out var cloudPcTitles);
         var cloudPcStripped = cloudPcTitles != null
             ? new HashSet<string>(
-                cloudPcTitles.Select(PlatformHelper.StripSpecialSymbols),
+                cloudPcTitles.Select(PlatformHelper.NormalizeTitleForComparison),
                 StringComparer.OrdinalIgnoreCase)
             : null;
 
@@ -581,7 +590,8 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var g in _allGames)
         {
             string normalizedPlatform = GameLauncher.Models.PlatformHelper.NormalizePlatform(g.Platform);
-            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.StripSpecialSymbols(g.Title))) continue;
+            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.NormalizeTitleForComparison(g.Title))) continue;
+            var matchingRom = FindMatchingRom(_allRoms, normalizedPlatform, g);
             bool isInstalled = false;
             if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
             {
@@ -599,6 +609,7 @@ public partial class LibraryViewModel : ViewModelBase
                 CoverUrl         = g.CoverUrl,
                 CoverGradient    = g.CoverGradient ?? "#0d1117,#1f2937",
                 SourceCloudGame  = g,
+                SourceRom        = matchingRom,
                 IsInstalledLocal = isInstalled,
                 PlaytimeLabel    = FormatPlaytime(g.PlaytimeMinutes),
             });
@@ -609,7 +620,7 @@ public partial class LibraryViewModel : ViewModelBase
         {
             if (cloudPcTitles != null &&
                 (cloudPcTitles.Contains(g.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.StripSpecialSymbols(g.Title))))
+                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))))
                 continue;
             if (g.SteamAppId > 0 && cloudSteamAppIds.Contains(g.SteamAppId))
                 continue;
@@ -637,7 +648,7 @@ public partial class LibraryViewModel : ViewModelBase
 
             if (cloudPcTitles != null &&
                 (cloudPcTitles.Contains(r.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.StripSpecialSymbols(r.Title))))
+                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title))))
                 continue;
 
             _allMyGames.Add(new LocalGameCardVm
@@ -676,11 +687,7 @@ public partial class LibraryViewModel : ViewModelBase
                 continue;
 
             if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
-                (cloudTitles.Contains(r.Title) ||
-                 cloudTitles.Any(ct => string.Equals(
-                     PlatformHelper.StripSpecialSymbols(ct),
-                     PlatformHelper.StripSpecialSymbols(r.Title),
-                     StringComparison.OrdinalIgnoreCase))))
+                cloudTitles.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title)))
                 continue;
 
             _allMyGames.Add(new LocalGameCardVm
@@ -712,12 +719,16 @@ public partial class LibraryViewModel : ViewModelBase
             .GroupBy(g => PlatformHelper.NormalizePlatform(g.Platform), StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 grp => grp.Key,
-                grp => new HashSet<string>(grp.Select(g => g.Title), StringComparer.OrdinalIgnoreCase),
+                grp => new HashSet<string>(
+                    grp.Select(g => PlatformHelper.NormalizeTitleForComparison(g.Title)),
+                    StringComparer.OrdinalIgnoreCase),
                 StringComparer.OrdinalIgnoreCase);
 
         cloudByPlatform.TryGetValue("PC", out var cloudPcTitles);
         var cloudPcStripped = cloudPcTitles != null
-            ? new HashSet<string>(cloudPcTitles.Select(PlatformHelper.StripSpecialSymbols), StringComparer.OrdinalIgnoreCase)
+            ? new HashSet<string>(
+                cloudPcTitles.Select(PlatformHelper.NormalizeTitleForComparison),
+                StringComparer.OrdinalIgnoreCase)
             : null;
 
         var cloudSteamAppIds = new HashSet<long>(
@@ -738,7 +749,8 @@ public partial class LibraryViewModel : ViewModelBase
         foreach (var g in allGames)
         {
             string normalizedPlatform = PlatformHelper.NormalizePlatform(g.Platform);
-            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.StripSpecialSymbols(g.Title))) continue;
+            if (!seenCloud.Add(normalizedPlatform + "|" + PlatformHelper.NormalizeTitleForComparison(g.Title))) continue;
+            var matchingRom = FindMatchingRom(roms, normalizedPlatform, g);
             bool isInstalled = false;
             if (string.Equals(normalizedPlatform, "PC", StringComparison.OrdinalIgnoreCase))
             {
@@ -759,6 +771,7 @@ public partial class LibraryViewModel : ViewModelBase
                 CoverUrl         = g.CoverUrl,
                 CoverGradient    = g.CoverGradient ?? "#0d1117,#1f2937",
                 SourceCloudGame  = g,
+                SourceRom        = matchingRom,
                 IsInstalledLocal = isInstalled,
                 PlaytimeLabel    = FormatPlaytime(g.PlaytimeMinutes),
             });
@@ -769,7 +782,7 @@ public partial class LibraryViewModel : ViewModelBase
         {
             if (cloudPcTitles != null &&
                 (cloudPcTitles.Contains(g.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.StripSpecialSymbols(g.Title))))
+                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(g.Title))))
                 continue;
 
             if (g.SteamAppId > 0 && cloudSteamAppIds.Contains(g.SteamAppId))
@@ -794,7 +807,7 @@ public partial class LibraryViewModel : ViewModelBase
             // cloud card already handles the repack install path via OpenDetailFromGame.
             if (cloudPcTitles != null &&
                 (cloudPcTitles.Contains(r.Title) ||
-                 cloudPcStripped!.Contains(PlatformHelper.StripSpecialSymbols(r.Title))))
+                 cloudPcStripped!.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title))))
                 continue;
 
             result.Add(new LocalGameCardVm
@@ -822,11 +835,7 @@ public partial class LibraryViewModel : ViewModelBase
                 continue;
 
             if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
-                (cloudTitles.Contains(r.Title) ||
-                 cloudTitles.Any(ct => string.Equals(
-                     PlatformHelper.StripSpecialSymbols(ct),
-                     PlatformHelper.StripSpecialSymbols(r.Title),
-                     StringComparison.OrdinalIgnoreCase))))
+                cloudTitles.Contains(PlatformHelper.NormalizeTitleForComparison(r.Title)))
                 continue;
 
             result.Add(new LocalGameCardVm

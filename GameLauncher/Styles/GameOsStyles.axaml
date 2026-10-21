@@ -355,6 +355,11 @@
         <Setter Property="Background" Value="#21262d"/>
     </Style>
 
+    <Style Selector="Button.store-card-btn.focused /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="#FFD400"/>
+        <Setter Property="BorderThickness" Value="3"/>
+    </Style>
+
     <!-- ─── Platform Filter Chip ─── -->
     <Style Selector="Button.platform-chip">
         <Setter Property="Background" Value="#21262d"/>
