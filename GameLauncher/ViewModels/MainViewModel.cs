@@ -942,12 +942,32 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found.");
             LibraryVm.UpdateRoms(roms);
             RefreshDashboardLocalGames();
+            _ = Task.Run(() => QueueUnknownRomsForDatabaseAsync(roms));
             if (BackgroundMetadataCachingEnabled())
             {
                 // Trigger background metadata caching for the newly found ROMs
                 _ = Task.Run(() => BackgroundCacheLocalGamesAsync());
             }
         };
+    }
+
+    /// <summary>
+    /// Checks local ROMs missing from the games database; legit ones are queued and
+    /// batch-added (hourly) to the platform database so other users get them too.
+    /// </summary>
+    private static async Task QueueUnknownRomsForDatabaseAsync(IReadOnlyList<LocalRom> roms)
+    {
+        try
+        {
+            foreach (var rom in roms.ToList())
+            {
+                if (!Services.GitHubDataService.IsLegitRom(rom)) continue;
+                if (!await Services.GitHubDataService.IsMissingFromDatabaseAsync(rom).ConfigureAwait(false)) continue;
+                Services.DatabaseContributionQueue.EnqueueRom(
+                    Models.PlatformHelper.NormalizePlatform(rom.Platform), rom.Title, rom.TitleId);
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[DbQueue] ROM check failed: {ex.Message}"); }
     }
 
     public void BeginStartup()

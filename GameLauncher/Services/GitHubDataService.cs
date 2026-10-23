@@ -2248,6 +2248,109 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Basic legitimacy check for a local ROM before it is queued for contribution:
+        /// supported platform, plausible title, game-sized disc/cartridge image, and a
+        /// well-formed title ID when one was detected.
+        /// </summary>
+        public static bool IsLegitRom(Models.LocalRom rom)
+        {
+            if (rom == null || string.IsNullOrWhiteSpace(rom.Title) || rom.Title.Trim().Length < 3) return false;
+            if (!rom.Title.Any(char.IsLetterOrDigit)) return false;
+            string platform = NormalizePlatform(rom.Platform);
+            if (platform == "PC" || PlatformToDbFolder(platform) == null) return false;
+            if (rom.SizeBytes < 1_048_576) return false; // too small to be a real game image
+            string[] okTypes = { "iso", "bin", "cue", "chd", "img", "mdf", "nrg", "cso", "zso", "pkg",
+                                 "nsp", "xci", "wbfs", "rvz", "gcm", "xex", "god", "7z", "zip", "rar" };
+            if (!string.IsNullOrEmpty(rom.FileType) &&
+                !okTypes.Contains(rom.FileType.TrimStart('.').ToLowerInvariant())) return false;
+            if (!string.IsNullOrEmpty(rom.TitleId) && !System.Text.RegularExpressions.Regex.IsMatch(
+                    rom.TitleId, @"^[A-Za-z0-9_\-\.]{4,20}$")) return false;
+            return true;
+        }
+
+        /// <summary>True when the ROM is not already in the (cached or fetched) platform database.</summary>
+        public static async Task<bool> IsMissingFromDatabaseAsync(
+            Models.LocalRom rom, CancellationToken ct = default)
+        {
+            var db = await FetchGamesDatabaseAsync(rom.Platform, ct).ConfigureAwait(false);
+            string norm = NormalizeTitleForMatch(rom.Title);
+            return !db.Any(g =>
+                (!string.IsNullOrEmpty(rom.TitleId) &&
+                 string.Equals(g.TitleId, rom.TitleId, StringComparison.OrdinalIgnoreCase)) ||
+                NormalizeTitleForMatch(g.Title ?? "") == norm ||
+                (g.AlternateNames?.Any(a => NormalizeTitleForMatch(a) == norm) ?? false));
+        }
+
+        private static string NormalizeTitleForMatch(string t)
+            => new string(t.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        /// <summary>
+        /// Adds queued ROM games to each platform's <c>{Platform}.Games.json</c> (same as a dev
+        /// adding a game). Returns the platforms that were fully processed.
+        /// </summary>
+        public async Task<HashSet<string>> ContributeRomsToDatabaseAsync(
+            IReadOnlyList<(string Platform, string Title, string? TitleId)> roms, CancellationToken ct = default)
+        {
+            var handled = new HashSet<string>();
+            foreach (var group in roms.GroupBy(r => r.Platform))
+            {
+                if (ct.IsCancellationRequested) break;
+                string platform = NormalizePlatform(group.Key);
+                string filePath = $"{platform}.Games.json";
+                try
+                {
+                    var (root, sha) = await ReadGamesDatabaseFileAsync<System.Text.Json.Nodes.JsonNode>(filePath, ct)
+                        .ConfigureAwait(false);
+                    if (root == null) { handled.Add(group.Key); continue; } // platform file must already exist
+
+                    System.Text.Json.Nodes.JsonArray? arr = root as System.Text.Json.Nodes.JsonArray
+                        ?? ((root as System.Text.Json.Nodes.JsonObject)?["Games"]
+                            ?? (root as System.Text.Json.Nodes.JsonObject)?["games"]) as System.Text.Json.Nodes.JsonArray;
+                    if (arr == null) { handled.Add(group.Key); continue; }
+
+                    var titles = new HashSet<string>();
+                    var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var e in arr.OfType<System.Text.Json.Nodes.JsonObject>())
+                    {
+                        foreach (var k in new[] { "Title", "title", "game_name", "name" })
+                            if (e[k] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var s))
+                                titles.Add(NormalizeTitleForMatch(s));
+                        foreach (var k in new[] { "TitleID", "title_id", "titleId" })
+                            if (e[k] is System.Text.Json.Nodes.JsonValue v2 && v2.TryGetValue<string>(out var s2))
+                                ids.Add(s2);
+                    }
+
+                    int added = 0;
+                    foreach (var r in group)
+                    {
+                        if (titles.Contains(NormalizeTitleForMatch(r.Title)) ||
+                            (!string.IsNullOrEmpty(r.TitleId) && ids.Contains(r.TitleId))) continue;
+                        var obj = new System.Text.Json.Nodes.JsonObject { ["Title"] = r.Title };
+                        if (!string.IsNullOrEmpty(r.TitleId)) obj["TitleID"] = r.TitleId;
+                        arr.Add(obj);
+                        titles.Add(NormalizeTitleForMatch(r.Title));
+                        added++;
+                    }
+
+                    if (added > 0)
+                    {
+                        await WriteGamesDatabaseFileAsync(filePath, root,
+                            $"Add {added} {platform} game(s) contributed from user ROM libraries", sha, ct)
+                            .ConfigureAwait(false);
+                        InvalidatePlatformCache(platform);
+                        DevLogService.Log($"[GamesDB] Contributed {added} new {platform} ROM game(s).");
+                    }
+                    handled.Add(group.Key);
+                }
+                catch (Exception ex)
+                {
+                    DevLogService.Log($"[GamesDB] ROM contribution for {platform} failed: {ex.Message}");
+                }
+            }
+            return handled;
+        }
+
+        /// <summary>
         /// Uploads the full achievement schema for a Steam game to
         /// <c>Data/PC/Games/{appId}/achievements.json</c> in the Games.Database repository.
         /// Returns the raw URL to the uploaded file on success, or <c>null</c> on failure.
