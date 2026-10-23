@@ -37,6 +37,9 @@ namespace GameLauncher.Services
             /// <summary>Platform name for "rom" items (e.g. "PS2").</summary>
             public string Platform { get; set; } = "";
             public string? TitleId { get; set; }
+            /// <summary>Online proof for "rom" items: description and source page URL.</summary>
+            public string? Description { get; set; }
+            public string? SourceUrl { get; set; }
         }
 
         private static readonly string QueuePath = System.IO.Path.Combine(
@@ -104,7 +107,7 @@ namespace GameLauncher.Services
         }
 
         /// <summary>Queues a locally found ROM that is missing from the platform games database.</summary>
-        public static bool EnqueueRom(string platform, string title, string? titleId)
+        public static bool EnqueueRom(string platform, string title, string? titleId, string? description = null, string? sourceUrl = null)
         {
             if (string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(title)) return false;
             string key = "rom:" + platform.ToLowerInvariant() + ":" +
@@ -113,7 +116,7 @@ namespace GameLauncher.Services
             {
                 var items = Items();
                 if (items.Count >= MaxQueueSize || items.Any(i => i.Key == key)) return false;
-                items.Add(new Item { Kind = "rom", Key = key, Platform = platform, Name = title, TitleId = titleId });
+                items.Add(new Item { Kind = "rom", Key = key, Platform = platform, Name = title, TitleId = titleId, Description = description, SourceUrl = sourceUrl });
                 Save();
                 return true;
             }
@@ -182,7 +185,7 @@ namespace GameLauncher.Services
                 try
                 {
                     var handled = await svc.ContributeRomsToDatabaseAsync(
-                        roms.Select(r => (r.Platform, r.Name, r.TitleId)).ToList(), ct).ConfigureAwait(false);
+                        roms.Select(r => (r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl)).ToList(), ct).ConfigureAwait(false);
                     done.AddRange(roms.Where(r => handled.Contains(r.Platform)));
                     if (handled.Count == roms.Select(r => r.Platform).Distinct().Count())
                         _lastRomFlushUtc = DateTime.UtcNow;

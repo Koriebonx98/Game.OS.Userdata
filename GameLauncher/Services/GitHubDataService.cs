@@ -2281,6 +2281,69 @@ namespace GameLauncher.Services
                 (g.AlternateNames?.Any(a => NormalizeTitleForMatch(a) == norm) ?? false));
         }
 
+        private static readonly HttpClient _verifyHttp = CreateVerifyHttp();
+        private static HttpClient CreateVerifyHttp()
+        {
+            var c = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/1.0 (game verification)");
+            return c;
+        }
+
+        private static string[] PlatformSearchNames(string platform) => NormalizePlatform(platform) switch
+        {
+            "PS1"      => new[] { "PlayStation (console)", "PlayStation", "PS1" },
+            "PS2"      => new[] { "PlayStation 2", "PS2" },
+            "PS3"      => new[] { "PlayStation 3", "PS3" },
+            "PS4"      => new[] { "PlayStation 4", "PS4" },
+            "PS5"      => new[] { "PlayStation 5", "PS5" },
+            "PSP"      => new[] { "PlayStation Portable", "PSP" },
+            "PS Vita"  => new[] { "PlayStation Vita", "PS Vita" },
+            "Xbox 360" => new[] { "Xbox 360" },
+            "Xbox One" => new[] { "Xbox One" },
+            "Switch"   => new[] { "Nintendo Switch", "Switch" },
+            var p      => new[] { p },
+        };
+
+        /// <summary>
+        /// Online proof that a ROM is a real game on its platform: searches Wikipedia (no API key)
+        /// for a video-game article whose title matches and whose intro mentions the platform.
+        /// Returns the proof (article URL + short description) or <c>null</c> when not verified.
+        /// Throws on network failure so callers can retry later instead of rejecting the game.
+        /// </summary>
+        public static async Task<(string Url, string Description)?> VerifyGameOnlineAsync(
+            string platform, string title, CancellationToken ct = default)
+        {
+            string wanted = NormalizeTitleForMatch(title);
+            if (wanted.Length < 3) return null;
+            string platName = PlatformSearchNames(platform)[0];
+            string q = Uri.EscapeDataString($"{title} {platName} video game");
+            string url = "https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search" +
+                         $"&gsrsearch={q}&gsrlimit=5&prop=extracts%7Cinfo&exintro=1&explaintext=1&exlimit=max&inprop=url";
+            using var resp = await _verifyHttp.GetAsync(url, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            if (!doc.RootElement.TryGetProperty("query", out var qr) ||
+                !qr.TryGetProperty("pages", out var pages)) return null;
+
+            foreach (var page in pages.EnumerateObject())
+            {
+                var pg = page.Value;
+                string pTitle = pg.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                string extract = pg.TryGetProperty("extract", out var e) ? e.GetString() ?? "" : "";
+                string pageUrl = pg.TryGetProperty("fullurl", out var u) ? u.GetString() ?? "" : "";
+                string bare = System.Text.RegularExpressions.Regex.Replace(pTitle, @"\s*\(.*?\)\s*$", "");
+                if (NormalizeTitleForMatch(bare) != wanted) continue;
+                if (extract.IndexOf("video game", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!PlatformSearchNames(platform).Any(n =>
+                        extract.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+                if (!pageUrl.StartsWith("https://en.wikipedia.org/", StringComparison.Ordinal)) continue;
+                string desc = extract.Split('\n')[0].Trim();
+                if (desc.Length > 500) desc = desc[..500].TrimEnd() + "…";
+                return (pageUrl, desc);
+            }
+            return null;
+        }
+
         private static string NormalizeTitleForMatch(string t)
             => new string(t.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
@@ -2289,7 +2352,7 @@ namespace GameLauncher.Services
         /// adding a game). Returns the platforms that were fully processed.
         /// </summary>
         public async Task<HashSet<string>> ContributeRomsToDatabaseAsync(
-            IReadOnlyList<(string Platform, string Title, string? TitleId)> roms, CancellationToken ct = default)
+            IReadOnlyList<(string Platform, string Title, string? TitleId, string? Description, string? SourceUrl)> roms, CancellationToken ct = default)
         {
             var handled = new HashSet<string>();
             foreach (var group in roms.GroupBy(r => r.Platform))
@@ -2327,6 +2390,8 @@ namespace GameLauncher.Services
                             (!string.IsNullOrEmpty(r.TitleId) && ids.Contains(r.TitleId))) continue;
                         var obj = new System.Text.Json.Nodes.JsonObject { ["Title"] = r.Title };
                         if (!string.IsNullOrEmpty(r.TitleId)) obj["TitleID"] = r.TitleId;
+                        if (!string.IsNullOrWhiteSpace(r.Description)) obj["Description"] = r.Description;
+                        if (!string.IsNullOrWhiteSpace(r.SourceUrl)) obj["StorePageUrl"] = r.SourceUrl;
                         arr.Add(obj);
                         titles.Add(NormalizeTitleForMatch(r.Title));
                         added++;
