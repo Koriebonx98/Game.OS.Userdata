@@ -2362,3 +2362,16 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 
 .app-store-btn { width: auto !important; min-width: 0; flex: 0 0 auto; padding: 4px 10px; font-size: .9rem; line-height: 1.2; }
 .game-modal-bg-img{cursor:zoom-in}
+
+/* ── Mods list (game info card) ── */
+.mod-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 14px; }
+.mod-card { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); color: inherit; text-decoration: none; transition: transform .15s, border-color .15s; }
+.mod-card:hover { transform: translateY(-1px); border-color: #6c8cff; }
+.mod-card-info { flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mod-genres { display: flex; flex-wrap: wrap; gap: 4px; }
+.mod-genre { font-size: .72em; padding: 2px 8px; border-radius: 999px; background: rgba(108,140,255,.2); }
+.mod-card-go { opacity: .6; }
+
+/* ── Store-style browse cards ── */
+#browseGamesList .game-item, #browseGamesList .browse-game-item { border-radius: 12px; transition: transform .15s, box-shadow .15s; }
+#browseGamesList .game-item:hover, #browseGamesList .browse-game-item:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
