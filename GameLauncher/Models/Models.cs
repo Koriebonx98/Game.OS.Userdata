@@ -132,6 +132,14 @@ namespace GameLauncher.Models
                                                     !UnlockedAt.StartsWith("1970-01-01T00:00:00", StringComparison.OrdinalIgnoreCase);
         /// <summary>Opacity used in the UI: 1.0 for unlocked, 0.35 for locked (darkened).</summary>
         [JsonIgnore] public double  LockedOpacity => IsUnlocked ? 1.0 : 0.35;
+        /// <summary>"🏆" when unlocked, "🔒" when locked — mirrors the website's achievement cards.</summary>
+        [JsonIgnore] public string  StatusIcon    => IsUnlocked ? "🏆" : "🔒";
+        /// <summary>"🏆 Unlocked {date}" or "🔒 Locked" status line for achievement cards.</summary>
+        [JsonIgnore] public string  StatusLabel   => IsUnlocked
+            ? (DateTimeOffset.TryParse(UnlockedAt, out var dt)
+                ? $"🏆 Unlocked {dt.LocalDateTime:MMM d, yyyy}"
+                : "🏆 Unlocked")
+            : "🔒 Locked";
     }
 
     public class FriendRequest
@@ -337,6 +345,18 @@ namespace GameLauncher.Models
     }
 
     /// <summary>A store entry shown in the Games Store screen.</summary>
+    /// <summary>An entry in the shared "New" games feed (store/new-games.json).</summary>
+    public class NewGameEntry
+    {
+        [JsonPropertyName("platform")]   public string  Platform   { get; set; } = "";
+        [JsonPropertyName("title")]      public string  Title      { get; set; } = "";
+        [JsonPropertyName("titleId")]    public string? TitleId    { get; set; }
+        [JsonPropertyName("coverUrl")]   public string? CoverUrl   { get; set; }
+        [JsonPropertyName("steamAppId")] public long?   SteamAppId { get; set; }
+        [JsonPropertyName("source")]     public string  Source     { get; set; } = "";
+        [JsonPropertyName("addedAt")]    public string  AddedAt    { get; set; } = "";
+    }
+
     public class StoreGame
     {
         public string        Title           { get; set; } = "";

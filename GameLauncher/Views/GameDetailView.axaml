@@ -1091,6 +1091,8 @@
                                                            FontSize="11" Foreground="#8b949e"
                                                            TextWrapping="Wrap" MaxWidth="180"
                                                            MaxLines="2"/>
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           FontSize="10" Foreground="#f1c40f"/>
                                             </StackPanel>
                                         </StackPanel>
                                     </Border>

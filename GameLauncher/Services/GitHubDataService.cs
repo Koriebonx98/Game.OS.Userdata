@@ -468,6 +468,58 @@ namespace GameLauncher.Services
 
             library.Add(game);
             await WriteFileAsync(key, library, $"Add game '{game.Title}' for {username}", sha, ct);
+
+            // Steam auto-added games feed the shared "New" section of the store.
+            if (game.SteamAppId is > 0)
+                await RecordNewGameAsync(game, "steam-auto-add", ct);
+        }
+
+        public const string NewGamesPath = "store/new-games.json";
+        private const int NewGamesMax = 100;
+
+        /// <summary>Reads the shared "New" games feed. Returns an empty list when missing.</summary>
+        public async Task<List<NewGameEntry>> GetNewGamesAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                var (list, _) = await ReadFileAsync<List<NewGameEntry>>(NewGamesPath, ct);
+                return list ?? new List<NewGameEntry>();
+            }
+            catch { return new List<NewGameEntry>(); }
+        }
+
+        /// <summary>Adds/refreshes a game at the top of the "New" feed. Best-effort.</summary>
+        public async Task RecordNewGameAsync(Game game, string source, CancellationToken ct = default)
+        {
+            try
+            {
+                for (int attempt = 0; attempt < 2; attempt++)
+                {
+                    var (list, sha) = await ReadFileAsync<List<NewGameEntry>>(NewGamesPath, ct);
+                    var feed = list ?? new List<NewGameEntry>();
+                    feed.RemoveAll(e =>
+                        string.Equals(e.Title,    game.Title,    StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(e.Platform, game.Platform, StringComparison.OrdinalIgnoreCase));
+                    feed.Insert(0, new NewGameEntry
+                    {
+                        Platform   = game.Platform,
+                        Title      = game.Title,
+                        TitleId    = game.TitleId,
+                        CoverUrl   = game.CoverUrl,
+                        SteamAppId = game.SteamAppId,
+                        Source     = source,
+                        AddedAt    = DateTimeOffset.UtcNow.ToString("o"),
+                    });
+                    if (feed.Count > NewGamesMax) feed.RemoveRange(NewGamesMax, feed.Count - NewGamesMax);
+                    try
+                    {
+                        await WriteFileAsync(NewGamesPath, feed, $"New games feed: {game.Title}", sha, ct);
+                        return;
+                    }
+                    catch when (attempt == 0) { /* SHA conflict — re-read and retry once */ }
+                }
+            }
+            catch { /* best-effort */ }
         }
 
         public async Task RemoveGameAsync(
