@@ -942,12 +942,53 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log($"[Scanner] RomsUpdated: {roms.Count} ROMs found.");
             LibraryVm.UpdateRoms(roms);
             RefreshDashboardLocalGames();
+            _ = Task.Run(() => QueueUnknownRomsForDatabaseAsync(roms));
             if (BackgroundMetadataCachingEnabled())
             {
                 // Trigger background metadata caching for the newly found ROMs
                 _ = Task.Run(() => BackgroundCacheLocalGamesAsync());
             }
         };
+    }
+
+    /// <summary>
+    /// Checks local ROMs missing from the games database; ones verified online (Wikipedia) as real games are queued and
+    /// batch-added (hourly) to the platform database so other users get them too.
+    /// </summary>
+    private static readonly HashSet<string> _romVerifyChecked = new();
+
+    private static async Task QueueUnknownRomsForDatabaseAsync(IReadOnlyList<LocalRom> roms)
+    {
+        try
+        {
+            foreach (var rom in roms.ToList())
+            {
+                if (!Services.GitHubDataService.IsLegitRom(rom)) continue;
+                if (!await Services.GitHubDataService.IsMissingFromDatabaseAsync(rom).ConfigureAwait(false)) continue;
+                string platform = Models.PlatformHelper.NormalizePlatform(rom.Platform);
+                string checkKey = platform + "|" + rom.Title.ToLowerInvariant();
+                lock (_romVerifyChecked) { if (!_romVerifyChecked.Add(checkKey)) continue; }
+                try
+                {
+                    // Only contribute games with online proof that they are real for this platform
+                    var proof = await Services.GitHubDataService.VerifyGameOnlineAsync(platform, rom.Title).ConfigureAwait(false);
+                    if (proof == null)
+                    {
+                        DevLogService.Log($"[DbQueue] '{rom.Title}' ({platform}) not verified online — not queued.");
+                        continue;
+                    }
+                    Services.DatabaseContributionQueue.EnqueueRom(
+                        platform, rom.Title, rom.TitleId, proof.Value.Description, proof.Value.Url);
+                }
+                catch (Exception ex)
+                {
+                    // Network problem: allow a retry on the next scan
+                    lock (_romVerifyChecked) _romVerifyChecked.Remove(checkKey);
+                    DevLogService.Log($"[DbQueue] Online check failed for '{rom.Title}': {ex.Message}");
+                }
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[DbQueue] ROM check failed: {ex.Message}"); }
     }
 
     public void BeginStartup()

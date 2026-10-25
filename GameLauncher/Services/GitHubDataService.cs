@@ -2300,6 +2300,174 @@ namespace GameLauncher.Services
         }
 
         /// <summary>
+        /// Basic legitimacy check for a local ROM before it is queued for contribution:
+        /// supported platform, plausible title, game-sized disc/cartridge image, and a
+        /// well-formed title ID when one was detected.
+        /// </summary>
+        public static bool IsLegitRom(Models.LocalRom rom)
+        {
+            if (rom == null || string.IsNullOrWhiteSpace(rom.Title) || rom.Title.Trim().Length < 3) return false;
+            if (!rom.Title.Any(char.IsLetterOrDigit)) return false;
+            string platform = NormalizePlatform(rom.Platform);
+            if (platform == "PC" || PlatformToDbFolder(platform) == null) return false;
+            if (rom.SizeBytes < 1_048_576) return false; // too small to be a real game image
+            string[] okTypes = { "iso", "bin", "cue", "chd", "img", "mdf", "nrg", "cso", "zso", "pkg",
+                                 "nsp", "xci", "wbfs", "rvz", "gcm", "xex", "god", "7z", "zip", "rar" };
+            if (!string.IsNullOrEmpty(rom.FileType) &&
+                !okTypes.Contains(rom.FileType.TrimStart('.').ToLowerInvariant())) return false;
+            if (!string.IsNullOrEmpty(rom.TitleId) && !System.Text.RegularExpressions.Regex.IsMatch(
+                    rom.TitleId, @"^[A-Za-z0-9_\-\.]{4,20}$")) return false;
+            return true;
+        }
+
+        /// <summary>True when the ROM is not already in the (cached or fetched) platform database.</summary>
+        public static async Task<bool> IsMissingFromDatabaseAsync(
+            Models.LocalRom rom, CancellationToken ct = default)
+        {
+            var db = await FetchGamesDatabaseAsync(rom.Platform, ct).ConfigureAwait(false);
+            string norm = NormalizeTitleForMatch(rom.Title);
+            return !db.Any(g =>
+                (!string.IsNullOrEmpty(rom.TitleId) &&
+                 string.Equals(g.TitleId, rom.TitleId, StringComparison.OrdinalIgnoreCase)) ||
+                NormalizeTitleForMatch(g.Title ?? "") == norm ||
+                (g.AlternateNames?.Any(a => NormalizeTitleForMatch(a) == norm) ?? false));
+        }
+
+        private static readonly HttpClient _verifyHttp = CreateVerifyHttp();
+        private static HttpClient CreateVerifyHttp()
+        {
+            var c = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
+            c.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher/1.0 (game verification)");
+            return c;
+        }
+
+        private static string[] PlatformSearchNames(string platform) => NormalizePlatform(platform) switch
+        {
+            "PS1"      => new[] { "PlayStation (console)", "PlayStation", "PS1" },
+            "PS2"      => new[] { "PlayStation 2", "PS2" },
+            "PS3"      => new[] { "PlayStation 3", "PS3" },
+            "PS4"      => new[] { "PlayStation 4", "PS4" },
+            "PS5"      => new[] { "PlayStation 5", "PS5" },
+            "PSP"      => new[] { "PlayStation Portable", "PSP" },
+            "PS Vita"  => new[] { "PlayStation Vita", "PS Vita" },
+            "Xbox 360" => new[] { "Xbox 360" },
+            "Xbox One" => new[] { "Xbox One" },
+            "Switch"   => new[] { "Nintendo Switch", "Switch" },
+            var p      => new[] { p },
+        };
+
+        /// <summary>
+        /// Online proof that a ROM is a real game on its platform: searches Wikipedia (no API key)
+        /// for a video-game article whose title matches and whose intro mentions the platform.
+        /// Returns the proof (article URL + short description) or <c>null</c> when not verified.
+        /// Throws on network failure so callers can retry later instead of rejecting the game.
+        /// </summary>
+        public static async Task<(string Url, string Description)?> VerifyGameOnlineAsync(
+            string platform, string title, CancellationToken ct = default)
+        {
+            string wanted = NormalizeTitleForMatch(title);
+            if (wanted.Length < 3) return null;
+            string platName = PlatformSearchNames(platform)[0];
+            string q = Uri.EscapeDataString($"{title} {platName} video game");
+            string url = "https://en.wikipedia.org/w/api.php?action=query&format=json&generator=search" +
+                         $"&gsrsearch={q}&gsrlimit=5&prop=extracts%7Cinfo&exintro=1&explaintext=1&exlimit=max&inprop=url";
+            using var resp = await _verifyHttp.GetAsync(url, ct).ConfigureAwait(false);
+            resp.EnsureSuccessStatusCode();
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            if (!doc.RootElement.TryGetProperty("query", out var qr) ||
+                !qr.TryGetProperty("pages", out var pages)) return null;
+
+            foreach (var page in pages.EnumerateObject())
+            {
+                var pg = page.Value;
+                string pTitle = pg.TryGetProperty("title", out var t) ? t.GetString() ?? "" : "";
+                string extract = pg.TryGetProperty("extract", out var e) ? e.GetString() ?? "" : "";
+                string pageUrl = pg.TryGetProperty("fullurl", out var u) ? u.GetString() ?? "" : "";
+                string bare = System.Text.RegularExpressions.Regex.Replace(pTitle, @"\s*\(.*?\)\s*$", "");
+                if (NormalizeTitleForMatch(bare) != wanted) continue;
+                if (extract.IndexOf("video game", StringComparison.OrdinalIgnoreCase) < 0) continue;
+                if (!PlatformSearchNames(platform).Any(n =>
+                        extract.IndexOf(n, StringComparison.OrdinalIgnoreCase) >= 0)) continue;
+                if (!pageUrl.StartsWith("https://en.wikipedia.org/", StringComparison.Ordinal)) continue;
+                string desc = extract.Split('\n')[0].Trim();
+                if (desc.Length > 500) desc = desc[..500].TrimEnd() + "…";
+                return (pageUrl, desc);
+            }
+            return null;
+        }
+
+        private static string NormalizeTitleForMatch(string t)
+            => new string(t.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+
+        /// <summary>
+        /// Adds queued ROM games to each platform's <c>{Platform}.Games.json</c> (same as a dev
+        /// adding a game). Returns the platforms that were fully processed.
+        /// </summary>
+        public async Task<HashSet<string>> ContributeRomsToDatabaseAsync(
+            IReadOnlyList<(string Platform, string Title, string? TitleId, string? Description, string? SourceUrl)> roms, CancellationToken ct = default)
+        {
+            var handled = new HashSet<string>();
+            foreach (var group in roms.GroupBy(r => r.Platform))
+            {
+                if (ct.IsCancellationRequested) break;
+                string platform = NormalizePlatform(group.Key);
+                string filePath = $"{platform}.Games.json";
+                try
+                {
+                    var (root, sha) = await ReadGamesDatabaseFileAsync<System.Text.Json.Nodes.JsonNode>(filePath, ct)
+                        .ConfigureAwait(false);
+                    if (root == null) { handled.Add(group.Key); continue; } // platform file must already exist
+
+                    System.Text.Json.Nodes.JsonArray? arr = root as System.Text.Json.Nodes.JsonArray
+                        ?? ((root as System.Text.Json.Nodes.JsonObject)?["Games"]
+                            ?? (root as System.Text.Json.Nodes.JsonObject)?["games"]) as System.Text.Json.Nodes.JsonArray;
+                    if (arr == null) { handled.Add(group.Key); continue; }
+
+                    var titles = new HashSet<string>();
+                    var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var e in arr.OfType<System.Text.Json.Nodes.JsonObject>())
+                    {
+                        foreach (var k in new[] { "Title", "title", "game_name", "name" })
+                            if (e[k] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var s))
+                                titles.Add(NormalizeTitleForMatch(s));
+                        foreach (var k in new[] { "TitleID", "title_id", "titleId" })
+                            if (e[k] is System.Text.Json.Nodes.JsonValue v2 && v2.TryGetValue<string>(out var s2))
+                                ids.Add(s2);
+                    }
+
+                    int added = 0;
+                    foreach (var r in group)
+                    {
+                        if (titles.Contains(NormalizeTitleForMatch(r.Title)) ||
+                            (!string.IsNullOrEmpty(r.TitleId) && ids.Contains(r.TitleId))) continue;
+                        var obj = new System.Text.Json.Nodes.JsonObject { ["Title"] = r.Title };
+                        if (!string.IsNullOrEmpty(r.TitleId)) obj["TitleID"] = r.TitleId;
+                        if (!string.IsNullOrWhiteSpace(r.Description)) obj["Description"] = r.Description;
+                        if (!string.IsNullOrWhiteSpace(r.SourceUrl)) obj["StorePageUrl"] = r.SourceUrl;
+                        arr.Add(obj);
+                        titles.Add(NormalizeTitleForMatch(r.Title));
+                        added++;
+                    }
+
+                    if (added > 0)
+                    {
+                        await WriteGamesDatabaseFileAsync(filePath, root,
+                            $"Add {added} {platform} game(s) contributed from user ROM libraries", sha, ct)
+                            .ConfigureAwait(false);
+                        InvalidatePlatformCache(platform);
+                        DevLogService.Log($"[GamesDB] Contributed {added} new {platform} ROM game(s).");
+                    }
+                    handled.Add(group.Key);
+                }
+                catch (Exception ex)
+                {
+                    DevLogService.Log($"[GamesDB] ROM contribution for {platform} failed: {ex.Message}");
+                }
+            }
+            return handled;
+        }
+
+        /// <summary>
         /// Uploads the full achievement schema for a Steam game to
         /// <c>Data/PC/Games/{appId}/achievements.json</c> in the Games.Database repository.
         /// Returns the raw URL to the uploaded file on success, or <c>null</c> on failure.

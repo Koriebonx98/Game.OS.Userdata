@@ -19,7 +19,10 @@ namespace GameLauncher.Services
     public static class DatabaseContributionQueue
     {
         public static readonly TimeSpan FlushInterval = TimeSpan.FromMinutes(10);
+        /// <summary>ROM contributions are batched and uploaded at most this often.</summary>
+        public static readonly TimeSpan RomFlushInterval = TimeSpan.FromHours(1);
         private const int MaxQueueSize = 500;
+        private static DateTime _lastRomFlushUtc = DateTime.UtcNow;
 
         public class Item
         {
@@ -31,6 +34,12 @@ namespace GameLauncher.Services
             public string Message { get; set; } = "";
             public long AppId { get; set; }
             public string Name { get; set; } = "";
+            /// <summary>Platform name for "rom" items (e.g. "PS2").</summary>
+            public string Platform { get; set; } = "";
+            public string? TitleId { get; set; }
+            /// <summary>Online proof for "rom" items: description and source page URL.</summary>
+            public string? Description { get; set; }
+            public string? SourceUrl { get; set; }
         }
 
         private static readonly string QueuePath = System.IO.Path.Combine(
@@ -97,6 +106,22 @@ namespace GameLauncher.Services
             }
         }
 
+        /// <summary>Queues a locally found ROM that is missing from the platform games database.</summary>
+        public static bool EnqueueRom(string platform, string title, string? titleId, string? description = null, string? sourceUrl = null)
+        {
+            if (string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(title)) return false;
+            string key = "rom:" + platform.ToLowerInvariant() + ":" +
+                         (string.IsNullOrWhiteSpace(titleId) ? title : titleId).ToLowerInvariant();
+            lock (_lock)
+            {
+                var items = Items();
+                if (items.Count >= MaxQueueSize || items.Any(i => i.Key == key)) return false;
+                items.Add(new Item { Kind = "rom", Key = key, Platform = platform, Name = title, TitleId = titleId, Description = description, SourceUrl = sourceUrl });
+                Save();
+                return true;
+            }
+        }
+
         public static int Count { get { lock (_lock) return Items().Count; } }
 
         /// <summary>Starts the periodic background flush (idempotent).</summary>
@@ -152,6 +177,20 @@ namespace GameLauncher.Services
                     done.AddRange(games);
                 }
                 catch (Exception ex) { DevLogService.Log($"[DbQueue] Steam games batch failed: {ex.Message}"); }
+            }
+
+            var roms = snapshot.Where(i => i.Kind == "rom").ToList();
+            if (roms.Count > 0 && DateTime.UtcNow - _lastRomFlushUtc >= RomFlushInterval)
+            {
+                try
+                {
+                    var handled = await svc.ContributeRomsToDatabaseAsync(
+                        roms.Select(r => (r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl)).ToList(), ct).ConfigureAwait(false);
+                    done.AddRange(roms.Where(r => handled.Contains(r.Platform)));
+                    if (handled.Count == roms.Select(r => r.Platform).Distinct().Count())
+                        _lastRomFlushUtc = DateTime.UtcNow;
+                }
+                catch (Exception ex) { DevLogService.Log($"[DbQueue] ROM batch failed: {ex.Message}"); }
             }
 
             foreach (var item in snapshot.Where(i => i.Kind == "file"))
