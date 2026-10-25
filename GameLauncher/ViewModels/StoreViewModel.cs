@@ -93,6 +93,46 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     public ObservableCollection<StoreGame> FilteredStore { get; } = new();
     public ObservableCollection<string>    Genres        { get; } = new();
 
+    /// <summary>Recently added games (Steam auto-adds and new/edited platform games).</summary>
+    public ObservableCollection<StoreGame> NewGames { get; } = new();
+    public bool HasNewGames => NewGames.Count > 0;
+
+    private async Task LoadNewGamesAsync()
+    {
+        try
+        {
+            var entries = await _client.GetNewGamesAsync().ConfigureAwait(false);
+            var items = entries
+                .Where(e => !string.IsNullOrWhiteSpace(e.Title))
+                .OrderByDescending(e => e.AddedAt, StringComparer.Ordinal)
+                .Take(30)
+                .Select(e => new StoreGame
+                {
+                    Title       = e.Title,
+                    Platform    = e.Platform,
+                    CoverUrl    = e.CoverUrl,
+                    Genre       = $"{e.Platform} · {NewSourceLabel(e.Source)}",
+                    Description = $"Recently {NewSourceLabel(e.Source).ToLowerInvariant()}.",
+                    StorePageUrl = e.SteamAppId is > 0 ? $"https://store.steampowered.com/app/{e.SteamAppId}" : null,
+                }).ToList();
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                NewGames.Clear();
+                foreach (var g in items) NewGames.Add(g);
+                OnPropertyChanged(nameof(HasNewGames));
+            });
+        }
+        catch { /* best-effort */ }
+    }
+
+    private static string NewSourceLabel(string source) => source switch
+    {
+        "steam-auto-add" => "Added via Steam",
+        "admin-add"      => "New to database",
+        "admin-edit"     => "Updated",
+        _                => "Added",
+    };
+
     /// <summary>True when Featured contains at least one game.</summary>
     public bool HasFeatured => Featured.Count > 0;
 
@@ -122,6 +162,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
         // Eagerly load App Store in the background
         _ = LoadAppStoreAsync();
+        _ = LoadNewGamesAsync();
 
         // Discover all platform JSON files from the Games.Database repository so new
         // platforms appear automatically without requiring an app update.

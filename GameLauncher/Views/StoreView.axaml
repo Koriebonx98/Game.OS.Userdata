@@ -179,6 +179,53 @@
             </StackPanel>
         </Border>
 
+        <!-- New: recently added games (Steam auto-add + new/edited platform games) -->
+        <TextBlock Text="🆕  New"
+                   Classes="section-header" Margin="0,0,0,12"
+                   IsVisible="{Binding HasNewGames}"/>
+
+        <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Disabled"
+                      Margin="0,0,0,28"
+                      IsVisible="{Binding HasNewGames}">
+            <ItemsControl ItemsSource="{Binding NewGames}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <StackPanel Orientation="Horizontal" Spacing="16"/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:StoreGame">
+                        <Button Classes="store-card-btn" Width="180"
+                                Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                CommandParameter="{Binding}">
+                            <StackPanel Spacing="6">
+                                <Border Height="100" CornerRadius="8" ClipToBounds="True">
+                                    <views:CoverImage
+                                        ImageUrl="{Binding CoverUrl}"
+                                        FallbackText="{Binding Title}"
+                                        FallbackGradient="{Binding CoverGradient}"
+                                        SubText="{Binding Platform}"
+                                        LetterFontSize="40"
+                                        ImageCornerRadius="8"
+                                        Height="100"/>
+                                </Border>
+                                <Border Background="#1f6feb" CornerRadius="3"
+                                        Padding="6,2" HorizontalAlignment="Left">
+                                    <TextBlock Text="NEW" FontSize="10"
+                                               FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Bold"
+                                           Foreground="White" TextWrapping="Wrap" MaxHeight="36"/>
+                                <TextBlock Text="{Binding Genre}" FontSize="11" Foreground="#8b949e"
+                                           TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
         <!-- Featured banner -->
         <TextBlock Text="⭐  Featured &amp; New Releases"
                    Classes="section-header" Margin="0,0,0,12"

@@ -515,6 +515,57 @@ async function putFile(path, content, message, sha) {
     await octokit.repos.createOrUpdateFileContents(params);
 }
 
+// ── "New" games feed ─────────────────────────────────────────────────────────
+// Shared, capped list of recently added/edited games shown in the "New" section
+// of the site and launcher store. Sources: Steam auto-add, admin add/edit.
+const NEW_GAMES_PATH = 'store/new-games.json';
+const NEW_GAMES_MAX  = 100;
+
+async function recordNewGame(entry) {
+    try {
+        const title = String(entry.title || '').trim();
+        const platform = String(entry.platform || '').trim();
+        if (!title || !platform) return;
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                const file = await getFile(NEW_GAMES_PATH);
+                const list = file && Array.isArray(file.content) ? file.content : [];
+                const key = `${platform}|${title}`.toLowerCase();
+                const rest = list.filter(g => `${g.platform}|${g.title}`.toLowerCase() !== key);
+                const prev = list.find(g => `${g.platform}|${g.title}`.toLowerCase() === key);
+                rest.unshift({
+                    platform,
+                    title,
+                    titleId:    entry.titleId ? String(entry.titleId) : null,
+                    coverUrl:   typeof entry.coverUrl === 'string' && entry.coverUrl.trim() ? entry.coverUrl.trim() : null,
+                    steamAppId: entry.steamAppId || null,
+                    source:     entry.source || 'unknown',
+                    addedAt:    new Date().toISOString(),
+                    firstAddedAt: prev && prev.firstAddedAt ? prev.firstAddedAt : (prev ? prev.addedAt : new Date().toISOString())
+                });
+                await putFile(NEW_GAMES_PATH, rest.slice(0, NEW_GAMES_MAX),
+                    `New games feed: ${title.replace(/[\r\n]/g, ' ').slice(0, 60)} (${platform})`,
+                    file ? file.sha : undefined);
+                return;
+            } catch (err) {
+                if (attempt === 1 || err.status !== 409) throw err;
+            }
+        }
+    } catch (err) {
+        console.warn('recordNewGame failed:', err.message);
+    }
+}
+
+app.get('/api/new-games', async (req, res) => {
+    try {
+        const file = await getFile(NEW_GAMES_PATH);
+        res.json({ success: true, games: file && Array.isArray(file.content) ? file.content : [] });
+    } catch (err) {
+        console.error('GET /api/new-games error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 const STEAM_ID_INDEX_PATH = 'accounts/SteamID.json';
 
 function normaliseSteamUserId(value) {
@@ -2084,6 +2135,9 @@ app.post('/api/me/games', authenticateToken, async (req, res) => {
         });
 
         await putFile(path, library, `Add game: ${title} (${platform})`, file ? file.sha : undefined);
+        if (parsedSteamAppId) {
+            await recordNewGame({ platform, title, titleId, coverUrl, steamAppId: parsedSteamAppId, source: 'steam-auto-add' });
+        }
         res.json({ success: true, message: 'Game added to library.', games: library });
     } catch (err) {
         console.error('POST /api/me/games error:', err);
@@ -3944,6 +3998,12 @@ app.post('/api/admin/add-game', authenticateToken, async (req, res) => {
             }
         }
 
+        await recordNewGame({
+            platform: safePlatform, title: safeTitle,
+            titleId:  game.TitleID || game.title_id || game.titleid || game.appid,
+            coverUrl: game.CoverUrl || game.cover_url || game.coverUrl || game.image,
+            steamAppId: game.appid || null, source: 'admin-add'
+        });
         res.json({ success: true, message: `Game added successfully: ${safeTitle}` });
     } catch (err) {
         console.error('POST /api/admin/add-game error:', err);
@@ -4107,6 +4167,12 @@ app.post('/api/admin/update-game', authenticateToken, async (req, res) => {
             }
         }
 
+        await recordNewGame({
+            platform: safePlatform, title: safeTitle,
+            titleId:  gamesArr[idx].TitleID || gamesArr[idx].title_id || gamesArr[idx].titleid || gamesArr[idx].appid,
+            coverUrl: gamesArr[idx].CoverUrl || gamesArr[idx].cover_url || gamesArr[idx].coverUrl || gamesArr[idx].image,
+            steamAppId: gamesArr[idx].appid || null, source: 'admin-edit'
+        });
         res.json({ success: true, message: `Game updated successfully: ${safeTitle}` });
     } catch (err) {
         console.error('POST /api/admin/update-game error:', err);

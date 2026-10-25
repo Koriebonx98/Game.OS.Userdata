@@ -237,6 +237,20 @@ namespace GameLauncher
             catch { return new List<Game>(); }
         }
 
+        /// <summary>Shared "New" games feed (Steam auto-adds, new/edited platform games).</summary>
+        public async Task<List<NewGameEntry>> GetNewGamesAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                if (_backend != null)
+                    return await _backend.GetNewGamesAsync(ct);
+                if (_github != null)
+                    return await _github.GetNewGamesAsync(ct);
+            }
+            catch { }
+            return new List<NewGameEntry>();
+        }
+
         public async Task AddGameAsync(
             Game game, CancellationToken ct = default)
         {

@@ -3617,6 +3617,29 @@ function _gamesDbHeaders() {
  * Git Data API (blobs → trees → commits → ref update).  This avoids the
  * 1 MB Contents-API limit that would affect Switch.Games.json and PS3.Games.json.
  */
+/**
+ * Record a game in the shared "New" feed (store/new-games.json) — client-side (GitHub mode).
+ * Best-effort: failures never block the add/edit that triggered it.
+ */
+async function _recordNewGameFeed(platform, game, source) {
+    try {
+        const title = String(game.Title || game.game_name || game.title || '').trim();
+        if (!title || !platform) return;
+        const file = await githubRead('store/new-games.json');
+        const list = file && Array.isArray(file.content) ? file.content : [];
+        const rest = list.filter(g => !(g.platform === platform && String(g.title).toLowerCase() === title.toLowerCase()));
+        rest.unshift({
+            platform, title,
+            titleId:    String(game.TitleID || game.title_id || game.titleid || game.appid || '') || null,
+            coverUrl:   game.CoverUrl || game.cover_url || game.coverUrl || game.image || null,
+            steamAppId: game.appid || null,
+            source,
+            addedAt:    new Date().toISOString()
+        });
+        await githubWrite('store/new-games.json', rest.slice(0, 100), `New games feed: ${title} (${platform})`, file ? file.sha : undefined);
+    } catch (e) { console.warn('New games feed update failed:', e.message); }
+}
+
 async function _gamesDbWriteFile(platform, content, message) {
     if (!GAMES_DB_TOKEN) throw new Error('GAMES_DB_TOKEN is not configured. Add it as a repository secret and re-deploy to enable editing.');
 
@@ -4592,6 +4615,7 @@ async function handleAdminEditSave() {
                 newContent,
                 `Update game: ${title} (${_currentModalPlatform})`
             );
+            _recordNewGameFeed(_currentModalPlatform, updated, 'admin-edit');
 
             // Write game data to Data/{platformFolder}/Games/{titleId}/info.json
             const _platFolder = _PLATFORM_TO_GAMES_DB_FOLDER[_currentModalPlatform];
@@ -5167,6 +5191,7 @@ async function handleAddPcGameToDb() {
             const newContent = topKey ? { ...fileData, [topKey]: gamesArr } : { Games: gamesArr };
             if (saveBtn) saveBtn.textContent = '⏳ Saving…';
             await _gamesDbWriteFile(_addGamePlatform, newContent, `Add ${_addGamePlatform} game: ${title}`);
+            _recordNewGameFeed(_addGamePlatform, newGame, 'admin-add');
         }
 
         const platformFile = `${_addGamePlatform}.Games.json`;

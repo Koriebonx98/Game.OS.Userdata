@@ -52,14 +52,20 @@
 
             <!-- View Tabs -->
             <div class="games-tab-row">
-                <button class="games-tab active" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
+                <button class="games-tab active" id="tabNew" onclick="switchTab('new')">🆕 New</button>
+                <button class="games-tab" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
                 <button class="games-tab" id="tabOwned" onclick="switchTab('owned')">📚 My Library</button>
                 <button class="games-tab" id="tabWishlist" onclick="switchTab('wishlist')">⭐ Wishlist</button>
                 <button class="games-tab" id="tabFavourites" onclick="switchTab('favourites')">❤️ Favourites</button>
             </div>
 
             <!-- BROWSE TAB -->
-            <div id="browsePanelWrap">
+            <div id="newPanelWrap">
+                <div id="newMessage" class="message"></div>
+                <div id="newGamesList" class="games-browse-list"></div>
+            </div>
+
+            <div id="browsePanelWrap" style="display:none;">
                 <!-- Platform Selector -->
                 <div id="platformSelectorWrap" style="margin-bottom:20px;">
                     <label for="platformSelect" style="font-weight:600;margin-right:10px;">Platform:</label>
@@ -148,6 +154,7 @@
             if (notice) notice.style.display = 'flex';
         }
         await initGamesPage();
+        loadNewGames();
         // Check URL param to open the correct tab (only for logged-in users)
         const params = new URLSearchParams(window.location.search);
         if (loggedIn && params.get('tab') === 'library') {
@@ -830,7 +837,49 @@
     }
 
     // ── Tab switching ──────────────────────────────────────────
+    // ── "New" tab: recently added games (Steam auto-add + new/edited platform games) ──
+    function _newSourceLabel(src) {
+        return ({ 'steam-auto-add': 'Added via Steam', 'admin-add': 'New to database', 'admin-edit': 'Updated' })[src] || 'Added';
+    }
+
+    async function loadNewGames() {
+        const listEl = document.getElementById('newGamesList');
+        const msgEl  = document.getElementById('newMessage');
+        if (!listEl) return;
+        msgEl.textContent = 'Loading new games…';
+        try {
+            let feed = [];
+            const backend = typeof getBackendBase === 'function' ? getBackendBase() : '';
+            if (backend) {
+                const r = await fetch(`${backend}/api/new-games`);
+                if (r.ok) feed = (await r.json()).games || [];
+            } else {
+                const file = await githubRead('store/new-games.json');
+                feed = file && Array.isArray(file.content) ? file.content : [];
+            }
+            feed = feed.filter(e => e && e.title && e.platform)
+                       .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')))
+                       .slice(0, 60);
+            if (!feed.length) {
+                msgEl.textContent = 'No new games yet — games added via Steam auto-add or the database will appear here.';
+                listEl.innerHTML = '';
+                return;
+            }
+            msgEl.textContent = '';
+            listEl.innerHTML = feed.map(e => {
+                const g = { Title: e.title, TitleID: e.titleId || '', image: e.coverUrl || '', appid: e.steamAppId || undefined };
+                return `<div style="font-size:.75em;color:#8b949e;margin:6px 0 -4px 4px;">🆕 ${escapeHtml(_newSourceLabel(e.source))} · ${escapeHtml(e.platform)}</div>`
+                    + renderGameItem(g, e.platform);
+            }).join('');
+        } catch (e) {
+            msgEl.textContent = 'Could not load the New section.';
+        }
+    }
+
     function switchTab(tab) {
+        document.getElementById('tabNew').classList.toggle('active', tab === 'new');
+        document.getElementById('newPanelWrap').style.display = tab === 'new' ? '' : 'none';
+        if (tab === 'new') loadNewGames();
         document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse');
         document.getElementById('tabOwned').classList.toggle('active', tab === 'owned');
         document.getElementById('tabWishlist').classList.toggle('active', tab === 'wishlist');

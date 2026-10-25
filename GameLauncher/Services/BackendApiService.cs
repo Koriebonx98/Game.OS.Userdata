@@ -233,6 +233,19 @@ namespace GameLauncher.Services
             }
         }
 
+        /// <summary>Fetch the shared "New" games feed via GET /api/new-games.</summary>
+        public async Task<List<NewGameEntry>> GetNewGamesAsync(CancellationToken ct = default)
+        {
+            try
+            {
+                using var resp = await _http.GetAsync("/api/new-games", ct);
+                if (!resp.IsSuccessStatusCode) return new List<NewGameEntry>();
+                var data = await resp.Content.ReadFromJsonAsync<NewGamesResponse>(_jsonOpts, ct);
+                return data?.Games ?? new List<NewGameEntry>();
+            }
+            catch { return new List<NewGameEntry>(); }
+        }
+
         /// <summary>Add a game to the authenticated user's library via POST /api/me/games.</summary>
         public async Task AddGameAsync(Game game, CancellationToken ct = default)
         {
@@ -926,6 +939,11 @@ namespace GameLauncher.Services
             [JsonPropertyName("token")]    public string? Token    { get; set; }
             [JsonPropertyName("username")] public string? Username { get; set; }
             [JsonPropertyName("message")]  public string? Message  { get; set; }
+        }
+
+        private sealed class NewGamesResponse
+        {
+            [JsonPropertyName("games")] public List<NewGameEntry>? Games { get; set; }
         }
 
         private sealed class ErrorResponse
