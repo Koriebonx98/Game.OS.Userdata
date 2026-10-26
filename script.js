@@ -6707,10 +6707,11 @@ async function voteCompatibility(username, platform, title, rating) {
 /** Small green/amber/red badge for a game card, based on the community's votes (game.compatibility totals). */
 function getCompatBadgeHtml(game) {
     const t = game && game.compatibility && typeof game.compatibility === 'object' ? game.compatibility : null;
-    if (!t) return '';
+    const none = '<span class="store-card-compat compat-none" title="No compatibility votes yet">⚪ Not rated</span>';
+    if (!t) return none;
     let best = '', max = 0;
     ['green', 'amber', 'red'].forEach(k => { const n = Number(t[k]) || 0; if (n > max) { max = n; best = k; } });
-    if (!best) return '';
+    if (!best) return none;
     const o = COMPAT_OPTIONS[best];
     return `<span class="store-card-compat compat-${best}" title="Community compatibility: ${o.label} (${max} vote${max === 1 ? '' : 's'})">${o.icon} ${o.label}</span>`;
 }

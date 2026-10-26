@@ -2420,6 +2420,7 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .store-card-compat.compat-green { color: #16a34a; }
 .store-card-compat.compat-amber { color: #d97706; }
 .store-card-compat.compat-red { color: #dc2626; }
+.store-card-compat.compat-none { color: #94a3b8; font-weight: 400; }
 
 .store-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .store-card-grid .store-card { flex: none; }
