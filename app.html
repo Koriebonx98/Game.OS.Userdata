@@ -369,6 +369,7 @@
                 <button class="btn app-more" id="detailFull">ℹ️ Full game info (description, trailer, screenshots)</button>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">🧩 Mods</h2><div id="detailMods" class="mod-list"></div>
+                <h2 class="app-h2">🧪 Compatibility</h2><div id="detailCompat"></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
@@ -394,6 +395,10 @@
                 const dbGames = typeof fetchGamesDbPlatform === 'function' ? await fetchGamesDbPlatform(g.platform) : [];
                 const dbg = dbGames.find(x => (x.Title || x.game_name || x.title || '').toLowerCase() === (g.title || '').toLowerCase());
                 const html = dbg ? _buildModsSection(dbg) : '';
+                try {
+                    const cg = dbg || { title: g.title, platform: g.platform };
+                    if (!$('gameDetail').hidden) $('detailCompat').innerHTML = (typeof _isPcPlatform === 'function' && _isPcPlatform(g.platform)) ? empty('Compatibility applies to emulated console games only.') : `<div class="compat-section">${_compatTotalsHtml(cg, g.platform)}</div>`;
+                } catch (_) { $('detailCompat').innerHTML = empty('No compatibility reports yet.'); }
                 if (!$('gameDetail').hidden) $('detailMods').innerHTML = html ? html.replace(/^[\s\S]*?<div class="mod-list">/, '').replace(/<\/div>\s*<\/div>\s*$/, '') : empty('No mods listed for this game.');
             } catch (_) { $('detailMods').innerHTML = empty('No mods listed for this game.'); }
             if (!friendsLoaded) await loadFriends();
