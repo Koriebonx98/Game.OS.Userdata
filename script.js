@@ -6547,7 +6547,7 @@ async function saveRecommendations(username, list) {
  * ranked by overlap with the genres / platforms of the owned games.
  * catalog: { platform: [game] }; skipped: { platform: [{title}] }
  */
-function buildRecommendations(catalog, library, skipped, count) {
+function buildRecommendations(catalog, library, skipped, count, perPlatform) {
     count = count || 10;
     const key = (p, t) => p + '|' + String(t).toLowerCase();
     const excluded = new Set();
@@ -6571,6 +6571,15 @@ function buildRecommendations(catalog, library, skipped, count) {
         scored.push({ s, p, g, t });
     }));
     scored.sort((a, b) => b.s - a.s || a.t.localeCompare(b.t));
+    if (perPlatform) {
+        // Mix of all platforms: top N per platform, interleaved round-robin
+        const buckets = {};
+        scored.forEach(x => { (buckets[x.p] = buckets[x.p] || []).length < perPlatform && buckets[x.p].push(x); });
+        const lists = Object.keys(buckets).sort().map(k => buckets[k]);
+        const mixed = [];
+        for (let i = 0; i < perPlatform; i++) lists.forEach(l => { if (l[i]) mixed.push(l[i]); });
+        return mixed.map(({ p, g, t }) => ({ title: t, platform: p, game: g }));
+    }
     // Spread picks across platforms where scores tie by taking top N overall.
     return scored.slice(0, count).map(({ p, g, t }) => ({ title: t, platform: p, game: g }));
 }

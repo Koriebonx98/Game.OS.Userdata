@@ -72,7 +72,11 @@
                     </div>
                 </div>
                 <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;"></span>
-                <button id="addPcGameBtn" class="btn" style="display:none;margin-bottom:10px;" onclick="openAddPcGameModal()">➕ Add Game</button>
+                <div id="adminStoreTools" style="display:none;margin-bottom:10px;gap:8px;align-items:center;flex-wrap:wrap;">
+                    <select id="addGamePlatformSelect" class="games-select" aria-label="Platform for new game"></select>
+                    <button id="addPcGameBtn" class="btn" onclick="openAddPcGameModal(document.getElementById('addGamePlatformSelect').value)">➕ Add Game</button>
+                    <small style="color:#64748b;">Open any game to ✏️ Edit or 🗑️ Delete it.</small>
+                </div>
 
                 <!-- Search -->
                 <div class="games-search-row" id="browseSearchRow">
@@ -81,14 +85,14 @@
 
                 <!-- Preset filters: Platform / Genre / Features (all games load by default; filters narrow them) -->
                 <div class="store-filter-panel" id="storeFilterPanel">
-                    <details class="store-filter-group" open><summary>Platform</summary><div id="filterPlatforms" class="store-filter-options"></div></details>
+                    <label class="store-filter-sort">Platform: <select id="filterPlatforms" class="games-select"></select></label>
                     <details class="store-filter-group"><summary>Genre</summary><div id="filterGenres" class="store-filter-options"></div></details>
                     <details class="store-filter-group" open><summary>Features</summary><div id="filterFeatures" class="store-filter-options"></div></details>
                     <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
                     <button type="button" class="btn btn-secondary" id="storeClearFilters">Clear filters</button>
                 </div>
 
-                <!-- Shelves: Exclusives / New / Updated / Coming soon / Recommended -->
+                <!-- Shelves: Recommended first, then New / Updated / Exclusives / Coming soon -->
                 <div id="storeShelves"></div>
                 <h3 class="store-all-heading" id="storeAllHeading">All Games</h3>
 
@@ -117,7 +121,7 @@
         </footer>
     </div>
 
-    <script src="script.js?v=store1"></script>
+    <script src="script.js?v=store2"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
     const PAGE_SIZE      = 100;  // max items rendered at once per view/group
@@ -474,8 +478,10 @@
         const modGenres = new Set();
         platforms.forEach(p => _allPlatformGames[p].forEach(g => window.getGameModGenres(g).forEach(x => modGenres.add(x))));
 
-        document.getElementById('filterPlatforms').innerHTML =
-            platforms.map(p => _checkbox('platforms', p, p, _allPlatformGames[p].length)).join('');
+        const platSel = document.getElementById('filterPlatforms');
+        const curPlat = [..._filters.platforms][0] || '';
+        platSel.innerHTML = '<option value="">All platforms</option>' +
+            platforms.map(p => `<option value="${escapeHtml(p)}" ${p === curPlat ? 'selected' : ''}>${escapeHtml(p)} (${_allPlatformGames[p].length})</option>`).join('');
         document.getElementById('filterGenres').innerHTML = genres.length
             ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
             : '<small style="color:#64748b;">No genre data available yet.</small>';
@@ -484,15 +490,16 @@
             (modGenres.size ? `<div class="store-mod-genres"><small>Mod types: ${[...modGenres].map(escapeHtml).join(', ')}</small></div>` : '');
         document.getElementById('filterFeatures').innerHTML = feat;
 
-        const addPcBtn = document.getElementById('addPcGameBtn');
-        if (addPcBtn) {
-            if (isAdminUser() && _filters.platforms.size === 1) {
-                const plat = [..._filters.platforms][0];
-                addPcBtn.textContent = `➕ Add ${plat} Game`;
-                addPcBtn.onclick = () => openAddPcGameModal(plat);
-                addPcBtn.style.display = '';
+        const tools = document.getElementById('adminStoreTools');
+        if (tools) {
+            if (isAdminUser()) {
+                const sel = document.getElementById('addGamePlatformSelect');
+                const prev = sel.value || curPlat || 'PC';
+                const opts = platforms.includes('PC') ? platforms : ['PC', ...platforms];
+                sel.innerHTML = opts.map(p => `<option value="${escapeHtml(p)}" ${p === prev ? 'selected' : ''}>${escapeHtml(p)}</option>`).join('');
+                tools.style.display = 'flex';
             } else {
-                addPcBtn.style.display = 'none';
+                tools.style.display = 'none';
             }
         }
         renderShelves();
@@ -501,28 +508,55 @@
         return _filters.platforms.size || _filters.genres.size || _filters.features.size ||
             document.getElementById('browseSearch').value.trim();
     }
+    let _showAllRecs = false;
+    const _REC_PER_PLATFORM = 5;
+    function _modifiedTime(g) {
+        const d = Date.parse(g.updated_at || g.updated || g.last_updated || g.modified || '');
+        return isNaN(d) ? 0 : d;
+    }
+    function _recCard(r, i) {
+        return _cardHtml(r.game, r.platform,
+            `<div class="store-rec-actions" onclick="event.stopPropagation()">
+                <button type="button" class="btn" title="Yes – add to wishlist" onclick="answerRecommendation(${i}, 'yes')">✔ Yes</button>
+                <button type="button" class="btn btn-secondary" title="No – never recommend again" onclick="answerRecommendation(${i}, 'no')">✖ No</button>
+                <button type="button" class="btn btn-secondary" title="Skip – don't recommend again" onclick="answerRecommendation(${i}, 'skip')">⏭ Skip</button>
+            </div>`);
+    }
+    function _shelfHtml(label, items, emptyText) {
+        return `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">` +
+            (items.length ? items.join('') : `<p class="store-shelf-empty" style="color:#64748b;margin:8px 0;">${emptyText}</p>`) +
+            '</div></div>';
+    }
     function renderShelves() {
         const el = document.getElementById('storeShelves');
         // Shelves are shown on the default (unfiltered) view only, like a storefront home page
         if (_filtersActive()) { el.innerHTML = ''; return; }
-        const shelfDefs = [['exclusive', '⭐ Exclusives'], ['new', '🆕 New'], ['updated', '🔄 Updated'], ['coming', '⏳ Coming Soon']];
-        let html = shelfDefs.map(([key, label]) => {
-            const items = [];
-            Object.keys(_allPlatformGames).sort().forEach(p => _allPlatformGames[p].forEach(g => {
-                if (items.length < _SHELF_MAX && _shelfMatch(g, key)) items.push([g, p]);
-            }));
-            if (!items.length) return '';
-            return `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(([g, p]) => _cardHtml(g, p)).join('')}</div></div>`;
-        }).join('');
-        if (_isLoggedIn && _recommended.length) {
-            html += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">` +
-                _recommended.map((r, i) => _cardHtml(r.game, r.platform,
-                    `<div class="store-rec-actions" onclick="event.stopPropagation()">
-                        <button type="button" class="btn" title="Yes – add to wishlist" onclick="answerRecommendation(${i}, 'yes')">✔ Yes</button>
-                        <button type="button" class="btn btn-secondary" title="No – never recommend again" onclick="answerRecommendation(${i}, 'no')">✖ No</button>
-                        <button type="button" class="btn btn-secondary" title="Skip – don't recommend again" onclick="answerRecommendation(${i}, 'skip')">⏭ Skip</button>
-                    </div>`)).join('') + '</div></div>';
+        let html = '';
+        if (_isLoggedIn) {
+            // Mixed platforms: first 5 per platform (interleaved); "Show all" reveals the rest
+            const shownCount = {};
+            const visible = _recommended.map((r, i) => [r, i]).filter(([r]) => {
+                if (_showAllRecs) return true;
+                shownCount[r.platform] = (shownCount[r.platform] || 0) + 1;
+                return shownCount[r.platform] <= _REC_PER_PLATFORM;
+            });
+            html += _shelfHtml('🎯 Recommended for you', visible.map(([r, i]) => _recCard(r, i)),
+                'No recommendations yet – add games to your library or wishlist to get picks.');
+            if (_recommended.length > visible.length || _showAllRecs) {
+                html += `<div style="margin:-6px 0 14px;"><button type="button" class="btn btn-secondary" onclick="_showAllRecs = !_showAllRecs; renderShelves();">${_showAllRecs ? 'Show fewer' : 'Show all'}</button></div>`;
+            }
         }
+        const shelfDefs = [['new', '🆕 New', 'No new games right now.'], ['updated', '🔄 Updated', 'No recently updated games.'],
+                           ['exclusive', '⭐ Exclusives', 'No exclusives yet.'], ['coming', '⏳ Coming Soon', 'Nothing coming soon yet.']];
+        html += shelfDefs.map(([key, label, empty]) => {
+            let items = [];
+            Object.keys(_allPlatformGames).sort().forEach(p => _allPlatformGames[p].forEach(g => {
+                if (key === 'updated' ? (_modifiedTime(g) || _shelfMatch(g, key)) : _shelfMatch(g, key)) items.push([g, p]);
+            }));
+            // Updated: any modified game, most recently modified first
+            if (key === 'updated') items.sort((a, b) => _modifiedTime(b[0]) - _modifiedTime(a[0]));
+            return _shelfHtml(label, items.slice(0, _SHELF_MAX).map(([g, p]) => _cardHtml(g, p)), empty);
+        }).join('');
         el.innerHTML = html;
     }
 
@@ -544,42 +578,61 @@
                 .map(r => ({ ...r, game: (_allPlatformGames[r.platform] || []).find(g => _gName(g).toLowerCase() === r.title.toLowerCase()) }))
                 .filter(r => r.game);
             _recommended = saved;
-            if (_recommended.length < 10) {
+            _skippedCache = skipped;
+            const want = _REC_PER_PLATFORM * 2 * Object.keys(_allPlatformGames).length;
+            if (_recommended.length < want) {
                 const have = new Set(_recommended.map(r => r.platform + '|' + r.title.toLowerCase()));
-                const fresh = window.buildRecommendations(_allPlatformGames, _myLibrary, skipped, 10)
+                const fresh = window.buildRecommendations(_allPlatformGames, _myLibrary, skipped, want, _REC_PER_PLATFORM * 2)
                     .filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()));
-                _recommended = [..._recommended, ...fresh].slice(0, 10);
+                _recommended = [..._recommended, ...fresh].slice(0, want);
                 await saveRecommendations(user.username, _recommended.map(r => ({ title: r.title, platform: r.platform })));
             }
         } catch (_) { /* recommendations are best-effort */ }
     }
 
+    // Answers are applied instantly in the UI and written to the server in one
+    // batch after a short delay, so the store stays responsive and API calls are limited.
+    let _skippedCache = {};
+    let _pendingAnswers = [];
+    let _batchTimer = null;
+    const _BATCH_DELAY_MS = 4000;
+
+    async function flushRecommendationBatch() {
+        clearTimeout(_batchTimer); _batchTimer = null;
+        const user = getCurrentUser();
+        const batch = _pendingAnswers; _pendingAnswers = [];
+        if (!user || !batch.length) return;
+        for (const a of batch) {
+            try { await addSkippedGame(user.username, a.platform, a.title, a.answer); } catch (_) {}
+        }
+        try { await saveRecommendations(user.username, _recommended.map(r => ({ title: r.title, platform: r.platform }))); } catch (_) {}
+    }
+    window.addEventListener('pagehide', () => { if (_pendingAnswers.length) flushRecommendationBatch(); });
+
     async function answerRecommendation(index, answer) {
         const user = getCurrentUser();
         const rec  = _recommended[index];
         if (!user || !rec) return;
-        try {
-            if (answer === 'yes') {
+        if (answer === 'yes') {
+            try {
                 const r = MODE === 'demo' ? addToWishlistDemo(user.username, rec.game, rec.platform)
                                           : await addToWishlistGitHub(user.username, rec.game, rec.platform);
                 if (r && r.success !== false) await refreshWishlist();
-            } else {
-                await addSkippedGame(user.username, rec.platform, rec.title, answer);
-            }
-        } catch (_) { return; }
+            } catch (_) { return; }
+        } else {
+            (_skippedCache[rec.platform] = _skippedCache[rec.platform] || []).push({ title: rec.title });
+            _pendingAnswers.push({ platform: rec.platform, title: rec.title, answer });
+        }
         _recommended.splice(index, 1);
-        // Top up with the next best pick, never re-recommending skipped/owned games
-        const skipped = {};
-        await Promise.all(Object.keys(_allPlatformGames).map(async p => {
-            try { skipped[p] = await getSkippedGames(user.username, p); } catch (_) { skipped[p] = []; }
-        }));
+        // Top up locally with the next best pick (no server calls until the batch flushes)
         const have = new Set(_recommended.map(r => r.platform + '|' + r.title.toLowerCase()));
         const wl = _myWishlist.map(w => ({ platform: w.platform, title: w.title }));
-        const next = window.buildRecommendations(_allPlatformGames, [..._myLibrary, ...wl], skipped, 10 + have.size)
+        const next = window.buildRecommendations(_allPlatformGames, [..._myLibrary, ...wl], _skippedCache, 1000, _REC_PER_PLATFORM * 2)
             .filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()));
-        if (_recommended.length < 10 && next.length) _recommended.push(next[0]);
-        try { await saveRecommendations(user.username, _recommended.map(r => ({ title: r.title, platform: r.platform }))); } catch (_) {}
+        if (next.length) _recommended.push(next.find(r => r.platform === rec.platform) || next[0]);
         renderShelves();
+        clearTimeout(_batchTimer);
+        _batchTimer = setTimeout(flushRecommendationBatch, _BATCH_DELAY_MS);
     }
 
     function applyStoreFilters() {
@@ -599,6 +652,12 @@
         const title = (game.Title || game.game_name || game.title || '').toLowerCase();
         return _myWishlist.some(w => w.platform === platform && (w.title || '').toLowerCase() === title);
     }
+    document.getElementById('filterPlatforms').addEventListener('change', e => {
+        _filters.platforms.clear();
+        if (e.target.value) _filters.platforms.add(e.target.value);
+        renderStoreChrome();
+        applyStoreFilters();
+    });
     document.getElementById('storeFilterPanel').addEventListener('change', e => {
         const cb = e.target.closest('input[type=checkbox][data-group]'); if (!cb) return;
         const set = _filters[cb.dataset.group];
