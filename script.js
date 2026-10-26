@@ -6658,6 +6658,7 @@ if (typeof window !== 'undefined') {
     window.MOD_GENRE_PRESETS = MOD_GENRE_PRESETS;
     window.getCompatibility = getCompatibility;
     window.voteCompatibility = voteCompatibility;
+    window.getCompatBadgeHtml = getCompatBadgeHtml;
     window.getGameGenres = getGameGenres;
     window.getGameModGenres = getGameModGenres;
     window.gameHasFeature = gameHasFeature;
@@ -6701,6 +6702,17 @@ async function voteCompatibility(username, platform, title, rating) {
     const all = file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
     all[_compatKey(platform, title)] = rating;
     await githubWrite(path, all, `Compatibility vote: ${title} (${platform})`, file ? file.sha : undefined);
+}
+
+/** Small green/amber/red badge for a game card, based on the community's votes (game.compatibility totals). */
+function getCompatBadgeHtml(game) {
+    const t = game && game.compatibility && typeof game.compatibility === 'object' ? game.compatibility : null;
+    if (!t) return '';
+    let best = '', max = 0;
+    ['green', 'amber', 'red'].forEach(k => { const n = Number(t[k]) || 0; if (n > max) { max = n; best = k; } });
+    if (!best) return '';
+    const o = COMPAT_OPTIONS[best];
+    return `<span class="store-card-compat compat-${best}" title="Community compatibility: ${o.label} (${max} vote${max === 1 ? '' : 's'})">${o.icon} ${o.label}</span>`;
 }
 
 function _buildCompatSection(game, platform) {

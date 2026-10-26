@@ -2416,6 +2416,10 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .store-rec-actions .btn { flex: 1; padding: 4px 2px; font-size: .75em; }
 
 .store-card-ach { color: #b45309; font-weight: 600; }
+.store-card-compat { font-weight: 600; font-size: .85em; }
+.store-card-compat.compat-green { color: #16a34a; }
+.store-card-compat.compat-amber { color: #d97706; }
+.store-card-compat.compat-red { color: #dc2626; }
 
 .store-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .store-card-grid .store-card { flex: none; }

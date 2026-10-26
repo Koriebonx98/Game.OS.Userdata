@@ -121,7 +121,7 @@
         </footer>
     </div>
 
-    <script src="script.js?v=store2"></script>
+    <script src="script.js?v=store3"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
     const PAGE_SIZE      = 100;  // max items rendered at once per view/group
@@ -468,7 +468,7 @@
         return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
             <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
             <div class="store-card-title">${escapeHtml(_gName(g))}</div>
-            <div class="store-card-platform">${escapeHtml(platform)}${window.gameHasFeature(g, 'Achievements') ? ' · <span class="store-card-ach" title="Achievements available">🏆 Achievements</span>' : ''}</div>${extra || ''}</div>`;
+            <div class="store-card-platform">${escapeHtml(platform)}${window.gameHasFeature(g, 'Achievements') ? ' · <span class="store-card-ach" title="Achievements available">🏆 Achievements</span>' : ''}${window.getCompatBadgeHtml ? ' ' + window.getCompatBadgeHtml(g) : ''}</div>${extra || ''}</div>`;
     }
     function renderStoreChrome() {
         const platforms = Object.keys(_allPlatformGames).sort();
@@ -484,7 +484,7 @@
         document.getElementById('filterGenres').innerHTML = genres.length
             ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
             : '<small style="color:#64748b;">No genre data available yet.</small>';
-        const feat = window.getStoreFeatures().map(f => _checkbox('features', f, ({ Exclusive: '⭐ ', Mods: '🧩 ', Achievements: '🏆 ', Free: '🆓 ', 'Coming Soon': '⏳ ', Recomp: '🔧 ' }[f] || '') + f)).join('') +
+        const feat = (window.getStoreFeatures ? window.getStoreFeatures() : ['Exclusive', 'Mods', 'Achievements', 'Free', 'Coming Soon', 'Recomp']).map(f => _checkbox('features', f, ({ Exclusive: '⭐ ', Mods: '🧩 ', Achievements: '🏆 ', Free: '🆓 ', 'Coming Soon': '⏳ ', Recomp: '🔧 ' }[f] || '') + f)).join('') +
             (_isLoggedIn ? _checkbox('features', '__wishlist', '⭐ Wishlist') : '') +
             (modGenres.size ? `<div class="store-mod-genres"><small>Mod types: ${[...modGenres].map(escapeHtml).join(', ')}</small></div>` : '');
         document.getElementById('filterFeatures').innerHTML = feat;

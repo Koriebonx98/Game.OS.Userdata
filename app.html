@@ -148,7 +148,7 @@
         <button data-view="profile"><span>👤</span>Profile</button>
     </nav>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=store3"></script>
     <script>
     (function () {
         const $ = id => document.getElementById(id);
@@ -626,7 +626,7 @@
             const owned = new Set(library.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
             const wishlisted = new Set(storeWishlist.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
             const filtered = !!(term || storeF.platforms.size || storeF.genres.size || storeF.features.size);
-            const card = (g, extra) => { const c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${storeGames.indexOf(g)}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div><div class="store-card-platform">${esc(pf(g))}</div>${extra || ''}</div>`; };
+            const card = (g, extra) => { const c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${storeGames.indexOf(g)}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div><div class="store-card-platform">${esc(pf(g))}${window.getCompatBadgeHtml ? ' ' + window.getCompatBadgeHtml(g) : ''}</div>${extra || ''}</div>`; };
             const has = (g, c) => getGameCategories(g).some(x => x.toLowerCase() === c);
             const recent = g => { const d = Date.parse(g.updated_at || g.updated || g.last_updated || ''); return !isNaN(d) && Date.now() - d < 30 * 864e5; };
             let shelves = '';
