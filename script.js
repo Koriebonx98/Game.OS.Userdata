@@ -6370,7 +6370,7 @@ function _buildGameModalFields(game) {
 
 
 /** Store categories that can be assigned to a game by admins. */
-const STORE_CATEGORIES = ['New', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
+const STORE_CATEGORIES = ['New', 'Updated', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
 
 /** Normalise a game's categories into an array of strings. */
 function getGameCategories(game) {
@@ -6435,6 +6435,157 @@ if (typeof window !== 'undefined') {
     window.storeFilterGames = storeFilterGames;
     window.STORE_CATEGORIES = STORE_CATEGORIES;
     window.toggleModDetail = toggleModDetail;
+}
+
+// ============================================================
+// STORE FEATURES / GENRES / RECOMMENDATIONS
+// ============================================================
+
+/** Preset "Features" filters offered by the store. */
+const STORE_FEATURES = ['Exclusive', 'Mods', 'Achievements', 'Free', 'Coming Soon'];
+
+const _gameName = g => (g && (g.Title || g.game_name || g.title)) || '';
+
+/** Normalise a game's genres into an array of strings. */
+function getGameGenres(game) {
+    const g = game && (game.genres || game.Genres || game.genre || game.Genre);
+    if (Array.isArray(g)) return g.map(x => String(x).trim()).filter(Boolean);
+    if (typeof g === 'string') return g.split(/[,/;]/).map(x => x.trim()).filter(Boolean);
+    return [];
+}
+
+/** Sub-genres of mods (e.g. "HD Textures", "Recomp") found on a game. */
+function getGameModGenres(game) {
+    const out = [];
+    (Array.isArray(game && game.mods) ? game.mods : []).forEach(m => {
+        (Array.isArray(m.genres) ? m.genres : []).forEach(x => { if (x && !out.includes(x)) out.push(x); });
+    });
+    return out;
+}
+
+/** True when the game has the named store feature. */
+function gameHasFeature(game, feature) {
+    const f = String(feature).toLowerCase();
+    const cats = getGameCategories(game).map(c => c.toLowerCase());
+    if (f === 'mods') return Array.isArray(game.mods) && game.mods.length > 0;
+    if (f === 'achievements') return !!(game.achievementsUrl || game.exophaseUrl || game.steamAppId ||
+        (Array.isArray(game.achievements) && game.achievements.length));
+    if (f === 'free') return cats.includes('free') || game.free === true || game.is_free === true;
+    return cats.includes(f);
+}
+
+/**
+ * Filter games with the preset store filters.
+ * opts: { term, genres:[], features:[], sort }. Platform filtering is done by the caller.
+ */
+function storeApplyFilters(games, opts) {
+    opts = opts || {};
+    const genres = (opts.genres || []).map(x => x.toLowerCase());
+    const features = opts.features || [];
+    const out = games.filter(g => {
+        if (genres.length) {
+            const gg = getGameGenres(g).map(x => x.toLowerCase());
+            if (!genres.some(x => gg.includes(x))) return false;
+        }
+        return features.every(f => gameHasFeature(g, f));
+    });
+    return storeFilterGames(out, { term: opts.term, sort: opts.sort });
+}
+
+function _skippedPath(username, platform) {
+    return `accounts/${username.toLowerCase()}/skipped.${String(platform).replace(/[^A-Za-z0-9._+-]/g, '_')}.json`;
+}
+
+/** Read the user's skipped games for a platform ([{ title, action, date }]). */
+async function getSkippedGames(username, platform) {
+    if (MODE === 'demo') {
+        try { return JSON.parse(localStorage.getItem(`gameOS_skipped_${username.toLowerCase()}_${platform}`) || '[]'); }
+        catch (_) { return []; }
+    }
+    const file = await githubRead(_skippedPath(username, platform));
+    return file && Array.isArray(file.content) ? file.content : [];
+}
+
+/** Record a "No"/"Skip" so the game is never recommended again. */
+async function addSkippedGame(username, platform, title, action) {
+    const list = await getSkippedGames(username, platform);
+    if (list.some(s => (s.title || '').toLowerCase() === title.toLowerCase())) return list;
+    const updated = [...list, { title, action: action || 'skip', date: new Date().toISOString() }];
+    if (MODE === 'demo') {
+        localStorage.setItem(`gameOS_skipped_${username.toLowerCase()}_${platform}`, JSON.stringify(updated));
+    } else {
+        const path = _skippedPath(username, platform);
+        const file = await githubRead(path);
+        await githubWrite(path, updated, `Skip recommendation: ${title} (${platform})`, file ? file.sha : undefined);
+    }
+    return updated;
+}
+
+/** Read the saved "Recommended" list ([{ title, platform, game }]). */
+async function getRecommendations(username) {
+    if (MODE === 'demo') {
+        try { return JSON.parse(localStorage.getItem(`gameOS_recommended_${username.toLowerCase()}`) || '[]'); }
+        catch (_) { return []; }
+    }
+    const file = await githubRead(`accounts/${username.toLowerCase()}/recommended.json`);
+    return file && Array.isArray(file.content) ? file.content : [];
+}
+
+/** Write the "Recommended" list to the user's data (recommended.json). */
+async function saveRecommendations(username, list) {
+    if (MODE === 'demo') {
+        localStorage.setItem(`gameOS_recommended_${username.toLowerCase()}`, JSON.stringify(list));
+        return;
+    }
+    const path = `accounts/${username.toLowerCase()}/recommended.json`;
+    const file = await githubRead(path);
+    await githubWrite(path, list, 'Update recommendations', file ? file.sha : undefined);
+}
+
+/**
+ * Pick up to `count` store games the user may like: not in library, not skipped,
+ * ranked by overlap with the genres / platforms of the owned games.
+ * catalog: { platform: [game] }; skipped: { platform: [{title}] }
+ */
+function buildRecommendations(catalog, library, skipped, count) {
+    count = count || 10;
+    const key = (p, t) => p + '|' + String(t).toLowerCase();
+    const excluded = new Set();
+    (library || []).forEach(o => excluded.add(key(o.platform, o.title || '')));
+    Object.entries(skipped || {}).forEach(([p, l]) => (l || []).forEach(s => excluded.add(key(p, s.title || ''))));
+    const genreScore = {}, platScore = {};
+    const ownedGenres = (o) => {
+        const g = (catalog[o.platform] || []).find(x => _gameName(x).toLowerCase() === (o.title || '').toLowerCase());
+        return g ? getGameGenres(g) : (Array.isArray(o.genres) ? o.genres : []);
+    };
+    (library || []).forEach(o => {
+        platScore[o.platform] = (platScore[o.platform] || 0) + 1;
+        ownedGenres(o).forEach(x => { genreScore[x.toLowerCase()] = (genreScore[x.toLowerCase()] || 0) + 1; });
+    });
+    const scored = [];
+    Object.entries(catalog).forEach(([p, games]) => games.forEach(g => {
+        const t = _gameName(g);
+        if (!t || excluded.has(key(p, t))) return;
+        let s = (platScore[p] || 0) * 0.5 + (g.image || g.cover_url ? 0.5 : 0);
+        getGameGenres(g).forEach(x => { s += genreScore[x.toLowerCase()] || 0; });
+        scored.push({ s, p, g, t });
+    }));
+    scored.sort((a, b) => b.s - a.s || a.t.localeCompare(b.t));
+    // Spread picks across platforms where scores tie by taking top N overall.
+    return scored.slice(0, count).map(({ p, g, t }) => ({ title: t, platform: p, game: g }));
+}
+
+if (typeof window !== 'undefined') {
+    window.STORE_FEATURES = STORE_FEATURES;
+    window.getGameGenres = getGameGenres;
+    window.getGameModGenres = getGameModGenres;
+    window.gameHasFeature = gameHasFeature;
+    window.storeApplyFilters = storeApplyFilters;
+    window.getSkippedGames = getSkippedGames;
+    window.addSkippedGame = addSkippedGame;
+    window.getRecommendations = getRecommendations;
+    window.saveRecommendations = saveRecommendations;
+    window.buildRecommendations = buildRecommendations;
 }
 
 /** Render a mods section (like achievements) from game.mods array of { name, url, genres } objects. */
