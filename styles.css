@@ -2414,3 +2414,5 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .store-card-platform { padding: 0 8px 6px; font-size: .72em; color: #64748b; }
 .store-rec-actions { display: flex; gap: 4px; padding: 0 6px 8px; }
 .store-rec-actions .btn { flex: 1; padding: 4px 2px; font-size: .75em; }
+
+.store-card-ach { color: #b45309; font-weight: 600; }

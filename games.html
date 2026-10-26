@@ -85,10 +85,10 @@
 
                 <!-- Preset filters: Platform / Genre / Features (all games load by default; filters narrow them) -->
                 <div class="store-filter-panel" id="storeFilterPanel">
-                    <label class="store-filter-sort">Platform: <select id="filterPlatforms" class="games-select"></select></label>
+                    <details class="store-filter-group"><summary>Platform</summary><div id="filterPlatforms" class="store-filter-options"></div></details>
                     <details class="store-filter-group"><summary>Genre</summary><div id="filterGenres" class="store-filter-options"></div></details>
                     <details class="store-filter-group" open><summary>Features</summary><div id="filterFeatures" class="store-filter-options"></div></details>
-                    <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
+                    <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="random">Random</option><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
                     <button type="button" class="btn btn-secondary" id="storeClearFilters">Clear filters</button>
                 </div>
 
@@ -468,7 +468,7 @@
         return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
             <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
             <div class="store-card-title">${escapeHtml(_gName(g))}</div>
-            <div class="store-card-platform">${escapeHtml(platform)}</div>${extra || ''}</div>`;
+            <div class="store-card-platform">${escapeHtml(platform)}${window.gameHasFeature(g, 'Achievements') ? ' · <span class="store-card-ach" title="Achievements available">🏆 Achievements</span>' : ''}</div>${extra || ''}</div>`;
     }
     function renderStoreChrome() {
         const platforms = Object.keys(_allPlatformGames).sort();
@@ -478,10 +478,9 @@
         const modGenres = new Set();
         platforms.forEach(p => _allPlatformGames[p].forEach(g => window.getGameModGenres(g).forEach(x => modGenres.add(x))));
 
-        const platSel = document.getElementById('filterPlatforms');
         const curPlat = [..._filters.platforms][0] || '';
-        platSel.innerHTML = '<option value="">All platforms</option>' +
-            platforms.map(p => `<option value="${escapeHtml(p)}" ${p === curPlat ? 'selected' : ''}>${escapeHtml(p)} (${_allPlatformGames[p].length})</option>`).join('');
+        document.getElementById('filterPlatforms').innerHTML =
+            platforms.map(p => _checkbox('platforms', p, p, _allPlatformGames[p].length)).join('');
         document.getElementById('filterGenres').innerHTML = genres.length
             ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
             : '<small style="color:#64748b;">No genre data available yet.</small>';
@@ -529,6 +528,9 @@
     }
     function renderShelves() {
         const el = document.getElementById('storeShelves');
+        ['storeAllHeading', 'browseCount', 'browseGamesList'].forEach(id => {
+            const n = document.getElementById(id); if (n) n.style.display = (_showAllRecs && !_filtersActive()) ? 'none' : '';
+        });
         // Shelves are shown on the default (unfiltered) view only, like a storefront home page
         if (_filtersActive()) { el.innerHTML = ''; return; }
         let html = '';
@@ -543,7 +545,13 @@
             html += _shelfHtml('🎯 Recommended for you', visible.map(([r, i]) => _recCard(r, i)),
                 'No recommendations yet – add games to your library or wishlist to get picks.');
             if (_recommended.length > visible.length || _showAllRecs) {
-                html += `<div style="margin:-6px 0 14px;"><button type="button" class="btn btn-secondary" onclick="_showAllRecs = !_showAllRecs; renderShelves();">${_showAllRecs ? 'Show fewer' : 'Show all'}</button></div>`;
+                html += `<div style="margin:-6px 0 14px;"><button type="button" class="btn btn-secondary" onclick="_showAllRecs = !_showAllRecs; renderShelves();">${_showAllRecs ? 'Show fewer' : 'All'}</button></div>`;
+            }
+            if (_showAllRecs) {
+                el.innerHTML = `<div class="store-shelf"><h3>🎯 Recommended for you – all platforms</h3><div class="games-browse-list store-rec-all" style="display:flex;flex-wrap:wrap;gap:12px;">` +
+                    _recommended.map((r, i) => _recCard(r, i)).join('') + `</div></div>` +
+                    `<div style="margin:0 0 14px;"><button type="button" class="btn btn-secondary" onclick="_showAllRecs = false; renderShelves();">← Back to store</button></div>`;
+                return;
             }
         }
         const shelfDefs = [['new', '🆕 New', 'No new games right now.'], ['updated', '🔄 Updated', 'No recently updated games.'],
@@ -652,12 +660,6 @@
         const title = (game.Title || game.game_name || game.title || '').toLowerCase();
         return _myWishlist.some(w => w.platform === platform && (w.title || '').toLowerCase() === title);
     }
-    document.getElementById('filterPlatforms').addEventListener('change', e => {
-        _filters.platforms.clear();
-        if (e.target.value) _filters.platforms.add(e.target.value);
-        renderStoreChrome();
-        applyStoreFilters();
-    });
     document.getElementById('storeFilterPanel').addEventListener('change', e => {
         const cb = e.target.closest('input[type=checkbox][data-group]'); if (!cb) return;
         const set = _filters[cb.dataset.group];
