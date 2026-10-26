@@ -6402,6 +6402,14 @@ function _adminReadCategories() {
     return out;
 }
 
+/** Stable per-session pseudo-random key so the "random" order doesn't reshuffle on every render. */
+const _randSeed = Math.floor(Math.random() * 2147483647);
+function _randKey(str) {
+    let h = _randSeed;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 2654435761) >>> 0;
+    return h;
+}
+
 /** Filter/sort games for the store. opts: { category, term, hasMods, sort } */
 function storeFilterGames(games, opts) {
     opts = opts || {};
@@ -6420,6 +6428,7 @@ function storeFilterGames(games, opts) {
     });
     if (opts.sort === 'za') out = [...out].sort((a, b) => nm(b).localeCompare(nm(a)));
     else if (opts.sort === 'az') out = [...out].sort((a, b) => nm(a).localeCompare(nm(b)));
+    else if (opts.sort === 'random') out = [...out].sort((a, b) => _randKey(nm(a)) - _randKey(nm(b)));
     return out;
 }
 
@@ -6570,7 +6579,7 @@ function buildRecommendations(catalog, library, skipped, count, perPlatform) {
         getGameGenres(g).forEach(x => { s += genreScore[x.toLowerCase()] || 0; });
         scored.push({ s, p, g, t });
     }));
-    scored.sort((a, b) => b.s - a.s || a.t.localeCompare(b.t));
+    scored.sort((a, b) => b.s - a.s || _randKey(a.t) - _randKey(b.t));
     if (perPlatform) {
         // Mix of all platforms: top N per platform, interleaved round-robin
         const buckets = {};
