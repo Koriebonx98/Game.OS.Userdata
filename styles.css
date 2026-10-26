@@ -2416,6 +2416,11 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .store-rec-actions .btn { flex: 1; padding: 4px 2px; font-size: .75em; }
 
 .store-card-ach { color: #b45309; font-weight: 600; }
+.store-card-compat { font-weight: 600; font-size: .85em; }
+.store-card-compat.compat-green { color: #16a34a; }
+.store-card-compat.compat-amber { color: #d97706; }
+.store-card-compat.compat-red { color: #dc2626; }
+.store-card-compat.compat-none { color: #94a3b8; font-weight: 400; }
 
 .store-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; }
 .store-card-grid .store-card { flex: none; }
@@ -2427,3 +2432,12 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .compat-green.compat-selected { background: #16a34a; color: #fff; }
 .compat-amber.compat-selected { background: #f59e0b; color: #fff; }
 .compat-red.compat-selected { background: #dc2626; color: #fff; }
+
+.compat-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; background: #e2e8f0; margin-top: 6px; }
+.compat-bar-seg { display: block; height: 100%; }
+.compat-bg-green { background: #16a34a; }
+.compat-bg-amber { background: #d97706; }
+.compat-bg-red { background: #dc2626; }
+.compat-total.compat-green, .compat-summary .compat-green { color: #16a34a; }
+.compat-total.compat-amber, .compat-summary .compat-amber { color: #d97706; }
+.compat-total.compat-red, .compat-summary .compat-red { color: #dc2626; }

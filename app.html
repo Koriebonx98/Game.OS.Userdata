@@ -148,7 +148,7 @@
         <button data-view="profile"><span>👤</span>Profile</button>
     </nav>
 
-    <script src="script.js"></script>
+    <script src="script.js?v=store3"></script>
     <script>
     (function () {
         const $ = id => document.getElementById(id);
@@ -483,7 +483,7 @@
         // ── Store (browse Games.Database and add to library) ──
         let storeGames = [], storePlatOf = new Map(), storeWishlist = [], storeCat = 'All', storeRecs = [];
         let storeShowAllRecs = false;
-        const storeF = { platforms: new Set(), genres: new Set(), features: new Set() };
+        const storeF = { platforms: new Set(), genres: new Set(), features: new Set(), modGenres: new Set() };
         const pf = g => storePlatOf.get(g) || '';
         const gTitle = g => g.Title || g.game_name || g.title || '';
         function initAdminTools() {
@@ -577,6 +577,7 @@
                     try { (await fetchGamesDbPlatform(p)).forEach(g => { storeGames.push(g); storePlatOf.set(g, p); }); } catch (_) {}
                 }));
             } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
+            await loadGameStats([...new Set(storeGames.map(pf))]);
             storeGames.sort((a, b) => gTitle(a).toLowerCase().localeCompare(gTitle(b).toLowerCase()));
             await loadStoreRecs();
             renderStore();
@@ -618,15 +619,17 @@
             const plats = [...new Set(storeGames.map(pf))].sort();
             const gc = {}; storeGames.forEach(g => getGameGenres(g).forEach(x => gc[x] = (gc[x] || 0) + 1));
             const genres = Object.keys(gc).sort((a, b) => gc[b] - gc[a]).slice(0, 30).sort();
+            const storeModGenres = [...new Set(storeGames.flatMap(g => getGameModGenres(g)))].sort();
             const cb = (grp, v, l) => `<label class="store-check"><input type="checkbox" data-group="${grp}" value="${esc(v)}" ${storeF[grp].has(v) ? 'checked' : ''}> ${esc(l)}</label>`;
             if (!$('storeFilters').contains(document.activeElement)) $('storeFilters').innerHTML =
                 `<details class="store-filter-group"><summary>Platform</summary><div class="store-filter-options">${plats.map(p => cb('platforms', p, p)).join('')}</div></details>` +
                 `<details class="store-filter-group"><summary>Genre</summary><div class="store-filter-options">${genres.length ? genres.map(x => cb('genres', x, x)).join('') : '<small>No genre data yet.</small>'}</div></details>` +
-                `<details class="store-filter-group" open><summary>Features</summary><div class="store-filter-options">${getStoreFeatures().map(f => cb('features', f, f)).join('')}${cb('features', '__wishlist', '⭐ Wishlist')}</div></details>`;
+                `<details class="store-filter-group" open><summary>Features</summary><div class="store-filter-options">${getStoreFeatures().map(f => cb('features', f, f)).join('')}${cb('features', '__wishlist', '⭐ Wishlist')}${cb('features', '__popular', '🔥 Most Popular')}</div></details>` +
+                (storeModGenres.length ? `<details class="store-filter-group"><summary>Mod types</summary><div class="store-filter-options">${storeModGenres.map(x => cb('modGenres', x, x)).join('')}</div></details>` : '');
             const owned = new Set(library.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
             const wishlisted = new Set(storeWishlist.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
-            const filtered = !!(term || storeF.platforms.size || storeF.genres.size || storeF.features.size);
-            const card = (g, extra) => { const c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${storeGames.indexOf(g)}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div><div class="store-card-platform">${esc(pf(g))}</div>${extra || ''}</div>`; };
+            const filtered = !!(term || storeF.platforms.size || storeF.genres.size || storeF.features.size || storeF.modGenres.size);
+            const card = (g, extra) => { const c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${storeGames.indexOf(g)}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div><div class="store-card-platform">${esc(pf(g))}${window.getCompatBadgeHtml ? ' ' + window.getCompatBadgeHtml(g, pf(g)) : ''}</div>${extra || ''}</div>`; };
             const has = (g, c) => getGameCategories(g).some(x => x.toLowerCase() === c);
             const recent = g => { const d = Date.parse(g.updated_at || g.updated || g.last_updated || ''); return !isNaN(d) && Date.now() - d < 30 * 864e5; };
             let shelves = '';
@@ -640,20 +643,21 @@
                 else if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you <button type="button" class="btn btn-secondary store-rec-toggle" data-rec-all="1">All</button></h3><div class="store-shelf-row">${storeRecs.map((r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`)).join('')}</div></div>`;
             }
             $('storeShelves').innerHTML = shelves;
-            const feats = [...storeF.features].filter(f => f !== '__wishlist');
+            const feats = [...storeF.features].filter(f => f !== '__wishlist' && f !== '__popular');
             const hits = [];
             for (let i = 0; i < storeGames.length && hits.length < 100; i++) {
                 const g = storeGames[i], t = gTitle(g), p = pf(g);
                 if (t && (!storeF.platforms.size || storeF.platforms.has(p)) &&
                     (!storeF.features.has('__wishlist') || wishlisted.has(p + '|' + t.toLowerCase())) &&
                     (!term || t.toLowerCase().includes(term)) &&
-                    storeApplyFilters([g], { genres: [...storeF.genres], features: feats }).length) hits.push(i);
+                    storeApplyFilters([g], { genres: [...storeF.genres], modGenres: [...storeF.modGenres], features: feats }).length) hits.push(i);
             }
+            if (storeF.features.has('__popular')) hits.sort((x, y) => getPopularityScore(storeGames[y], pf(storeGames[y])) - getPopularityScore(storeGames[x], pf(storeGames[x])));
             $('storeCount').textContent = hits.length === 100 ? 'Showing first 100 of ' + storeGames.length + ' — use filters or search to find more' : hits.length + ' games';
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), p = pf(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(p))}</span>`;
-                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(p)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(p + '|' + t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
+                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(p)} ${getCompatBadgeHtml(g, p)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(p + '|' + t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {
