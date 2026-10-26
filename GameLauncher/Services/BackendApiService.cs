@@ -233,6 +233,25 @@ namespace GameLauncher.Services
             }
         }
 
+        public async Task<List<Game>> GetWishlistAsync(CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.GetAsync("/api/me/wishlist", ct);
+            resp.EnsureSuccessStatusCode();
+
+            try
+            {
+                var data = await resp.Content.ReadFromJsonAsync<WishlistResponse>(_jsonOpts, ct);
+                return data?.Wishlist ?? new List<Game>();
+            }
+            catch (JsonException ex)
+            {
+                System.Diagnostics.Debug.WriteLine(
+                    $"[BackendApiService] GetWishlist JSON parse error: {ex.Message}");
+                return new List<Game>();
+            }
+        }
+
         /// <summary>Fetch the shared "New" games feed via GET /api/new-games.</summary>
         public async Task<List<NewGameEntry>> GetNewGamesAsync(CancellationToken ct = default)
         {
@@ -883,6 +902,12 @@ namespace GameLauncher.Services
         {
             [JsonPropertyName("success")] public bool       Success { get; set; }
             [JsonPropertyName("games")]   public List<Game>? Games  { get; set; }
+        }
+
+        private sealed class WishlistResponse
+        {
+            [JsonPropertyName("success")]  public bool       Success  { get; set; }
+            [JsonPropertyName("wishlist")] public List<Game>? Wishlist { get; set; }
         }
 
         private sealed class InvitesResponse

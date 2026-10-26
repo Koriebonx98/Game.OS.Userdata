@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>Game OS – Browse Games</title>
+    <title>Game OS – Store</title>
     <link rel="stylesheet" href="styles.css">
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
@@ -20,9 +20,8 @@
             <h1>🎮 Game OS</h1>
             <nav>
                 <a href="index.html" class="nav-link">Home</a>
-                <a href="games.html" class="nav-link">🔍 Games</a>
+                <a href="games.html" class="nav-link">🛒 Store</a>
                 <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
-                <a href="games.html?tab=wishlist" class="nav-link">⭐ Wishlist</a>
                 <a href="games.html?tab=favourites" class="nav-link">❤️ Favourites</a>
                 <div id="guestNav" style="display:inline;">
                     <a href="login.html" class="nav-link">Login</a>
@@ -42,8 +41,8 @@
             <div class="text-center" style="margin-bottom:16px;">
                 <div id="connectionStatus" class="status"></div>
             </div>
-            <h2 style="margin-bottom:6px;">🕹️ Games</h2>
-            <p style="color:#64748b;margin-bottom:20px;font-size:0.95em;">Browse games from the database and manage your library.</p>
+            <h2 style="margin-bottom:6px;">🛒 Store</h2>
+            <p style="color:#64748b;margin-bottom:20px;font-size:0.95em;">Discover games across platforms and add them to your library.</p>
 
             <!-- Guest Notice (hidden for logged-in users) -->
             <div id="guestNotice" class="guest-notice" style="display:none;">
@@ -52,20 +51,26 @@
 
             <!-- View Tabs -->
             <div class="games-tab-row">
-                <button class="games-tab active" id="tabNew" onclick="switchTab('new')">🆕 New</button>
-                <button class="games-tab" id="tabBrowse" onclick="switchTab('browse')">🔍 Browse Games</button>
+                <button class="games-tab active" id="tabBrowse" onclick="switchTab('browse')">🛒 Store</button>
+                <button class="games-tab" id="tabNew" onclick="switchTab('new')">🆕 New</button>
                 <button class="games-tab" id="tabOwned" onclick="switchTab('owned')">📚 My Library</button>
-                <button class="games-tab" id="tabWishlist" onclick="switchTab('wishlist')">⭐ Wishlist</button>
                 <button class="games-tab" id="tabFavourites" onclick="switchTab('favourites')">❤️ Favourites</button>
             </div>
 
-            <!-- BROWSE TAB -->
-            <div id="newPanelWrap">
+            <!-- NEW GAMES -->
+            <div id="newPanelWrap" style="display:none;">
                 <div id="newMessage" class="message"></div>
                 <div id="newGamesList" class="games-browse-list"></div>
             </div>
 
-            <div id="browsePanelWrap" style="display:none;">
+            <div id="browsePanelWrap">
+                <div class="store-home-hero">
+                    <div>
+                        <span class="store-home-eyebrow">GAME.OS STORE</span>
+                        <h3>Find your next game</h3>
+                        <p>Browse the catalog, save games to your wishlist, and build your library.</p>
+                    </div>
+                </div>
                 <!-- Platform Selector -->
                 <div id="platformSelectorWrap" style="margin-bottom:20px;">
                     <label for="platformSelect" style="font-weight:600;margin-right:10px;">Platform:</label>
@@ -77,7 +82,7 @@
                 </div>
 
                 <!-- Search -->
-                <div class="games-search-row" id="browseSearchRow" style="display:none;">
+                <div class="games-search-row" id="browseSearchRow">
                     <input type="text" id="browseSearch" class="games-search-input" placeholder="Search by title or ID…" autocomplete="off">
                 </div>
 
@@ -100,12 +105,6 @@
             <div id="ownedPanelWrap" style="display:none;">
                 <div id="ownedMessage" class="message"></div>
                 <div id="ownedGamesList"></div>
-            </div>
-
-            <!-- WISHLIST TAB -->
-            <div id="wishlistPanelWrap" style="display:none;">
-                <div id="wishlistMessage" class="message"></div>
-                <div id="wishlistGamesList"></div>
             </div>
 
             <!-- FAVOURITES TAB -->
@@ -153,10 +152,8 @@
         // Hide the My Library tab and nav link for guests
         if (!loggedIn) {
             document.getElementById('tabOwned').style.display = 'none';
-            document.getElementById('tabWishlist').style.display = 'none';
             document.getElementById('tabFavourites').style.display = 'none';
             document.querySelectorAll('a[href="games.html?tab=library"]').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('a[href="games.html?tab=wishlist"]').forEach(el => el.style.display = 'none');
             // Show guest notice
             const notice = document.getElementById('guestNotice');
             if (notice) notice.style.display = 'flex';
@@ -171,9 +168,7 @@
         if (loggedIn && params.get('tab') === 'favourites') {
             switchTab('favourites');
         }
-        if (loggedIn && params.get('tab') === 'wishlist') {
-            switchTab('wishlist');
-        }
+        if (params.get('tab') === 'wishlist') switchTab('browse');
     });
 
     async function initGamesPage() {
@@ -219,12 +214,11 @@
         const searchRow = document.getElementById('browseSearchRow');
         const msg       = document.getElementById('browseLoadingMsg');
         const addPcBtn    = document.getElementById('addPcGameBtn');
-        document.getElementById('browseSearch').value = '';
 
         if (!platform) {
             listEl.innerHTML    = '';
             countEl.textContent = '';
-            searchRow.style.display = 'none';
+            searchRow.style.display = 'flex';
             if (addPcBtn) addPcBtn.style.display = 'none';
             return;
         }
@@ -529,8 +523,13 @@
         const counts = {};
         all.forEach(g => window.getGameCategories(g).forEach(c => { counts[c.toLowerCase()] = (counts[c.toLowerCase()] || 0) + 1; }));
         const chips = ['All', ...known].filter(c => c === 'All' || counts[c.toLowerCase()]);
+        const wishlistCount = _myWishlist.filter(w => _currentPlatform === 'ALL' ||
+            w.platform === _currentPlatform).length;
+        const wishlistChip = _isLoggedIn
+            ? `<button type="button" class="store-chip ${_storeCategory === '__wishlist' ? 'active' : ''}" data-cat="__wishlist">⭐ Wishlist (${wishlistCount})</button>`
+            : '';
         document.getElementById('storeChips').innerHTML = chips.map(c =>
-            `<button type="button" class="store-chip ${c === _storeCategory ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c === 'All' ? 'All' : c + ' (' + counts[c.toLowerCase()] + ')')}</button>`).join('');
+            `<button type="button" class="store-chip ${c === _storeCategory ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c === 'All' ? 'All' : c + ' (' + counts[c.toLowerCase()] + ')')}</button>`).join('') + wishlistChip;
         document.getElementById('storeFilters').style.display = all.length ? 'flex' : 'none';
         // Shelves (New / Exclusive) only on the unfiltered default view
         const shelves = ['New', 'Exclusive'].map(cat => {
@@ -551,12 +550,28 @@
         if (_currentPlatform === 'ALL') {
             const filtered = {};
             Object.keys(_allPlatformGames).forEach(p => {
-                filtered[p] = window.storeFilterGames(_allPlatformGames[p], opts);
+                const games = _storeCategory === '__wishlist'
+                    ? _allPlatformGames[p].filter(g => _isWishlisted(g, p))
+                    : _allPlatformGames[p];
+                filtered[p] = window.storeFilterGames(games, {
+                    ...opts,
+                    category: _storeCategory === '__wishlist' ? 'All' : opts.category
+                });
             });
             renderBrowseGamesGrouped(filtered, '');
         } else {
-            renderBrowseGames(window.storeFilterGames(_allBrowseGames, opts));
+            const games = _storeCategory === '__wishlist'
+                ? _allBrowseGames.filter(g => _isWishlisted(g, _currentPlatform))
+                : _allBrowseGames;
+            renderBrowseGames(window.storeFilterGames(games, {
+                ...opts,
+                category: _storeCategory === '__wishlist' ? 'All' : opts.category
+            }));
         }
+    }
+    function _isWishlisted(game, platform) {
+        const title = (game.Title || game.game_name || game.title || '').toLowerCase();
+        return _myWishlist.some(w => w.platform === platform && (w.title || '').toLowerCase() === title);
     }
     document.getElementById('storeChips').addEventListener('click', e => {
         const b = e.target.closest('.store-chip'); if (!b) return;
@@ -760,7 +775,7 @@
         }).join('');
     }
 
-    // ── Wishlist Tab ───────────────────────────────────────────
+    // ── Wishlist filter data ────────────────────────────────────
     async function refreshWishlist() {
         const user = getCurrentUser();
         if (!user) return;
@@ -773,50 +788,10 @@
         } catch (_) {
             _myWishlist = [];
         }
-        renderWishlistGames();
-    }
-
-    function renderWishlistGames() {
-        const listEl = document.getElementById('wishlistGamesList');
-        if (_myWishlist.length === 0) {
-            listEl.innerHTML = '<p class="games-list-empty">Your wishlist is empty. Browse games and click ☆ to add games you want!</p>';
-            return;
+        if (_currentPlatform) {
+            renderStoreChrome();
+            applyStoreFilters();
         }
-
-        // Group by platform
-        const byPlatform = {};
-        _myWishlist.forEach(g => {
-            if (!byPlatform[g.platform]) byPlatform[g.platform] = [];
-            byPlatform[g.platform].push(g);
-        });
-
-        listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
-            const games      = byPlatform[plat];
-            const coverColor = getPlatformColor(plat);
-            const coverIcon  = getPlatformIcon(plat);
-            return `
-            <div class="owned-platform-group">
-                <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
-                ${games.map(g => {
-                    const coverUrl  = g.coverUrl || null;
-                    const coverHtml = coverUrl
-                        ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
-                        : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
-                    return `
-                <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
-                    ${coverHtml}
-                    <div class="games-browse-info">
-                        <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
-                        ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
-                    </div>
-                    <button class="btn-remove-game"
-                        onclick="event.stopPropagation(); handleRemoveWishlist('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
-                        🗑️ Remove
-                    </button>
-                </div>`;
-                }).join('')}
-            </div>`;
-        }).join('');
     }
 
     async function handleToggleWishlist(btn, gameJson, platform) {
@@ -855,29 +830,6 @@
         } catch (e) {
             btn.disabled = false;
             alert('Failed to update wishlist: ' + e.message);
-        }
-    }
-
-    async function handleRemoveWishlist(platform, title, btn) {
-        const user = getCurrentUser();
-        if (!user) return;
-        btn.disabled = true;
-        try {
-            if (MODE === 'demo') {
-                removeFromWishlistDemo(user.username, platform, title);
-            } else {
-                await removeFromWishlistGitHub(user.username, platform, title);
-            }
-            await refreshWishlist();
-            // Re-render browse so wishlist star badges update
-            if (_currentPlatform === 'ALL') {
-                applyStoreFilters();
-            } else if (_currentPlatform === platform && _allBrowseGames.length) {
-                applyStoreFilters();
-            }
-        } catch (e) {
-            btn.disabled = false;
-            alert('Failed to remove from wishlist: ' + e.message);
         }
     }
 
@@ -927,14 +879,11 @@
         if (tab === 'new') loadNewGames();
         document.getElementById('tabBrowse').classList.toggle('active', tab === 'browse');
         document.getElementById('tabOwned').classList.toggle('active', tab === 'owned');
-        document.getElementById('tabWishlist').classList.toggle('active', tab === 'wishlist');
         document.getElementById('tabFavourites').classList.toggle('active', tab === 'favourites');
         document.getElementById('favouritesPanelWrap').style.display = tab === 'favourites' ? '' : 'none';
         document.getElementById('browsePanelWrap').style.display  = tab === 'browse'   ? '' : 'none';
         document.getElementById('ownedPanelWrap').style.display   = tab === 'owned'    ? '' : 'none';
-        document.getElementById('wishlistPanelWrap').style.display = tab === 'wishlist' ? '' : 'none';
         if (tab === 'owned')    refreshOwnedGames();
-        if (tab === 'wishlist') refreshWishlist();
         if (tab === 'favourites') renderFavouriteGames();
     }
     </script>

@@ -62,6 +62,13 @@
             <div id="favList" class="app-list"></div>
         </section>
         <section id="view-store" class="app-view" hidden>
+            <div class="store-home-hero">
+                <div>
+                    <span class="store-home-eyebrow">GAME.OS STORE</span>
+                    <h3>Find your next game</h3>
+                    <p>Discover games across platforms, save favorites to your wishlist, and build your library.</p>
+                </div>
+            </div>
             <div class="app-filters">
                 <select id="storePlatform" aria-label="Platform"><option value="">Select a platform…</option></select>
             </div>
@@ -475,7 +482,7 @@
             }).join('') : empty('No achievements to compare.'));
         }
         // ── Store (browse Games.Database and add to library) ──
-        let storeGames = [], storePlat = '', storeCat = 'All';
+        let storeGames = [], storePlat = '', storeCat = 'All', storeWishlist = [];
         const gTitle = g => g.Title || g.game_name || g.title || '';
         function initAdminTools() {
             if (!isAdminUser()) return;
@@ -500,11 +507,15 @@
         }
         async function initStore() {
             try {
+                storeWishlist = MODE === 'demo' ? getDemoWishlist(user.username) : await getWishlistGitHub(user.username);
+            } catch (_) { storeWishlist = []; }
+            try {
                 const plats = await fetchGamesDbPlatforms();
                 $('storePlatform').innerHTML = '<option value="">Select a platform…</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)}</option>`).join('');
             } catch (_) {}
             $('storePlatform').onchange = async () => {
                 storePlat = $('storePlatform').value; storeGames = [];
+                if (storeCat !== '__wishlist') storeCat = 'All';
                 if (!storePlat) { renderStore(); return; }
                 $('storeList').innerHTML = empty('Loading…');
                 try { storeGames = await fetchGamesDbPlatform(storePlat); } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
@@ -562,23 +573,33 @@
         }
         function renderStore() {
             const term = $('storeSearch').value.trim().toLowerCase();
-            if (!storePlat) { $('storeCount').textContent = ''; $('storeChips').innerHTML = ''; $('storeShelves').innerHTML = ''; $('storeList').innerHTML = empty('Pick a platform to browse games.'); return; }
+            if (!storePlat) {
+                $('storeCount').textContent = '';
+                $('storeChips').innerHTML = `<button type="button" class="store-chip ${storeCat === 'All' ? 'active' : ''}" data-store-cat="All">All</button><button type="button" class="store-chip ${storeCat === '__wishlist' ? 'active' : ''}" data-store-cat="__wishlist">⭐ Wishlist (${storeWishlist.length})</button>`;
+                $('storeShelves').innerHTML = '';
+                $('storeList').innerHTML = empty('Choose a platform to explore the store catalog.');
+                return;
+            }
             const counts = {}, known = [...STORE_CATEGORIES];
             let modCount = 0;
             storeGames.forEach(g => { if (Array.isArray(g.mods) && g.mods.length) modCount++; getGameCategories(g).forEach(c => { const k = c.toLowerCase(); counts[k] = (counts[k] || 0) + 1; if (!known.some(x => x.toLowerCase() === k)) known.push(c); }); });
-            if (storeCat !== 'All' && storeCat !== '__mods' && !counts[storeCat.toLowerCase()]) storeCat = 'All';
+            if (storeCat !== 'All' && storeCat !== '__mods' && storeCat !== '__wishlist' && !counts[storeCat.toLowerCase()]) storeCat = 'All';
             $('storeChips').innerHTML = [['All', 'All'], ...known.filter(c => counts[c.toLowerCase()]).map(c => [c, c + ' (' + counts[c.toLowerCase()] + ')']), ...(modCount ? [['__mods', '🧩 Has mods (' + modCount + ')']] : [])]
-                .map(([v, l]) => `<button type="button" class="store-chip ${v === storeCat ? 'active' : ''}" data-store-cat="${esc(v)}">${esc(l)}</button>`).join('');
+                .map(([v, l]) => `<button type="button" class="store-chip ${v === storeCat ? 'active' : ''}" data-store-cat="${esc(v)}">${esc(l)}</button>`).join('') +
+                `<button type="button" class="store-chip ${storeCat === '__wishlist' ? 'active' : ''}" data-store-cat="__wishlist">⭐ Wishlist (${storeWishlist.filter(w => w.platform === storePlat).length})</button>`;
             $('storeShelves').innerHTML = (storeCat === 'All' && !term) ? ['New', 'Exclusive'].map(cat => {
                 const idx = []; for (let i = 0; i < storeGames.length && idx.length < 20; i++) if (getGameCategories(storeGames[i]).some(c => c.toLowerCase() === cat.toLowerCase())) idx.push(i);
                 if (!idx.length) return '';
                 return `<div class="store-shelf"><h3>${cat === 'New' ? '🆕 New' : '⭐ Exclusives'}</h3><div class="store-shelf-row">` + idx.map(i => { const g = storeGames[i], c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${i}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div></div>`; }).join('') + '</div></div>';
             }).join('') : '';
             const owned = new Set(library.filter(g => g.platform === storePlat).map(g => (g.title || '').toLowerCase()));
+            const wishlisted = new Set(storeWishlist.filter(g => g.platform === storePlat).map(g => (g.title || '').toLowerCase()));
             const hits = [];
             for (let i = 0; i < storeGames.length && hits.length < 100; i++) {
                 const t = gTitle(storeGames[i]);
-                if (t && (!term || t.toLowerCase().includes(term)) && storeFilterGames([storeGames[i]], { category: storeCat === '__mods' ? 'All' : storeCat, hasMods: storeCat === '__mods' }).length) hits.push(i);
+                if (t && (storeCat !== '__wishlist' || wishlisted.has(t.toLowerCase())) &&
+                    (!term || t.toLowerCase().includes(term)) &&
+                    storeFilterGames([storeGames[i]], { category: storeCat === '__mods' || storeCat === '__wishlist' ? 'All' : storeCat, hasMods: storeCat === '__mods' }).length) hits.push(i);
             }
             $('storeCount').textContent = term ? hits.length + (hits.length === 100 ? '+' : '') + ' results' : 'Showing first 100 of ' + storeGames.length + ' — search to find more';
             $('storeList').innerHTML = hits.length ? hits.map(i => {
