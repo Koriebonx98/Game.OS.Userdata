@@ -69,9 +69,7 @@
                     <p>Discover games across platforms, save favorites to your wishlist, and build your library.</p>
                 </div>
             </div>
-            <div class="app-filters">
-                <select id="storePlatform" aria-label="Platform"><option value="">Select a platform…</option></select>
-            </div>
+            <div id="storeFilters" class="store-filter-panel"></div>
             <div id="adminTools" class="app-filters" hidden>
                 <button class="btn app-more" id="admAddGame">➕ Add game</button>
                 <button class="btn app-more" id="admAddSteam">🎮 Add Steam game</button>
@@ -79,7 +77,7 @@
             </div>
             <input id="storeSearch" class="app-search" type="search" placeholder="Search the store…">
             <div id="storeShelves"></div>
-            <div id="storeChips" class="store-chips"></div>
+            <h3 class="store-all-heading">All Games</h3>
             <div id="storeCount" class="app-count"></div>
             <div id="storeList" class="app-list"></div>
         </section>
@@ -482,12 +480,14 @@
             }).join('') : empty('No achievements to compare.'));
         }
         // ── Store (browse Games.Database and add to library) ──
-        let storeGames = [], storePlat = '', storeCat = 'All', storeWishlist = [];
+        let storeGames = [], storePlatOf = new Map(), storeWishlist = [], storeCat = 'All', storeRecs = [];
+        const storeF = { platforms: new Set(), genres: new Set(), features: new Set() };
+        const pf = g => storePlatOf.get(g) || '';
         const gTitle = g => g.Title || g.game_name || g.title || '';
         function initAdminTools() {
             if (!isAdminUser()) return;
             $('adminTools').hidden = false;
-            $('admAddGame').onclick = () => storePlat ? openAddPcGameModal(storePlat) : alert('Pick a platform first.');
+            $('admAddGame').onclick = () => storeF.platforms.size === 1 ? openAddPcGameModal([...storeF.platforms][0]) : alert('Tick exactly one platform first.');
             $('admAddSteam').onclick = () => openAddSteamGameModal();
             $('admAddPlat').onclick = async () => {
                 const name = (prompt('New platform name (e.g. Sega Saturn):') || '').trim();
@@ -496,8 +496,7 @@
                 try {
                     await _gamesDbWriteFile(name, { Games: [] }, 'Add platform: ' + name);
                     _discoveredPlatformsPromise = null;
-                    $('storePlatform').insertAdjacentHTML('beforeend', `<option value="${esc(name)}">${esc(getPlatformIcon(name))} ${esc(name)}</option>`);
-                    $('storePlatform').value = name; $('storePlatform').onchange();
+                    storeF.platforms = new Set([name]); await loadStoreAll();
                 } catch (err) { alert('Failed to add platform: ' + err.message); }
             };
             document.addEventListener('click', e => {
@@ -509,36 +508,30 @@
             try {
                 storeWishlist = MODE === 'demo' ? getDemoWishlist(user.username) : await getWishlistGitHub(user.username);
             } catch (_) { storeWishlist = []; }
-            try {
-                const plats = await fetchGamesDbPlatforms();
-                $('storePlatform').innerHTML = '<option value="">Select a platform…</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)}</option>`).join('');
-            } catch (_) {}
-            $('storePlatform').onchange = async () => {
-                storePlat = $('storePlatform').value; storeGames = [];
-                if (storeCat !== '__wishlist') storeCat = 'All';
-                if (!storePlat) { renderStore(); return; }
-                $('storeList').innerHTML = empty('Loading…');
-                try { storeGames = await fetchGamesDbPlatform(storePlat); } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
+            await loadStoreAll();
+            $('storeFilters').addEventListener('change', e => {
+                const cb = e.target.closest('input[data-group]'); if (!cb) return;
+                const set = storeF[cb.dataset.group];
+                if (cb.checked) set.add(cb.value); else set.delete(cb.value);
                 renderStore();
-            };
+            });
             $('storeSearch').addEventListener('input', renderStore);
-            $('storeChips').addEventListener('click', e => { const b = e.target.closest('[data-store-cat]'); if (b) { storeCat = b.dataset.storeCat; renderStore(); } });
-            $('storeShelves').addEventListener('click', e => { const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, storePlat); });
+            $('storeShelves').addEventListener('click', e => { const r = e.target.closest('[data-rec]'); if (r) { answerStoreRec(+r.dataset.rec, r.dataset.ans); return; } const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, pf(og)); });
             $('storeList').addEventListener('click', async e => {
                 const ed = e.target.closest('[data-store-edit]');
-                if (ed) { const g = storeGames[+ed.dataset.storeEdit]; if (g) openAdminEditModal(g, storePlat); return; }
+                if (ed) { const g = storeGames[+ed.dataset.storeEdit]; if (g) openAdminEditModal(g, pf(g)); return; }
                 const rm = e.target.closest('[data-store-rm]');
-                if (rm) { const g = storeGames[+rm.dataset.storeRm]; if (g) removeFromLibrary(storePlat, gTitle(g), rm); return; }
+                if (rm) { const g = storeGames[+rm.dataset.storeRm]; if (g) removeFromLibrary(pf(g), gTitle(g), rm); return; }
                 const b = e.target.closest('[data-store-add]');
                 if (!b) {
                     const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen];
-                    if (og) openGameModal(og, storePlat);
+                    if (og) openGameModal(og, pf(og));
                     return;
                 }
                 const g = storeGames[+b.dataset.storeAdd]; if (!g) return;
                 b.disabled = true; b.textContent = '⏳';
                 try {
-                    const r = MODE === 'demo' ? addGameDemo(user.username, g, storePlat) : await addGameGitHub(user.username, g, storePlat);
+                    const r = MODE === 'demo' ? addGameDemo(user.username, g, pf(g)) : await addGameGitHub(user.username, g, pf(g));
                     if (r && r.success === false && !/already/i.test(r.message || '')) throw new Error(r.message);
                     b.textContent = '✅';
                     library = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
@@ -571,41 +564,91 @@
                 fillPlatforms(); renderAll(); renderProfile(); renderStore();
             } catch (_) {} finally { refreshing = false; }
         }
+        // Load every platform by default (Steam/Xbox style); filters narrow the list
+        async function loadStoreAll() {
+            $('storeList').innerHTML = empty('Loading…');
+            storeGames = []; storePlatOf = new Map();
+            try {
+                const plats = await fetchGamesDbPlatforms();
+                await Promise.all(plats.map(async p => {
+                    try { (await fetchGamesDbPlatform(p)).forEach(g => { storeGames.push(g); storePlatOf.set(g, p); }); } catch (_) {}
+                }));
+            } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
+            storeGames.sort((a, b) => gTitle(a).toLowerCase().localeCompare(gTitle(b).toLowerCase()));
+            await loadStoreRecs();
+            renderStore();
+        }
+        const catalogByPlat = () => { const c = {}; storeGames.forEach(g => (c[pf(g)] = c[pf(g)] || []).push(g)); return c; };
+        async function loadStoreRecs() {
+            storeRecs = [];
+            try {
+                const cat = catalogByPlat(), skipped = {};
+                await Promise.all(Object.keys(cat).map(async p => { try { skipped[p] = await getSkippedGames(user.username, p); } catch (_) { skipped[p] = []; } }));
+                const inLib = new Set(library.map(o => o.platform + '|' + (o.title || '').toLowerCase()));
+                const saved = (await getRecommendations(user.username).catch(() => []))
+                    .filter(r => r && r.platform && r.title && !inLib.has(r.platform + '|' + r.title.toLowerCase()) &&
+                        !(skipped[r.platform] || []).some(s => (s.title || '').toLowerCase() === r.title.toLowerCase()))
+                    .map(r => ({ ...r, game: storeGames.find(g => pf(g) === r.platform && gTitle(g).toLowerCase() === r.title.toLowerCase()) }))
+                    .filter(r => r.game);
+                storeRecs = saved;
+                if (storeRecs.length < 10) {
+                    const have = new Set(storeRecs.map(r => r.platform + '|' + r.title.toLowerCase()));
+                    storeRecs = [...storeRecs, ...buildRecommendations(cat, library, skipped, 10).filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()))].slice(0, 10);
+                    await saveRecommendations(user.username, storeRecs.map(r => ({ title: r.title, platform: r.platform })));
+                }
+            } catch (_) {}
+        }
+        async function answerStoreRec(i, answer) {
+            const rec = storeRecs[i]; if (!rec) return;
+            try {
+                if (answer === 'yes') {
+                    const r = MODE === 'demo' ? addToWishlistDemo(user.username, rec.game, rec.platform) : await addToWishlistGitHub(user.username, rec.game, rec.platform);
+                    if (r && r.success !== false) storeWishlist = MODE === 'demo' ? getDemoWishlist(user.username) : await getWishlistGitHub(user.username);
+                } else await addSkippedGame(user.username, rec.platform, rec.title, answer);
+            } catch (_) { return; }
+            storeRecs.splice(i, 1);
+            await loadStoreRecs();
+            renderStore();
+        }
         function renderStore() {
             const term = $('storeSearch').value.trim().toLowerCase();
-            if (!storePlat) {
-                $('storeCount').textContent = '';
-                $('storeChips').innerHTML = `<button type="button" class="store-chip ${storeCat === 'All' ? 'active' : ''}" data-store-cat="All">All</button><button type="button" class="store-chip ${storeCat === '__wishlist' ? 'active' : ''}" data-store-cat="__wishlist">⭐ Wishlist (${storeWishlist.length})</button>`;
-                $('storeShelves').innerHTML = '';
-                $('storeList').innerHTML = empty('Choose a platform to explore the store catalog.');
-                return;
+            const plats = [...new Set(storeGames.map(pf))].sort();
+            const gc = {}; storeGames.forEach(g => getGameGenres(g).forEach(x => gc[x] = (gc[x] || 0) + 1));
+            const genres = Object.keys(gc).sort((a, b) => gc[b] - gc[a]).slice(0, 30).sort();
+            const cb = (grp, v, l) => `<label class="store-check"><input type="checkbox" data-group="${grp}" value="${esc(v)}" ${storeF[grp].has(v) ? 'checked' : ''}> ${esc(l)}</label>`;
+            if (!$('storeFilters').contains(document.activeElement)) $('storeFilters').innerHTML =
+                `<details class="store-filter-group"><summary>Platform</summary><div class="store-filter-options">${plats.map(p => cb('platforms', p, p)).join('')}</div></details>` +
+                `<details class="store-filter-group"><summary>Genre</summary><div class="store-filter-options">${genres.length ? genres.map(x => cb('genres', x, x)).join('') : '<small>No genre data yet.</small>'}</div></details>` +
+                `<details class="store-filter-group" open><summary>Features</summary><div class="store-filter-options">${STORE_FEATURES.map(f => cb('features', f, f)).join('')}${cb('features', '__wishlist', '⭐ Wishlist')}</div></details>`;
+            const owned = new Set(library.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
+            const wishlisted = new Set(storeWishlist.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
+            const filtered = !!(term || storeF.platforms.size || storeF.genres.size || storeF.features.size);
+            const card = (g, extra) => { const c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${storeGames.indexOf(g)}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div><div class="store-card-platform">${esc(pf(g))}</div>${extra || ''}</div>`; };
+            const has = (g, c) => getGameCategories(g).some(x => x.toLowerCase() === c);
+            const recent = g => { const d = Date.parse(g.updated_at || g.updated || g.last_updated || ''); return !isNaN(d) && Date.now() - d < 30 * 864e5; };
+            let shelves = '';
+            if (!filtered) {
+                shelves = [['⭐ Exclusives', g => has(g, 'exclusive')], ['🆕 New', g => has(g, 'new')], ['🔄 Updated', g => has(g, 'updated') || recent(g)], ['⏳ Coming Soon', g => has(g, 'coming soon')]].map(([label, fn]) => {
+                    const items = []; for (let i = 0; i < storeGames.length && items.length < 20; i++) if (fn(storeGames[i])) items.push(storeGames[i]);
+                    return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(g => card(g)).join('')}</div></div>` : '';
+                }).join('');
+                if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">${storeRecs.map((r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`)).join('')}</div></div>`;
             }
-            const counts = {}, known = [...STORE_CATEGORIES];
-            let modCount = 0;
-            storeGames.forEach(g => { if (Array.isArray(g.mods) && g.mods.length) modCount++; getGameCategories(g).forEach(c => { const k = c.toLowerCase(); counts[k] = (counts[k] || 0) + 1; if (!known.some(x => x.toLowerCase() === k)) known.push(c); }); });
-            if (storeCat !== 'All' && storeCat !== '__mods' && storeCat !== '__wishlist' && !counts[storeCat.toLowerCase()]) storeCat = 'All';
-            $('storeChips').innerHTML = [['All', 'All'], ...known.filter(c => counts[c.toLowerCase()]).map(c => [c, c + ' (' + counts[c.toLowerCase()] + ')']), ...(modCount ? [['__mods', '🧩 Has mods (' + modCount + ')']] : [])]
-                .map(([v, l]) => `<button type="button" class="store-chip ${v === storeCat ? 'active' : ''}" data-store-cat="${esc(v)}">${esc(l)}</button>`).join('') +
-                `<button type="button" class="store-chip ${storeCat === '__wishlist' ? 'active' : ''}" data-store-cat="__wishlist">⭐ Wishlist (${storeWishlist.filter(w => w.platform === storePlat).length})</button>`;
-            $('storeShelves').innerHTML = (storeCat === 'All' && !term) ? ['New', 'Exclusive'].map(cat => {
-                const idx = []; for (let i = 0; i < storeGames.length && idx.length < 20; i++) if (getGameCategories(storeGames[i]).some(c => c.toLowerCase() === cat.toLowerCase())) idx.push(i);
-                if (!idx.length) return '';
-                return `<div class="store-shelf"><h3>${cat === 'New' ? '🆕 New' : '⭐ Exclusives'}</h3><div class="store-shelf-row">` + idx.map(i => { const g = storeGames[i], c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${i}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div></div>`; }).join('') + '</div></div>';
-            }).join('') : '';
-            const owned = new Set(library.filter(g => g.platform === storePlat).map(g => (g.title || '').toLowerCase()));
-            const wishlisted = new Set(storeWishlist.filter(g => g.platform === storePlat).map(g => (g.title || '').toLowerCase()));
+            $('storeShelves').innerHTML = shelves;
+            const feats = [...storeF.features].filter(f => f !== '__wishlist');
             const hits = [];
             for (let i = 0; i < storeGames.length && hits.length < 100; i++) {
-                const t = gTitle(storeGames[i]);
-                if (t && (storeCat !== '__wishlist' || wishlisted.has(t.toLowerCase())) &&
+                const g = storeGames[i], t = gTitle(g), p = pf(g);
+                if (t && (!storeF.platforms.size || storeF.platforms.has(p)) &&
+                    (!storeF.features.has('__wishlist') || wishlisted.has(p + '|' + t.toLowerCase())) &&
                     (!term || t.toLowerCase().includes(term)) &&
-                    storeFilterGames([storeGames[i]], { category: storeCat === '__mods' || storeCat === '__wishlist' ? 'All' : storeCat, hasMods: storeCat === '__mods' }).length) hits.push(i);
+                    storeApplyFilters([g], { genres: [...storeF.genres], features: feats }).length) hits.push(i);
             }
-            $('storeCount').textContent = term ? hits.length + (hits.length === 100 ? '+' : '') + ' results' : 'Showing first 100 of ' + storeGames.length + ' — search to find more';
+            $('storeCount').textContent = hits.length === 100 ? 'Showing first 100 of ' + storeGames.length + ' — use filters or search to find more' : hits.length + ' games';
             $('storeList').innerHTML = hits.length ? hits.map(i => {
-                const g = storeGames[i], t = gTitle(g), cover = getGameCoverUrl(g);
-                const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(storePlat))}</span>`;
-                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(storePlat)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
+                const g = storeGames[i], t = gTitle(g), p = pf(g), cover = getGameCoverUrl(g);
+                const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(p))}</span>`;
+                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(p)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(p + '|' + t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {

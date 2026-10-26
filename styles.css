@@ -2401,3 +2401,16 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
     .store-home-hero { min-height: 120px; padding: 20px; }
     .store-home-hero h3 { font-size: 1.25rem; }
 }
+
+/* Store filters, shelves & recommendations */
+.store-filter-panel { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; margin: 12px 0 18px; padding: 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; }
+.store-filter-group { min-width: 180px; flex: 1 1 200px; }
+.store-filter-group summary { cursor: pointer; font-weight: 700; color: #0f172a; }
+.store-filter-options { display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; margin-top: 6px; }
+.store-check { font-size: .9em; color: #334155; cursor: pointer; }
+.store-check small { color: #94a3b8; }
+.store-filter-sort { align-self: center; }
+.store-all-heading { margin: 20px 0 10px; }
+.store-card-platform { padding: 0 8px 6px; font-size: .72em; color: #64748b; }
+.store-rec-actions { display: flex; gap: 4px; padding: 0 6px 8px; }
+.store-rec-actions .btn { flex: 1; padding: 4px 2px; font-size: .75em; }

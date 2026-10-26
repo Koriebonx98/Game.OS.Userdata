@@ -71,28 +71,26 @@
                         <p>Browse the catalog, save games to your wishlist, and build your library.</p>
                     </div>
                 </div>
-                <!-- Platform Selector -->
-                <div id="platformSelectorWrap" style="margin-bottom:20px;">
-                    <label for="platformSelect" style="font-weight:600;margin-right:10px;">Platform:</label>
-                    <select id="platformSelect" class="games-select">
-                        <option value="">Loading platforms…</option>
-                    </select>
-                    <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;margin-left:12px;"></span>
-                    <button id="addPcGameBtn" class="btn" style="display:none;margin-left:12px;" onclick="openAddPcGameModal()">➕ Add Game</button>
-                </div>
+                <span id="browseLoadingMsg" style="color:#666;font-size:0.9em;"></span>
+                <button id="addPcGameBtn" class="btn" style="display:none;margin-bottom:10px;" onclick="openAddPcGameModal()">➕ Add Game</button>
 
                 <!-- Search -->
                 <div class="games-search-row" id="browseSearchRow">
                     <input type="text" id="browseSearch" class="games-search-input" placeholder="Search by title or ID…" autocomplete="off">
                 </div>
 
-                <!-- Store shelves, categories & filters -->
-                <div id="storeShelves"></div>
-                <div id="storeChips" class="store-chips"></div>
-                <div class="store-filters" id="storeFilters" style="display:none;">
-                    <label><input type="checkbox" id="storeHasMods"> 🧩 Has mods</label>
-                    <label>Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
+                <!-- Preset filters: Platform / Genre / Features (all games load by default; filters narrow them) -->
+                <div class="store-filter-panel" id="storeFilterPanel">
+                    <details class="store-filter-group" open><summary>Platform</summary><div id="filterPlatforms" class="store-filter-options"></div></details>
+                    <details class="store-filter-group"><summary>Genre</summary><div id="filterGenres" class="store-filter-options"></div></details>
+                    <details class="store-filter-group" open><summary>Features</summary><div id="filterFeatures" class="store-filter-options"></div></details>
+                    <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
+                    <button type="button" class="btn btn-secondary" id="storeClearFilters">Clear filters</button>
                 </div>
+
+                <!-- Shelves: Exclusives / New / Updated / Coming soon / Recommended -->
+                <div id="storeShelves"></div>
+                <h3 class="store-all-heading" id="storeAllHeading">All Games</h3>
 
                 <!-- Games Count -->
                 <div id="browseCount" style="color:#666;font-size:0.9em;margin-bottom:10px;"></div>
@@ -119,7 +117,7 @@
         </footer>
     </div>
 
-    <script src="script.js?v=fav3"></script>
+    <script src="script.js?v=store1"></script>
     <script>
     // ── Page init ──────────────────────────────────────────────
     const PAGE_SIZE      = 100;  // max items rendered at once per view/group
@@ -172,32 +170,15 @@
     });
 
     async function initGamesPage() {
-        const select = document.getElementById('platformSelect');
-        const msg    = document.getElementById('browseLoadingMsg');
-        msg.textContent = 'Loading platforms…';
-        try {
-            const platforms = await fetchGamesDbPlatforms();
-            select.innerHTML =
-                '<option value="">— select a platform —</option>' +
-                '<option value="ALL">🌐 All Platforms (Universal Search)</option>' +
-                platforms.map(p => `<option value="${p}">${p}</option>`).join('');
-            msg.textContent = '';
-        } catch (e) {
-            msg.textContent = 'Failed to load platforms.';
-        }
-
-        select.addEventListener('change', () => loadBrowsePlatform(select.value));
-
         document.getElementById('browseSearch').addEventListener('input', debounceSearch);
-
-        // No platform auto-loaded on init – PC.Games.json is very large and loading it
-        // automatically would download 30+ MB and render 150K+ items, crashing the browser.
 
         // Load library for "My Library" tab (only for logged-in users)
         if (isLoggedIn()) {
             await refreshOwnedGames();
             await refreshWishlist();
         }
+        // Default: load ALL games from every platform; users narrow them with filters.
+        await loadAllPlatforms();
     }
 
     function toggleBrowsePlatformGroup(headerEl) {
@@ -205,61 +186,6 @@
         const expanded = list.classList.toggle('expanded');
         headerEl.classList.toggle('expanded', expanded);
         headerEl.setAttribute('aria-expanded', String(expanded));
-    }
-
-    // ── Platform loading ───────────────────────────────────────
-    async function loadBrowsePlatform(platform) {
-        const listEl    = document.getElementById('browseGamesList');
-        const countEl   = document.getElementById('browseCount');
-        const searchRow = document.getElementById('browseSearchRow');
-        const msg       = document.getElementById('browseLoadingMsg');
-        const addPcBtn    = document.getElementById('addPcGameBtn');
-
-        if (!platform) {
-            listEl.innerHTML    = '';
-            countEl.textContent = '';
-            searchRow.style.display = 'flex';
-            if (addPcBtn) addPcBtn.style.display = 'none';
-            return;
-        }
-
-        if (platform === 'ALL') {
-            if (addPcBtn) addPcBtn.style.display = 'none';
-            await loadAllPlatforms();
-            return;
-        }
-
-        const showAdminBtns   = isAdminUser();
-        if (addPcBtn) {
-            if (showAdminBtns) {
-                addPcBtn.textContent = `➕ Add ${platform} Game`;
-                addPcBtn.onclick = () => openAddPcGameModal(platform);
-                addPcBtn.style.display = '';
-            } else {
-                addPcBtn.style.display = 'none';
-            }
-        }
-
-        _currentPlatform = platform;
-        listEl.innerHTML    = '<p style="color:#666;">Loading games…</p>';
-        countEl.textContent = '';
-        searchRow.style.display = 'none';
-        msg.textContent = '';
-
-        try {
-            _allBrowseGames = await fetchGamesDbPlatform(platform);
-            _allBrowseGames.sort((a, b) => {
-                const na = (a.Title || a.game_name || a.title || '').toLowerCase();
-                const nb = (b.Title || b.game_name || b.title || '').toLowerCase();
-                return na.localeCompare(nb);
-            });
-            searchRow.style.display = 'flex';
-            _storeCategory = 'All';
-            renderStoreChrome();
-            applyStoreFilters();
-        } catch (e) {
-            listEl.innerHTML = `<p style="color:#c00;">Failed to load games: ${e.message}</p>`;
-        }
     }
 
     // ── All-platforms loading ──────────────────────────────────
@@ -272,7 +198,6 @@
         _currentPlatform = 'ALL';
         listEl.innerHTML    = '<p style="color:#666;">Loading all platforms…</p>';
         countEl.textContent = '';
-        searchRow.style.display = 'none';
         msg.textContent = 'Loading all platforms…';
 
         try {
@@ -299,8 +224,7 @@
             _allBrowseGames = Object.values(_allPlatformGames).flat();
 
             msg.textContent = '';
-            searchRow.style.display = 'flex';
-            _storeCategory = 'All';
+            await loadRecommendations();
             renderStoreChrome();
             applyStoreFilters();
         } catch (e) {
@@ -397,7 +321,7 @@
     }
 
     function _loadMoreBrowse() {
-        const games = window.storeFilterGames(_allBrowseGames, _storeOpts());
+        const games = window.storeApplyFilters(_allBrowseGames, _storeOpts());
 
         const listEl     = document.getElementById('browseGamesList');
         const countEl    = document.getElementById('browseCount');
@@ -468,16 +392,7 @@
 
     function _loadMoreGroup(btn) {
         const platform = btn.getAttribute('data-platform');
-        const allGames = _allPlatformGames[platform] || [];
-        const term     = document.getElementById('browseSearch').value.toLowerCase().trim();
-        const games    = term
-            ? allGames.filter(g => {
-                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
-                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
-                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
-                return name.includes(term) || tid.includes(term) || alts.includes(term);
-            })
-            : allGames;
+        const games    = _filteredFor(platform);
 
         const offset    = _groupedOffsets[platform] || PAGE_SIZE;
         const newOffset = Math.min(offset + PAGE_SIZE, games.length);
@@ -504,82 +419,199 @@
         }, 300);
     }
 
-    // ── Store categories / filters ─────────────────────────────
-    let _storeCategory = 'All';
-    function _storeOpts(withTerm) {
+    // ── Store filters (Platform / Genre / Features) ────────────
+    const _filters = { platforms: new Set(), genres: new Set(), features: new Set() };
+    let _recommended = [];   // [{ title, platform, game }] shown in the Recommended shelf
+    const _SHELF_MAX = 20;
+
+    const _gName = g => g.Title || g.game_name || g.title || '';
+    function _platformOf(game) {
+        for (const [p, gs] of Object.entries(_allPlatformGames)) if (gs.includes(game)) return p;
+        return '';
+    }
+    function _recentlyUpdated(g) {
+        const d = Date.parse(g.updated_at || g.updated || g.last_updated || '');
+        return !isNaN(d) && Date.now() - d < 30 * 864e5;
+    }
+    function _shelfMatch(g, shelf) {
+        const has = c => window.getGameCategories(g).some(x => x.toLowerCase() === c);
+        if (shelf === 'exclusive') return has('exclusive');
+        if (shelf === 'new') return has('new');
+        if (shelf === 'updated') return has('updated') || _recentlyUpdated(g);
+        return has('coming soon');
+    }
+    function _storeOpts() {
         return {
-            category: _storeCategory,
-            hasMods:  document.getElementById('storeHasMods').checked,
-            sort:     document.getElementById('storeSort').value,
-            term:     withTerm === false ? '' : document.getElementById('browseSearch').value
+            term:     document.getElementById('browseSearch').value,
+            genres:   [..._filters.genres],
+            features: [..._filters.features].filter(f => f !== '__wishlist'),
+            sort:     document.getElementById('storeSort').value
         };
     }
-    function renderStoreChrome() {
-        const all = _allBrowseGames;
-        const platOf = new Map();
-        if (_currentPlatform === 'ALL') Object.entries(_allPlatformGames).forEach(([p, gs]) => gs.forEach(g => platOf.set(g, p)));
-        const known = new Set(window.STORE_CATEGORIES);
-        all.forEach(g => window.getGameCategories(g).forEach(c => known.add(c)));
-        const counts = {};
-        all.forEach(g => window.getGameCategories(g).forEach(c => { counts[c.toLowerCase()] = (counts[c.toLowerCase()] || 0) + 1; }));
-        const chips = ['All', ...known].filter(c => c === 'All' || counts[c.toLowerCase()]);
-        const wishlistCount = _myWishlist.filter(w => _currentPlatform === 'ALL' ||
-            w.platform === _currentPlatform).length;
-        const wishlistChip = _isLoggedIn
-            ? `<button type="button" class="store-chip ${_storeCategory === '__wishlist' ? 'active' : ''}" data-cat="__wishlist">⭐ Wishlist (${wishlistCount})</button>`
-            : '';
-        document.getElementById('storeChips').innerHTML = chips.map(c =>
-            `<button type="button" class="store-chip ${c === _storeCategory ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c === 'All' ? 'All' : c + ' (' + counts[c.toLowerCase()] + ')')}</button>`).join('') + wishlistChip;
-        document.getElementById('storeFilters').style.display = all.length ? 'flex' : 'none';
-        // Shelves (New / Exclusive) only on the unfiltered default view
-        const shelves = ['New', 'Exclusive'].map(cat => {
-            const items = all.filter(g => window.getGameCategories(g).some(c => c.toLowerCase() === cat.toLowerCase())).slice(0, 20);
-            if (!items.length) return '';
-            return `<div class="store-shelf"><h3>${cat === 'New' ? '🆕 New' : '⭐ Exclusives'}</h3><div class="store-shelf-row">` + items.map(g => {
-                const t = g.Title || g.game_name || g.title || '';
-                const cover = getGameCoverUrl(g);
-                return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platOf.get(g) || _currentPlatform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
-                    <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
-                    <div class="store-card-title">${escapeHtml(t)}</div></div>`;
-            }).join('') + '</div></div>';
-        }).join('');
-        document.getElementById('storeShelves').innerHTML = shelves;
+    /** Games of a platform after applying all active filters. */
+    function _filteredFor(platform) {
+        if (_filters.platforms.size && !_filters.platforms.has(platform)) return [];
+        let games = _allPlatformGames[platform] || [];
+        if (_filters.features.has('__wishlist')) games = games.filter(g => _isWishlisted(g, platform));
+        return window.storeApplyFilters(games, _storeOpts());
     }
-    function applyStoreFilters() {
-        const opts = _storeOpts();
-        if (_currentPlatform === 'ALL') {
-            const filtered = {};
-            Object.keys(_allPlatformGames).forEach(p => {
-                const games = _storeCategory === '__wishlist'
-                    ? _allPlatformGames[p].filter(g => _isWishlisted(g, p))
-                    : _allPlatformGames[p];
-                filtered[p] = window.storeFilterGames(games, {
-                    ...opts,
-                    category: _storeCategory === '__wishlist' ? 'All' : opts.category
-                });
-            });
-            renderBrowseGamesGrouped(filtered, '');
-        } else {
-            const games = _storeCategory === '__wishlist'
-                ? _allBrowseGames.filter(g => _isWishlisted(g, _currentPlatform))
-                : _allBrowseGames;
-            renderBrowseGames(window.storeFilterGames(games, {
-                ...opts,
-                category: _storeCategory === '__wishlist' ? 'All' : opts.category
-            }));
+    function _checkbox(group, value, label, count) {
+        const checked = _filters[group].has(value) ? 'checked' : '';
+        return `<label class="store-check"><input type="checkbox" data-group="${group}" value="${escapeHtml(value)}" ${checked}> ${escapeHtml(label)}${count !== undefined ? ` <small>(${count})</small>` : ''}</label>`;
+    }
+    function _cardHtml(g, platform, extra) {
+        const cover = getGameCoverUrl(g);
+        return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
+            <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
+            <div class="store-card-title">${escapeHtml(_gName(g))}</div>
+            <div class="store-card-platform">${escapeHtml(platform)}</div>${extra || ''}</div>`;
+    }
+    function renderStoreChrome() {
+        const platforms = Object.keys(_allPlatformGames).sort();
+        const genreCounts = {};
+        platforms.forEach(p => _allPlatformGames[p].forEach(g => window.getGameGenres(g).forEach(x => { genreCounts[x] = (genreCounts[x] || 0) + 1; })));
+        const genres = Object.keys(genreCounts).sort((a, b) => genreCounts[b] - genreCounts[a]).slice(0, 40).sort();
+        const modGenres = new Set();
+        platforms.forEach(p => _allPlatformGames[p].forEach(g => window.getGameModGenres(g).forEach(x => modGenres.add(x))));
+
+        document.getElementById('filterPlatforms').innerHTML =
+            platforms.map(p => _checkbox('platforms', p, p, _allPlatformGames[p].length)).join('');
+        document.getElementById('filterGenres').innerHTML = genres.length
+            ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
+            : '<small style="color:#64748b;">No genre data available yet.</small>';
+        const feat = window.STORE_FEATURES.map(f => _checkbox('features', f, ({ Exclusive: '⭐ ', Mods: '🧩 ', Achievements: '🏆 ', Free: '🆓 ', 'Coming Soon': '⏳ ' }[f] || '') + f)).join('') +
+            (_isLoggedIn ? _checkbox('features', '__wishlist', '⭐ Wishlist') : '') +
+            (modGenres.size ? `<div class="store-mod-genres"><small>Mod types: ${[...modGenres].map(escapeHtml).join(', ')}</small></div>` : '');
+        document.getElementById('filterFeatures').innerHTML = feat;
+
+        const addPcBtn = document.getElementById('addPcGameBtn');
+        if (addPcBtn) {
+            if (isAdminUser() && _filters.platforms.size === 1) {
+                const plat = [..._filters.platforms][0];
+                addPcBtn.textContent = `➕ Add ${plat} Game`;
+                addPcBtn.onclick = () => openAddPcGameModal(plat);
+                addPcBtn.style.display = '';
+            } else {
+                addPcBtn.style.display = 'none';
+            }
         }
+        renderShelves();
+    }
+    function _filtersActive() {
+        return _filters.platforms.size || _filters.genres.size || _filters.features.size ||
+            document.getElementById('browseSearch').value.trim();
+    }
+    function renderShelves() {
+        const el = document.getElementById('storeShelves');
+        // Shelves are shown on the default (unfiltered) view only, like a storefront home page
+        if (_filtersActive()) { el.innerHTML = ''; return; }
+        const shelfDefs = [['exclusive', '⭐ Exclusives'], ['new', '🆕 New'], ['updated', '🔄 Updated'], ['coming', '⏳ Coming Soon']];
+        let html = shelfDefs.map(([key, label]) => {
+            const items = [];
+            Object.keys(_allPlatformGames).sort().forEach(p => _allPlatformGames[p].forEach(g => {
+                if (items.length < _SHELF_MAX && _shelfMatch(g, key)) items.push([g, p]);
+            }));
+            if (!items.length) return '';
+            return `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(([g, p]) => _cardHtml(g, p)).join('')}</div></div>`;
+        }).join('');
+        if (_isLoggedIn && _recommended.length) {
+            html += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">` +
+                _recommended.map((r, i) => _cardHtml(r.game, r.platform,
+                    `<div class="store-rec-actions" onclick="event.stopPropagation()">
+                        <button type="button" class="btn" title="Yes – add to wishlist" onclick="answerRecommendation(${i}, 'yes')">✔ Yes</button>
+                        <button type="button" class="btn btn-secondary" title="No – never recommend again" onclick="answerRecommendation(${i}, 'no')">✖ No</button>
+                        <button type="button" class="btn btn-secondary" title="Skip – don't recommend again" onclick="answerRecommendation(${i}, 'skip')">⏭ Skip</button>
+                    </div>`)).join('') + '</div></div>';
+        }
+        el.innerHTML = html;
+    }
+
+    // ── Recommendations ────────────────────────────────────────
+    async function loadRecommendations() {
+        _recommended = [];
+        if (!_isLoggedIn) return;
+        const user = getCurrentUser();
+        try {
+            const skipped = {};
+            await Promise.all(Object.keys(_allPlatformGames).map(async p => {
+                try { skipped[p] = await getSkippedGames(user.username, p); } catch (_) { skipped[p] = []; }
+            }));
+            const inLib = new Set(_myLibrary.map(o => o.platform + '|' + (o.title || '').toLowerCase()));
+            const saved = (await getRecommendations(user.username).catch(() => []))
+                .filter(r => r && r.platform && r.title &&
+                    !inLib.has(r.platform + '|' + r.title.toLowerCase()) &&
+                    !(skipped[r.platform] || []).some(s => (s.title || '').toLowerCase() === r.title.toLowerCase()))
+                .map(r => ({ ...r, game: (_allPlatformGames[r.platform] || []).find(g => _gName(g).toLowerCase() === r.title.toLowerCase()) }))
+                .filter(r => r.game);
+            _recommended = saved;
+            if (_recommended.length < 10) {
+                const have = new Set(_recommended.map(r => r.platform + '|' + r.title.toLowerCase()));
+                const fresh = window.buildRecommendations(_allPlatformGames, _myLibrary, skipped, 10)
+                    .filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()));
+                _recommended = [..._recommended, ...fresh].slice(0, 10);
+                await saveRecommendations(user.username, _recommended.map(r => ({ title: r.title, platform: r.platform })));
+            }
+        } catch (_) { /* recommendations are best-effort */ }
+    }
+
+    async function answerRecommendation(index, answer) {
+        const user = getCurrentUser();
+        const rec  = _recommended[index];
+        if (!user || !rec) return;
+        try {
+            if (answer === 'yes') {
+                const r = MODE === 'demo' ? addToWishlistDemo(user.username, rec.game, rec.platform)
+                                          : await addToWishlistGitHub(user.username, rec.game, rec.platform);
+                if (r && r.success !== false) await refreshWishlist();
+            } else {
+                await addSkippedGame(user.username, rec.platform, rec.title, answer);
+            }
+        } catch (_) { return; }
+        _recommended.splice(index, 1);
+        // Top up with the next best pick, never re-recommending skipped/owned games
+        const skipped = {};
+        await Promise.all(Object.keys(_allPlatformGames).map(async p => {
+            try { skipped[p] = await getSkippedGames(user.username, p); } catch (_) { skipped[p] = []; }
+        }));
+        const have = new Set(_recommended.map(r => r.platform + '|' + r.title.toLowerCase()));
+        const wl = _myWishlist.map(w => ({ platform: w.platform, title: w.title }));
+        const next = window.buildRecommendations(_allPlatformGames, [..._myLibrary, ...wl], skipped, 10 + have.size)
+            .filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()));
+        if (_recommended.length < 10 && next.length) _recommended.push(next[0]);
+        try { await saveRecommendations(user.username, _recommended.map(r => ({ title: r.title, platform: r.platform }))); } catch (_) {}
+        renderShelves();
+    }
+
+    function applyStoreFilters() {
+        const filtered = {};
+        Object.keys(_allPlatformGames).forEach(p => { filtered[p] = _filteredFor(p); });
+        renderShelves();
+        renderBrowseGroupedExpanded(filtered);
+    }
+    function renderBrowseGroupedExpanded(filtered) {
+        renderBrowseGamesGrouped(filtered, '');
+        // Steam-style: show every game by default – expand all platform groups
+        document.querySelectorAll('#browseGamesList .owned-platform-header, #browseGamesList .platform-games-list')
+            .forEach(el => el.classList.add('expanded'));
+        document.querySelectorAll('#browseGamesList .owned-platform-header').forEach(el => el.setAttribute('aria-expanded', 'true'));
     }
     function _isWishlisted(game, platform) {
         const title = (game.Title || game.game_name || game.title || '').toLowerCase();
         return _myWishlist.some(w => w.platform === platform && (w.title || '').toLowerCase() === title);
     }
-    document.getElementById('storeChips').addEventListener('click', e => {
-        const b = e.target.closest('.store-chip'); if (!b) return;
-        _storeCategory = b.dataset.cat;
+    document.getElementById('storeFilterPanel').addEventListener('change', e => {
+        const cb = e.target.closest('input[type=checkbox][data-group]'); if (!cb) return;
+        const set = _filters[cb.dataset.group];
+        if (cb.checked) set.add(cb.value); else set.delete(cb.value);
         renderStoreChrome();
         applyStoreFilters();
     });
-    document.getElementById('storeHasMods').addEventListener('change', applyStoreFilters);
+    document.getElementById('storeClearFilters').addEventListener('click', () => {
+        Object.values(_filters).forEach(s => s.clear());
+        document.getElementById('browseSearch').value = '';
+        renderStoreChrome();
+        applyStoreFilters();
+    });
     document.getElementById('storeSort').addEventListener('change', applyStoreFilters);
 
     // ── Add game ───────────────────────────────────────────────
