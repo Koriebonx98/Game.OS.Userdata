@@ -202,6 +202,16 @@ namespace GameLauncher
             return await _github!.GetGamesAsync(_username, ct);
         }
 
+        public async Task<List<Game>> GetWishlistAsync(CancellationToken ct = default)
+        {
+            if (_username == null) return new List<Game>();
+
+            if (_backend != null)
+                return await _backend.GetWishlistAsync(ct);
+
+            return await _github!.GetWishlistAsync(_username, ct);
+        }
+
         /// <summary>
         /// Fetches the public profile for any user by username (no authentication required
         /// in GitHub-direct mode).  Used to show a friend's profile page.

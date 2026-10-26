@@ -401,6 +401,14 @@ namespace GameLauncher.Services
             return games ?? new List<Game>();
         }
 
+        public async Task<List<Game>> GetWishlistAsync(
+            string username, CancellationToken ct = default)
+        {
+            var (games, _) = await ReadFileAsync<List<Game>>(
+                $"accounts/{username.ToLowerInvariant()}/wishlist.json", ct);
+            return games ?? new List<Game>();
+        }
+
         public async Task<List<Achievement>> GetAchievementsAsync(
             string username, CancellationToken ct = default)
         {

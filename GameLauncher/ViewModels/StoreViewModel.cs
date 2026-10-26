@@ -16,6 +16,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     private List<StoreGame> _allStore     = new();
     private List<StoreGame> _allStoreBase = new(); // curated catalog, restored on "All"
     private List<Game>      _library  = new();
+    private List<Game>      _wishlist = new();
     private UserProfile     _profile  = new();
     private GameOsClient    _client   = new();
 
@@ -163,10 +164,25 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         // Eagerly load App Store in the background
         _ = LoadAppStoreAsync();
         _ = LoadNewGamesAsync();
+        _ = LoadWishlistAsync();
 
         // Discover all platform JSON files from the Games.Database repository so new
         // platforms appear automatically without requiring an app update.
         _ = RefreshPlatformListAsync();
+    }
+
+    private async Task LoadWishlistAsync()
+    {
+        try
+        {
+            var wishlist = await _client.GetWishlistAsync().ConfigureAwait(false);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                _wishlist = wishlist;
+                ApplyFilter();
+            });
+        }
+        catch { /* best-effort */ }
     }
 
     /// <summary>
@@ -291,6 +307,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         Genres.Add("All");
         foreach (var genre in _allStore.Select(s => s.Genre).Distinct().OrderBy(g => g))
             Genres.Add(genre);
+        if (!Genres.Contains("Wishlist"))
+            Genres.Add("Wishlist");
 
         FilterGenre = "All"; // resets genre filter; callback fires ApplyFilter() if changed
         ApplyFilter();       // always re-apply in case FilterGenre was already "All"
@@ -477,7 +495,11 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         FilteredStore.Clear();
         var results = _allStore.AsEnumerable();
 
-        if (FilterGenre != "All")
+        if (FilterGenre == "Wishlist")
+            results = results.Where(s => _wishlist.Any(w =>
+                w.Platform.Equals(s.Platform, StringComparison.OrdinalIgnoreCase) &&
+                w.Title.Equals(s.Title, StringComparison.OrdinalIgnoreCase)));
+        else if (FilterGenre != "All")
             results = results.Where(s => s.Genre == FilterGenre);
 
         if (!string.IsNullOrWhiteSpace(SearchText))

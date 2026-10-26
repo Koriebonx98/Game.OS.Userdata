@@ -12,13 +12,13 @@
         <!-- Header -->
         <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,16">
             <StackPanel Grid.Column="0">
-                <TextBlock Text="Games Store" Classes="page-title"
+                <TextBlock Text="Store" Classes="page-title"
                            IsVisible="{Binding IsGamesTab}"/>
                 <TextBlock Text="App Store" Classes="page-title"
                            IsVisible="{Binding IsAppStoreTab}"/>
                 <StackPanel Orientation="Horizontal" Spacing="8"
                             IsVisible="{Binding IsGamesTab}">
-                    <TextBlock Text="Discover and add games to your library"
+                    <TextBlock Text="Discover games, build your wishlist, and add titles to your library"
                                Classes="page-subtitle"/>
                     <TextBlock Text="·" Classes="page-subtitle"/>
                     <TextBlock Text="{Binding CatalogCountLabel}"
@@ -54,7 +54,7 @@
                     IsVisible="{Binding IsGamesTab}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Text="🎮" FontSize="14"/>
-                    <TextBlock Text="Games Store" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                    <TextBlock Text="Store" FontSize="13" FontWeight="SemiBold" Foreground="White"/>
                 </StackPanel>
             </Button>
             <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
@@ -63,7 +63,7 @@
                     IsVisible="{Binding IsAppStoreTab}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                     <TextBlock Text="🎮" FontSize="14"/>
-                    <TextBlock Text="Games Store" FontSize="13" FontWeight="SemiBold" Foreground="#8b949e"/>
+                    <TextBlock Text="Store" FontSize="13" FontWeight="SemiBold" Foreground="#8b949e"/>
                 </StackPanel>
             </Button>
             <Button Padding="18,9" CornerRadius="8" BorderThickness="0"
@@ -90,6 +90,24 @@
              GAMES STORE TAB
         ══════════════════════════════════════════════════════════ -->
         <StackPanel IsVisible="{Binding IsGamesTab}" Spacing="0">
+
+        <Border CornerRadius="14" Padding="24,20" Margin="0,0,0,20">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#1e1b4b" Offset="0"/>
+                    <GradientStop Color="#3730a3" Offset="0.62"/>
+                    <GradientStop Color="#2563eb" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <StackPanel Spacing="6">
+                <TextBlock Text="GAME.OS STORE" FontSize="10" FontWeight="Bold"
+                           Foreground="#c7d2fe" CharacterSpacing="1.4"/>
+                <TextBlock Text="Find your next game" FontSize="22" FontWeight="Bold"
+                           Foreground="White"/>
+                <TextBlock Text="Explore new releases, filter by genre or platform, and discover games for your library."
+                           FontSize="13" Foreground="#e0e7ff" TextWrapping="Wrap"/>
+            </StackPanel>
+        </Border>
 
         <!-- ══ ADMIN PANEL ══ (only visible to Admin.GameOS account) -->
         <Border IsVisible="{Binding IsAdmin}"
@@ -307,7 +325,7 @@
         <!-- Platform selector + Genre filter + heading -->
         <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,0,0,6">
             <TextBlock Grid.Column="0"
-                       Text="Browse Games" Classes="section-header"
+                       Text="Discover games" Classes="section-header"
                        VerticalAlignment="Center" Margin="0"/>
             <Button Grid.Column="1" Classes="btn-secondary" Padding="10,6"
                     Margin="0,0,8,0"
