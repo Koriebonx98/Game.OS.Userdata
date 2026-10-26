@@ -481,6 +481,7 @@
         }
         // ── Store (browse Games.Database and add to library) ──
         let storeGames = [], storePlatOf = new Map(), storeWishlist = [], storeCat = 'All', storeRecs = [];
+        let storeShowAllRecs = false;
         const storeF = { platforms: new Set(), genres: new Set(), features: new Set() };
         const pf = g => storePlatOf.get(g) || '';
         const gTitle = g => g.Title || g.game_name || g.title || '';
@@ -516,7 +517,7 @@
                 renderStore();
             });
             $('storeSearch').addEventListener('input', renderStore);
-            $('storeShelves').addEventListener('click', e => { const r = e.target.closest('[data-rec]'); if (r) { answerStoreRec(+r.dataset.rec, r.dataset.ans); return; } const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, pf(og)); });
+            $('storeShelves').addEventListener('click', e => { const t = e.target.closest('[data-rec-all]'); if (t) { storeShowAllRecs = t.dataset.recAll === '1'; renderStore(); return; } const r = e.target.closest('[data-rec]'); if (r) { answerStoreRec(+r.dataset.rec, r.dataset.ans); return; } const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, pf(og)); });
             $('storeList').addEventListener('click', async e => {
                 const ed = e.target.closest('[data-store-edit]');
                 if (ed) { const g = storeGames[+ed.dataset.storeEdit]; if (g) openAdminEditModal(g, pf(g)); return; }
@@ -593,7 +594,7 @@
                 storeRecs = saved;
                 if (storeRecs.length < 10) {
                     const have = new Set(storeRecs.map(r => r.platform + '|' + r.title.toLowerCase()));
-                    storeRecs = [...storeRecs, ...buildRecommendations(cat, library, skipped, 10).filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()))].slice(0, 10);
+                    storeRecs = [...storeRecs, ...buildRecommendations(cat, library, skipped, 10, 3).filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()))].slice(0, 10);
                     await saveRecommendations(user.username, storeRecs.map(r => ({ title: r.title, platform: r.platform })));
                 }
             } catch (_) {}
@@ -632,7 +633,9 @@
                     const items = []; for (let i = 0; i < storeGames.length && items.length < 20; i++) if (fn(storeGames[i])) items.push(storeGames[i]);
                     return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(g => card(g)).join('')}</div></div>` : '';
                 }).join('');
-                if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">${storeRecs.map((r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`)).join('')}</div></div>`;
+                const recActions = i => `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`;
+                if (storeRecs.length && storeShowAllRecs) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you <button type="button" class="btn btn-secondary store-rec-toggle" data-rec-all="0">‹ Back</button></h3><div class="store-card-grid">${storeRecs.map((r, i) => card(r.game, recActions(i))).join('')}</div></div>`;
+                else if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you <button type="button" class="btn btn-secondary store-rec-toggle" data-rec-all="1">All</button></h3><div class="store-shelf-row">${storeRecs.map((r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`)).join('')}</div></div>`;
             }
             $('storeShelves').innerHTML = shelves;
             const feats = [...storeF.features].filter(f => f !== '__wishlist');
