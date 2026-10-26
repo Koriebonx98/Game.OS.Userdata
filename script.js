@@ -6689,7 +6689,7 @@ const COMPAT_OPTIONS = {
 };
 const _compatKey = (platform, title) => String(platform) + '|' + String(title).toLowerCase();
 
-// Community stats per platform: stats/popularity.<platform>.json
+// Community stats per platform: stats/popularity.<platform>.json (rebuilt hourly from users' compatibility.json / reviews.json)
 //   { "<title lower>": { title, compat:{green,amber,red}, ratingSum, ratingCount } }
 const _gameStats = {};
 const _statsPath = platform => `stats/popularity.${String(platform).replace(/[^A-Za-z0-9._+-]/g, '_')}.json`;
@@ -6727,21 +6727,15 @@ function getPopularityScore(game, platform) {
     return (Number(c.green) || 0) + (Number(c.amber) || 0) + (Number(c.red) || 0) + 2 * (st.ratingCount || 0) + avg;
 }
 
-async function _mutateStat(platform, title, fn) {
+/** Update only the in-memory cache so the user sees their own vote/review immediately.
+ *  The shared stats file is rebuilt hourly by the "Aggregate Game Stats" workflow. */
+function _bumpLocalStat(platform, title, fn) {
     const key = String(title).toLowerCase();
-    for (let attempt = 0; attempt < 3; attempt++) {
-        const f = await _readStatsFile(platform);
-        const st = Object.assign(_blankStat(title), f.content[key] || {});
-        st.compat = Object.assign({ green: 0, amber: 0, red: 0 }, st.compat);
-        fn(st);
-        f.content[key] = st;
-        try {
-            if (MODE === 'demo') localStorage.setItem('gameOS_stats_' + platform, JSON.stringify(f.content));
-            else await githubWrite(_statsPath(platform), f.content, `Stats update: ${title} (${platform})`, f.sha);
-            (_gameStats[platform] = _gameStats[platform] || {})[key] = st;
-            return;
-        } catch (e) { if (attempt === 2) throw e; }
-    }
+    const m = (_gameStats[platform] = _gameStats[platform] || {});
+    const st = Object.assign(_blankStat(title), m[key] || {});
+    st.compat = Object.assign({ green: 0, amber: 0, red: 0 }, st.compat);
+    fn(st);
+    m[key] = st;
 }
 
 async function _readUserMap(kind, username) {
@@ -6771,7 +6765,7 @@ async function voteCompatibility(username, platform, title, rating) {
     if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
     if (_isPcPlatform(platform)) throw new Error('Compatibility is for non-PC games');
     await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
-    await _mutateStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
+    _bumpLocalStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
 }
 
 /** The signed-in user's reviews: { 'platform|title': { stars, text, date } }. */
@@ -6783,7 +6777,7 @@ async function submitReview(username, platform, title, stars, text) {
     if (!(stars >= 1 && stars <= 5)) throw new Error('Invalid rating');
     const entry = { stars, text: String(text || '').slice(0, 1000), date: new Date().toISOString() };
     await _addUserEntry('reviews', username, _compatKey(platform, title), entry, `Review: ${title} (${platform})`);
-    await _mutateStat(platform, title, st => { st.ratingSum += stars; st.ratingCount += 1; });
+    _bumpLocalStat(platform, title, st => { st.ratingSum += stars; st.ratingCount += 1; });
 }
 
 function _compatVerdict(c) {

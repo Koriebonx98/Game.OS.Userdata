@@ -1,0 +1,98 @@
+# Aggregate Game Stats (hourly)
+#
+# Users only write their own accounts/<user>/compatibility.json and reviews.json.
+# This job rebuilds stats/popularity.<platform>.json in the private data repo
+# from all of them, so the shared files are written once an hour instead of on
+# every vote/review.
+#
+# Required secret: DATA_REPO_TOKEN – PAT with Contents: Read and write on
+#                  Koriebonx98/Game.OS.Private.Data
+
+name: Aggregate Game Stats
+
+on:
+  schedule:
+    - cron: "0 * * * *"   # hourly
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aggregate-game-stats
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check for DATA_REPO_TOKEN
+        run: |
+          if [ -z "${{ secrets.DATA_REPO_TOKEN }}" ]; then
+            echo "❌ DATA_REPO_TOKEN secret is not set."
+            exit 1
+          fi
+
+      - name: Rebuild stats/popularity.<platform>.json
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, re, sys
+          import urllib.request, urllib.error
+
+          REPO = 'Koriebonx98/Game.OS.Private.Data'
+          API = f'https://api.github.com/repos/{REPO}'
+          HEAD = {'Authorization': 'Bearer ' + os.environ['DATA_REPO_TOKEN'],
+                  'Accept': 'application/vnd.github+json', 'User-Agent': 'gameos-stats'}
+
+          def call(url, method='GET', body=None):
+              req = urllib.request.Request(url, method=method, headers=HEAD,
+                                           data=json.dumps(body).encode() if body else None)
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  return json.loads(r.read())
+
+          def read(path):
+              try:
+                  f = call(f'{API}/contents/{path}')
+                  return json.loads(base64.b64decode(f['content'])), f['sha']
+              except urllib.error.HTTPError as e:
+                  if e.code == 404: return None, None
+                  raise
+
+          try:
+              users = [u['name'] for u in call(f'{API}/contents/accounts') if u['type'] == 'dir']
+          except Exception as e:
+              print(f'❌ Cannot list accounts: {e}'); sys.exit(1)
+
+          stats = {}   # platform -> title_lower -> stat
+          def stat(plat, key, title):
+              d = stats.setdefault(plat, {})
+              return d.setdefault(key, {'title': title, 'compat': {'green': 0, 'amber': 0, 'red': 0},
+                                        'ratingSum': 0, 'ratingCount': 0})
+
+          for u in users:
+              compat, _ = read(f'accounts/{u}/compatibility.json')
+              for k, v in (compat or {}).items():
+                  plat, _, title = k.partition('|')
+                  if v in ('green', 'amber', 'red') and plat and title:
+                      stat(plat, title, title)['compat'][v] += 1
+              reviews, _ = read(f'accounts/{u}/reviews.json')
+              for k, v in (reviews or {}).items():
+                  plat, _, title = k.partition('|')
+                  try: stars = int(v.get('stars'))
+                  except Exception: continue
+                  if 1 <= stars <= 5 and plat and title:
+                      st = stat(plat, title, title); st['ratingSum'] += stars; st['ratingCount'] += 1
+
+          for plat, data in stats.items():
+              path = f'stats/popularity.{re.sub(r"[^A-Za-z0-9._+-]", "_", plat)}.json'
+              old, sha = read(path)
+              if old == data:
+                  print(f'= {path} unchanged'); continue
+              body = {'message': f'Aggregate stats: {plat}',
+                      'content': base64.b64encode(json.dumps(data, indent=2, sort_keys=True).encode()).decode()}
+              if sha: body['sha'] = sha
+              call(f'{API}/contents/{path}', 'PUT', body)
+              print(f'✅ wrote {path} ({len(data)} games)')
+          PYEOF
