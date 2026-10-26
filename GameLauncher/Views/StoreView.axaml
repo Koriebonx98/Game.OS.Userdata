@@ -101,7 +101,7 @@
             </Border.Background>
             <StackPanel Spacing="6">
                 <TextBlock Text="GAME.OS STORE" FontSize="10" FontWeight="Bold"
-                           Foreground="#c7d2fe" CharacterSpacing="1.4"/>
+                           Foreground="#c7d2fe"/>
                 <TextBlock Text="Find your next game" FontSize="22" FontWeight="Bold"
                            Foreground="White"/>
                 <TextBlock Text="Explore new releases, filter by genre or platform, and discover games for your library."
