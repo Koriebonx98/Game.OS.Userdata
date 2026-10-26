@@ -514,7 +514,8 @@
                 $('storePlatform').innerHTML = '<option value="">Select a platform…</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)}</option>`).join('');
             } catch (_) {}
             $('storePlatform').onchange = async () => {
-                storePlat = $('storePlatform').value; storeGames = []; storeCat = 'All';
+                storePlat = $('storePlatform').value; storeGames = [];
+                if (storeCat !== '__wishlist') storeCat = 'All';
                 if (!storePlat) { renderStore(); return; }
                 $('storeList').innerHTML = empty('Loading…');
                 try { storeGames = await fetchGamesDbPlatform(storePlat); } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }

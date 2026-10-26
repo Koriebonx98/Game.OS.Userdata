@@ -775,7 +775,7 @@
         }).join('');
     }
 
-    // ── Wishlist Tab ───────────────────────────────────────────
+    // ── Wishlist filter data ────────────────────────────────────
     async function refreshWishlist() {
         const user = getCurrentUser();
         if (!user) return;
@@ -792,49 +792,6 @@
             renderStoreChrome();
             applyStoreFilters();
         }
-    }
-
-    function renderWishlistGames() {
-        const listEl = document.getElementById('wishlistGamesList');
-        if (_myWishlist.length === 0) {
-            listEl.innerHTML = '<p class="games-list-empty">Your wishlist is empty. Browse games and click ☆ to add games you want!</p>';
-            return;
-        }
-
-        // Group by platform
-        const byPlatform = {};
-        _myWishlist.forEach(g => {
-            if (!byPlatform[g.platform]) byPlatform[g.platform] = [];
-            byPlatform[g.platform].push(g);
-        });
-
-        listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
-            const games      = byPlatform[plat];
-            const coverColor = getPlatformColor(plat);
-            const coverIcon  = getPlatformIcon(plat);
-            return `
-            <div class="owned-platform-group">
-                <h4 class="owned-platform-header">${escapeHtml(plat)} <span class="games-count-badge">${games.length}</span></h4>
-                ${games.map(g => {
-                    const coverUrl  = g.coverUrl || null;
-                    const coverHtml = coverUrl
-                        ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${escapeHtml(plat)}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${escapeHtml(g.title || '')}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
-                        : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
-                    return `
-                <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(plat)}', '${escapeHtml(String(g.titleId || ''))}')">
-                    ${coverHtml}
-                    <div class="games-browse-info">
-                        <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
-                        ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
-                    </div>
-                    <button class="btn-remove-game"
-                        onclick="event.stopPropagation(); handleRemoveWishlist('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
-                        🗑️ Remove
-                    </button>
-                </div>`;
-                }).join('')}
-            </div>`;
-        }).join('');
     }
 
     async function handleToggleWishlist(btn, gameJson, platform) {
@@ -873,29 +830,6 @@
         } catch (e) {
             btn.disabled = false;
             alert('Failed to update wishlist: ' + e.message);
-        }
-    }
-
-    async function handleRemoveWishlist(platform, title, btn) {
-        const user = getCurrentUser();
-        if (!user) return;
-        btn.disabled = true;
-        try {
-            if (MODE === 'demo') {
-                removeFromWishlistDemo(user.username, platform, title);
-            } else {
-                await removeFromWishlistGitHub(user.username, platform, title);
-            }
-            await refreshWishlist();
-            // Re-render browse so wishlist star badges update
-            if (_currentPlatform === 'ALL') {
-                applyStoreFilters();
-            } else if (_currentPlatform === platform && _allBrowseGames.length) {
-                applyStoreFilters();
-            }
-        } catch (e) {
-            btn.disabled = false;
-            alert('Failed to remove from wishlist: ' + e.message);
         }
     }
 
