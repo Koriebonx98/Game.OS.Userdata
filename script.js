@@ -4123,10 +4123,14 @@ function _adminModFieldHtml(name, url, genres, description) {
     return `<div class="admin-bg-field admin-mod-field" style="flex-wrap:wrap;">
         <input type="text" class="admin-form-input admin-mod-name" placeholder="Mod name" value="${n}" style="flex:1;">
         <input type="url"  class="admin-form-input admin-mod-url"  placeholder="Mod URL…" value="${u}" style="flex:2;">
-        <input type="text" class="admin-form-input admin-mod-genres" placeholder="Genres (comma separated)" value="${g}" style="flex:1;">
+        <input type="text" class="admin-form-input admin-mod-genres" list="adminModGenrePresets" placeholder="Mod genres, comma separated (HD Texture, Track, Character, Level, Recomp)" value="${g}" style="flex:1;">
         <button type="button" class="admin-btn-remove" onclick="this.parentNode.remove()" title="Remove">✕</button>
         <textarea class="admin-form-input admin-mod-desc" placeholder="Mod description" rows="2" style="flex-basis:100%;">${d}</textarea>
     </div>`;
+}
+
+function _adminModGenreDatalist() {
+    return `<datalist id="adminModGenrePresets">${MOD_GENRE_PRESETS.map(g => `<option value="${g}">`).join('')}</datalist>`;
 }
 
 function _adminAddModField() {
@@ -4380,7 +4384,7 @@ function openAdminEditModal(game, platform) {
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🧩 Mods</label>
-            <div id="adminModList">${modsHtml}</div>
+            <div id="adminModList">${modsHtml}</div>${_adminModGenreDatalist()}
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
         </div>
         <div class="admin-form-group">
@@ -4409,6 +4413,11 @@ function openAdminEditModal(game, platform) {
                 <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="${escapeHtml(specRec.ram || '')}">
                 <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="${escapeHtml(specRec.resolution || '')}">
             </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🎭 Genre <span style="font-size:.8em;opacity:.7;">(comma separated)</span></label>
+            <input type="text" id="editGenres" class="admin-form-input" list="adminGenrePresets" placeholder="Action, RPG…" value="${escapeHtml(getGameGenres(game).join(', '))}">
+            <datalist id="adminGenrePresets">${GAME_GENRE_PRESETS.map(g => `<option value="${g}">`).join('')}</datalist>
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🏆 Achievements JSON URL</label>
@@ -4528,6 +4537,7 @@ async function handleAdminEditSave() {
         : null;
 
     const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const genres = (((getField('editGenres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
     const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
     const steamAppId      = ((getField('editSteamAppId')      || {}).value || '').trim();
 
@@ -4553,7 +4563,7 @@ async function handleAdminEditSave() {
             // Build the updated entry once; send it to the backend and reuse for the cache
             updated = _buildUpdatedGameEntry(_currentModalGame, {
                 title, titleId, description, coverUrl, bgUrls, trailers,
-                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId, genres
             });
 
             const updateResp = await fetch(`${backendBase}/api/admin/update-game`, {
@@ -4617,7 +4627,7 @@ async function handleAdminEditSave() {
             // Merge form values over the CURRENT entry (preserves any fields not in the form)
             updated = _buildUpdatedGameEntry(gamesArr[idx], {
                 title, titleId, description, coverUrl, bgUrls, trailers,
-                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId
+                mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, steamAppId, genres
             });
             gamesArr[idx] = updated;
 
@@ -4858,7 +4868,7 @@ async function handleAdminDeleteGame() {
 function _buildUpdatedGameEntry(existing, fields) {
     const { title, titleId, description, coverUrl, bgUrls, trailers,
             mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl,
-            steamAppId } = fields;
+            steamAppId, genres } = fields;
     const updated = { ...existing };
 
     // Update title (preserve original field name)
@@ -4890,6 +4900,7 @@ function _buildUpdatedGameEntry(existing, fields) {
     else                       delete updated.sysSpecMin;
     if (sysSpecRecommended)    updated.sysSpecRecommended = sysSpecRecommended;
     else                       delete updated.sysSpecRecommended;
+    if (Array.isArray(genres)) { if (genres.length) updated.genres = genres; else { delete updated.genres; delete updated.Genres; delete updated.genre; delete updated.Genre; } }
     if (achievementsUrl)       updated.achievementsUrl    = achievementsUrl;
     else                       delete updated.achievementsUrl;
     if (exophaseUrl)           updated.exophaseUrl        = exophaseUrl;
@@ -5002,7 +5013,7 @@ function openAddPcGameModal(platform) {
         ${isPc ? `
         <div class="admin-form-group">
             <label class="admin-form-label">🧩 Mods</label>
-            <div id="adminModList">${_adminModFieldHtml('', '')}</div>
+            <div id="adminModList">${_adminModFieldHtml('', '')}</div>${_adminModGenreDatalist()}
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
         </div>
         <div class="admin-form-group">
@@ -5032,6 +5043,11 @@ function openAddPcGameModal(platform) {
                 <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="">
             </div>
         </div>` : ''}
+        <div class="admin-form-group">
+            <label class="admin-form-label">🎭 Genre <span style="font-size:.8em;opacity:.7;">(comma separated)</span></label>
+            <input type="text" id="editGenres" class="admin-form-input" list="adminGenrePresets" placeholder="Action, RPG…" value="">
+            <datalist id="adminGenrePresets">${GAME_GENRE_PRESETS.map(g => `<option value="${g}">`).join('')}</datalist>
+        </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🏆 Achievements JSON URL</label>
             <input type="url" id="editAchievementsUrl" class="admin-form-input" placeholder="https://…/achievements.json" value="">
@@ -5129,6 +5145,7 @@ async function handleAddPcGameToDb() {
         : null;
 
     const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const genres = (((getField('editGenres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
     const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
@@ -5144,6 +5161,7 @@ async function handleAddPcGameToDb() {
     if (stores.length)      newGame.stores             = stores;
     if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
     if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
+    if (genres.length)      newGame.genres             = genres;
     if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
     if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
@@ -5383,7 +5401,7 @@ function openAddSteamGameModal() {
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🧩 Mods</label>
-            <div id="adminModList">${_adminModFieldHtml('', '')}</div>
+            <div id="adminModList">${_adminModFieldHtml('', '')}</div>${_adminModGenreDatalist()}
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
         </div>
         <div class="admin-form-group">
@@ -5412,6 +5430,11 @@ function openAddSteamGameModal() {
                 <input type="text" id="editSpecRecRam" class="admin-form-input" placeholder="RAM" value="">
                 <input type="text" id="editSpecRecRes" class="admin-form-input" placeholder="Resolution" value="">
             </div>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🎭 Genre <span style="font-size:.8em;opacity:.7;">(comma separated)</span></label>
+            <input type="text" id="editGenres" class="admin-form-input" list="adminGenrePresets" placeholder="Action, RPG…" value="">
+            <datalist id="adminGenrePresets">${GAME_GENRE_PRESETS.map(g => `<option value="${g}">`).join('')}</datalist>
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🏆 Achievements JSON URL</label>
@@ -5661,6 +5684,7 @@ async function handleAddSteamGameToDb() {
         : null;
 
     const achievementsUrl = ((getField('editAchievementsUrl') || {}).value || '').trim();
+    const genres = (((getField('editGenres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
     const exophaseUrl     = ((getField('editExophaseUrl')     || {}).value || '').trim();
 
     if (!title) { showMsg('❌ Title is required.', 'error'); return; }
@@ -5677,6 +5701,7 @@ async function handleAddSteamGameToDb() {
     if (stores.length)      newGame.stores             = stores;
     if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
     if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
+    if (genres.length)      newGame.genres             = genres;
     if (achievementsUrl)    newGame.achievementsUrl    = achievementsUrl;
     if (exophaseUrl)        newGame.exophaseUrl        = exophaseUrl;
 
@@ -5766,7 +5791,7 @@ async function handleAddSteamGameToDb() {
                 // Merge curated form data onto the existing Steam catalogue entry
                 gamesArr[existingIdx] = _buildUpdatedGameEntry(gamesArr[existingIdx], {
                     title, titleId, description, coverUrl, bgUrls, trailers,
-                    mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl
+                    mods, stores, sysSpecMin, sysSpecRecommended, achievementsUrl, exophaseUrl, genres
                 });
             } else {
                 gamesArr.push(newGame);
@@ -6355,7 +6380,7 @@ function closeGameModal() {
 
 function _buildGameModalFields(game) {
     const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
-        'mods', 'stores', 'categories', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
+        'mods', 'stores', 'categories', 'genres', 'compatibility', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -6451,7 +6476,26 @@ if (typeof window !== 'undefined') {
 // ============================================================
 
 /** Preset "Features" filters offered by the store. */
-const STORE_FEATURES = ['Exclusive', 'Mods', 'Achievements', 'Free', 'Coming Soon'];
+const STORE_FEATURES = ['Exclusive', 'Mods', 'Achievements', 'Free', 'Coming Soon', 'Recomp'];
+
+/** Preset mod genres and game genres offered to admins. */
+const MOD_GENRE_PRESETS = ['HD Texture', 'Track', 'Character', 'Level', 'Recomp'];
+const GAME_GENRE_PRESETS = ['Action', 'Adventure', 'RPG', 'Shooter', 'Platformer', 'Racing', 'Sports', 'Fighting', 'Puzzle', 'Strategy', 'Simulation', 'Horror', 'Indie'];
+
+/** Admin-defined extra feature filters (matched against game categories / mod genres). */
+function getCustomFeatures() {
+    try { return JSON.parse(localStorage.getItem('gameOS_customFeatures') || '[]').filter(x => typeof x === 'string' && x); }
+    catch (_) { return []; }
+}
+function addCustomFeature(name) {
+    name = String(name || '').trim().slice(0, 40);
+    if (!name) return false;
+    const all = getStoreFeatures();
+    if (all.some(f => f.toLowerCase() === name.toLowerCase())) return false;
+    localStorage.setItem('gameOS_customFeatures', JSON.stringify([...getCustomFeatures(), name]));
+    return true;
+}
+function getStoreFeatures() { return [...STORE_FEATURES, ...getCustomFeatures()]; }
 
 const _gameName = g => (g && (g.Title || g.game_name || g.title)) || '';
 
@@ -6480,7 +6524,8 @@ function gameHasFeature(game, feature) {
     if (f === 'achievements') return !!(game.achievementsUrl || game.exophaseUrl || game.steamAppId ||
         (Array.isArray(game.achievements) && game.achievements.length));
     if (f === 'free') return cats.includes('free') || game.free === true || game.is_free === true;
-    return cats.includes(f);
+    if (f === 'recomp' && getGameModGenres(game).some(x => x.toLowerCase() === 'recomp')) return true;
+    return cats.includes(f) || getGameModGenres(game).some(x => x.toLowerCase() === f);
 }
 
 /**
@@ -6556,19 +6601,31 @@ async function saveRecommendations(username, list) {
  * ranked by overlap with the genres / platforms of the owned games.
  * catalog: { platform: [game] }; skipped: { platform: [{title}] }
  */
+/** Series key: explicit game.series, else title before ':' / ' - ' minus trailing number/roman numeral. */
+function getGameSeries(game) {
+    const explicit = game && (game.series || game.Series);
+    let t = String(explicit || _gameName(game) || '').toLowerCase();
+    if (!explicit) t = t.split(/\s*[:\u2013-]\s+/)[0].replace(/\s+(\d+|[ivx]{1,5})$/i, '');
+    t = t.replace(/[^a-z0-9 ]/g, '').trim();
+    return t.length >= 3 ? t : '';
+}
+
 function buildRecommendations(catalog, library, skipped, count, perPlatform) {
     count = count || 10;
     const key = (p, t) => p + '|' + String(t).toLowerCase();
     const excluded = new Set();
     (library || []).forEach(o => excluded.add(key(o.platform, o.title || '')));
     Object.entries(skipped || {}).forEach(([p, l]) => (l || []).forEach(s => excluded.add(key(p, s.title || ''))));
-    const genreScore = {}, platScore = {};
+    const genreScore = {}, platScore = {}, seriesScore = {};
     const ownedGenres = (o) => {
         const g = (catalog[o.platform] || []).find(x => _gameName(x).toLowerCase() === (o.title || '').toLowerCase());
         return g ? getGameGenres(g) : (Array.isArray(o.genres) ? o.genres : []);
     };
     (library || []).forEach(o => {
         platScore[o.platform] = (platScore[o.platform] || 0) + 1;
+        const og = (catalog[o.platform] || []).find(x => _gameName(x).toLowerCase() === (o.title || '').toLowerCase());
+        const sk = getGameSeries(og || { title: o.title });
+        if (sk) seriesScore[sk] = (seriesScore[sk] || 0) + 1;
         ownedGenres(o).forEach(x => { genreScore[x.toLowerCase()] = (genreScore[x.toLowerCase()] || 0) + 1; });
     });
     const scored = [];
@@ -6577,6 +6634,7 @@ function buildRecommendations(catalog, library, skipped, count, perPlatform) {
         if (!t || excluded.has(key(p, t))) return;
         let s = (platScore[p] || 0) * 0.5 + (g.image || g.cover_url ? 0.5 : 0);
         getGameGenres(g).forEach(x => { s += genreScore[x.toLowerCase()] || 0; });
+        s += (seriesScore[getGameSeries(g)] || 0) * 3;
         scored.push({ s, p, g, t });
     }));
     scored.sort((a, b) => b.s - a.s || _randKey(a.t) - _randKey(b.t));
@@ -6595,6 +6653,11 @@ function buildRecommendations(catalog, library, skipped, count, perPlatform) {
 
 if (typeof window !== 'undefined') {
     window.STORE_FEATURES = STORE_FEATURES;
+    window.getStoreFeatures = getStoreFeatures;
+    window.addCustomFeature = addCustomFeature;
+    window.MOD_GENRE_PRESETS = MOD_GENRE_PRESETS;
+    window.getCompatibility = getCompatibility;
+    window.voteCompatibility = voteCompatibility;
     window.getGameGenres = getGameGenres;
     window.getGameModGenres = getGameModGenres;
     window.gameHasFeature = gameHasFeature;
@@ -6604,6 +6667,68 @@ if (typeof window !== 'undefined') {
     window.getRecommendations = getRecommendations;
     window.saveRecommendations = saveRecommendations;
     window.buildRecommendations = buildRecommendations;
+    window.getGameSeries = getGameSeries;
+}
+
+// ── Compatibility votes (do ROMs work?) ─────────────────────
+const COMPAT_OPTIONS = {
+    green: { label: 'Playable', icon: '🟢' },
+    amber: { label: 'In Game',  icon: '🟠' },
+    red:   { label: 'No Boot',  icon: '🔴' }
+};
+const _compatKey = (platform, title) => String(platform) + '|' + String(title).toLowerCase();
+
+/** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
+async function getCompatibility(username) {
+    if (MODE === 'demo') {
+        try { return JSON.parse(localStorage.getItem(`gameOS_compat_${username.toLowerCase()}`) || '{}'); }
+        catch (_) { return {}; }
+    }
+    const file = await githubRead(`accounts/${username.toLowerCase()}/compatibility.json`);
+    return file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
+}
+
+async function voteCompatibility(username, platform, title, rating) {
+    if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
+    if (MODE === 'demo') {
+        const all = await getCompatibility(username);
+        all[_compatKey(platform, title)] = rating;
+        localStorage.setItem(`gameOS_compat_${username.toLowerCase()}`, JSON.stringify(all));
+        return;
+    }
+    const path = `accounts/${username.toLowerCase()}/compatibility.json`;
+    const file = await githubRead(path);
+    const all = file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
+    all[_compatKey(platform, title)] = rating;
+    await githubWrite(path, all, `Compatibility vote: ${title} (${platform})`, file ? file.sha : undefined);
+}
+
+function _buildCompatSection(game, platform) {
+    const title = _gameName(game);
+    const totals = game && game.compatibility && typeof game.compatibility === 'object' ? game.compatibility : {};
+    const btns = Object.entries(COMPAT_OPTIONS).map(([k, o]) =>
+        `<button type="button" class="btn btn-secondary compat-btn compat-${k}" data-compat="${k}">${o.icon} ${o.label}${totals[k] ? ` (${Number(totals[k]) || 0})` : ''}</button>`).join('');
+    return `<div class="game-modal-section compat-section" data-compat-title="${escapeHtml(title)}" data-compat-platform="${escapeHtml(platform || '')}">
+        <h4>🧪 Compatibility</h4>
+        <p style="font-size:.85em;opacity:.8;">Do the ROMs work? Vote: Green = Playable, Amber = In Game, Red = No Boot.</p>
+        <div class="compat-buttons">${btns}</div><div class="compat-status" style="font-size:.8em;margin-top:6px;"></div></div>`;
+}
+
+async function _initCompatSection() {
+    const sec = document.querySelector('.compat-section');
+    if (!sec) return;
+    const status = sec.querySelector('.compat-status');
+    const user = getCurrentUser();
+    const key = _compatKey(sec.dataset.compatPlatform, sec.dataset.compatTitle);
+    const mark = r => sec.querySelectorAll('[data-compat]').forEach(b => b.classList.toggle('compat-selected', b.dataset.compat === r));
+    if (!user) { status.textContent = 'Log in to vote.'; sec.querySelectorAll('[data-compat]').forEach(b => b.disabled = true); return; }
+    try { const mine = (await getCompatibility(user.username))[key]; if (mine) { mark(mine); status.textContent = 'Your vote: ' + COMPAT_OPTIONS[mine].label; } } catch (_) {}
+    sec.querySelectorAll('[data-compat]').forEach(b => b.onclick = async () => {
+        try {
+            await voteCompatibility(user.username, sec.dataset.compatPlatform, sec.dataset.compatTitle, b.dataset.compat);
+            mark(b.dataset.compat); status.textContent = 'Your vote: ' + COMPAT_OPTIONS[b.dataset.compat].label;
+        } catch (_) { status.textContent = 'Could not save vote.'; }
+    });
 }
 
 /** Render a mods section (like achievements) from game.mods array of { name, url, genres } objects. */
@@ -7014,6 +7139,7 @@ function openGameModal(game, platform) {
     bodyHtml += _buildFriendsSection(libs, platform, title);
     bodyHtml += _buildStoresSection(game);
     bodyHtml += _buildModsSection(game);
+    bodyHtml += _buildCompatSection(game, platform);
     bodyHtml += _buildSystemSpecsSection(game);
     bodyHtml += _buildAchievementsSection(game);
     if (bgUrls.length > 0) {
@@ -7025,6 +7151,7 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalBody').innerHTML = bodyHtml;
     modal.style.display = 'flex';
     _loadAchievementsInModal();
+    _initCompatSection();
 }
 
 async function openGameModalFromLibrary(title, platform, titleId) {

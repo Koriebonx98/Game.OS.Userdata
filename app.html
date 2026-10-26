@@ -73,6 +73,7 @@
             <div id="adminTools" class="app-filters" hidden>
                 <button class="btn app-more" id="admAddGame">➕ Add game</button>
                 <button class="btn app-more" id="admAddSteam">🎮 Add Steam game</button>
+                <button class="btn app-more" id="admAddFeature">🏷️ Add filter preset</button>
                 <button class="btn app-more" id="admAddPlat">🖥️ Add platform</button>
             </div>
             <input id="storeSearch" class="app-search" type="search" placeholder="Search the store…">
@@ -490,6 +491,7 @@
             $('adminTools').hidden = false;
             $('admAddGame').onclick = () => storeF.platforms.size === 1 ? openAddPcGameModal([...storeF.platforms][0]) : alert('Tick exactly one platform first.');
             $('admAddSteam').onclick = () => openAddSteamGameModal();
+            $('admAddFeature').onclick = () => { const n = prompt('New feature filter name (matches game categories / mod genres):'); if (n && addCustomFeature(n)) renderStore(); };
             $('admAddPlat').onclick = async () => {
                 const name = (prompt('New platform name (e.g. Sega Saturn):') || '').trim();
                 if (!name) return;
@@ -620,7 +622,7 @@
             if (!$('storeFilters').contains(document.activeElement)) $('storeFilters').innerHTML =
                 `<details class="store-filter-group"><summary>Platform</summary><div class="store-filter-options">${plats.map(p => cb('platforms', p, p)).join('')}</div></details>` +
                 `<details class="store-filter-group"><summary>Genre</summary><div class="store-filter-options">${genres.length ? genres.map(x => cb('genres', x, x)).join('') : '<small>No genre data yet.</small>'}</div></details>` +
-                `<details class="store-filter-group" open><summary>Features</summary><div class="store-filter-options">${STORE_FEATURES.map(f => cb('features', f, f)).join('')}${cb('features', '__wishlist', '⭐ Wishlist')}</div></details>`;
+                `<details class="store-filter-group" open><summary>Features</summary><div class="store-filter-options">${getStoreFeatures().map(f => cb('features', f, f)).join('')}${cb('features', '__wishlist', '⭐ Wishlist')}</div></details>`;
             const owned = new Set(library.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
             const wishlisted = new Set(storeWishlist.map(g => g.platform + '|' + (g.title || '').toLowerCase()));
             const filtered = !!(term || storeF.platforms.size || storeF.genres.size || storeF.features.size);

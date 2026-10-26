@@ -484,7 +484,7 @@
         document.getElementById('filterGenres').innerHTML = genres.length
             ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
             : '<small style="color:#64748b;">No genre data available yet.</small>';
-        const feat = window.STORE_FEATURES.map(f => _checkbox('features', f, ({ Exclusive: '⭐ ', Mods: '🧩 ', Achievements: '🏆 ', Free: '🆓 ', 'Coming Soon': '⏳ ' }[f] || '') + f)).join('') +
+        const feat = window.getStoreFeatures().map(f => _checkbox('features', f, ({ Exclusive: '⭐ ', Mods: '🧩 ', Achievements: '🏆 ', Free: '🆓 ', 'Coming Soon': '⏳ ', Recomp: '🔧 ' }[f] || '') + f)).join('') +
             (_isLoggedIn ? _checkbox('features', '__wishlist', '⭐ Wishlist') : '') +
             (modGenres.size ? `<div class="store-mod-genres"><small>Mod types: ${[...modGenres].map(escapeHtml).join(', ')}</small></div>` : '');
         document.getElementById('filterFeatures').innerHTML = feat;
