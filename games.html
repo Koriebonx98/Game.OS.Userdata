@@ -85,10 +85,10 @@
 
                 <!-- Preset filters: Platform / Genre / Features (all games load by default; filters narrow them) -->
                 <div class="store-filter-panel" id="storeFilterPanel">
-                    <label class="store-filter-sort">Platform: <select id="filterPlatforms" class="games-select"></select></label>
+                    <details class="store-filter-group"><summary>Platform</summary><div id="filterPlatforms" class="store-filter-options"></div></details>
                     <details class="store-filter-group"><summary>Genre</summary><div id="filterGenres" class="store-filter-options"></div></details>
                     <details class="store-filter-group" open><summary>Features</summary><div id="filterFeatures" class="store-filter-options"></div></details>
-                    <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
+                    <label class="store-filter-sort">Sort: <select id="storeSort" class="games-select"><option value="random">Random</option><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
                     <button type="button" class="btn btn-secondary" id="storeClearFilters">Clear filters</button>
                 </div>
 
@@ -478,10 +478,9 @@
         const modGenres = new Set();
         platforms.forEach(p => _allPlatformGames[p].forEach(g => window.getGameModGenres(g).forEach(x => modGenres.add(x))));
 
-        const platSel = document.getElementById('filterPlatforms');
         const curPlat = [..._filters.platforms][0] || '';
-        platSel.innerHTML = '<option value="">All platforms</option>' +
-            platforms.map(p => `<option value="${escapeHtml(p)}" ${p === curPlat ? 'selected' : ''}>${escapeHtml(p)} (${_allPlatformGames[p].length})</option>`).join('');
+        document.getElementById('filterPlatforms').innerHTML =
+            platforms.map(p => _checkbox('platforms', p, p, _allPlatformGames[p].length)).join('');
         document.getElementById('filterGenres').innerHTML = genres.length
             ? genres.map(x => _checkbox('genres', x, x, genreCounts[x])).join('')
             : '<small style="color:#64748b;">No genre data available yet.</small>';
@@ -527,6 +526,22 @@
             (items.length ? items.join('') : `<p class="store-shelf-empty" style="color:#64748b;margin:8px 0;">${emptyText}</p>`) +
             '</div></div>';
     }
+    /** Recommendations interleaved round-robin across platforms: [[rec, index]]. */
+    function _mixedRecs() {
+        const buckets = {};
+        _recommended.forEach((r, i) => { (buckets[r.platform] = buckets[r.platform] || []).push([r, i]); });
+        const lists = Object.keys(buckets).sort().map(k => buckets[k]);
+        const out = [];
+        for (let i = 0; lists.some(l => i < l.length); i++) lists.forEach(l => { if (l[i]) out.push(l[i]); });
+        return out;
+    }
+    const _STORE_BROWSE_IDS = ['browseSearchRow', 'storeFilterPanel', 'storeAllHeading', 'browseCount', 'browseGamesList'];
+    function _setShowAllRecs(on) {
+        _showAllRecs = on;
+        _STORE_BROWSE_IDS.forEach(id => { const n = document.getElementById(id); if (n) n.style.display = on ? 'none' : ''; });
+        renderShelves();
+        if (on) window.scrollTo(0, 0);
+    }
     function renderShelves() {
         const el = document.getElementById('storeShelves');
         // Shelves are shown on the default (unfiltered) view only, like a storefront home page
@@ -534,16 +549,22 @@
         let html = '';
         if (_isLoggedIn) {
             // Mixed platforms: first 5 per platform (interleaved); "Show all" reveals the rest
+            const mixed = _mixedRecs();
+            if (_showAllRecs) {
+                el.innerHTML = `<div class="store-shelf"><h3>🎯 All recommended games</h3>
+                    <div style="margin:0 0 10px;"><button type="button" class="btn btn-secondary" onclick="_setShowAllRecs(false)">← Back to store</button></div>
+                    <div class="store-shelf-row" style="flex-wrap:wrap;">${mixed.length ? mixed.map(([r, i]) => _recCard(r, i)).join('') : '<p class="store-shelf-empty" style="color:#64748b;">No recommendations yet.</p>'}</div></div>`;
+                return;
+            }
             const shownCount = {};
-            const visible = _recommended.map((r, i) => [r, i]).filter(([r]) => {
-                if (_showAllRecs) return true;
+            const visible = mixed.filter(([r]) => {
                 shownCount[r.platform] = (shownCount[r.platform] || 0) + 1;
                 return shownCount[r.platform] <= _REC_PER_PLATFORM;
             });
             html += _shelfHtml('🎯 Recommended for you', visible.map(([r, i]) => _recCard(r, i)),
                 'No recommendations yet – add games to your library or wishlist to get picks.');
-            if (_recommended.length > visible.length || _showAllRecs) {
-                html += `<div style="margin:-6px 0 14px;"><button type="button" class="btn btn-secondary" onclick="_showAllRecs = !_showAllRecs; renderShelves();">${_showAllRecs ? 'Show fewer' : 'Show all'}</button></div>`;
+            if (mixed.length) {
+                html += `<div style="margin:-6px 0 14px;"><button type="button" class="btn btn-secondary" onclick="_setShowAllRecs(true)">All (${mixed.length})</button></div>`;
             }
         }
         const shelfDefs = [['new', '🆕 New', 'No new games right now.'], ['updated', '🔄 Updated', 'No recently updated games.'],
@@ -652,12 +673,6 @@
         const title = (game.Title || game.game_name || game.title || '').toLowerCase();
         return _myWishlist.some(w => w.platform === platform && (w.title || '').toLowerCase() === title);
     }
-    document.getElementById('filterPlatforms').addEventListener('change', e => {
-        _filters.platforms.clear();
-        if (e.target.value) _filters.platforms.add(e.target.value);
-        renderStoreChrome();
-        applyStoreFilters();
-    });
     document.getElementById('storeFilterPanel').addEventListener('change', e => {
         const cb = e.target.closest('input[type=checkbox][data-group]'); if (!cb) return;
         const set = _filters[cb.dataset.group];

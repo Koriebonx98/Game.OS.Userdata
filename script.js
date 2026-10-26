@@ -6373,17 +6373,25 @@ function _buildGameModalFields(game) {
 const STORE_CATEGORIES = ['New', 'Updated', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
 
 /** Normalise a game's categories into an array of strings. */
-function getGameCategories(game) {
+function _rawGameCategories(game) {
     const c = game && (game.categories || game.Categories);
     if (Array.isArray(c)) return c.map(x => String(x).trim()).filter(Boolean);
     if (typeof c === 'string') return c.split(',').map(x => x.trim()).filter(Boolean);
     return [];
 }
 
+/** Categories of a game; "Achievements" is added automatically when it has an achievements URL. */
+function getGameCategories(game) {
+    const out = _rawGameCategories(game);
+    if (game && (game.achievementsUrl || game.exophaseUrl) &&
+        !out.some(x => x.toLowerCase() === 'achievements')) out.push('Achievements');
+    return out;
+}
+
 function _adminCategoriesFieldHtml(game) {
-    const cur = getGameCategories(game).map(c => c.toLowerCase());
+    const cur = _rawGameCategories(game).map(c => c.toLowerCase());
     const known = STORE_CATEGORIES.map(c => c.toLowerCase());
-    const custom = getGameCategories(game).filter(c => !known.includes(c.toLowerCase())).join(', ');
+    const custom = _rawGameCategories(game).filter(c => !known.includes(c.toLowerCase())).join(', ');
     const boxes = STORE_CATEGORIES.map(c =>
         `<label style="margin-right:12px;"><input type="checkbox" class="admin-cat-check" value="${escapeHtml(c)}" ${cur.includes(c.toLowerCase()) ? 'checked' : ''}> ${escapeHtml(c)}</label>`).join('');
     return `<div id="adminCategories">${boxes}
@@ -6403,6 +6411,14 @@ function _adminReadCategories() {
 }
 
 /** Filter/sort games for the store. opts: { category, term, hasMods, sort } */
+const _RANDOM_SEED = Math.floor(Math.random() * 2147483647);
+/** Stable pseudo-random rank for a title (changes per page load, not per render). */
+function _randomRank(str) {
+    let h = _RANDOM_SEED;
+    for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 2654435761) >>> 0;
+    return h;
+}
+
 function storeFilterGames(games, opts) {
     opts = opts || {};
     const nm = g => (g.Title || g.game_name || g.title || '');
@@ -6420,6 +6436,7 @@ function storeFilterGames(games, opts) {
     });
     if (opts.sort === 'za') out = [...out].sort((a, b) => nm(b).localeCompare(nm(a)));
     else if (opts.sort === 'az') out = [...out].sort((a, b) => nm(a).localeCompare(nm(b)));
+    else out = [...out].sort((a, b) => _randomRank(nm(a)) - _randomRank(nm(b)));
     return out;
 }
 
@@ -6570,7 +6587,7 @@ function buildRecommendations(catalog, library, skipped, count, perPlatform) {
         getGameGenres(g).forEach(x => { s += genreScore[x.toLowerCase()] || 0; });
         scored.push({ s, p, g, t });
     }));
-    scored.sort((a, b) => b.s - a.s || a.t.localeCompare(b.t));
+    scored.sort((a, b) => b.s - a.s || _randomRank(a.t + a.p) - _randomRank(b.t + b.p));
     if (perPlatform) {
         // Mix of all platforms: top N per platform, interleaved round-robin
         const buckets = {};
