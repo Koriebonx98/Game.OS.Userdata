@@ -2381,6 +2381,10 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .mod-detail-name { margin: 0 0 6px; }
 .mod-detail-desc { margin: 0 0 10px; white-space: pre-wrap; opacity: .85; }
 /* Store redesign */
+.store-home-hero { display: flex; align-items: center; min-height: 150px; margin: 0 0 20px; padding: 24px 28px; border-radius: 16px; color: #fff; background: linear-gradient(115deg, #1e1b4b, #3730a3 62%, #2563eb); box-shadow: 0 10px 28px rgba(30, 27, 75, .2); }
+.store-home-hero h3 { margin: 7px 0 5px; color: inherit; font-size: 1.5rem; }
+.store-home-hero p { margin: 0; color: rgba(255,255,255,.82); }
+.store-home-eyebrow { color: #c7d2fe; font-size: .72rem; font-weight: 700; letter-spacing: .14em; }
 .store-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .store-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font: inherit; font-size: .9em; color: #334155; }
 .store-chip.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
@@ -2393,3 +2397,7 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 .store-card-cover img { width: 100%; height: 100%; object-fit: cover; }
 .store-card-title { padding: 6px 8px; font-size: .85em; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .store-badge { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .7em; background: #e0e7ff; color: #3730a3; margin-left: 4px; }
+@media (max-width: 600px) {
+    .store-home-hero { min-height: 120px; padding: 20px; }
+    .store-home-hero h3 { font-size: 1.25rem; }
+}
