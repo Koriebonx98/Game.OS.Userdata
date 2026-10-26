@@ -39,7 +39,9 @@
             <div class="app-filters">
                 <select id="libPlatform" aria-label="Platform"><option value="">All platforms</option></select>
                 <select id="libSort" aria-label="Sort">
-                    <option value="name">Name</option>
+                    <option value="name">A → Z</option>
+                    <option value="nameDesc">Z → A</option>
+                    <option value="random">Random</option>
                     <option value="playtime">Most playtime</option>
                     <option value="achievements">Most achievements</option>
                     <option value="recent">Recently added</option>
@@ -55,7 +57,6 @@
                 </select>
             </div>
             <div id="libCount" class="app-count"></div>
-            <div id="libGroups" class="app-chips"></div>
             <div id="libList" class="app-list"></div>
         </section>
         <section id="view-favourites" class="app-view" hidden>
@@ -69,6 +70,7 @@
                     <p>Discover games across platforms, save favorites to your wishlist, and build your library.</p>
                 </div>
             </div>
+            <div class="store-filter-bar"><select id="storeSort" aria-label="Sort"><option value="random">🎲 Random</option><option value="az">A → Z</option><option value="za">Z → A</option><option value="popular">🔥 Most Popular</option></select></div>
             <div id="storeFilters" class="store-filter-panel"></div>
             <div id="adminTools" class="app-filters" hidden>
                 <button class="btn app-more" id="admAddGame">➕ Add game</button>
@@ -237,6 +239,8 @@
             });
         }
 
+        const _rnd = new Map();
+        const libRand = g => { let v = _rnd.get(g); if (v === undefined) _rnd.set(g, v = Math.random()); return v; };
         let libPlatform = '', libSort = 'name', libShow = '';
         function fillPlatforms() {
             const sel = $('libPlatform'), cur = sel.value;
@@ -254,6 +258,8 @@
                     || (libShow === 'ach' && achOf(g) > 0) || (libShow === 'fav' && isFav(g))));
             const cmp = {
                 name: (a, b) => (a.title || '').localeCompare(b.title || ''),
+                nameDesc: (a, b) => (b.title || '').localeCompare(a.title || ''),
+                random: (a, b) => libRand(a) - libRand(b),
                 playtime: (a, b) => minutesOf(b) - minutesOf(a) || (a.title || '').localeCompare(b.title || ''),
                 achievements: (a, b) => achOf(b) - achOf(a) || (a.title || '').localeCompare(b.title || ''),
                 recent: (a, b) => (b.addedAt || '').localeCompare(a.addedAt || ''),
@@ -263,8 +269,6 @@
             if (libShow === 'recentPlayed') list = list.filter(g => !!g.lastPlayedAt);
             list.sort(cmp);
             $('libCount').textContent = list.length + ' game' + (list.length === 1 ? '' : 's') + ' · ⏱ ' + fmtPlaytime(list.reduce((n, g) => n + minutesOf(g), 0)) + ' · 🏆 ' + list.reduce((n, g) => n + achOf(g), 0);
-            const plats = [...new Set(library.map(g => g.platform).filter(Boolean))].sort();
-            $('libGroups').innerHTML = plats.length > 1 ? ['', ...plats].map(p => `<button class="app-chip ${p === libPlatform ? 'active' : ''}" data-plat="${esc(p)}">${p ? esc(p) : 'All'}</button>`).join('') : '';
             $('libList').innerHTML = list.length ? list.map(g =>
                 row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${isFav(g) ? '❤️' : '🤍'}</button><button class="app-fav app-del" data-p="${esc(g.platform)}" data-t="${esc(g.title)}" aria-label="Remove from library">🗑️</button>`)).join('') : empty('No games found.');
         }
@@ -527,6 +531,7 @@
                 renderStore();
             });
             $('storeSearch').addEventListener('input', renderStore);
+            $('storeSort').addEventListener('change', renderStore);
             $('storeShelves').addEventListener('click', e => { const t = e.target.closest('[data-rec-all]'); if (t) { storeShowAllRecs = t.dataset.recAll === '1'; renderStore(); return; } const r = e.target.closest('[data-rec]'); if (r) { answerStoreRec(+r.dataset.rec, r.dataset.ans); return; } const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, pf(og)); });
             $('storeList').addEventListener('click', async e => {
                 const ed = e.target.closest('[data-store-edit]');
@@ -646,22 +651,25 @@
                     const items = []; for (let i = 0; i < storeGames.length && items.length < 20; i++) if (fn(storeGames[i])) items.push(storeGames[i]);
                     return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(g => card(g)).join('')}</div></div>` : '';
                 }).join('');
-                const recActions = i => `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`;
-                if (storeRecs.length && storeShowAllRecs) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you <button type="button" class="btn btn-secondary store-rec-toggle" data-rec-all="0">‹ Back</button></h3><div class="store-card-grid">${storeRecs.map((r, i) => card(r.game, recActions(i))).join('')}</div></div>`;
-                else if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you <button type="button" class="btn btn-secondary store-rec-toggle" data-rec-all="1">All</button></h3><div class="store-shelf-row">${storeRecs.map((r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`)).join('')}</div></div>`;
+                if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">${storeRecs.map(r => card(r.game)).join('')}</div></div>`;
             }
             $('storeShelves').innerHTML = shelves;
             const feats = [...storeF.features].filter(f => f !== '__wishlist' && f !== '__popular');
             const hits = [];
-            for (let i = 0; i < storeGames.length && hits.length < 100; i++) {
+            for (let i = 0; i < storeGames.length; i++) {
                 const g = storeGames[i], t = gTitle(g), p = pf(g);
                 if (t && (!storeF.platforms.size || storeF.platforms.has(p)) &&
                     (!storeF.features.has('__wishlist') || wishlisted.has(p + '|' + t.toLowerCase())) &&
                     (!term || t.toLowerCase().includes(term)) &&
                     storeApplyFilters([g], { genres: [...storeF.genres], modGenres: [...storeF.modGenres], features: feats }).length) hits.push(i);
             }
-            if (storeF.features.has('__popular')) hits.sort((x, y) => getPopularityScore(storeGames[y], pf(storeGames[y])) - getPopularityScore(storeGames[x], pf(storeGames[x])));
-            $('storeCount').textContent = hits.length === 100 ? 'Showing first 100 of ' + storeGames.length + ' — use filters or search to find more' : hits.length + ' games';
+            const sortMode = $('storeSort').value, total = hits.length;
+            if (sortMode === 'za') hits.sort((x, y) => gTitle(storeGames[y]).localeCompare(gTitle(storeGames[x])));
+            else if (sortMode === 'az') hits.sort((x, y) => gTitle(storeGames[x]).localeCompare(gTitle(storeGames[y])));
+            else if (sortMode === 'random') hits.sort((x, y) => libRand(storeGames[x]) - libRand(storeGames[y]));
+            else if (sortMode === 'popular' || storeF.features.has('__popular')) hits.sort((x, y) => getPopularityScore(storeGames[y], pf(storeGames[y])) - getPopularityScore(storeGames[x], pf(storeGames[x])));
+            hits.length = Math.min(hits.length, 100);
+            $('storeCount').textContent = total > 100 ? 'Showing first 100 of ' + total + ' — use filters or search to find more' : total + ' games';
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), p = pf(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(p))}</span>`;
@@ -881,7 +889,6 @@
                 renderSettingsNotifications();
                 subscribePush();
             };
-            $('libGroups').addEventListener('click', e => { const c = e.target.closest('[data-plat]'); if (c) { $('libPlatform').value = c.dataset.plat; renderLibrary(); } });
             $('achSheetClose').onclick = () => { $('achSheet').hidden = true; };
             $('achSheet').addEventListener('click', e => { if (e.target === $('achSheet')) $('achSheet').hidden = true; });
             document.addEventListener('click', e => { const r = e.target.closest('.app-friend-row'); if (r) { e.stopPropagation(); openFriend(r.dataset.fr); } }, true);
