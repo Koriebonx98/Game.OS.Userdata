@@ -369,6 +369,7 @@
                 <button class="btn app-more" id="detailFull">ℹ️ Full game info (description, trailer, screenshots)</button>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">🧩 Mods</h2><div id="detailMods" class="mod-list"></div>
+                <div id="detailCompat"></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
@@ -390,12 +391,19 @@
                     $('achSheet').hidden = false;
                 };
             }
+            let dbGame = null;
             try {
                 const dbGames = typeof fetchGamesDbPlatform === 'function' ? await fetchGamesDbPlatform(g.platform) : [];
-                const dbg = dbGames.find(x => (x.Title || x.game_name || x.title || '').toLowerCase() === (g.title || '').toLowerCase());
-                const html = dbg ? _buildModsSection(dbg) : '';
+                dbGame = dbGames.find(x => (x.Title || x.game_name || x.title || '').toLowerCase() === (g.title || '').toLowerCase());
+                const html = dbGame ? _buildModsSection(dbGame) : '';
                 if (!$('gameDetail').hidden) $('detailMods').innerHTML = html ? html.replace(/^[\s\S]*?<div class="mod-list">/, '').replace(/<\/div>\s*<\/div>\s*$/, '') : empty('No mods listed for this game.');
             } catch (_) { $('detailMods').innerHTML = empty('No mods listed for this game.'); }
+            try {
+                await loadGameStats([g.platform]);
+                if ($('gameDetail').hidden) return;
+                $('detailCompat').innerHTML = _buildCompatSection(dbGame || g, g.platform);
+                _initCompatSection($('detailBody'));
+            } catch (_) {}
             if (!friendsLoaded) await loadFriends();
             const owners = friends.filter(f => (friendLibs[f] || []).some(x => (x.title || '').toLowerCase() === (g.title || '').toLowerCase() && (!x.platform || !g.platform || x.platform === g.platform)));
             if ($('gameDetail').hidden) return;

@@ -6860,15 +6860,15 @@ function _buildCompatSection(game, platform) {
         <div class="compat-status" style="font-size:.8em;margin-top:6px;"></div></div>`;
 }
 
-async function _initCompatSection() {
-    const sec = document.querySelector('.compat-section');
+async function _initCompatSection(root = document) {
+    const sec = root.querySelector('.compat-section');
     if (!sec) return;
     const status = sec.querySelector('.compat-status');
     const voteBox = sec.querySelector('.compat-vote');
     const platform = sec.dataset.compatPlatform, title = sec.dataset.compatTitle;
     const user = getCurrentUser();
     const key = _compatKey(platform, title);
-    const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml(_currentModalGame || { title }, platform); };
+    const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml({ title }, platform); };
     const voted = r => { voteBox.style.display = 'none'; status.textContent = 'You voted: ' + COMPAT_OPTIONS[r].label; };
     if (!user) { status.textContent = 'Log in to vote.'; sec.querySelectorAll('[data-compat]').forEach(b => b.disabled = true); return; }
     try { const mine = (await getCompatibility(user.username))[key]; if (mine) voted(mine); } catch (_) {}
@@ -7305,7 +7305,7 @@ function openGameModal(game, platform) {
     document.getElementById('gameModalBody').innerHTML = bodyHtml;
     modal.style.display = 'flex';
     _loadAchievementsInModal();
-    _initCompatSection();
+    _initCompatSection(document.getElementById('gameModalBody'));
     _initReviewBox();
 }
 
@@ -7372,7 +7372,7 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
         document.getElementById('gameModalBody').innerHTML = bodyHtml;
         _loadAchievementsInModal();
-        _initCompatSection();
+        _initCompatSection(document.getElementById('gameModalBody'));
         _initReviewBox();
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =
