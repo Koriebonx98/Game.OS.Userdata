@@ -71,6 +71,8 @@
                 <button class="btn app-more" id="admAddPlat">🖥️ Add platform</button>
             </div>
             <input id="storeSearch" class="app-search" type="search" placeholder="Search the store…">
+            <div id="storeShelves"></div>
+            <div id="storeChips" class="store-chips"></div>
             <div id="storeCount" class="app-count"></div>
             <div id="storeList" class="app-list"></div>
         </section>
@@ -473,7 +475,7 @@
             }).join('') : empty('No achievements to compare.'));
         }
         // ── Store (browse Games.Database and add to library) ──
-        let storeGames = [], storePlat = '';
+        let storeGames = [], storePlat = '', storeCat = 'All';
         const gTitle = g => g.Title || g.game_name || g.title || '';
         function initAdminTools() {
             if (!isAdminUser()) return;
@@ -509,6 +511,8 @@
                 renderStore();
             };
             $('storeSearch').addEventListener('input', renderStore);
+            $('storeChips').addEventListener('click', e => { const b = e.target.closest('[data-store-cat]'); if (b) { storeCat = b.dataset.storeCat; renderStore(); } });
+            $('storeShelves').addEventListener('click', e => { const o = e.target.closest('[data-store-open]'); const og = o && storeGames[+o.dataset.storeOpen]; if (og) openGameModal(og, storePlat); });
             $('storeList').addEventListener('click', async e => {
                 const ed = e.target.closest('[data-store-edit]');
                 if (ed) { const g = storeGames[+ed.dataset.storeEdit]; if (g) openAdminEditModal(g, storePlat); return; }
@@ -558,12 +562,23 @@
         }
         function renderStore() {
             const term = $('storeSearch').value.trim().toLowerCase();
-            if (!storePlat) { $('storeCount').textContent = ''; $('storeList').innerHTML = empty('Pick a platform to browse games.'); return; }
+            if (!storePlat) { $('storeCount').textContent = ''; $('storeChips').innerHTML = ''; $('storeShelves').innerHTML = ''; $('storeList').innerHTML = empty('Pick a platform to browse games.'); return; }
+            const counts = {}, known = [...STORE_CATEGORIES];
+            let modCount = 0;
+            storeGames.forEach(g => { if (Array.isArray(g.mods) && g.mods.length) modCount++; getGameCategories(g).forEach(c => { const k = c.toLowerCase(); counts[k] = (counts[k] || 0) + 1; if (!known.some(x => x.toLowerCase() === k)) known.push(c); }); });
+            if (storeCat !== 'All' && storeCat !== '__mods' && !counts[storeCat.toLowerCase()]) storeCat = 'All';
+            $('storeChips').innerHTML = [['All', 'All'], ...known.filter(c => counts[c.toLowerCase()]).map(c => [c, c + ' (' + counts[c.toLowerCase()] + ')']), ...(modCount ? [['__mods', '🧩 Has mods (' + modCount + ')']] : [])]
+                .map(([v, l]) => `<button type="button" class="store-chip ${v === storeCat ? 'active' : ''}" data-store-cat="${esc(v)}">${esc(l)}</button>`).join('');
+            $('storeShelves').innerHTML = (storeCat === 'All' && !term) ? ['New', 'Exclusive'].map(cat => {
+                const idx = []; for (let i = 0; i < storeGames.length && idx.length < 20; i++) if (getGameCategories(storeGames[i]).some(c => c.toLowerCase() === cat.toLowerCase())) idx.push(i);
+                if (!idx.length) return '';
+                return `<div class="store-shelf"><h3>${cat === 'New' ? '🆕 New' : '⭐ Exclusives'}</h3><div class="store-shelf-row">` + idx.map(i => { const g = storeGames[i], c = getGameCoverUrl(g); return `<div class="store-card" data-store-open="${i}"><div class="store-card-cover">${c ? `<img src="${esc(c)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div><div class="store-card-title">${esc(gTitle(g))}</div></div>`; }).join('') + '</div></div>';
+            }).join('') : '';
             const owned = new Set(library.filter(g => g.platform === storePlat).map(g => (g.title || '').toLowerCase()));
             const hits = [];
             for (let i = 0; i < storeGames.length && hits.length < 100; i++) {
                 const t = gTitle(storeGames[i]);
-                if (t && (!term || t.toLowerCase().includes(term))) hits.push(i);
+                if (t && (!term || t.toLowerCase().includes(term)) && storeFilterGames([storeGames[i]], { category: storeCat === '__mods' ? 'All' : storeCat, hasMods: storeCat === '__mods' }).length) hits.push(i);
             }
             $('storeCount').textContent = term ? hits.length + (hits.length === 100 ? '+' : '') + ' results' : 'Showing first 100 of ' + storeGames.length + ' — search to find more';
             $('storeList').innerHTML = hits.length ? hits.map(i => {

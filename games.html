@@ -81,6 +81,14 @@
                     <input type="text" id="browseSearch" class="games-search-input" placeholder="Search by title or ID…" autocomplete="off">
                 </div>
 
+                <!-- Store shelves, categories & filters -->
+                <div id="storeShelves"></div>
+                <div id="storeChips" class="store-chips"></div>
+                <div class="store-filters" id="storeFilters" style="display:none;">
+                    <label><input type="checkbox" id="storeHasMods"> 🧩 Has mods</label>
+                    <label>Sort: <select id="storeSort" class="games-select"><option value="az">A → Z</option><option value="za">Z → A</option></select></label>
+                </div>
+
                 <!-- Games Count -->
                 <div id="browseCount" style="color:#666;font-size:0.9em;margin-bottom:10px;"></div>
 
@@ -252,7 +260,9 @@
                 return na.localeCompare(nb);
             });
             searchRow.style.display = 'flex';
-            renderBrowseGames(_allBrowseGames);
+            _storeCategory = 'All';
+            renderStoreChrome();
+            applyStoreFilters();
         } catch (e) {
             listEl.innerHTML = `<p style="color:#c00;">Failed to load games: ${e.message}</p>`;
         }
@@ -296,7 +306,9 @@
 
             msg.textContent = '';
             searchRow.style.display = 'flex';
-            renderBrowseGamesGrouped(_allPlatformGames);
+            _storeCategory = 'All';
+            renderStoreChrome();
+            applyStoreFilters();
         } catch (e) {
             listEl.innerHTML = `<p style="color:#c00;">Failed to load games: ${e.message}</p>`;
             msg.textContent = '';
@@ -391,15 +403,7 @@
     }
 
     function _loadMoreBrowse() {
-        const term = document.getElementById('browseSearch').value.toLowerCase().trim();
-        const games = term
-            ? _allBrowseGames.filter(g => {
-                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
-                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
-                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
-                return name.includes(term) || tid.includes(term) || alts.includes(term);
-            })
-            : _allBrowseGames;
+        const games = window.storeFilterGames(_allBrowseGames, _storeOpts());
 
         const listEl     = document.getElementById('browseGamesList');
         const countEl    = document.getElementById('browseCount');
@@ -502,21 +506,66 @@
     function debounceSearch() {
         clearTimeout(_searchTimer);
         _searchTimer = setTimeout(() => {
-            const term = document.getElementById('browseSearch').value.toLowerCase().trim();
-            if (_currentPlatform === 'ALL') {
-                renderBrowseGamesGrouped(_allPlatformGames, term);
-                return;
-            }
-            if (!term) { renderBrowseGames(_allBrowseGames); return; }
-            const filtered = _allBrowseGames.filter(g => {
-                const name = (g.Title || g.game_name || g.title || '').toLowerCase();
-                const tid  = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
-                const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
-                return name.includes(term) || tid.includes(term) || alts.includes(term);
-            });
-            renderBrowseGames(filtered);
+            applyStoreFilters();
         }, 300);
     }
+
+    // ── Store categories / filters ─────────────────────────────
+    let _storeCategory = 'All';
+    function _storeOpts(withTerm) {
+        return {
+            category: _storeCategory,
+            hasMods:  document.getElementById('storeHasMods').checked,
+            sort:     document.getElementById('storeSort').value,
+            term:     withTerm === false ? '' : document.getElementById('browseSearch').value
+        };
+    }
+    function renderStoreChrome() {
+        const all = _allBrowseGames;
+        const platOf = new Map();
+        if (_currentPlatform === 'ALL') Object.entries(_allPlatformGames).forEach(([p, gs]) => gs.forEach(g => platOf.set(g, p)));
+        const known = new Set(window.STORE_CATEGORIES);
+        all.forEach(g => window.getGameCategories(g).forEach(c => known.add(c)));
+        const counts = {};
+        all.forEach(g => window.getGameCategories(g).forEach(c => { counts[c.toLowerCase()] = (counts[c.toLowerCase()] || 0) + 1; }));
+        const chips = ['All', ...known].filter(c => c === 'All' || counts[c.toLowerCase()]);
+        document.getElementById('storeChips').innerHTML = chips.map(c =>
+            `<button type="button" class="store-chip ${c === _storeCategory ? 'active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c === 'All' ? 'All' : c + ' (' + counts[c.toLowerCase()] + ')')}</button>`).join('');
+        document.getElementById('storeFilters').style.display = all.length ? 'flex' : 'none';
+        // Shelves (New / Exclusive) only on the unfiltered default view
+        const shelves = ['New', 'Exclusive'].map(cat => {
+            const items = all.filter(g => window.getGameCategories(g).some(c => c.toLowerCase() === cat.toLowerCase())).slice(0, 20);
+            if (!items.length) return '';
+            return `<div class="store-shelf"><h3>${cat === 'New' ? '🆕 New' : '⭐ Exclusives'}</h3><div class="store-shelf-row">` + items.map(g => {
+                const t = g.Title || g.game_name || g.title || '';
+                const cover = getGameCoverUrl(g);
+                return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platOf.get(g) || _currentPlatform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
+                    <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
+                    <div class="store-card-title">${escapeHtml(t)}</div></div>`;
+            }).join('') + '</div></div>';
+        }).join('');
+        document.getElementById('storeShelves').innerHTML = shelves;
+    }
+    function applyStoreFilters() {
+        const opts = _storeOpts();
+        if (_currentPlatform === 'ALL') {
+            const filtered = {};
+            Object.keys(_allPlatformGames).forEach(p => {
+                filtered[p] = window.storeFilterGames(_allPlatformGames[p], opts);
+            });
+            renderBrowseGamesGrouped(filtered, '');
+        } else {
+            renderBrowseGames(window.storeFilterGames(_allBrowseGames, opts));
+        }
+    }
+    document.getElementById('storeChips').addEventListener('click', e => {
+        const b = e.target.closest('.store-chip'); if (!b) return;
+        _storeCategory = b.dataset.cat;
+        renderStoreChrome();
+        applyStoreFilters();
+    });
+    document.getElementById('storeHasMods').addEventListener('change', applyStoreFilters);
+    document.getElementById('storeSort').addEventListener('change', applyStoreFilters);
 
     // ── Add game ───────────────────────────────────────────────
     async function handleAddGame(btn, gameJson, platform) {
@@ -543,10 +592,9 @@
             await refreshOwnedGames();
             // Refresh browse so ownership badges update
             if (_currentPlatform === 'ALL') {
-                renderBrowseGamesGrouped(_allPlatformGames,
-                    document.getElementById('browseSearch').value);
+                applyStoreFilters();
             } else if (_allBrowseGames.length) {
-                renderBrowseGames(_allBrowseGames);
+                applyStoreFilters();
             }
         } catch (e) {
             btn.disabled    = false;
@@ -645,10 +693,9 @@
                 await refreshOwnedGames();
                 // Re-render browse so ownership badges update
                 if (_currentPlatform === 'ALL') {
-                    renderBrowseGamesGrouped(_allPlatformGames,
-                        document.getElementById('browseSearch').value);
+                    applyStoreFilters();
                 } else if (_currentPlatform === platform && _allBrowseGames.length) {
-                    renderBrowseGames(_allBrowseGames);
+                    applyStoreFilters();
                 }
             }
         } catch (e) {
@@ -660,9 +707,9 @@
     // ── Favourites Tab ─────────────────────────────────────────
     function rerenderBrowse() {
         if (_currentPlatform === 'ALL') {
-            renderBrowseGamesGrouped(_allPlatformGames, document.getElementById('browseSearch').value);
+            applyStoreFilters();
         } else if (_allBrowseGames.length) {
-            renderBrowseGames(_allBrowseGames);
+            applyStoreFilters();
         }
     }
 
@@ -801,10 +848,9 @@
             await refreshWishlist();
             // Re-render browse so wishlist star badges update
             if (_currentPlatform === 'ALL') {
-                renderBrowseGamesGrouped(_allPlatformGames,
-                    document.getElementById('browseSearch').value);
+                applyStoreFilters();
             } else if (_allBrowseGames.length) {
-                renderBrowseGames(_allBrowseGames);
+                applyStoreFilters();
             }
         } catch (e) {
             btn.disabled = false;
@@ -825,10 +871,9 @@
             await refreshWishlist();
             // Re-render browse so wishlist star badges update
             if (_currentPlatform === 'ALL') {
-                renderBrowseGamesGrouped(_allPlatformGames,
-                    document.getElementById('browseSearch').value);
+                applyStoreFilters();
             } else if (_currentPlatform === platform && _allBrowseGames.length) {
-                renderBrowseGames(_allBrowseGames);
+                applyStoreFilters();
             }
         } catch (e) {
             btn.disabled = false;

@@ -2375,3 +2375,21 @@ html:has(.app-body), html:has(.app-body) body { background: #060913; }
 /* ── Store-style browse cards ── */
 #browseGamesList .game-item, #browseGamesList .browse-game-item { border-radius: 12px; transition: transform .15s, box-shadow .15s; }
 #browseGamesList .game-item:hover, #browseGamesList .browse-game-item:hover { transform: translateY(-3px); box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+
+.mod-detail { padding: 10px 14px; margin-top: 4px; border-radius: 10px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.1); }
+.mod-detail[hidden] { display: none; }
+.mod-detail-name { margin: 0 0 6px; }
+.mod-detail-desc { margin: 0 0 10px; white-space: pre-wrap; opacity: .85; }
+/* Store redesign */
+.store-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.store-chip { padding: 6px 14px; border-radius: 999px; border: 1px solid #cbd5e1; background: #fff; cursor: pointer; font: inherit; font-size: .9em; color: #334155; }
+.store-chip.active { background: #4f46e5; border-color: #4f46e5; color: #fff; }
+.store-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 12px; }
+.store-shelf { margin: 18px 0; }
+.store-shelf h3 { margin: 0 0 10px; }
+.store-shelf-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 8px; scroll-snap-type: x proximity; }
+.store-card { flex: 0 0 140px; scroll-snap-align: start; cursor: pointer; border-radius: 12px; overflow: hidden; background: #fff; border: 1px solid #e2e8f0; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+.store-card-cover { aspect-ratio: 3/4; background: #1e293b; display: flex; align-items: center; justify-content: center; font-size: 2em; }
+.store-card-cover img { width: 100%; height: 100%; object-fit: cover; }
+.store-card-title { padding: 6px 8px; font-size: .85em; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.store-badge { display: inline-block; padding: 1px 8px; border-radius: 6px; font-size: .7em; background: #e0e7ff; color: #3730a3; margin-left: 4px; }

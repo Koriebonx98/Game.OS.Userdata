@@ -4115,15 +4115,17 @@ function _adminAddBgField() {
 }
 
 /** Returns HTML for a single mod link row (name + URL). */
-function _adminModFieldHtml(name, url, genres) {
+function _adminModFieldHtml(name, url, genres, description) {
     const n = escapeHtml(name || '');
     const u = escapeHtml(url  || '');
     const g = escapeHtml(Array.isArray(genres) ? genres.join(', ') : (genres || ''));
-    return `<div class="admin-bg-field admin-mod-field">
+    const d = escapeHtml(description || '');
+    return `<div class="admin-bg-field admin-mod-field" style="flex-wrap:wrap;">
         <input type="text" class="admin-form-input admin-mod-name" placeholder="Mod name" value="${n}" style="flex:1;">
         <input type="url"  class="admin-form-input admin-mod-url"  placeholder="Mod URL…" value="${u}" style="flex:2;">
         <input type="text" class="admin-form-input admin-mod-genres" placeholder="Genres (comma separated)" value="${g}" style="flex:1;">
         <button type="button" class="admin-btn-remove" onclick="this.parentNode.remove()" title="Remove">✕</button>
+        <textarea class="admin-form-input admin-mod-desc" placeholder="Mod description" rows="2" style="flex-basis:100%;">${d}</textarea>
     </div>`;
 }
 
@@ -4303,7 +4305,7 @@ function openAdminEditModal(game, platform) {
         : _adminBgFieldHtml('');
 
     const modsHtml = existingMods.length
-        ? existingMods.map(m => _adminModFieldHtml(m.name || '', m.url || '', m.genres)).join('')
+        ? existingMods.map(m => _adminModFieldHtml(m.name || '', m.url || '', m.genres, m.description)).join('')
         : _adminModFieldHtml('', '');
 
     const storesHtml = existingStores.length
@@ -4380,6 +4382,10 @@ function openAdminEditModal(game, platform) {
             <label class="admin-form-label">🧩 Mods</label>
             <div id="adminModList">${modsHtml}</div>
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
+        </div>
+        <div class="admin-form-group">
+            <label class="admin-form-label">🏷️ Store Categories</label>
+            ${_adminCategoriesFieldHtml(typeof game !== 'undefined' ? game : null)}
         </div>
         <div class="admin-form-group">
             <label class="admin-form-label">🛒 Stores</label>
@@ -4488,7 +4494,8 @@ async function handleAdminEditSave() {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -4498,7 +4505,8 @@ async function handleAdminEditSave() {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -4875,6 +4883,7 @@ function _buildUpdatedGameEntry(existing, fields) {
 
     if (mods.length)           updated.mods               = mods;
     else                       delete updated.mods;
+    { const cats = _adminReadCategories(); if (cats.length) updated.categories = cats; else delete updated.categories; }
     if (stores.length)         updated.stores             = stores;
     else                       delete updated.stores;
     if (sysSpecMin)            updated.sysSpecMin         = sysSpecMin;
@@ -4997,6 +5006,10 @@ function openAddPcGameModal(platform) {
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
         </div>
         <div class="admin-form-group">
+            <label class="admin-form-label">🏷️ Store Categories</label>
+            ${_adminCategoriesFieldHtml(typeof game !== 'undefined' ? game : null)}
+        </div>
+        <div class="admin-form-group">
             <label class="admin-form-label">🛒 Stores</label>
             <div id="adminStoreList">${_adminStoreFieldHtml('', '')}</div>
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddStoreField()">+ Add Store Link</button>
@@ -5083,7 +5096,8 @@ async function handleAddPcGameToDb() {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -5093,7 +5107,8 @@ async function handleAddPcGameToDb() {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -5125,6 +5140,7 @@ async function handleAddPcGameToDb() {
     if (bgUrls.length)      newGame.background_images  = bgUrls;
     if (trailers.length)    newGame.trailers            = trailers;
     if (mods.length)        newGame.mods               = mods;
+    { const cats = _adminReadCategories(); if (cats.length) newGame.categories = cats; }
     if (stores.length)      newGame.stores             = stores;
     if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
     if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
@@ -5371,6 +5387,10 @@ function openAddSteamGameModal() {
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddModField()">+ Add Mod Link</button>
         </div>
         <div class="admin-form-group">
+            <label class="admin-form-label">🏷️ Store Categories</label>
+            ${_adminCategoriesFieldHtml(typeof game !== 'undefined' ? game : null)}
+        </div>
+        <div class="admin-form-group">
             <label class="admin-form-label">🛒 Stores</label>
             <div id="adminStoreList">${_adminStoreFieldHtml('Steam', '')}</div>
             <button type="button" class="admin-btn-outline" style="margin-top:6px;" onclick="_adminAddStoreField()">+ Add Store Link</button>
@@ -5609,7 +5629,8 @@ async function handleAddSteamGameToDb() {
         const name = (row.querySelector('.admin-mod-name') || {}).value || '';
         const url  = (row.querySelector('.admin-mod-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -5618,7 +5639,8 @@ async function handleAddSteamGameToDb() {
         const name = (row.querySelector('.admin-store-name') || {}).value || '';
         const url  = (row.querySelector('.admin-store-url')  || {}).value || '';
         const genres = (((row.querySelector('.admin-mod-genres') || {}).value) || '').split(',').map(x => x.trim()).filter(Boolean);
-        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres });
+        const description = (((row.querySelector('.admin-mod-desc') || {}).value) || '').trim();
+        if (name.trim() && url.trim()) acc.push({ name: name.trim(), url: url.trim(), genres, ...(description ? { description } : {}) });
         return acc;
     }, []);
 
@@ -5651,6 +5673,7 @@ async function handleAddSteamGameToDb() {
     if (bgUrls.length)      newGame.background_images  = bgUrls;
     if (trailers.length)    newGame.trailers            = trailers;
     if (mods.length)        newGame.mods               = mods;
+    { const cats = _adminReadCategories(); if (cats.length) newGame.categories = cats; }
     if (stores.length)      newGame.stores             = stores;
     if (sysSpecMin)         newGame.sysSpecMin         = sysSpecMin;
     if (sysSpecRecommended) newGame.sysSpecRecommended = sysSpecRecommended;
@@ -6332,7 +6355,7 @@ function closeGameModal() {
 
 function _buildGameModalFields(game) {
     const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
-        'mods', 'stores', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
+        'mods', 'stores', 'categories', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
@@ -6345,16 +6368,92 @@ function _buildGameModalFields(game) {
         }).join('');
 }
 
+
+/** Store categories that can be assigned to a game by admins. */
+const STORE_CATEGORIES = ['New', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
+
+/** Normalise a game's categories into an array of strings. */
+function getGameCategories(game) {
+    const c = game && (game.categories || game.Categories);
+    if (Array.isArray(c)) return c.map(x => String(x).trim()).filter(Boolean);
+    if (typeof c === 'string') return c.split(',').map(x => x.trim()).filter(Boolean);
+    return [];
+}
+
+function _adminCategoriesFieldHtml(game) {
+    const cur = getGameCategories(game).map(c => c.toLowerCase());
+    const known = STORE_CATEGORIES.map(c => c.toLowerCase());
+    const custom = getGameCategories(game).filter(c => !known.includes(c.toLowerCase())).join(', ');
+    const boxes = STORE_CATEGORIES.map(c =>
+        `<label style="margin-right:12px;"><input type="checkbox" class="admin-cat-check" value="${escapeHtml(c)}" ${cur.includes(c.toLowerCase()) ? 'checked' : ''}> ${escapeHtml(c)}</label>`).join('');
+    return `<div id="adminCategories">${boxes}
+        <input type="text" class="admin-form-input admin-cat-custom" placeholder="Other categories (comma separated)" value="${escapeHtml(custom)}" style="margin-top:6px;"></div>`;
+}
+
+function _adminReadCategories() {
+    const root = document.querySelectorAll('#adminCategories');
+    const out = [];
+    root.forEach(r => {
+        if (!r.offsetParent && root.length > 1) return;
+        r.querySelectorAll('.admin-cat-check:checked').forEach(i => out.push(i.value));
+        const cu = r.querySelector('.admin-cat-custom');
+        if (cu) cu.value.split(',').map(x => x.trim()).filter(Boolean).forEach(x => { if (!out.includes(x)) out.push(x); });
+    });
+    return out;
+}
+
+/** Filter/sort games for the store. opts: { category, term, hasMods, sort } */
+function storeFilterGames(games, opts) {
+    opts = opts || {};
+    const nm = g => (g.Title || g.game_name || g.title || '');
+    const term = (opts.term || '').toLowerCase().trim();
+    let out = games.filter(g => {
+        if (opts.category && opts.category !== 'All' &&
+            !getGameCategories(g).some(c => c.toLowerCase() === opts.category.toLowerCase())) return false;
+        if (opts.hasMods && !(Array.isArray(g.mods) && g.mods.length)) return false;
+        if (term) {
+            const tid = String(g.TitleID || g.title_id || g.titleid || g.id || '').toLowerCase();
+            const alts = (g.AlternateNames || g.alternate_names || []).join(' ').toLowerCase();
+            if (!(nm(g).toLowerCase().includes(term) || tid.includes(term) || alts.includes(term))) return false;
+        }
+        return true;
+    });
+    if (opts.sort === 'za') out = [...out].sort((a, b) => nm(b).localeCompare(nm(a)));
+    else if (opts.sort === 'az') out = [...out].sort((a, b) => nm(a).localeCompare(nm(b)));
+    return out;
+}
+
+/** Expand/collapse a mod's detail panel (name, description, link). */
+function toggleModDetail(btn) {
+    const card = btn.closest('.mod-item');
+    if (!card) return;
+    const d = card.querySelector('.mod-detail');
+    if (d) d.hidden = !d.hidden;
+}
+if (typeof window !== 'undefined') {
+    window.getGameCategories = getGameCategories;
+    window.storeFilterGames = storeFilterGames;
+    window.STORE_CATEGORIES = STORE_CATEGORIES;
+    window.toggleModDetail = toggleModDetail;
+}
+
 /** Render a mods section (like achievements) from game.mods array of { name, url, genres } objects. */
 function _buildModsSection(game) {
     const mods = game.mods;
     if (!Array.isArray(mods)) return '';
     const items = mods.filter(m => m && /^https?:\/\//i.test(m.url || '')).map(m => {
         const genres = (Array.isArray(m.genres) ? m.genres : []).map(g => `<span class="mod-genre">${escapeHtml(g)}</span>`).join('');
-        return `<a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer" class="mod-card">
-            <span class="mod-card-icon">🧩</span>
-            <span class="mod-card-info"><b>${escapeHtml(m.name || 'Mod')}</b>${genres ? `<span class="mod-genres">${genres}</span>` : ''}</span>
-            <span class="mod-card-go">↗</span></a>`;
+        return `<div class="mod-item">
+            <button type="button" class="mod-card" onclick="toggleModDetail(this)" style="width:100%;text-align:left;cursor:pointer;font:inherit;">
+                <span class="mod-card-icon">🧩</span>
+                <span class="mod-card-info"><b>${escapeHtml(m.name || 'Mod')}</b>${genres ? `<span class="mod-genres">${genres}</span>` : ''}</span>
+                <span class="mod-card-go">▾</span></button>
+            <div class="mod-detail" hidden>
+                <h4 class="mod-detail-name">${escapeHtml(m.name || 'Mod')}</h4>
+                <p class="mod-detail-desc">${escapeHtml(m.description || 'No description provided.')}</p>
+                <a href="${escapeHtml(m.url)}" target="_blank" rel="noopener noreferrer" class="btn-mod-link">↗ Open in new tab</a>
+            </div>
+        </div>`;
     }).join('');
     if (!items) return '';
     return `<div class="game-modal-mods-section">
