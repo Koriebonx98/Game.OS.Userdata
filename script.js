@@ -6453,6 +6453,7 @@ function storeFilterGames(games, opts) {
     });
     if (opts.sort === 'za') out = [...out].sort((a, b) => nm(b).localeCompare(nm(a)));
     else if (opts.sort === 'az') out = [...out].sort((a, b) => nm(a).localeCompare(nm(b)));
+    else if (opts.sort === 'popular') out = [...out].sort((a, b) => getPopularityScore(b, opts.platform) - getPopularityScore(a, opts.platform) || nm(a).localeCompare(nm(b)));
     else if (opts.sort === 'random') out = [...out].sort((a, b) => _randKey(nm(a)) - _randKey(nm(b)));
     return out;
 }
@@ -6536,14 +6537,19 @@ function storeApplyFilters(games, opts) {
     opts = opts || {};
     const genres = (opts.genres || []).map(x => x.toLowerCase());
     const features = opts.features || [];
+    const modGenres = (opts.modGenres || []).map(x => x.toLowerCase());
     const out = games.filter(g => {
         if (genres.length) {
             const gg = getGameGenres(g).map(x => x.toLowerCase());
             if (!genres.some(x => gg.includes(x))) return false;
         }
+        if (modGenres.length) {
+            const mg = getGameModGenres(g).map(x => x.toLowerCase());
+            if (!modGenres.some(x => mg.includes(x))) return false;
+        }
         return features.every(f => gameHasFeature(g, f));
     });
-    return storeFilterGames(out, { term: opts.term, sort: opts.sort });
+    return storeFilterGames(out, { term: opts.term, sort: opts.sort, platform: opts.platform });
 }
 
 function _skippedPath(username, platform) {
@@ -6659,6 +6665,10 @@ if (typeof window !== 'undefined') {
     window.getCompatibility = getCompatibility;
     window.voteCompatibility = voteCompatibility;
     window.getCompatBadgeHtml = getCompatBadgeHtml;
+    window.loadGameStats = loadGameStats;
+    window.getGameStat = getGameStat;
+    window.getPopularityScore = getPopularityScore;
+    window.submitReview = submitReview;
     window.getGameGenres = getGameGenres;
     window.getGameModGenres = getGameModGenres;
     window.gameHasFeature = gameHasFeature;
@@ -6679,68 +6689,204 @@ const COMPAT_OPTIONS = {
 };
 const _compatKey = (platform, title) => String(platform) + '|' + String(title).toLowerCase();
 
-/** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
-async function getCompatibility(username) {
+// Community stats per platform: stats/popularity.<platform>.json
+//   { "<title lower>": { title, compat:{green,amber,red}, ratingSum, ratingCount } }
+const _gameStats = {};
+const _statsPath = platform => `stats/popularity.${String(platform).replace(/[^A-Za-z0-9._+-]/g, '_')}.json`;
+const _isPcPlatform = platform => /^(pc|windows)$/i.test(String(platform || '').trim());
+const _blankStat = title => ({ title, compat: { green: 0, amber: 0, red: 0 }, ratingSum: 0, ratingCount: 0 });
+const _isObj = c => c && typeof c === 'object' && !Array.isArray(c);
+
+async function _readStatsFile(platform) {
     if (MODE === 'demo') {
-        try { return JSON.parse(localStorage.getItem(`gameOS_compat_${username.toLowerCase()}`) || '{}'); }
-        catch (_) { return {}; }
+        try { return { content: JSON.parse(localStorage.getItem('gameOS_stats_' + platform) || '{}'), sha: undefined }; }
+        catch (_) { return { content: {}, sha: undefined }; }
     }
-    const file = await githubRead(`accounts/${username.toLowerCase()}/compatibility.json`);
-    return file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
+    const f = await githubRead(_statsPath(platform));
+    return f && _isObj(f.content) ? f : { content: {}, sha: f ? f.sha : undefined };
 }
 
+/** Load community stats for the given platforms into the cache (failures are ignored). */
+async function loadGameStats(platforms) {
+    await Promise.all([...new Set(platforms || [])].map(async p => {
+        try { _gameStats[p] = (await _readStatsFile(p)).content; } catch (_) { _gameStats[p] = _gameStats[p] || {}; }
+    }));
+}
+
+function getGameStat(game, platform) {
+    const m = _gameStats[platform];
+    return (m && m[_gameName(game).toLowerCase()]) || null;
+}
+
+/** Popularity score (votes + weighted reviews), used by the "Most Popular" sort. */
+function getPopularityScore(game, platform) {
+    const st = getGameStat(game, platform);
+    if (!st) return 0;
+    const c = st.compat || {};
+    const avg = st.ratingCount ? st.ratingSum / st.ratingCount : 0;
+    return (Number(c.green) || 0) + (Number(c.amber) || 0) + (Number(c.red) || 0) + 2 * (st.ratingCount || 0) + avg;
+}
+
+async function _mutateStat(platform, title, fn) {
+    const key = String(title).toLowerCase();
+    for (let attempt = 0; attempt < 3; attempt++) {
+        const f = await _readStatsFile(platform);
+        const st = Object.assign(_blankStat(title), f.content[key] || {});
+        st.compat = Object.assign({ green: 0, amber: 0, red: 0 }, st.compat);
+        fn(st);
+        f.content[key] = st;
+        try {
+            if (MODE === 'demo') localStorage.setItem('gameOS_stats_' + platform, JSON.stringify(f.content));
+            else await githubWrite(_statsPath(platform), f.content, `Stats update: ${title} (${platform})`, f.sha);
+            (_gameStats[platform] = _gameStats[platform] || {})[key] = st;
+            return;
+        } catch (e) { if (attempt === 2) throw e; }
+    }
+}
+
+async function _readUserMap(kind, username) {
+    if (MODE === 'demo') {
+        try { return { map: JSON.parse(localStorage.getItem(`gameOS_${kind}_${username.toLowerCase()}`) || '{}') }; }
+        catch (_) { return { map: {} }; }
+    }
+    const path = `accounts/${username.toLowerCase()}/${kind === 'compat' ? 'compatibility' : 'reviews'}.json`;
+    const file = await githubRead(path);
+    return { map: file && _isObj(file.content) ? file.content : {}, sha: file ? file.sha : undefined, path };
+}
+
+/** Add one entry to a user's map file; throws 'ALREADY_VOTED' if it already exists. */
+async function _addUserEntry(kind, username, key, value, message) {
+    const r = await _readUserMap(kind, username);
+    if (r.map[key]) throw new Error('ALREADY_VOTED');
+    r.map[key] = value;
+    if (MODE === 'demo') localStorage.setItem(`gameOS_${kind}_${username.toLowerCase()}`, JSON.stringify(r.map));
+    else await githubWrite(r.path, r.map, message, r.sha);
+}
+
+/** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
+async function getCompatibility(username) { return (await _readUserMap('compat', username)).map; }
+
+/** One vote per user per game; throws 'ALREADY_VOTED' if the user has voted before. */
 async function voteCompatibility(username, platform, title, rating) {
     if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
-    if (MODE === 'demo') {
-        const all = await getCompatibility(username);
-        all[_compatKey(platform, title)] = rating;
-        localStorage.setItem(`gameOS_compat_${username.toLowerCase()}`, JSON.stringify(all));
-        return;
-    }
-    const path = `accounts/${username.toLowerCase()}/compatibility.json`;
-    const file = await githubRead(path);
-    const all = file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
-    all[_compatKey(platform, title)] = rating;
-    await githubWrite(path, all, `Compatibility vote: ${title} (${platform})`, file ? file.sha : undefined);
+    if (_isPcPlatform(platform)) throw new Error('Compatibility is for non-PC games');
+    await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
+    await _mutateStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
 }
 
-/** Small green/amber/red badge for a game card, based on the community's votes (game.compatibility totals). */
-function getCompatBadgeHtml(game) {
-    const t = game && game.compatibility && typeof game.compatibility === 'object' ? game.compatibility : null;
-    const none = '<span class="store-card-compat compat-none" title="No compatibility votes yet">⚪ Not rated</span>';
-    if (!t) return none;
+/** The signed-in user's reviews: { 'platform|title': { stars, text, date } }. */
+async function getReviews(username) { return (await _readUserMap('reviews', username)).map; }
+
+/** One review per user per game; its star rating feeds the Game OS average. */
+async function submitReview(username, platform, title, stars, text) {
+    stars = Math.round(Number(stars));
+    if (!(stars >= 1 && stars <= 5)) throw new Error('Invalid rating');
+    const entry = { stars, text: String(text || '').slice(0, 1000), date: new Date().toISOString() };
+    await _addUserEntry('reviews', username, _compatKey(platform, title), entry, `Review: ${title} (${platform})`);
+    await _mutateStat(platform, title, st => { st.ratingSum += stars; st.ratingCount += 1; });
+}
+
+function _compatVerdict(c) {
     let best = '', max = 0;
-    ['green', 'amber', 'red'].forEach(k => { const n = Number(t[k]) || 0; if (n > max) { max = n; best = k; } });
-    if (!best) return none;
-    const o = COMPAT_OPTIONS[best];
-    return `<span class="store-card-compat compat-${best}" title="Community compatibility: ${o.label} (${max} vote${max === 1 ? '' : 's'})">${o.icon} ${o.label}</span>`;
+    ['green', 'amber', 'red'].forEach(k => { const n = Number(c[k]) || 0; if (n > max) { max = n; best = k; } });
+    return best;
+}
+function _compatCounts(game, platform) {
+    const st = getGameStat(game, platform);
+    return (st && st.compat) || (game && _isObj(game.compatibility) && game.compatibility) || {};
+}
+
+/** Green/amber/red (or "Not rated") badge for non-PC game cards. */
+function getCompatBadgeHtml(game, platform) {
+    if (_isPcPlatform(platform)) return '';
+    const c = _compatCounts(game, platform);
+    const best = _compatVerdict(c);
+    if (!best) return '<span class="store-card-compat compat-none" title="No compatibility votes yet">⚪ Not rated</span>';
+    const o = COMPAT_OPTIONS[best], n = Number(c[best]);
+    return `<span class="store-card-compat compat-${best}" title="Community compatibility: ${o.label} (${n} vote${n === 1 ? '' : 's'})">${o.icon} ${o.label}</span>`;
+}
+
+const _starsText = n => { const r = Math.round(n); return '★'.repeat(r) + '☆'.repeat(5 - r); };
+
+/** Game OS (user review) stars and IGDB stars for the info card. */
+function _buildRatingsSection(game, platform) {
+    const st = getGameStat(game, platform);
+    const avg = st && st.ratingCount ? st.ratingSum / st.ratingCount : 0;
+    const igdbRaw = Number(game && (game.igdb_rating || game.igdbRating || game.igdb_score || game.IGDBRating));
+    const igdb = igdbRaw > 0 ? (igdbRaw > 5 ? igdbRaw / 20 : igdbRaw) : 0;
+    const line = (label, v, extra) => `<div>${label}: ${v ? `<span style="color:#f59e0b;">${_starsText(v)}</span> ${v.toFixed(1)}${extra}` : '<span style="opacity:.6;">No ratings yet</span>'}</div>`;
+    return `<div class="game-modal-section ratings-section"><h4>⭐ Ratings</h4>
+        ${line('Game OS users', avg, ` (${st ? st.ratingCount : 0} review${st && st.ratingCount === 1 ? '' : 's'})`)}
+        ${line('IGDB', igdb, '')}
+        <div class="review-box" data-review-title="${escapeHtml(_gameName(game))}" data-review-platform="${escapeHtml(platform || '')}" style="margin-top:8px;font-size:.85em;"></div></div>`;
+}
+
+async function _initReviewBox() {
+    const box = document.querySelector('.review-box');
+    if (!box) return;
+    const user = getCurrentUser();
+    if (!user) { box.textContent = 'Log in to review.'; return; }
+    const title = box.dataset.reviewTitle, platform = box.dataset.reviewPlatform;
+    let mine = null;
+    try { mine = (await getReviews(user.username))[_compatKey(platform, title)]; } catch (_) {}
+    if (mine) { box.textContent = `Your review: ${_starsText(mine.stars)}${mine.text ? ' – ' + mine.text : ''}`; return; }
+    box.innerHTML = `<select class="review-stars">${[5, 4, 3, 2, 1].map(n => `<option value="${n}">${'★'.repeat(n)}</option>`).join('')}</select>
+        <input type="text" class="review-text" maxlength="1000" placeholder="Write a review (optional)">
+        <button type="button" class="btn btn-secondary review-submit">Submit review</button> <span class="review-status"></span>`;
+    box.querySelector('.review-submit').onclick = async () => {
+        const status = box.querySelector('.review-status');
+        try {
+            await submitReview(user.username, platform, title, box.querySelector('.review-stars').value, box.querySelector('.review-text').value);
+            box.textContent = 'Thanks – review saved (one review per game).';
+        } catch (e) { status.textContent = e.message === 'ALREADY_VOTED' ? 'You already reviewed this game.' : 'Could not save review.'; }
+    };
+}
+
+function _compatTotalsHtml(game, platform) {
+    const c = _compatCounts(game, platform);
+    const total = ['green', 'amber', 'red'].reduce((n, k) => n + (Number(c[k]) || 0), 0);
+    const best = _compatVerdict(c);
+    const bar = total ? Object.keys(COMPAT_OPTIONS).map(k => `<span class="compat-bar-seg compat-bg-${k}" style="width:${(Number(c[k]) || 0) / total * 100}%"></span>`).join('') : '';
+    const rows = Object.entries(COMPAT_OPTIONS).map(([k, o]) => `<span class="compat-total compat-${k}">${o.icon} ${o.label}: ${Number(c[k]) || 0}</span>`).join(' ');
+    return `<div class="compat-summary">${best ? `<strong class="compat-${best}">${COMPAT_OPTIONS[best].icon} ${COMPAT_OPTIONS[best].label}</strong> – ` : ''}${total} vote${total === 1 ? '' : 's'}</div>
+        <div class="compat-bar">${bar}</div><div style="font-size:.85em;margin-top:4px;">${rows}</div>`;
 }
 
 function _buildCompatSection(game, platform) {
+    if (_isPcPlatform(platform)) return '';
     const title = _gameName(game);
-    const totals = game && game.compatibility && typeof game.compatibility === 'object' ? game.compatibility : {};
     const btns = Object.entries(COMPAT_OPTIONS).map(([k, o]) =>
-        `<button type="button" class="btn btn-secondary compat-btn compat-${k}" data-compat="${k}">${o.icon} ${o.label}${totals[k] ? ` (${Number(totals[k]) || 0})` : ''}</button>`).join('');
+        `<button type="button" class="btn btn-secondary compat-btn compat-${k}" data-compat="${k}">${o.icon} ${o.label}</button>`).join('');
     return `<div class="game-modal-section compat-section" data-compat-title="${escapeHtml(title)}" data-compat-platform="${escapeHtml(platform || '')}">
         <h4>🧪 Compatibility</h4>
-        <p style="font-size:.85em;opacity:.8;">Do the ROMs work? Vote: Green = Playable, Amber = In Game, Red = No Boot.</p>
-        <div class="compat-buttons">${btns}</div><div class="compat-status" style="font-size:.8em;margin-top:6px;"></div></div>`;
+        <div class="compat-totals">${_compatTotalsHtml(game, platform)}</div>
+        <div class="compat-vote">
+            <p style="font-size:.85em;opacity:.8;">Do the ROMs work? One vote per user: Green = Playable, Amber = In Game, Red = No Boot.</p>
+            <div class="compat-buttons">${btns}</div></div>
+        <div class="compat-status" style="font-size:.8em;margin-top:6px;"></div></div>`;
 }
 
 async function _initCompatSection() {
     const sec = document.querySelector('.compat-section');
     if (!sec) return;
     const status = sec.querySelector('.compat-status');
+    const voteBox = sec.querySelector('.compat-vote');
+    const platform = sec.dataset.compatPlatform, title = sec.dataset.compatTitle;
     const user = getCurrentUser();
-    const key = _compatKey(sec.dataset.compatPlatform, sec.dataset.compatTitle);
-    const mark = r => sec.querySelectorAll('[data-compat]').forEach(b => b.classList.toggle('compat-selected', b.dataset.compat === r));
+    const key = _compatKey(platform, title);
+    const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml(_currentModalGame || { title }, platform); };
+    const voted = r => { voteBox.style.display = 'none'; status.textContent = 'You voted: ' + COMPAT_OPTIONS[r].label; };
     if (!user) { status.textContent = 'Log in to vote.'; sec.querySelectorAll('[data-compat]').forEach(b => b.disabled = true); return; }
-    try { const mine = (await getCompatibility(user.username))[key]; if (mine) { mark(mine); status.textContent = 'Your vote: ' + COMPAT_OPTIONS[mine].label; } } catch (_) {}
+    try { const mine = (await getCompatibility(user.username))[key]; if (mine) voted(mine); } catch (_) {}
     sec.querySelectorAll('[data-compat]').forEach(b => b.onclick = async () => {
+        sec.querySelectorAll('[data-compat]').forEach(x => x.disabled = true);
         try {
-            await voteCompatibility(user.username, sec.dataset.compatPlatform, sec.dataset.compatTitle, b.dataset.compat);
-            mark(b.dataset.compat); status.textContent = 'Your vote: ' + COMPAT_OPTIONS[b.dataset.compat].label;
-        } catch (_) { status.textContent = 'Could not save vote.'; }
+            await voteCompatibility(user.username, platform, title, b.dataset.compat);
+            voted(b.dataset.compat); refresh();
+        } catch (e) {
+            if (e.message === 'ALREADY_VOTED') { status.textContent = 'You have already voted.'; voteBox.style.display = 'none'; }
+            else { status.textContent = 'Could not save vote.'; sec.querySelectorAll('[data-compat]').forEach(x => x.disabled = false); }
+        }
     });
 }
 
@@ -7152,6 +7298,7 @@ function openGameModal(game, platform) {
     bodyHtml += _buildFriendsSection(libs, platform, title);
     bodyHtml += _buildStoresSection(game);
     bodyHtml += _buildModsSection(game);
+    bodyHtml += _buildRatingsSection(game, platform);
     bodyHtml += _buildCompatSection(game, platform);
     bodyHtml += _buildSystemSpecsSection(game);
     bodyHtml += _buildAchievementsSection(game);
@@ -7165,6 +7312,7 @@ function openGameModal(game, platform) {
     modal.style.display = 'flex';
     _loadAchievementsInModal();
     _initCompatSection();
+    _initReviewBox();
 }
 
 async function openGameModalFromLibrary(title, platform, titleId) {
@@ -7217,6 +7365,9 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         bodyHtml += _buildFriendsSection(libs, platform, title);
         bodyHtml += _buildStoresSection(source);
         bodyHtml += _buildModsSection(source);
+        await loadGameStats([platform]);
+        bodyHtml += _buildRatingsSection(source, platform);
+        bodyHtml += _buildCompatSection(source, platform);
         bodyHtml += _buildSystemSpecsSection(source);
         bodyHtml += _buildAchievementsSection(source);
         if (bgUrls.length > 0) {
@@ -7227,6 +7378,8 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         bodyHtml += fieldRows || '<p style="color:#666;font-size:0.9em;">No additional details available.</p>';
         document.getElementById('gameModalBody').innerHTML = bodyHtml;
         _loadAchievementsInModal();
+        _initCompatSection();
+        _initReviewBox();
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =
             '<p style="color:#c00;font-size:0.9em;">Failed to load game details.</p>';
