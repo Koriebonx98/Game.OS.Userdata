@@ -52,6 +52,18 @@ namespace GameLauncher.Services
         public static Func<IReadOnlyList<string>>? InstalledGamesProvider { get; set; }
         /// <summary>Launches an installed game by title; returns false when no such game is installed.</summary>
         public static Func<string, bool>? LaunchHandler { get; set; }
+        /// <summary>Returns the library (PC games and ROMs) as (title, platform, isRom) tuples.</summary>
+        public static Func<IReadOnlyList<(string Title, string Platform, bool IsRom)>>? LibraryProvider { get; set; }
+        /// <summary>Launches a ROM by title and platform; returns false when it is not found.</summary>
+        public static Func<string, string, bool>? RomLaunchHandler { get; set; }
+        /// <summary>Username of the account signed in on this PC. Library/launch requests must come from the same account.</summary>
+        public static Func<string>? AccountProvider { get; set; }
+
+        private static bool AccountMatches(string user)
+        {
+            var acct = AccountProvider?.Invoke() ?? "";
+            return acct.Length > 0 && string.Equals(acct, user, StringComparison.OrdinalIgnoreCase);
+        }
 
         public static string Pin => _pin;
         public static int Port => _port;
@@ -213,6 +225,14 @@ namespace GameLauncher.Services
                     }
                     if (path == "/" || path == "/index.html")
                         await Respond(stream, 200, "text/html; charset=utf-8", ViewerHtml(pin));
+                    else if ((path == "/games" || path == "/library" || path == "/launch") && !(qp.TryGetValue("user", out var reqUser) && AccountMatches(reqUser)))
+                        await Respond(stream, 403, "application/json", "{\"error\":\"account mismatch\"}");
+                    else if (path == "/library")
+                    {
+                        var items = (LibraryProvider?.Invoke() ?? Array.Empty<(string, string, bool)>())
+                            .Select(i => new { title = i.Title, platform = i.Platform, rom = i.IsRom }).ToArray();
+                        await Respond(stream, 200, "application/json; charset=utf-8", JsonSerializer.Serialize(items));
+                    }
                     else if (path == "/games")
                     {
                         var titles = (InstalledGamesProvider?.Invoke() ?? Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray();
@@ -220,7 +240,10 @@ namespace GameLauncher.Services
                     }
                     else if (path == "/launch")
                     {
-                        bool ok = qp.TryGetValue("title", out var title) && !string.IsNullOrWhiteSpace(title) && (LaunchHandler?.Invoke(title) ?? false);
+                        bool ok = qp.TryGetValue("title", out var title) && !string.IsNullOrWhiteSpace(title) &&
+                            (qp.TryGetValue("platform", out var plat) && qp.TryGetValue("rom", out var isRom) && isRom == "1"
+                                ? (RomLaunchHandler?.Invoke(title, plat) ?? false)
+                                : (LaunchHandler?.Invoke(title) ?? false));
                         await Respond(stream, ok ? 200 : 404, "application/json", ok ? "{\"launched\":true}" : "{\"launched\":false}");
                     }
                     else if (path == "/speedtest")
@@ -519,6 +542,7 @@ body.immersive #controls{opacity:.25;transition:opacity .2s}body.immersive #cont
 <img id='s' alt='Connecting…'><video id='v' muted playsinline autoplay disablepictureinpicture style='display:none;width:100%;height:100%;object-fit:contain;background:#000'></video>
 <script>
 var s=document.getElementById('s'), audioButton=document.getElementById('audio'), status=document.getElementById('audioStatus');
+var userQ=encodeURIComponent(new URLSearchParams(location.search).get('user')||'');
 var pinQ='" + Uri.EscapeDataString(pin) + @"';
 var cfg=JSON.parse(localStorage.getItem('gameOS_stream_cfg')||'{}');
 function go(){var a='';if(cfg.fps)a+='&fps='+cfg.fps;if(cfg.w)a+='&w='+cfg.w;if(cfg.q)a+='&q='+cfg.q;s.src='/stream?pin='+pinQ+a+'&t='+Date.now();}
@@ -535,12 +559,12 @@ document.getElementById('sTest').onclick=async function(){var r=document.getElem
 var allGames=[];
 function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),l=document.getElementById('gl');l.innerHTML='';
  allGames.filter(function(t){return t.toLowerCase().indexOf(q)>=0}).forEach(function(t){var b=document.createElement('button');b.textContent='▶ '+t;b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
-  b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&title='+encodeURIComponent(t));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
+  b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(t));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
  if(!l.children.length)l.textContent='No installed games found.'}
 document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');g.hidden=!g.hidden;if(g.hidden)return;
- try{allGames=await (await fetch('/games?pin='+pinQ)).json()}catch(e){allGames=[]}renderGames()};
+ try{allGames=await (await fetch('/games?pin='+pinQ+'&user='+userQ)).json()}catch(e){allGames=[]}renderGames()};
 document.getElementById('gq').oninput=renderGames;
-(function(){var lt=new URLSearchParams(location.search).get('launch');if(lt){fetch('/launch?pin='+pinQ+'&title='+encodeURIComponent(lt)).catch(function(){})}})();
+(function(){var u=new URLSearchParams(location.search),lt=u.get('launch');if(lt){var pf=u.get('platform');fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(lt)+(pf?'&rom=1&platform='+encodeURIComponent(pf):'')).catch(function(){})}})();
 var vid=document.getElementById('v'),vws=null,vgen=0;
 function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
 function startVideo(){

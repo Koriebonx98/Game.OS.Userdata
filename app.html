@@ -166,14 +166,18 @@
             const addr = localStorage.getItem('gameOS_stream_addr'), pin = localStorage.getItem('gameOS_stream_pin');
             return addr && pin ? { addr, pin } : null;
         }
-        function pcGames() {
-            try { return new Set(JSON.parse(localStorage.getItem('gameOS_pc_games') || '[]').map(t => String(t).toLowerCase())); } catch (e) { return new Set(); }
+        function pcLib() {
+            try { const o = JSON.parse(localStorage.getItem('gameOS_pc_library') || '{}'); return o.user && user && o.user.toLowerCase() === user.username.toLowerCase() ? o.items || [] : []; } catch (e) { return []; }
+        }
+        function pcHas(g) {
+            return pcLib().some(i => i.title.toLowerCase() === (g.title || '').toLowerCase() && (!i.rom || i.platform === g.platform));
         }
         async function refreshPcGames() {
-            const c = pcConn(); if (!c) return;
+            const c = pcConn(); if (!c || !user) return;
             try {
-                const r = await fetch('http://' + c.addr + '/games?pin=' + encodeURIComponent(c.pin), { cache: 'no-store' });
-                if (r.ok) localStorage.setItem('gameOS_pc_games', JSON.stringify(await r.json()));
+                const r = await fetch('http://' + c.addr + '/library?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username), { cache: 'no-store' });
+                if (r.ok) localStorage.setItem('gameOS_pc_library', JSON.stringify({ user: user.username, items: await r.json() }));
+                else localStorage.removeItem('gameOS_pc_library');
             } catch (e) { /* PC offline or blocked as mixed content; keep cached list */ }
         }
         function fmtPlaytime(min) {
@@ -396,14 +400,13 @@
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
-            if (!g._owner && pcConn()) {
-                const key = (g.title || '').toLowerCase();
+            if (!g._owner && pcConn() && pcHas(g)) {
                 const c = pcConn();
                 const pcBox = document.createElement('div');
-                const inPc = pcGames().has(key);
+                const inPc = pcHas(g);
                 pcBox.innerHTML = `<small>${inPc ? '✅ Installed on your PC' : ''}</small><button class="btn app-more" id="detailPcPlay">🖥 Play on PC (stream)</button>`;
                 $('detailPlay').before(pcBox);
-                $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&launch=' + encodeURIComponent(g.title); };
+                $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&launch=' + encodeURIComponent(g.title) + (g.platform && g.platform !== 'PC' ? '&platform=' + encodeURIComponent(g.platform) : ''); };
             }
             if (!g._owner && window.GameOSEmu) {
                 const box = $('detailPlay');
@@ -974,7 +977,7 @@
                 msg.textContent = '';
                 // The launcher serves its own viewer page (plain http), avoiding mixed-content blocks.
                 saveCfg();
-                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin);
+                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin) + '&user=' + encodeURIComponent(user.username);
             };
             $('settingsNotifBtn').onclick = async () => {
                 if (!('Notification' in window)) return;

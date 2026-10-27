@@ -891,6 +891,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             });
             return true;
         };
+        StreamHostService.AccountProvider = () => _profile?.Username ?? "";
+        StreamHostService.LibraryProvider = () =>
+            LibraryVm.LocalGames.Select(g => (g.Title, "PC", false))
+                .Concat(LibraryVm.LocalRoms.Select(r => (r.Title, r.Platform, true))).ToList();
+        StreamHostService.RomLaunchHandler = (title, platform) =>
+        {
+            var rom = LibraryVm.LocalRoms.FirstOrDefault(r =>
+                string.Equals(r.Title, title, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(r.Platform, platform, StringComparison.OrdinalIgnoreCase));
+            if (rom == null) return false;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                DetailVm.LoadFromLocalRom(rom);
+                DetailVm.LaunchGameCommand.Execute(null);
+            });
+            return true;
+        };
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
