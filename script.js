@@ -6785,7 +6785,7 @@ async function loadGameCompat(platform, title) {
  * touch the same file; the workflow merges them into compatibility/<platform>/<slug>.json and Games.Database.
  * Idempotent: an existing queue file (or an already-aggregated vote) is left alone.
  */
-async function _recordGameCompat(username, platform, title, rating) {
+async function _recordGameCompat(username, platform, title, rating, titleId) {
     if (MODE === 'demo') return;
     const user = username.toLowerCase();
     const agg = _gameCompatPath(platform, title);
@@ -6793,19 +6793,51 @@ async function _recordGameCompat(username, platform, title, rating) {
     if (await githubRead(queuePath)) return;
     const done = await githubRead(agg);
     if (done && _isObj(done.content) && _isObj(done.content.votes) && done.content.votes[user]) return;
-    await githubWrite(queuePath, { username: user, platform, title, rating, votedAt: new Date().toISOString() },
+    await githubWrite(queuePath, { username: user, platform, title, rating, titleId: _safeTitleId(titleId) || undefined, votedAt: new Date().toISOString() },
         `Queue compatibility vote: ${title} (${platform})`);
 }
 
+/** Game title ID as used for Games.Database folders (Data/<platform>/Games/<titleId>/); '' when unusable. */
+const _safeTitleId = id => /^[A-Za-z0-9_-]+$/.test(String(id == null ? '' : id).trim()) ? String(id).trim() : '';
+
 /** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
-async function getCompatibility(username) { return (await _readUserMap('compat', username)).map; }
+async function getCompatibility(username) {
+    const api = _compatApi(username);
+    if (api) {
+        const r = await fetch(`${api.base}/api/me/compatibility`, { headers: { Authorization: 'Bearer ' + api.token } });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.message || 'Compatibility API error');
+        return d.votes || {};
+    }
+    return (await _readUserMap('compat', username)).map;
+}
+
+/** Game OS backend + API token for the user, or null when votes must go straight to GitHub. */
+function _compatApi(username) {
+    if (MODE === 'demo') return null;
+    const base = getBackendBase();
+    const token = localStorage.getItem(`gameOS_apiToken_${username.toLowerCase()}`) || '';
+    return base && token ? { base, token } : null;
+}
 
 /** One vote per user per game; throws 'ALREADY_VOTED' if the user has voted before. */
-async function voteCompatibility(username, platform, title, rating) {
+async function voteCompatibility(username, platform, title, rating, titleId) {
     if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
     if (_isPcPlatform(platform)) throw new Error('Compatibility is for non-PC games');
-    await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
-    try { await _recordGameCompat(username, platform, title, rating); } catch (e) { console.warn('compat: per-game file not updated', e.message); }
+    const api = _compatApi(username);
+    if (api) {
+        const r = await fetch(`${api.base}/api/me/compatibility`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + api.token },
+            body: JSON.stringify({ platform, title, rating, titleId: _safeTitleId(titleId) || undefined })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 409) throw new Error('ALREADY_VOTED');
+        if (!r.ok || !d.success) throw new Error(d.message || 'Could not save vote');
+    } else {
+        await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
+        try { await _recordGameCompat(username, platform, title, rating, titleId); } catch (e) { console.warn('compat: per-game file not updated', e.message); }
+    }
     _bumpLocalStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
 }
 
@@ -6892,7 +6924,7 @@ function _buildCompatSection(game, platform) {
     const title = _gameName(game);
     const btns = Object.entries(COMPAT_OPTIONS).map(([k, o]) =>
         `<button type="button" class="btn btn-secondary compat-btn compat-${k}" data-compat="${k}">${o.icon} ${o.label}</button>`).join('');
-    return `<div class="game-modal-section compat-section" data-compat-title="${escapeHtml(title)}" data-compat-platform="${escapeHtml(platform || '')}">
+    return `<div class="game-modal-section compat-section" data-compat-title="${escapeHtml(title)}" data-compat-platform="${escapeHtml(platform || '')}" data-compat-titleid="${escapeHtml(_safeTitleId(game && (game.TitleID || game.title_id || game.titleid || game.id)))}">
         <h4>🧪 Compatibility</h4>
         <div class="compat-totals">${_compatTotalsHtml(game, platform)}</div>
         <div class="compat-vote">
@@ -6906,7 +6938,7 @@ async function _initCompatSection(root = document) {
     if (!sec) return;
     const status = sec.querySelector('.compat-status');
     const voteBox = sec.querySelector('.compat-vote');
-    const platform = sec.dataset.compatPlatform, title = sec.dataset.compatTitle;
+    const platform = sec.dataset.compatPlatform, title = sec.dataset.compatTitle, titleId = sec.dataset.compatTitleid || '';
     const user = getCurrentUser();
     const key = _compatKey(platform, title);
     const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml({ title }, platform); };
@@ -6916,14 +6948,14 @@ async function _initCompatSection(root = document) {
         const mine = (await getCompatibility(user.username))[key];
         if (mine) {
             voted(mine);
-            await _recordGameCompat(user.username, platform, title, mine).catch(() => {});
+            if (!_compatApi(user.username)) await _recordGameCompat(user.username, platform, title, mine, titleId).catch(() => {});
         }
     } catch (_) {}
     try { await loadGameCompat(platform, title); refresh(); } catch (_) {}
     sec.querySelectorAll('[data-compat]').forEach(b => b.onclick = async () => {
         sec.querySelectorAll('[data-compat]').forEach(x => x.disabled = true);
         try {
-            await voteCompatibility(user.username, platform, title, b.dataset.compat);
+            await voteCompatibility(user.username, platform, title, b.dataset.compat, titleId);
             voted(b.dataset.compat); refresh();
         } catch (e) {
             if (e.message === 'ALREADY_VOTED') { status.textContent = 'You have already voted.'; voteBox.style.display = 'none'; }

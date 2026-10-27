@@ -4,7 +4,8 @@
 # AND to a unique queue file compat-queue/<user>/<platform>__<slug>.json (private data repo).
 # This job merges queued votes (one vote per user per game, so repeats never double count) into
 #   - Game.OS.Private.Data  compatibility/<platform>/<slug>.json
-#   - Koriebonx98/Games.Database  Data/<platform folder>/Compatibility/<slug>.json
+#   - Koriebonx98/Games.Database  Data/<platform folder>/Games/<TitleID>/compatibility.json
+#     (same layout as achievements.json; falls back to Games/<slug>/ when the vote has no title ID)
 # and then deletes the processed queue files.
 #
 # Required secrets: DATA_REPO_TOKEN (Contents: read/write on Game.OS.Private.Data)
@@ -72,19 +73,38 @@ jobs:
               raise
 
           groups = {}   # (platform, title) -> [(user, rating, queue path, sha)]
+          tids = {}     # (platform, title) -> title ID
           for u in users:
               for f in call(f'{PRIV}/contents/compat-queue/{u}', PH):
                   q, sha = read(PRIV, PH, f['path'])
                   if not isinstance(q, dict) or q.get('rating') not in ('green', 'amber', 'red') or not q.get('platform') or not q.get('title'):
                       groups.setdefault(None, []).append((None, None, f['path'], sha)); continue
                   # trust the directory name, not the file body, for who voted
+                  if isinstance(q.get('titleId'), str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', q['titleId']): tids.setdefault((q['platform'], q['title']), q['titleId'])
                   groups.setdefault((q['platform'], q['title']), []).append((u.lower(), q['rating'], f['path'], sha))
+
+          _plat_cache = {}
+          def lookup_tid(plat, title):
+              # votes without a title ID: find it in Games.Database <platform>.Games.json (same source as achievements)
+              if plat not in _plat_cache:
+                  try:
+                      req = urllib.request.Request(f'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main/{urllib.request.quote(plat)}.Games.json', headers={'User-Agent': 'gameos-compat'})
+                      with urllib.request.urlopen(req, timeout=60) as r: _plat_cache[plat] = json.loads(r.read())
+                  except Exception as e:
+                      print(f'⚠️ could not load {plat}.Games.json: {e}'); _plat_cache[plat] = []
+              for g in _plat_cache[plat] if isinstance(_plat_cache[plat], list) else []:
+                  if not isinstance(g, dict): continue
+                  if str(g.get('Title') or g.get('game_name') or g.get('title') or '').strip().lower() == title.strip().lower():
+                      tid = str(g.get('TitleID') or g.get('title_id') or g.get('titleid') or g.get('id') or '')
+                      if re.fullmatch(r'[A-Za-z0-9_-]{1,64}', tid): return tid
+              return None
 
           for key, items in groups.items():
               if key is None:
                   for _, _, p, sha in items: call(f'{PRIV}/contents/{urllib.request.quote(p)}', PH, 'DELETE', {'message': 'Drop invalid queue file', 'sha': sha})
                   continue
               plat, title = key
+              if not tids.get(key): tids[key] = lookup_tid(plat, title)
               path = f'compatibility/{psafe(plat)}/{slug(title)}.json'
               doc, sha = read(PRIV, PH, path)
               doc = doc if isinstance(doc, dict) else {}
@@ -98,10 +118,10 @@ jobs:
                   counts = {'green': 0, 'amber': 0, 'red': 0}
                   for v in votes.values():
                       if v in counts: counts[v] += 1
-                  gpath = f'Data/{folder}/Compatibility/{slug(title)}.json'
+                  gpath = f'Data/{folder}/Games/{tids.get(key) or slug(title)}/compatibility.json'
                   try:
                       _, gsha = read(GDB, GH, gpath)
-                      write(GDB, GH, gpath, {'title': doc['title'], 'platform': plat, 'compatibility': counts, 'totalVotes': len(votes)},
+                      write(GDB, GH, gpath, {'title': doc['title'], 'platform': plat, 'titleId': tids.get(key), 'compatibility': counts, 'totalVotes': len(votes)},
                             f'Compatibility votes: {title} ({plat})', gsha)
                   except Exception as e:
                       print(f'⚠️ Games.Database write failed for {title}: {e}'); ok = False
