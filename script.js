@@ -6798,14 +6798,43 @@ async function _recordGameCompat(username, platform, title, rating) {
 }
 
 /** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
-async function getCompatibility(username) { return (await _readUserMap('compat', username)).map; }
+async function getCompatibility(username) {
+    const api = _compatApi(username);
+    if (api) {
+        const r = await fetch(`${api.base}/api/me/compatibility`, { headers: { Authorization: 'Bearer ' + api.token } });
+        const d = await r.json();
+        if (!r.ok || !d.success) throw new Error(d.message || 'Compatibility API error');
+        return d.votes || {};
+    }
+    return (await _readUserMap('compat', username)).map;
+}
+
+/** Game OS backend + API token for the user, or null when votes must go straight to GitHub. */
+function _compatApi(username) {
+    if (MODE === 'demo') return null;
+    const base = getBackendBase();
+    const token = localStorage.getItem(`gameOS_apiToken_${username.toLowerCase()}`) || '';
+    return base && token ? { base, token } : null;
+}
 
 /** One vote per user per game; throws 'ALREADY_VOTED' if the user has voted before. */
 async function voteCompatibility(username, platform, title, rating) {
     if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
     if (_isPcPlatform(platform)) throw new Error('Compatibility is for non-PC games');
-    await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
-    try { await _recordGameCompat(username, platform, title, rating); } catch (e) { console.warn('compat: per-game file not updated', e.message); }
+    const api = _compatApi(username);
+    if (api) {
+        const r = await fetch(`${api.base}/api/me/compatibility`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + api.token },
+            body: JSON.stringify({ platform, title, rating })
+        });
+        const d = await r.json().catch(() => ({}));
+        if (r.status === 409) throw new Error('ALREADY_VOTED');
+        if (!r.ok || !d.success) throw new Error(d.message || 'Could not save vote');
+    } else {
+        await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
+        try { await _recordGameCompat(username, platform, title, rating); } catch (e) { console.warn('compat: per-game file not updated', e.message); }
+    }
     _bumpLocalStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
 }
 
@@ -6916,7 +6945,7 @@ async function _initCompatSection(root = document) {
         const mine = (await getCompatibility(user.username))[key];
         if (mine) {
             voted(mine);
-            await _recordGameCompat(user.username, platform, title, mine).catch(() => {});
+            if (!_compatApi(user.username)) await _recordGameCompat(user.username, platform, title, mine).catch(() => {});
         }
     } catch (_) {}
     try { await loadGameCompat(platform, title); refresh(); } catch (_) {}

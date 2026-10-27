@@ -2326,6 +2326,67 @@ app.post('/api/me/wishlist', authenticateToken, async (req, res) => {
     }
 });
 
+// ── GET /api/me/compatibility ─────────────────────────────────────────────────
+// The authenticated user's compatibility votes: { "platform|title": "green"|"amber"|"red" }
+app.get('/api/me/compatibility', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const file = await getFile(`accounts/${usernameLower}/compatibility.json`);
+        const votes = file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? file.content : {};
+        res.json({ success: true, votes });
+    } catch (err) {
+        console.error('GET /api/me/compatibility error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
+// ── POST /api/me/compatibility ────────────────────────────────────────────────
+// Cast one compatibility vote (green = playable, amber = in game, red = no boot) for a non-PC game.
+// Body: { platform, title, rating }. Responds 409 when the user has already voted on the game.
+// Also queues compat-queue/<user>/<platform>__<slug>.json for the hourly aggregation workflow.
+app.post('/api/me/compatibility', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const { platform, title, rating } = req.body || {};
+        if (typeof platform !== 'string' || typeof title !== 'string' || !platform.trim() || !title.trim()) {
+            return res.status(400).json({ success: false, message: 'platform and title are required.' });
+        }
+        if (!['green', 'amber', 'red'].includes(rating)) {
+            return res.status(400).json({ success: false, message: 'rating must be green, amber or red.' });
+        }
+        if (/^(pc|windows)$/i.test(platform.trim())) {
+            return res.status(400).json({ success: false, message: 'Compatibility is for non-PC games.' });
+        }
+
+        const key  = `${platform}|${title.toLowerCase()}`;
+        const path = `accounts/${usernameLower}/compatibility.json`;
+        const file = await getFile(path);
+        const votes = file && file.content && typeof file.content === 'object' && !Array.isArray(file.content) ? { ...file.content } : {};
+        if (votes[key]) {
+            return res.status(409).json({ success: false, message: 'You have already voted on this game.' });
+        }
+        votes[key] = rating;
+        await putFile(path, votes, `Compatibility vote: ${title} (${platform})`, file ? file.sha : undefined);
+
+        try {
+            const safePlat = platform.replace(/[^A-Za-z0-9._+-]/g, '_');
+            const slug = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100) || 'untitled';
+            const queuePath = `compat-queue/${usernameLower}/${safePlat}__${slug}.json`;
+            if (!(await getFile(queuePath))) {
+                await putFile(queuePath,
+                    { username: usernameLower, platform, title, rating, votedAt: new Date().toISOString() },
+                    `Queue compatibility vote: ${title} (${platform})`);
+            }
+        } catch (qErr) {
+            console.warn('compat queue not written:', qErr.message);
+        }
+        res.json({ success: true, message: 'Vote saved.' });
+    } catch (err) {
+        console.error('POST /api/me/compatibility error:', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+});
+
 // ── DELETE /api/me/wishlist ───────────────────────────────────────────────────
 // Remove a game from the authenticated user's wishlist.
 // Body: { platform, title }
