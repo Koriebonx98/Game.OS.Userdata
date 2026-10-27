@@ -6759,7 +6759,7 @@ async function _addUserEntry(kind, username, key, value, message) {
 }
 
 
-// Per-game votes file (private data repo): compatibility/<platform>/<title-slug>.json
+// Per-game aggregated votes (built hourly by the workflow): compatibility/<platform>/<title-slug>.json
 //   { title, platform, votes: { "<username>": "green"|"amber"|"red" } }
 const _gameCompatPath = (platform, title) =>
     `compatibility/${String(platform).replace(/[^A-Za-z0-9._+-]/g, '_')}/${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100) || 'untitled'}.json`;
@@ -6779,20 +6779,22 @@ async function loadGameCompat(platform, title) {
     _bumpLocalStat(platform, title, st => { st.compat = counts; });
 }
 
-/** Record username's vote in the per-game file (retries on write conflicts). Idempotent. */
+/**
+ * Queue the vote for the hourly "Aggregate Compatibility Votes" workflow.
+ * One file per user+game (compat-queue/<user>/<platform>__<slug>.json) so concurrent voters never
+ * touch the same file; the workflow merges them into compatibility/<platform>/<slug>.json and Games.Database.
+ * Idempotent: an existing queue file (or an already-aggregated vote) is left alone.
+ */
 async function _recordGameCompat(username, platform, title, rating) {
     if (MODE === 'demo') return;
-    const path = _gameCompatPath(platform, title), user = username.toLowerCase();
-    for (let i = 0; i < 4; i++) {
-        const f = await githubRead(path);
-        const doc = f && _isObj(f.content) ? f.content : {};
-        doc.title = doc.title || title; doc.platform = platform;
-        doc.votes = _isObj(doc.votes) ? doc.votes : {};
-        if (doc.votes[user]) return;
-        doc.votes[user] = rating;
-        try { await githubWrite(path, doc, `Compatibility vote: ${title} (${platform})`, f ? f.sha : undefined); return; }
-        catch (e) { if (i === 3) throw e; await new Promise(r => setTimeout(r, 300 * (i + 1))); }
-    }
+    const user = username.toLowerCase();
+    const agg = _gameCompatPath(platform, title);
+    const queuePath = `compat-queue/${user}/${agg.slice('compatibility/'.length).replace('/', '__')}`;
+    if (await githubRead(queuePath)) return;
+    const done = await githubRead(agg);
+    if (done && _isObj(done.content) && _isObj(done.content.votes) && done.content.votes[user]) return;
+    await githubWrite(queuePath, { username: user, platform, title, rating, votedAt: new Date().toISOString() },
+        `Queue compatibility vote: ${title} (${platform})`);
 }
 
 /** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
