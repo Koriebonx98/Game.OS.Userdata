@@ -6664,6 +6664,7 @@ if (typeof window !== 'undefined') {
     window.MOD_GENRE_PRESETS = MOD_GENRE_PRESETS;
     window.getCompatibility = getCompatibility;
     window.voteCompatibility = voteCompatibility;
+    window.loadGameCompat = loadGameCompat;
     window.getCompatBadgeHtml = getCompatBadgeHtml;
     window.loadGameStats = loadGameStats;
     window.getGameStat = getGameStat;
@@ -6757,6 +6758,43 @@ async function _addUserEntry(kind, username, key, value, message) {
     else await githubWrite(r.path, r.map, message, r.sha);
 }
 
+
+// Per-game votes file (private data repo): compatibility/<platform>/<title-slug>.json
+//   { title, platform, votes: { "<username>": "green"|"amber"|"red" } }
+const _gameCompatPath = (platform, title) =>
+    `compatibility/${String(platform).replace(/[^A-Za-z0-9._+-]/g, '_')}/${String(title).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 100) || 'untitled'}.json`;
+
+function _compatCountsFromVotes(votes) {
+    const c = { green: 0, amber: 0, red: 0 };
+    Object.values(votes || {}).forEach(v => { if (c[v] !== undefined) c[v]++; });
+    return c;
+}
+
+/** Read a game's votes file and refresh the in-memory counts from it (no-op in demo mode / when missing). */
+async function loadGameCompat(platform, title) {
+    if (MODE === 'demo') return;
+    const f = await githubRead(_gameCompatPath(platform, title));
+    if (!f || !_isObj(f.content) || !_isObj(f.content.votes)) return;
+    const counts = _compatCountsFromVotes(f.content.votes);
+    _bumpLocalStat(platform, title, st => { st.compat = counts; });
+}
+
+/** Record username's vote in the per-game file (retries on write conflicts). Idempotent. */
+async function _recordGameCompat(username, platform, title, rating) {
+    if (MODE === 'demo') return;
+    const path = _gameCompatPath(platform, title), user = username.toLowerCase();
+    for (let i = 0; i < 4; i++) {
+        const f = await githubRead(path);
+        const doc = f && _isObj(f.content) ? f.content : {};
+        doc.title = doc.title || title; doc.platform = platform;
+        doc.votes = _isObj(doc.votes) ? doc.votes : {};
+        if (doc.votes[user]) return;
+        doc.votes[user] = rating;
+        try { await githubWrite(path, doc, `Compatibility vote: ${title} (${platform})`, f ? f.sha : undefined); return; }
+        catch (e) { if (i === 3) throw e; await new Promise(r => setTimeout(r, 300 * (i + 1))); }
+    }
+}
+
 /** The signed-in user's compatibility votes: { 'platform|title': 'green'|'amber'|'red' }. */
 async function getCompatibility(username) { return (await _readUserMap('compat', username)).map; }
 
@@ -6765,6 +6803,7 @@ async function voteCompatibility(username, platform, title, rating) {
     if (!COMPAT_OPTIONS[rating]) throw new Error('Invalid rating');
     if (_isPcPlatform(platform)) throw new Error('Compatibility is for non-PC games');
     await _addUserEntry('compat', username, _compatKey(platform, title), rating, `Compatibility vote: ${title} (${platform})`);
+    try { await _recordGameCompat(username, platform, title, rating); } catch (e) { console.warn('compat: per-game file not updated', e.message); }
     _bumpLocalStat(platform, title, st => { st.compat[rating] = (Number(st.compat[rating]) || 0) + 1; });
 }
 
@@ -6871,15 +6910,14 @@ async function _initCompatSection(root = document) {
     const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml({ title }, platform); };
     const voted = r => { voteBox.style.display = 'none'; status.textContent = 'You voted: ' + COMPAT_OPTIONS[r].label; };
     if (!user) { status.textContent = 'Log in to vote.'; sec.querySelectorAll('[data-compat]').forEach(b => b.disabled = true); return; }
-    try { const mine = (await getCompatibility(user.username))[key]; if (mine) {
-        voted(mine);
-        // Shared stats are rebuilt hourly, so make sure the user's own earlier vote is reflected
-        const st = getGameStat({ title }, platform);
-        if (!st || !(Number(st.compat && st.compat[mine]) > 0)) {
-            _bumpLocalStat(platform, title, s => { s.compat[mine] = (Number(s.compat[mine]) || 0) + 1; });
-            refresh();
+    try {
+        const mine = (await getCompatibility(user.username))[key];
+        if (mine) {
+            voted(mine);
+            await _recordGameCompat(user.username, platform, title, mine).catch(() => {});
         }
-    } } catch (_) {}
+    } catch (_) {}
+    try { await loadGameCompat(platform, title); refresh(); } catch (_) {}
     sec.querySelectorAll('[data-compat]').forEach(b => b.onclick = async () => {
         sec.querySelectorAll('[data-compat]').forEach(x => x.disabled = true);
         try {
