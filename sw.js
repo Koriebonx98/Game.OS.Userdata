@@ -1,6 +1,6 @@
 /* Game OS service worker: offline shell + notification display */
 const CACHE = 'gameos-shell-v11';
-const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'emulator.js?v=emu6', 'manifest.webmanifest', 'icons/icon-192.png'];
+const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'emulator.js?v=emu7', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
