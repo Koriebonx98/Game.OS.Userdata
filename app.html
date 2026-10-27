@@ -13,6 +13,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <script src="pwa.js"></script>
+    <script src="emulator.js"></script>
 </head>
 <body class="app-body">
     <header class="app-header">
@@ -371,12 +372,28 @@
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
                 <small>${esc(g.platform)}</small>${g._owner ? `<small>👤 ${esc(g._owner)}'s copy</small>` : ''}<small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
                 <button class="btn app-more" id="detailFull">ℹ️ Full game info (description, trailer, screenshots)</button>
+                <div id="detailCompat"></div>
+                <div id="detailPlay"></div>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">🧩 Mods</h2><div id="detailMods" class="mod-list"></div>
-                <div id="detailCompat"></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
+            if (!g._owner && window.GameOSEmu && GameOSEmu.isRetro(g.platform || '')) {
+                const box = $('detailPlay');
+                const draw = async () => {
+                    let inst = false;
+                    try { inst = await GameOSEmu.isInstalled(g.platform, g.title); } catch (_) {}
+                    box.innerHTML = `<button class="btn app-more" id="detailPlayBtn">${inst ? '▶ Play' : '⬇ Set up ROM to play'}</button>` +
+                        (inst ? '<button class="btn app-more" id="detailRomBtn">🗑 Remove ROM</button>' : '');
+                    $('detailPlayBtn').onclick = async () => {
+                        if (inst) await GameOSEmu.play(g.platform, g.title);
+                        else if (await GameOSEmu.install(g.platform, g.title)) draw();
+                    };
+                    if (inst) $('detailRomBtn').onclick = async () => { await GameOSEmu.uninstall(g.platform, g.title); draw(); };
+                };
+                draw();
+            }
             const items = await loadGameAchievements(g);
             if ($('gameDetail').hidden) return;
             const done = items.filter(a => a.at).length;

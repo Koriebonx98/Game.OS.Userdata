@@ -4,8 +4,10 @@
  */
 (function () {
     const EJS_CDN = 'https://cdn.emulatorjs.org/stable/data/';
-    const CORES = { gba: 'gba', gb: 'gb', gbc: 'gb', nes: 'nes', snes: 'snes', sfc: 'snes', smc: 'snes' };
-    const ACCEPT = '.gba,.gb,.gbc,.nes,.sfc,.smc,.zip';
+    const CORES = { gba: 'gba', gb: 'gb', gbc: 'gb', nes: 'nes', snes: 'snes', sfc: 'snes', smc: 'snes',
+        n64: 'n64', z64: 'n64', v64: 'n64', nds: 'nds', md: 'segaMD', gen: 'segaMD', smd: 'segaMD', sms: 'segaMS', gg: 'segaGG',
+        pce: 'pce', a26: 'atari2600', lnx: 'lynx', ngp: 'ngp', ws: 'ws', wsc: 'ws', bin: null, cue: null, iso: null };
+    const ACCEPT = '.gba,.gb,.gbc,.nes,.sfc,.smc,.n64,.z64,.v64,.nds,.md,.gen,.smd,.sms,.gg,.pce,.a26,.lnx,.ngp,.ws,.wsc,.zip';
     const DB = 'gameos-roms';
 
     function db() {
@@ -30,6 +32,16 @@
         const ext = (fileName.split('.').pop() || '').toLowerCase();
         if (CORES[ext] && ext !== 'zip') return CORES[ext];
         const p = (platform || '').toLowerCase();
+        if (/nintendo 64|\bn64\b/.test(p)) return 'n64';
+        if (/\bds\b|nds/.test(p) && !/3ds/.test(p)) return 'nds';
+        if (/genesis|mega ?drive/.test(p)) return 'segaMD';
+        if (/master system/.test(p)) return 'segaMS';
+        if (/game gear/.test(p)) return 'segaGG';
+        if (/turbografx|pc engine/.test(p)) return 'pce';
+        if (/atari 2600/.test(p)) return 'atari2600';
+        if (/lynx/.test(p)) return 'lynx';
+        if (/neo geo pocket/.test(p)) return 'ngp';
+        if (/wonderswan/.test(p)) return 'ws';
         if (/advance|gba/.test(p)) return 'gba';
         if (/color|gbc|game ?boy|\bgb\b/.test(p)) return 'gb';
         if (/super|snes/.test(p)) return 'snes';
@@ -50,7 +62,7 @@
     async function install(platform, title) {
         const f = await pickFile();
         if (!f) return false;
-        if (!coreFor(platform, f.name)) { alert('Unsupported ROM type. Use GBA, GB, GBC, NES or SNES.'); return false; }
+        if (!coreFor(platform, f.name)) { alert('Unsupported ROM type. Use a ROM for a platform supported by the emulator.'); return false; }
         await tx('readwrite', s => s.put({ name: f.name, blob: f }, key(platform, title)));
         return true;
     }
