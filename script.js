@@ -7340,6 +7340,27 @@ function _buildFriendsSection(friendLibraries, platform, title) {
     </div>`;
 }
 
+function _buildPlaySection(platform, title) {
+    if (!(window.GameOSEmu && GameOSEmu.isRetro(platform || ''))) return '';
+    return `<div class="game-modal-section" id="gameModalPlay" data-p="${escapeHtml(platform || '')}" data-t="${escapeHtml(title || '')}"></div>`;
+}
+
+async function _initPlaySection(root = document) {
+    const box = root.querySelector('#gameModalPlay');
+    if (!box) return;
+    const p = box.dataset.p, t = box.dataset.t;
+    let inst = false;
+    try { inst = await GameOSEmu.isInstalled(p, t); } catch (_) {}
+    box.innerHTML = `<button class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;">${inst ? '▶ Play' : '⬇ Set up ROM to play'}</button>` +
+        (inst ? ' <button class="btn" id="gameModalRomBtn">🗑 Remove ROM</button>' : '');
+    box.querySelector('#gameModalPlayBtn').onclick = async () => {
+        if (inst) await GameOSEmu.play(p, t);
+        else if (await GameOSEmu.install(p, t)) _initPlaySection(root);
+    };
+    const rm = box.querySelector('#gameModalRomBtn');
+    if (rm) rm.onclick = async () => { await GameOSEmu.uninstall(p, t); _initPlaySection(root); };
+}
+
 function openGameModal(game, platform) {
     if (typeof game === 'string') {
         try { game = JSON.parse(game); } catch (_) { return; }
@@ -7372,14 +7393,15 @@ function openGameModal(game, platform) {
     const fieldRows = _buildGameModalFields(game);
     const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
     let bodyHtml = '';
+    bodyHtml += _buildCompatSection(game, platform);
+    bodyHtml += _buildPlaySection(platform, title);
+    bodyHtml += _buildAchievementsSection(game);
     bodyHtml += _buildTrailerSection(game);
-    bodyHtml += _buildFriendsSection(libs, platform, title);
     bodyHtml += _buildStoresSection(game);
     bodyHtml += _buildModsSection(game);
     bodyHtml += _buildRatingsSection(game, platform);
-    bodyHtml += _buildCompatSection(game, platform);
     bodyHtml += _buildSystemSpecsSection(game);
-    bodyHtml += _buildAchievementsSection(game);
+    bodyHtml += _buildFriendsSection(libs, platform, title);
     if (bgUrls.length > 0) {
         bodyHtml += `<div class="game-modal-bg-gallery">${
             bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
@@ -7390,6 +7412,7 @@ function openGameModal(game, platform) {
     modal.style.display = 'flex';
     _loadAchievementsInModal();
     _initCompatSection(document.getElementById('gameModalBody'));
+    _initPlaySection(document.getElementById('gameModalBody'));
     _initReviewBox();
 }
 
@@ -7439,15 +7462,16 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         const fieldRows = _buildGameModalFields(source);
         const libs = (typeof _friendLibraries !== 'undefined') ? _friendLibraries : {};
         let bodyHtml = '';
+        await loadGameStats([platform]);
+        bodyHtml += _buildCompatSection(source, platform);
+        bodyHtml += _buildPlaySection(platform, title);
+        bodyHtml += _buildAchievementsSection(source);
         bodyHtml += _buildTrailerSection(source);
-        bodyHtml += _buildFriendsSection(libs, platform, title);
         bodyHtml += _buildStoresSection(source);
         bodyHtml += _buildModsSection(source);
-        await loadGameStats([platform]);
         bodyHtml += _buildRatingsSection(source, platform);
-        bodyHtml += _buildCompatSection(source, platform);
         bodyHtml += _buildSystemSpecsSection(source);
-        bodyHtml += _buildAchievementsSection(source);
+        bodyHtml += _buildFriendsSection(libs, platform, title);
         if (bgUrls.length > 0) {
             bodyHtml += `<div class="game-modal-bg-gallery">${
                 bgUrls.map(u => `<img src="${escapeHtml(u)}" class="game-modal-bg-img" alt="Background">`).join('')
@@ -7457,6 +7481,8 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         document.getElementById('gameModalBody').innerHTML = bodyHtml;
         _loadAchievementsInModal();
         _initCompatSection(document.getElementById('gameModalBody'));
+        _initPlaySection(document.getElementById('gameModalBody'));
+    _initPlaySection(document.getElementById('gameModalBody'));
         _initReviewBox();
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =
