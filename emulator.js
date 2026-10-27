@@ -73,7 +73,8 @@
         let rec = await tx('readonly', s => s.get(key(platform, title)));
         if (!rec) { if (!(await install(platform, title))) return; rec = await tx('readonly', s => s.get(key(platform, title))); }
         const core = coreFor(platform, rec.name);
-        const url = URL.createObjectURL(rec.blob);
+        // Pass a File (not a blob: URL) so EmulatorJS keeps the file extension needed to detect the ROM type
+        const rom = new File([rec.blob], rec.name, { type: 'application/octet-stream' });
         const wrap = document.createElement('div');
         wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#000;';
         const close = document.createElement('button');
@@ -85,7 +86,7 @@
         holder.id = 'game';
         stage.appendChild(holder);
         // Run EmulatorJS in the page itself: iOS WebKit fails to load it from a srcdoc iframe
-        Object.assign(window, { EJS_player: '#game', EJS_core: core, EJS_gameUrl: url, EJS_gameName: title,
+        Object.assign(window, { EJS_player: '#game', EJS_core: core, EJS_gameUrl: rom, EJS_gameName: title,
             EJS_pathtodata: EJS_CDN, EJS_startOnLoaded: true });
         const loader = document.createElement('script');
         loader.src = EJS_CDN + 'loader.js';
