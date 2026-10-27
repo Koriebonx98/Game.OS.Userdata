@@ -162,6 +162,20 @@
         let user = null, library = [], userAch = null, friendAch = {}, returnFriend = null;
         let activityLog = [];
 
+        function pcConn() {
+            const addr = localStorage.getItem('gameOS_stream_addr'), pin = localStorage.getItem('gameOS_stream_pin');
+            return addr && pin ? { addr, pin } : null;
+        }
+        function pcGames() {
+            try { return new Set(JSON.parse(localStorage.getItem('gameOS_pc_games') || '[]').map(t => String(t).toLowerCase())); } catch (e) { return new Set(); }
+        }
+        async function refreshPcGames() {
+            const c = pcConn(); if (!c) return;
+            try {
+                const r = await fetch('http://' + c.addr + '/games?pin=' + encodeURIComponent(c.pin), { cache: 'no-store' });
+                if (r.ok) localStorage.setItem('gameOS_pc_games', JSON.stringify(await r.json()));
+            } catch (e) { /* PC offline or blocked as mixed content; keep cached list */ }
+        }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
             return h >= 1 ? h + 'h' : min + 'm';
@@ -382,6 +396,15 @@
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;
             $('gameDetail').hidden = false;
             $('detailFull').onclick = () => openGameModalFromLibrary(g.title, g.platform, g.titleId || '');
+            if (!g._owner && pcConn()) {
+                const key = (g.title || '').toLowerCase();
+                const c = pcConn();
+                const pcBox = document.createElement('div');
+                const inPc = pcGames().has(key);
+                pcBox.innerHTML = `<small>${inPc ? '✅ Installed on your PC' : ''}</small><button class="btn app-more" id="detailPcPlay">🖥 Play on PC (stream)</button>`;
+                $('detailPlay').before(pcBox);
+                $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&launch=' + encodeURIComponent(g.title); };
+            }
             if (!g._owner && window.GameOSEmu) {
                 const box = $('detailPlay');
                 const draw = async () => {
@@ -925,6 +948,7 @@
                 localStorage.setItem(devKey, JSON.stringify(l)); renderDevs(); msg.textContent = 'Saved "' + name + '".';
             };
             renderDevs();
+            refreshPcGames();
             $('streamTestBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
                 const pin = $('streamPin').value.trim(), msg = $('streamMsg');

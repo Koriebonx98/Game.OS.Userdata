@@ -540,6 +540,7 @@ function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),l
 document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');g.hidden=!g.hidden;if(g.hidden)return;
  try{allGames=await (await fetch('/games?pin='+pinQ)).json()}catch(e){allGames=[]}renderGames()};
 document.getElementById('gq').oninput=renderGames;
+(function(){var lt=new URLSearchParams(location.search).get('launch');if(lt){fetch('/launch?pin='+pinQ+'&title='+encodeURIComponent(lt)).catch(function(){})}})();
 var vid=document.getElementById('v'),vws=null,vgen=0;
 function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
 function startVideo(){
