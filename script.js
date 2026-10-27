@@ -6871,7 +6871,15 @@ async function _initCompatSection(root = document) {
     const refresh = () => { sec.querySelector('.compat-totals').innerHTML = _compatTotalsHtml({ title }, platform); };
     const voted = r => { voteBox.style.display = 'none'; status.textContent = 'You voted: ' + COMPAT_OPTIONS[r].label; };
     if (!user) { status.textContent = 'Log in to vote.'; sec.querySelectorAll('[data-compat]').forEach(b => b.disabled = true); return; }
-    try { const mine = (await getCompatibility(user.username))[key]; if (mine) voted(mine); } catch (_) {}
+    try { const mine = (await getCompatibility(user.username))[key]; if (mine) {
+        voted(mine);
+        // Shared stats are rebuilt hourly, so make sure the user's own earlier vote is reflected
+        const st = getGameStat({ title }, platform);
+        if (!st || !(Number(st.compat && st.compat[mine]) > 0)) {
+            _bumpLocalStat(platform, title, s => { s.compat[mine] = (Number(s.compat[mine]) || 0) + 1; });
+            refresh();
+        }
+    } } catch (_) {}
     sec.querySelectorAll('[data-compat]').forEach(b => b.onclick = async () => {
         sec.querySelectorAll('[data-compat]').forEach(x => x.disabled = true);
         try {
