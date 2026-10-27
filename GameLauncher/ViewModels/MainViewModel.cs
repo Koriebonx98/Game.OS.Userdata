@@ -879,6 +879,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 return false;
             }
         };
+        StreamHostService.InstalledGamesProvider = () => LibraryVm.LocalGames.Select(g => g.Title).ToList();
+        StreamHostService.LaunchHandler = title =>
+        {
+            var game = LibraryVm.LocalGames.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
+            if (game == null) return false;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                DetailVm.LoadFromLocalGame(game, 0);
+                DetailVm.LaunchGameCommand.Execute(null);
+            });
+            return true;
+        };
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
