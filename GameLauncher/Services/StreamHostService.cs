@@ -523,9 +523,9 @@ namespace GameLauncher.Services
 
         private static string ViewerHtml(string pin) => @"<!doctype html><html><head><meta charset='utf-8'>
 <meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>
-<meta name='apple-mobile-web-app-capable' content='yes'><title>Game OS Stream</title>
+<meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'><title>Game OS Stream</title>
 <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:-apple-system,sans-serif}
-body{position:fixed;inset:0}img{width:100%;height:100%;object-fit:contain;display:block}
+body{position:fixed;inset:0}video{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh}img{width:100%;height:100%;object-fit:contain;display:block}
 #controls{position:fixed;z-index:2;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:8px}
 button,a{color:#fff;background:rgba(0,0,0,.72);border:1px solid #777;padding:8px 12px;border-radius:16px;text-decoration:none;font-size:14px}
 #audioStatus{align-self:center;font-size:12px;text-shadow:0 1px 3px #000}
@@ -556,13 +556,13 @@ document.getElementById('sTest').onclick=async function(){var r=document.getElem
  var l=Math.min.apply(null,lat),t0=performance.now(),b=await (await fetch('/speedtest?pin='+pinQ+'&kb=2048&t='+Date.now(),{cache:'no-store'})).arrayBuffer();
  var mbps=b.byteLength*8/1e6/((performance.now()-t0)/1000);var q=mbps>=20&&l<=40?'Good':mbps>=8&&l<=100?'OK':'Bad';
  r.textContent=q+' connection — '+mbps.toFixed(1)+' Mbps, '+l.toFixed(0)+' ms latency'}catch(e){r.textContent='Test failed'}};
-var allGames=[];
+var allGames=[];// items: {title,platform,rom}
 function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),l=document.getElementById('gl');l.innerHTML='';
- allGames.filter(function(t){return t.toLowerCase().indexOf(q)>=0}).forEach(function(t){var b=document.createElement('button');b.textContent='▶ '+t;b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
-  b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(t));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
+ allGames.filter(function(g){return g.title.toLowerCase().indexOf(q)>=0}).forEach(function(g){var t=g.title,b=document.createElement('button');b.textContent='▶ '+t+(g.rom?' ('+g.platform+')':'');b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
+  b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(t)+(g.rom?'&rom=1&platform='+encodeURIComponent(g.platform):''));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
  if(!l.children.length)l.textContent='No installed games found.'}
 document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');g.hidden=!g.hidden;if(g.hidden)return;
- try{allGames=await (await fetch('/games?pin='+pinQ+'&user='+userQ)).json()}catch(e){allGames=[]}renderGames()};
+ try{allGames=await (await fetch('/library?pin='+pinQ+'&user='+userQ)).json()}catch(e){allGames=[]}renderGames()};
 document.getElementById('gq').oninput=renderGames;
 (function(){var u=new URLSearchParams(location.search),lt=u.get('launch');if(lt){var pf=u.get('platform');fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(lt)+(pf?'&rom=1&platform='+encodeURIComponent(pf):'')).catch(function(){})}})();
 var vid=document.getElementById('v'),vws=null,vgen=0;
@@ -616,12 +616,18 @@ audioButton.onclick=async function(){
  }catch(e){status.textContent='Audio could not start. Tap Enable audio to try again.'}
 };
 function setFullscreen(){
- if(document.fullscreenElement){document.exitFullscreen&&document.exitFullscreen();document.body.classList.remove('immersive');return}
- document.body.classList.add('immersive');
- if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen().catch(function(){});
+ var d=document,de=d.documentElement,fs=d.fullscreenElement||d.webkitFullscreenElement;
+ if(fs){(d.exitFullscreen||d.webkitExitFullscreen).call(d);d.body.classList.remove('immersive');return}
+ d.body.classList.add('immersive');
+ var rq=de.requestFullscreen||de.webkitRequestFullscreen;
+ if(rq){try{var p=rq.call(de);if(p&&p.catch)p.catch(function(){})}catch(e){}return}
+ // iPhone Safari has no element fullscreen API: use the native video player fullscreen instead.
+ if(vid.style.display!=='none'&&vid.webkitEnterFullscreen){try{vid.webkitEnterFullscreen()}catch(e){}}
+ else window.scrollTo(0,1);
 }
 document.getElementById('full').onclick=setFullscreen;
-document.addEventListener('fullscreenchange',function(){document.getElementById('full').textContent=document.fullscreenElement?'Exit fullscreen':'Fullscreen'});
+function fsChange(){document.getElementById('full').textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'Exit fullscreen':'Fullscreen'}
+document.addEventListener('fullscreenchange',fsChange);document.addEventListener('webkitfullscreenchange',fsChange);
 </script></body></html>";
     }
 }
