@@ -69,7 +69,6 @@ const PLATFORM_TO_GAMES_DB_FOLDER = {
     'PS5':      'Sony - PlayStation 5',
     'Xbox One': 'Microsoft - Xbox One',
     'GameBoy':  'Nintendo - Game Boy',
-    'GameBoy Color':   'Nintendo - Game Boy Color',
     'GameBoy Advance': 'Nintendo - Game Boy Advance',
     'NES':      'Nintendo - NES',
     'SNES':     'Nintendo - SNES',

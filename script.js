@@ -3215,7 +3215,7 @@ async function displayTotalUsersCount() {
 const GAMES_DB_RAW_BASE = 'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main';
 
 const GAMES_DB_PLATFORMS = [
-    'PC', 'PS3', 'PS4', 'PS1', 'PS2', 'Xbox', 'Switch', 'GameCube', 'DS', 'Xbox 360', 'GameBoy Advance', 'PSP','GameBoy', 'GameBoy Color', 'NES', 'SNES', '3DS'
+    'PC', 'PS3', 'PS4', 'PS1', 'PS2', 'Xbox', 'Switch', 'GameCube', 'DS', 'Xbox 360', 'GameBoy Advance', 'PSP','GameBoy', 'NES', 'SNES', '3DS'
 ];
 
 // Token for writing to the Games Database repository (XOR-hex-encoded, injected at deploy time).
@@ -3745,7 +3745,6 @@ const _PLATFORM_TO_GAMES_DB_FOLDER = {
     'PS5':      'Sony - PlayStation 5',
     'Xbox One': 'Microsoft - Xbox One',
     'GameBoy':  'Nintendo - Game Boy',
-    'GameBoy Color':   'Nintendo - Game Boy Color',
     'GameBoy Advance': 'Nintendo - Game Boy Advance',
     'NES':      'Nintendo - NES',
     'SNES':     'Nintendo - SNES',
