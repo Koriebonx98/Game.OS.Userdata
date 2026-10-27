@@ -394,6 +394,18 @@
                 };
                 draw();
             }
+            let dbGame = null;
+            try {
+                const dbGames = typeof fetchGamesDbPlatform === 'function' ? await fetchGamesDbPlatform(g.platform) : [];
+                dbGame = dbGames.find(x => (x.Title || x.game_name || x.title || '').toLowerCase() === (g.title || '').toLowerCase());
+            } catch (_) {}
+            try {
+                await loadGameStats([g.platform]);
+                if ($('gameDetail').hidden) return;
+                $('detailCompat').innerHTML = _buildCompatSection(dbGame || g, g.platform);
+                _initCompatSection($('detailBody'));
+            } catch (_) {}
+            if ($('gameDetail').hidden) return;
             const items = await loadGameAchievements(g);
             if ($('gameDetail').hidden) return;
             const done = items.filter(a => a.at).length;
@@ -412,19 +424,10 @@
                     $('achSheet').hidden = false;
                 };
             }
-            let dbGame = null;
             try {
-                const dbGames = typeof fetchGamesDbPlatform === 'function' ? await fetchGamesDbPlatform(g.platform) : [];
-                dbGame = dbGames.find(x => (x.Title || x.game_name || x.title || '').toLowerCase() === (g.title || '').toLowerCase());
                 const html = dbGame ? _buildModsSection(dbGame) : '';
                 if (!$('gameDetail').hidden) $('detailMods').innerHTML = html ? html.replace(/^[\s\S]*?<div class="mod-list">/, '').replace(/<\/div>\s*<\/div>\s*$/, '') : empty('No mods listed for this game.');
             } catch (_) { $('detailMods').innerHTML = empty('No mods listed for this game.'); }
-            try {
-                await loadGameStats([g.platform]);
-                if ($('gameDetail').hidden) return;
-                $('detailCompat').innerHTML = _buildCompatSection(dbGame || g, g.platform);
-                _initCompatSection($('detailBody'));
-            } catch (_) {}
             if (!friendsLoaded) await loadFriends();
             const owners = friends.filter(f => (friendLibs[f] || []).some(x => (x.title || '').toLowerCase() === (g.title || '').toLowerCase() && (!x.platform || !g.platform || x.platform === g.platform)));
             if ($('gameDetail').hidden) return;
@@ -510,7 +513,7 @@
             }).join('') : empty('No achievements to compare.'));
         }
         // ── Store (browse Games.Database and add to library) ──
-        let storeGames = [], storePlatOf = new Map(), storeWishlist = [], storeCat = 'All', storeRecs = [];
+        let storeGames = [], storePlatOf = new Map(), storeWishlist = [], storeCat = 'All', storeRecs = [], updatedGameOrder = new Map();
         let storeShowAllRecs = false;
         const storeF = { platforms: new Set(), genres: new Set(), features: new Set(), modGenres: new Set() };
         const pf = g => storePlatOf.get(g) || '';
@@ -607,6 +610,15 @@
                     try { (await fetchGamesDbPlatform(p)).forEach(g => { storeGames.push(g); storePlatOf.set(g, p); }); } catch (_) {}
                 }));
             } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
+            updatedGameOrder = new Map();
+            try {
+                const feed = await getUpdatedGameFeed();
+                feed.forEach((entry, index) => {
+                    updatedGameOrder.set(`${entry.platform}|${String(entry.title).toLowerCase()}`, index);
+                });
+            } catch (err) {
+                console.warn('Updated games feed could not be loaded:', err.message);
+            }
             await loadGameStats([...new Set(storeGames.map(pf))]);
             storeGames.sort((a, b) => gTitle(a).toLowerCase().localeCompare(gTitle(b).toLowerCase()));
             await loadStoreRecs();
@@ -664,9 +676,16 @@
             const recent = g => { const d = Date.parse(g.updated_at || g.updated || g.last_updated || ''); return !isNaN(d) && Date.now() - d < 30 * 864e5; };
             let shelves = '';
             if (!filtered) {
-                shelves = [['⭐ Exclusives', g => has(g, 'exclusive')], ['🆕 New', g => has(g, 'new')], ['🔄 Updated', g => has(g, 'updated') || recent(g)], ['⏳ Coming Soon', g => has(g, 'coming soon')]].map(([label, fn]) => {
-                    const items = []; for (let i = 0; i < storeGames.length && items.length < 20; i++) if (fn(storeGames[i])) items.push(storeGames[i]);
-                    return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(g => card(g)).join('')}</div></div>` : '';
+                shelves = [['🔄 Updated', g => has(g, 'updated') || recent(g) ||
+                    updatedGameOrder.has(`${pf(g)}|${gTitle(g).toLowerCase()}`)], ['⭐ Exclusives', g => has(g, 'exclusive')],
+                    ['⏳ Coming Soon', g => has(g, 'coming soon')]].map(([label, fn]) => {
+                    const items = []; for (const game of storeGames) if (fn(game)) items.push(game);
+                    if (label === '🔄 Updated') items.sort((a, b) => {
+                        const oa = updatedGameOrder.has(`${pf(a)}|${gTitle(a).toLowerCase()}`) ? updatedGameOrder.get(`${pf(a)}|${gTitle(a).toLowerCase()}`) : Infinity;
+                        const ob = updatedGameOrder.has(`${pf(b)}|${gTitle(b).toLowerCase()}`) ? updatedGameOrder.get(`${pf(b)}|${gTitle(b).toLowerCase()}`) : Infinity;
+                        return oa - ob;
+                    });
+                    return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.slice(0, 20).map(g => card(g)).join('')}</div></div>` : '';
                 }).join('');
                 if (storeRecs.length) {
                     const recCard = (r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`);
