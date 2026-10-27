@@ -7365,24 +7365,7 @@ async function _initPlaySection(root = document) {
     const box = root.querySelector('#gameModalPlay');
     if (!box) return;
     const p = box.dataset.p, t = box.dataset.t;
-    if (!(window.GameOSEmu && GameOSEmu.isRetro(p))) {
-        const g = (typeof _currentModalGame !== 'undefined' && _currentModalGame) || {};
-        const steamId = String(g.steamAppId || g.appid || '').replace(/\D/g, '');
-        const stores = Array.isArray(g.stores) ? g.stores.filter(s => s && /^https?:\/\//i.test(s.url || '')) : [];
-        let href = '';
-        if (/^(ios|iphone|ipad)\b|apple/i.test(p)) {
-            const st = stores.find(s => /apple|app store|itunes/i.test((s.name || '') + s.url));
-            href = st ? st.url : 'https://apps.apple.com/search?term=' + encodeURIComponent(t);
-        } else if (steamId) {
-            href = 'steam://run/' + steamId;
-        } else if (stores.length) {
-            href = stores[0].url;
-        } else {
-            href = 'https://store.steampowered.com/search/?term=' + encodeURIComponent(t);
-        }
-        box.innerHTML = `<a class="btn" id="gameModalPlayBtn" href="${escapeHtml(href)}" ${href.startsWith('http') ? 'target="_blank" rel="noopener noreferrer"' : ''} style="background:#16a34a;color:#fff;text-decoration:none;display:inline-block;">▶ Play</a>`;
-        return;
-    }
+    if (!window.GameOSEmu) return;
     let inst = false;
     try { inst = await GameOSEmu.isInstalled(p, t); } catch (_) {}
     box.innerHTML = `<button class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;">${inst ? '▶ Play' : '⬇ Set up ROM to play'}</button>` +

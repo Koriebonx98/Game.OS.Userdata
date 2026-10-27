@@ -64,7 +64,7 @@
     async function install(platform, title) {
         const f = await pickFile();
         if (!f) return false;
-        if (!coreFor(platform, f.name)) { alert('Unsupported ROM type. Use a ROM for a platform supported by the emulator.'); return false; }
+        if (!coreFor(platform, f.name)) { alert('Unsupported ROM type. Pick a ROM file for a platform supported by the emulator (e.g. .gba, .nes, .sfc, .n64, .nds, .md).'); return false; }
         await tx('readwrite', s => s.put({ name: f.name, blob: f }, key(platform, title)));
         return true;
     }
