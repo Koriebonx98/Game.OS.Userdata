@@ -198,11 +198,11 @@
             return 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(i.title) + (i.rom ? '&platform=' + encodeURIComponent(i.platform) : '');
         }
         function renderPcLib() {
-            const c = pcConn(), items = c && user ? pcLib() : [];
+            const c = pcConn(), items = user ? pcLib() : [];
             const q = $('libSearch').value.trim().toLowerCase(), plat = $('libPlatform').value, src = $('libSource').value;
             const shown = src === 'lib' ? [] : items.map((i, n) => ({ i, n })).filter(({ i }) => i.title.toLowerCase().includes(q) && (!plat || (i.platform || 'PC') === plat));
             $('pcLibHead').hidden = !shown.length;
-            $('pcLibList').innerHTML = shown.map(({ i, n }) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div><button class="btn app-more" data-pcplay="${n}">▶ Stream</button></div>`).join('');
+            $('pcLibList').innerHTML = shown.map(({ i, n }) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div>${c ? `<button class="btn app-more" data-pcplay="${n}">▶ Stream</button>` : ''}</div>`).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -290,8 +290,8 @@
         let libPlatform = '', libSort = 'name', libShow = '';
         function fillPlatforms() {
             const sel = $('libPlatform'), cur = sel.value;
-            const plats = [...new Set([...library.map(g => g.platform), ...(pcConn() ? pcLib().map(i => i.platform || 'PC') : [])].filter(Boolean))].sort();
-            sel.innerHTML = '<option value="">All platforms</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)} (${library.filter(g => g.platform === p).length + (pcConn() ? pcLib().filter(i => (i.platform || 'PC') === p).length : 0)})</option>`).join('');
+            const plats = [...new Set([...library.map(g => g.platform), ...pcLib().map(i => i.platform || 'PC')].filter(Boolean))].sort();
+            sel.innerHTML = '<option value="">All platforms</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)} (${library.filter(g => g.platform === p).length + pcLib().filter(i => (i.platform || 'PC') === p).length})</option>`).join('');
             sel.value = plats.includes(cur) ? cur : '';
         }
         function renderLibrary() {
