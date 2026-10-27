@@ -371,9 +371,9 @@
             const pt = minutesOf(g);
             $('detailBody').innerHTML = `<div class="app-hero"><div class="app-cover">${cover}</div><div><h2>${esc(g.title)}</h2>
                 <small>${esc(g.platform)}</small>${g._owner ? `<small>👤 ${esc(g._owner)}'s copy</small>` : ''}<small>⏱ Playtime: ${pt ? fmtPlaytime(pt) + (pt >= 60 ? ' ' + (pt % 60) + 'm' : '') : 'Not played yet'}</small>${g.addedAt ? `<small>Added ${esc(asDate(g.addedAt))}</small>` : ''}</div></div>
+                <div id="detailPlay"></div>
                 <button class="btn app-more" id="detailFull">ℹ️ Full game info (description, trailer, screenshots)</button>
                 <div id="detailCompat"></div>
-                <div id="detailPlay"></div>
                 <h2 class="app-h2">🏆 Achievements</h2><div id="detailAch"><p class="games-list-empty">Loading…</p></div>
                 <h2 class="app-h2">🧩 Mods</h2><div id="detailMods" class="mod-list"></div>
                 <h2 class="app-h2">👥 Friends who own this</h2><div id="detailFriends" class="app-list"><p class="games-list-empty">Loading…</p></div>`;

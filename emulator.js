@@ -79,16 +79,21 @@
         const close = document.createElement('button');
         close.textContent = '✕ Close';
         close.style.cssText = 'position:absolute;top:env(safe-area-inset-top,8px);right:8px;z-index:2;padding:8px 12px;';
-        const frame = document.createElement('iframe');
-        frame.style.cssText = 'width:100%;height:100%;border:0;';
-        frame.allow = 'autoplay; gamepad; fullscreen';
-        const q = s => JSON.stringify(String(s)).replace(/</g, '\\u003c');
-        frame.srcdoc = '<!doctype html><body style="margin:0;background:#000"><div style="width:100vw;height:100vh"><div id="game"></div></div><script>' +
-            'EJS_player="#game";EJS_core=' + q(core) + ';EJS_gameUrl=' + q(url) + ';EJS_gameName=' + q(title) +
-            ';EJS_pathtodata=' + q(EJS_CDN) + ';EJS_startOnLoaded=true;<\/script><script src="' + EJS_CDN + 'loader.js"><\/script>';
-        close.onclick = () => { wrap.remove(); URL.revokeObjectURL(url); };
-        wrap.append(frame, close);
+        const stage = document.createElement('div');
+        stage.style.cssText = 'width:100%;height:100%;';
+        const holder = document.createElement('div');
+        holder.id = 'game';
+        stage.appendChild(holder);
+        // Run EmulatorJS in the page itself: iOS WebKit fails to load it from a srcdoc iframe
+        Object.assign(window, { EJS_player: '#game', EJS_core: core, EJS_gameUrl: url, EJS_gameName: title,
+            EJS_pathtodata: EJS_CDN, EJS_startOnLoaded: true });
+        const loader = document.createElement('script');
+        loader.src = EJS_CDN + 'loader.js';
+        loader.onerror = () => alert('Could not load the emulator. Check your connection and try again.');
+        close.onclick = () => location.reload(); // EmulatorJS cannot be torn down cleanly
+        wrap.append(stage, close);
         document.body.appendChild(wrap);
+        document.body.appendChild(loader);
     }
 
     window.GameOSEmu = { isRetro, install, play, uninstall, isInstalled };
