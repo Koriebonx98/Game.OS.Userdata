@@ -1,1 +1,11 @@
-{"Games":[{"Title":"Test","TitleID":"TEST-0","description":"Test game entry – pick your own ROM when you press Play.","background_images":[],"trailers":[]}]}
+{
+  "Games": [
+    {
+      "Title": "Test",
+      "TitleID": "TEST-0",
+      "description": "Test entry - replace or remove once real games are added.",
+      "background_images": [],
+      "trailers": []
+    }
+  ]
+}

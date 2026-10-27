@@ -1,0 +1,11 @@
+{
+  "Games": [
+    {
+      "Title": "Test",
+      "TitleID": "TEST-0",
+      "description": "Test entry - replace or remove once real games are added.",
+      "background_images": [],
+      "trailers": []
+    }
+  ]
+}
