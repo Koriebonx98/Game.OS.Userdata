@@ -48,6 +48,11 @@ namespace GameLauncher.Services
         private static int _jpegQuality = 60;
         private static bool _audioEnabled = true;
 
+        /// <summary>Returns the titles of games installed on this PC (set by the launcher; used by the stream viewer's game list).</summary>
+        public static Func<IReadOnlyList<string>>? InstalledGamesProvider { get; set; }
+        /// <summary>Launches an installed game by title; returns false when no such game is installed.</summary>
+        public static Func<string, bool>? LaunchHandler { get; set; }
+
         public static string Pin => _pin;
         public static int Port => _port;
         public static bool IsRunning => _listener != null;
@@ -208,6 +213,16 @@ namespace GameLauncher.Services
                     }
                     if (path == "/" || path == "/index.html")
                         await Respond(stream, 200, "text/html; charset=utf-8", ViewerHtml(pin));
+                    else if (path == "/games")
+                    {
+                        var titles = (InstalledGamesProvider?.Invoke() ?? Array.Empty<string>()).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToArray();
+                        await Respond(stream, 200, "application/json; charset=utf-8", JsonSerializer.Serialize(titles));
+                    }
+                    else if (path == "/launch")
+                    {
+                        bool ok = qp.TryGetValue("title", out var title) && !string.IsNullOrWhiteSpace(title) && (LaunchHandler?.Invoke(title) ?? false);
+                        await Respond(stream, ok ? 200 : 404, "application/json", ok ? "{\"launched\":true}" : "{\"launched\":false}");
+                    }
                     else if (path == "/speedtest")
                     {
                         int kb = qp.TryGetValue("kb", out var kbs) && int.TryParse(kbs, out var k) ? Math.Clamp(k, 1, 8192) : 1024;
@@ -493,12 +508,14 @@ button,a{color:#fff;background:rgba(0,0,0,.72);border:1px solid #777;padding:8px
 #audioStatus{align-self:center;font-size:12px;text-shadow:0 1px 3px #000}
 body.immersive #controls{opacity:.25;transition:opacity .2s}body.immersive #controls:active{opacity:1}
 </style></head>
-<body><div id='controls'><a href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><button id='cfg'>Settings</button><span id='audioStatus' role='status'></span></div>
+<body><div id='controls'><a href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><button id='cfg'>Settings</button><button id='gm'>Games</button><span id='audioStatus' role='status'></span></div>
 <div id='panel' hidden style='position:fixed;z-index:3;inset:auto 8px 8px 8px;background:rgba(20,20,24,.95);border:1px solid #555;border-radius:16px;padding:12px;font-size:14px'>
 <label>FPS <select id='sFps'><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option></select></label>
 <label>Width <select id='sW'><option>640</option><option>854</option><option>1280</option><option>1920</option></select></label>
 <label>Quality <select id='sQ'><option>35</option><option>50</option><option>60</option><option>75</option><option>90</option></select></label>
 <div style='margin-top:8px'><button id='sApply'>Apply</button> <button id='sTest'>Test connection</button></div><div id='sRes' style='margin-top:6px'></div></div>
+<div id='games' hidden style='position:fixed;z-index:3;inset:56px 8px 8px 8px;background:rgba(20,20,24,.96);border:1px solid #555;border-radius:16px;padding:12px;overflow:auto;font-size:14px'>
+<input id='gq' placeholder='Search installed games' style='width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #555;background:#111;color:#fff'><div id='gl'></div></div>
 <img id='s' alt='Connecting…'><video id='v' muted playsinline autoplay disablepictureinpicture style='display:none;width:100%;height:100%;object-fit:contain;background:#000'></video>
 <script>
 var s=document.getElementById('s'), audioButton=document.getElementById('audio'), status=document.getElementById('audioStatus');
@@ -515,6 +532,14 @@ document.getElementById('sTest').onclick=async function(){var r=document.getElem
  var l=Math.min.apply(null,lat),t0=performance.now(),b=await (await fetch('/speedtest?pin='+pinQ+'&kb=2048&t='+Date.now(),{cache:'no-store'})).arrayBuffer();
  var mbps=b.byteLength*8/1e6/((performance.now()-t0)/1000);var q=mbps>=20&&l<=40?'Good':mbps>=8&&l<=100?'OK':'Bad';
  r.textContent=q+' connection — '+mbps.toFixed(1)+' Mbps, '+l.toFixed(0)+' ms latency'}catch(e){r.textContent='Test failed'}};
+var allGames=[];
+function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),l=document.getElementById('gl');l.innerHTML='';
+ allGames.filter(function(t){return t.toLowerCase().indexOf(q)>=0}).forEach(function(t){var b=document.createElement('button');b.textContent='▶ '+t;b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
+  b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&title='+encodeURIComponent(t));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
+ if(!l.children.length)l.textContent='No installed games found.'}
+document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');g.hidden=!g.hidden;if(g.hidden)return;
+ try{allGames=await (await fetch('/games?pin='+pinQ)).json()}catch(e){allGames=[]}renderGames()};
+document.getElementById('gq').oninput=renderGames;
 var vid=document.getElementById('v'),vws=null,vgen=0;
 function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
 function startVideo(){
@@ -527,7 +552,7 @@ function startVideo(){
  function pump(){if(!sb||sb.updating||!queue.length)return;try{
   if(queue.length>60){queue.length=0;return}
   sb.appendBuffer(queue.shift())}catch(e){queue.length=0}}
- function live(){try{var b=vid.buffered;if(b.length){var e=b.end(b.length-1);if(e-vid.currentTime>.3)vid.currentTime=e-.05;if(vid.paused)vid.play().catch(function(){});
+ function live(){try{var b=vid.buffered;if(b.length){var e=b.end(b.length-1);if(e-vid.currentTime>.15)vid.currentTime=e-.03;if(vid.paused)vid.play().catch(function(){});
   if(b.start(0)<vid.currentTime-4&&!sb.updating)sb.remove(0,vid.currentTime-2)}}catch(e){}}
  vid.disableRemotePlayback=true;vid.src=URL.createObjectURL(ms);
  ws.onmessage=function(e){

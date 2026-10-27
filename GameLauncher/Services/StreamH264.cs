@@ -137,7 +137,7 @@ namespace GameLauncher.Services
             int sw = GetSystemMetrics(0), sh = GetSystemMetrics(1);
             int w = Math.Min(sw, maxWidth) & ~1, h = ((int)((long)sh * w / sw)) & ~1;
             string enc = PickEncoder(ffmpeg);
-            string args = $"-hide_banner -loglevel error -fflags nobuffer -f gdigrab -framerate {fps} -draw_mouse 1 -i desktop " +
+            string args = $"-hide_banner -loglevel error -fflags nobuffer -flags low_delay -probesize 32 -analyzeduration 0 -f gdigrab -framerate {fps} -draw_mouse 1 -i desktop " +
                           $"-vf scale={w}:{h},format=yuv420p {EncoderArgs(enc, BitrateKbps(w, h, fps, quality), fps)} " +
                           "-an -flush_packets 1 -f mp4 -movflags frag_every_frame+empty_moov+default_base_moof+omit_tfhd_offset pipe:1";
 
