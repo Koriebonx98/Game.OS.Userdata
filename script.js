@@ -7499,7 +7499,6 @@ async function openGameModalFromLibrary(title, platform, titleId) {
         _loadAchievementsInModal();
         _initCompatSection(document.getElementById('gameModalBody'));
         _initPlaySection(document.getElementById('gameModalBody'));
-    _initPlaySection(document.getElementById('gameModalBody'));
         _initReviewBox();
     } catch (_) {
         document.getElementById('gameModalBody').innerHTML =

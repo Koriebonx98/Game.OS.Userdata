@@ -45,7 +45,7 @@
         if (/advance|gba/.test(p)) return 'gba';
         if (/color|gbc|game ?boy|\bgb\b/.test(p)) return 'gb';
         if (/super|snes/.test(p)) return 'snes';
-        if (/nes|famicom/.test(p)) return 'nes';
+        if (/\bnes\b|nintendo entertainment|famicom/.test(p)) return 'nes';
         return null;
     }
     function isRetro(platform) { return !!coreFor(platform, ''); }
