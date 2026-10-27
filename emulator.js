@@ -72,6 +72,7 @@
     const uninstall = (platform, title) => tx('readwrite', s => s.delete(key(platform, title)));
 
     async function play(platform, title) {
+        if (!isRetro(platform)) { alert('No in-browser emulator is available for ' + (platform || 'this platform') + ' yet.'); return; }
         let rec = await tx('readonly', s => s.get(key(platform, title)));
         if (!rec) { if (!(await install(platform, title))) return; rec = await tx('readonly', s => s.get(key(platform, title))); }
         const core = coreFor(platform, rec.name);

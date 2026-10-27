@@ -7358,7 +7358,7 @@ function _buildFriendsSection(friendLibraries, platform, title) {
 }
 
 function _buildPlaySection(platform, title) {
-    if (!(window.GameOSEmu && GameOSEmu.isRetro(platform || ''))) return '';
+    if (!window.GameOSEmu) return '';
     return `<div class="game-modal-section" id="gameModalPlay" data-p="${escapeHtml(platform || '')}" data-t="${escapeHtml(title || '')}"></div>`;
 }
 
