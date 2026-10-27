@@ -191,6 +191,7 @@ namespace GameLauncher.Services
                 try
                 {
                     client.NoDelay = true;
+                    client.SendBufferSize = 64 * 1024;
                     var stream = client.GetStream();
                     stream.ReadTimeout = 5000;
                     var buf = new byte[4096];
@@ -329,16 +330,85 @@ namespace GameLauncher.Services
             }
             await s.WriteAsync(Encoding.ASCII.GetBytes(
                 "HTTP/1.1 200 OK\r\nContent-Type: multipart/x-mixed-replace; boundary=frame\r\nAccess-Control-Allow-Origin: *\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n"), ct);
-            while (!ct.IsCancellationRequested)
+            // Capture on its own task and keep only the newest frame, so a slow network drops frames
+            // instead of building up a delay.
+            byte[]? latest = null; long seq = 0, sent = 0;
+            using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var producer = Task.Run(async () =>
             {
-                var started = Environment.TickCount64;
-                byte[] jpg = CaptureJpeg(maxWidth, jpegQuality);
-                await s.WriteAsync(Encoding.ASCII.GetBytes($"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {jpg.Length}\r\n\r\n"), ct);
-                await s.WriteAsync(jpg, ct);
-                await s.WriteAsync(Encoding.ASCII.GetBytes("\r\n"), ct);
-                int wait = 1000 / frameRate - (int)(Environment.TickCount64 - started);
-                if (wait > 0) await Task.Delay(wait, ct);
+                using var grabber = new MjpegGrabber(maxWidth, jpegQuality);
+                try
+                {
+                    while (!linked.IsCancellationRequested)
+                    {
+                        var started = Environment.TickCount64;
+                        var jpg = grabber.Grab();
+                        Volatile.Write(ref latest, jpg); Interlocked.Increment(ref seq);
+                        int wait = 1000 / frameRate - (int)(Environment.TickCount64 - started);
+                        if (wait > 0) await Task.Delay(wait, linked.Token);
+                    }
+                }
+                catch { }
+            });
+            try
+            {
+                while (!ct.IsCancellationRequested)
+                {
+                    if (Interlocked.Read(ref seq) == sent) { await Task.Delay(2, ct); continue; }
+                    sent = Interlocked.Read(ref seq);
+                    var jpg = Volatile.Read(ref latest)!;
+                    var header = Encoding.ASCII.GetBytes($"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {jpg.Length}\r\n\r\n");
+                    var buf = new byte[header.Length + jpg.Length + 2];
+                    header.CopyTo(buf, 0); jpg.CopyTo(buf, header.Length); buf[^2] = 13; buf[^1] = 10;
+                    await s.WriteAsync(buf, ct);
+                }
             }
+            finally { linked.Cancel(); try { await producer; } catch { } }
+        }
+
+        /// <summary>Reuses GDI bitmaps and the JPEG encoder between frames to keep capture cost low.</summary>
+        [SupportedOSPlatform("windows")]
+        private sealed class MjpegGrabber : IDisposable
+        {
+            private readonly int _maxWidth;
+            private readonly EncoderParameters _ep = new(1);
+            private readonly ImageCodecInfo _codec = ImageCodecInfo.GetImageEncoders().First(c => c.FormatID == ImageFormat.Jpeg.Guid);
+            private readonly MemoryStream _ms = new();
+            private Bitmap? _full, _small;
+            private int _w, _h;
+
+            public MjpegGrabber(int maxWidth, int quality)
+            {
+                _maxWidth = maxWidth;
+                _ep.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)quality);
+            }
+
+            public byte[] Grab()
+            {
+                int w = GetSystemMetrics(0), h = GetSystemMetrics(1);
+                if (_full == null || w != _w || h != _h)
+                {
+                    _full?.Dispose(); _small?.Dispose();
+                    _w = w; _h = h;
+                    int tw = Math.Min(w, _maxWidth), th = (int)((long)h * tw / w);
+                    _full = new Bitmap(w, h, PixelFormat.Format32bppRgb);
+                    _small = new Bitmap(tw, th, PixelFormat.Format32bppRgb);
+                }
+                using (var g = Graphics.FromImage(_full))
+                    g.CopyFromScreen(0, 0, 0, 0, new Size(w, h));
+                if (_small!.Width == w) { _ms.SetLength(0); _full.Save(_ms, _codec, _ep); return _ms.ToArray(); }
+                using (var g = Graphics.FromImage(_small))
+                {
+                    g.InterpolationMode = System.Drawing.Drawing2D.InterpolationMode.Bilinear;
+                    g.CompositingQuality = System.Drawing.Drawing2D.CompositingQuality.HighSpeed;
+                    g.DrawImage(_full, 0, 0, _small.Width, _small.Height);
+                }
+                _ms.SetLength(0);
+                _small.Save(_ms, _codec, _ep);
+                return _ms.ToArray();
+            }
+
+            public void Dispose() { _full?.Dispose(); _small?.Dispose(); _ep.Dispose(); _ms.Dispose(); }
         }
 
         private static async Task StreamAudio(TcpClient client, string request, CancellationToken ct)
@@ -525,21 +595,21 @@ namespace GameLauncher.Services
 <meta name='viewport' content='width=device-width,initial-scale=1,viewport-fit=cover'>
 <meta name='apple-mobile-web-app-capable' content='yes'><meta name='apple-mobile-web-app-status-bar-style' content='black-translucent'><title>Game OS Stream</title>
 <style>html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#000;color:#fff;font-family:-apple-system,sans-serif}
-body{position:fixed;inset:0}video{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh}img{width:100%;height:100%;object-fit:contain;display:block}
-#controls{position:fixed;z-index:2;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:8px}
+body{position:fixed;inset:0}#s,#v{position:fixed;inset:0;width:100vw;height:100vh;height:100dvh;object-fit:contain;background:#000;display:block}
+#controls{position:fixed;z-index:2;top:max(8px,env(safe-area-inset-top));left:8px;right:8px;display:flex;gap:8px;flex-wrap:wrap;transition:opacity .25s}
 button,a{color:#fff;background:rgba(0,0,0,.72);border:1px solid #777;padding:8px 12px;border-radius:16px;text-decoration:none;font-size:14px}
 #audioStatus{align-self:center;font-size:12px;text-shadow:0 1px 3px #000}
-body.immersive #controls{opacity:.25;transition:opacity .2s}body.immersive #controls:active{opacity:1}
+body.immersive #controls.hide{opacity:0;pointer-events:none}
 </style></head>
-<body><div id='controls'><a href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><button id='cfg'>Settings</button><button id='gm'>Games</button><span id='audioStatus' role='status'></span></div>
+<body><div id='controls'><a id='back' href='javascript:history.back()'>‹ Back</a><button id='audio'>Enable audio</button><button id='full'>Fullscreen</button><button id='cfg'>Settings</button><button id='gm'>Games</button><span id='audioStatus' role='status'></span></div>
 <div id='panel' hidden style='position:fixed;z-index:3;inset:auto 8px 8px 8px;background:rgba(20,20,24,.95);border:1px solid #555;border-radius:16px;padding:12px;font-size:14px'>
 <label>FPS <select id='sFps'><option>10</option><option>15</option><option>20</option><option>30</option><option>60</option></select></label>
 <label>Width <select id='sW'><option>640</option><option>854</option><option>1280</option><option>1920</option></select></label>
 <label>Quality <select id='sQ'><option>35</option><option>50</option><option>60</option><option>75</option><option>90</option></select></label>
 <div style='margin-top:8px'><button id='sApply'>Apply</button> <button id='sTest'>Test connection</button></div><div id='sRes' style='margin-top:6px'></div></div>
 <div id='games' hidden style='position:fixed;z-index:3;inset:56px 8px 8px 8px;background:rgba(20,20,24,.96);border:1px solid #555;border-radius:16px;padding:12px;overflow:auto;font-size:14px'>
-<input id='gq' placeholder='Search installed games' style='width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #555;background:#111;color:#fff'><div id='gl'></div></div>
-<img id='s' alt='Connecting…'><video id='v' muted playsinline autoplay disablepictureinpicture style='display:none;width:100%;height:100%;object-fit:contain;background:#000'></video>
+<input id='gq' placeholder='Search installed games' style='width:100%;box-sizing:border-box;padding:8px;border-radius:8px;border:1px solid #555;background:#111;color:#fff'><select id='gp' style='width:100%;margin-top:6px;padding:8px;border-radius:8px;border:1px solid #555;background:#111;color:#fff'><option value=''>All platforms</option></select><div id='gl'></div></div>
+<img id='s' alt=''><video id='v' muted playsinline autoplay disablepictureinpicture style='display:none'></video>
 <script>
 var s=document.getElementById('s'), audioButton=document.getElementById('audio'), status=document.getElementById('audioStatus');
 var userQ=encodeURIComponent(new URLSearchParams(location.search).get('user')||'');
@@ -549,7 +619,7 @@ function go(){var a='';if(cfg.fps)a+='&fps='+cfg.fps;if(cfg.w)a+='&w='+cfg.w;if(
 var wl=null;async function keepAwake(){try{if(navigator.wakeLock&&document.visibilityState==='visible')wl=await navigator.wakeLock.request('screen')}catch(e){}}
 keepAwake();document.addEventListener('visibilitychange',keepAwake);document.addEventListener('click',keepAwake);
 ['sFps','sW','sQ'].forEach(function(id,i){var k=['fps','w','q'][i];if(cfg[k])document.getElementById(id).value=cfg[k]});
-document.getElementById('cfg').onclick=function(){var p=document.getElementById('panel');p.hidden=!p.hidden};
+document.getElementById('cfg').onclick=function(){var p=document.getElementById('panel');document.getElementById('games').hidden=true;p.hidden=!p.hidden};
 document.getElementById('sApply').onclick=function(){cfg={fps:sFps.value,w:sW.value,q:sQ.value};localStorage.setItem('gameOS_stream_cfg',JSON.stringify(cfg));go();document.getElementById('panel').hidden=true};
 document.getElementById('sTest').onclick=async function(){var r=document.getElementById('sRes');r.textContent='Testing…';try{
  var lat=[];for(var i=0;i<5;i++){var t=performance.now();await fetch('/ping?t='+Date.now(),{cache:'no-store'});lat.push(performance.now()-t)}
@@ -557,13 +627,23 @@ document.getElementById('sTest').onclick=async function(){var r=document.getElem
  var mbps=b.byteLength*8/1e6/((performance.now()-t0)/1000);var q=mbps>=20&&l<=40?'Good':mbps>=8&&l<=100?'OK':'Bad';
  r.textContent=q+' connection — '+mbps.toFixed(1)+' Mbps, '+l.toFixed(0)+' ms latency'}catch(e){r.textContent='Test failed'}};
 var allGames=[];// items: {title,platform,rom}
-function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),l=document.getElementById('gl');l.innerHTML='';
- allGames.filter(function(g){return g.title.toLowerCase().indexOf(q)>=0}).forEach(function(g){var t=g.title,b=document.createElement('button');b.textContent='▶ '+t+(g.rom?' ('+g.platform+')':'');b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
+function renderGames(){var q=document.getElementById('gq').value.toLowerCase(),pf=document.getElementById('gp').value,l=document.getElementById('gl');l.innerHTML='';
+ allGames.filter(function(g){return g.title.toLowerCase().indexOf(q)>=0&&(!pf||(g.platform||'PC')===pf)}).forEach(function(g){var t=g.title,b=document.createElement('button');b.textContent='▶ Stream '+t+(g.rom?' ('+g.platform+')':'');b.style.cssText='display:block;width:100%;margin-top:6px;text-align:left';
   b.onclick=async function(){try{var r=await fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(t)+(g.rom?'&rom=1&platform='+encodeURIComponent(g.platform):''));b.textContent=r.ok?'Launching '+t+'…':'Could not launch '+t;if(r.ok)document.getElementById('games').hidden=true}catch(e){b.textContent='Launch failed'}};l.appendChild(b)});
  if(!l.children.length)l.textContent='No installed games found.'}
-document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');g.hidden=!g.hidden;if(g.hidden)return;
- try{allGames=await (await fetch('/library?pin='+pinQ+'&user='+userQ)).json()}catch(e){allGames=[]}renderGames()};
+document.getElementById('gm').onclick=async function(){var g=document.getElementById('games');document.getElementById('panel').hidden=true;g.hidden=!g.hidden;if(g.hidden)return;
+ allGames=await loadLib();
+ var gp=document.getElementById('gp'),cur=gp.value,ps=[];allGames.forEach(function(g){var p=g.platform||'PC';if(ps.indexOf(p)<0)ps.push(p)});ps.sort();gp.innerHTML='<option value="">All platforms</option>'+ps.map(function(p){return '<option>'+p.replace(/[<&]/g,'')+'</option>'}).join('');gp.value=cur;renderGames()};
+document.getElementById('gp').onchange=renderGames;
 document.getElementById('gq').oninput=renderGames;
+// The web app is on another origin (https), so it cannot read this PC directly: hand the library back via the URL hash.
+var retUrl=new URLSearchParams(location.search).get('ret')||'',libReady=null;
+function loadLib(){return fetch('/library?pin='+pinQ+'&user='+userQ).then(function(r){return r.ok?r.json():[]}).then(function(l){allGames=l;return l}).catch(function(){return[]})}
+libReady=loadLib();
+document.getElementById('back').onclick=async function(e){e.preventDefault();
+ if(/^https?:\/\//i.test(retUrl)){var l=await libReady;if(l.length){var j=JSON.stringify(l.map(function(g){return[g.title,g.platform,g.rom?1:0]}));
+  location.href=retUrl+'#pclib='+btoa(unescape(encodeURIComponent(j)));return}location.href=retUrl;return}
+ history.back()};
 (function(){var u=new URLSearchParams(location.search),lt=u.get('launch');if(lt){var pf=u.get('platform');fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(lt)+(pf?'&rom=1&platform='+encodeURIComponent(pf):'')).catch(function(){})}})();
 var vid=document.getElementById('v'),vws=null,vgen=0;
 function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
@@ -615,19 +695,26 @@ audioButton.onclick=async function(){
   audioButton.textContent='Stop audio';status.textContent='Connecting audio…';
  }catch(e){status.textContent='Audio could not start. Tap Enable audio to try again.'}
 };
+var ctl=document.getElementById('controls'),hideT=null;
+function showCtl(){ctl.classList.remove('hide');clearTimeout(hideT);if(document.body.classList.contains('immersive'))hideT=setTimeout(function(){if(document.getElementById('panel').hidden&&document.getElementById('games').hidden)ctl.classList.add('hide')},3000)}
+function setImmersive(on){document.body.classList.toggle('immersive',on);document.getElementById('full').textContent=on?'Exit fullscreen':'Fullscreen';showCtl()}
 function setFullscreen(){
  var d=document,de=d.documentElement,fs=d.fullscreenElement||d.webkitFullscreenElement;
- if(fs){(d.exitFullscreen||d.webkitExitFullscreen).call(d);d.body.classList.remove('immersive');return}
- d.body.classList.add('immersive');
+ if(fs){(d.exitFullscreen||d.webkitExitFullscreen).call(d)}
+ if(fs||d.body.classList.contains('immersive')){setImmersive(false);return}
+ setImmersive(true);
  var rq=de.requestFullscreen||de.webkitRequestFullscreen;
  if(rq){try{var p=rq.call(de);if(p&&p.catch)p.catch(function(){})}catch(e){}return}
- // iPhone Safari has no element fullscreen API: use the native video player fullscreen instead.
+ // iPhone Safari has no element fullscreen API: use the native video player when H.264 is playing,
+ // otherwise the edge-to-edge page layout (immersive) is used.
  if(vid.style.display!=='none'&&vid.webkitEnterFullscreen){try{vid.webkitEnterFullscreen()}catch(e){}}
- else window.scrollTo(0,1);
+ window.scrollTo(0,1);
 }
 document.getElementById('full').onclick=setFullscreen;
-function fsChange(){document.getElementById('full').textContent=(document.fullscreenElement||document.webkitFullscreenElement)?'Exit fullscreen':'Fullscreen'}
+function fsChange(){if(!(document.fullscreenElement||document.webkitFullscreenElement)&&document.body.classList.contains('immersive')&&document.getElementById('full').textContent==='Exit fullscreen'&&document.fullscreenEnabled)setImmersive(false)}
 document.addEventListener('fullscreenchange',fsChange);document.addEventListener('webkitfullscreenchange',fsChange);
+['s','v'].forEach(function(id){document.getElementById(id).addEventListener('click',function(){if(document.body.classList.contains('immersive')){ctl.classList.contains('hide')?showCtl():ctl.classList.add('hide')}})});
+setImmersive(true);
 </script></body></html>";
     }
 }

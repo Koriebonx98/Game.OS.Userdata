@@ -38,6 +38,7 @@
         <section id="view-library" class="app-view" hidden>
             <input id="libSearch" class="app-search" type="search" placeholder="Search your library…">
             <div class="app-filters">
+                <select id="libSource" aria-label="Source"><option value="">All games</option><option value="lib">My library</option><option value="pc">On my PC</option></select>
                 <select id="libPlatform" aria-label="Platform"><option value="">All platforms</option></select>
                 <select id="libSort" aria-label="Sort">
                     <option value="name">A → Z</option>
@@ -174,6 +175,16 @@
         function pcHas(g) {
             return pcLib().some(i => i.title.toLowerCase() === (g.title || '').toLowerCase() && (!i.rom || i.platform === g.platform));
         }
+        function importPcHash() {
+            const m = /^#pclib=(.+)$/.exec(location.hash);
+            if (!m || !user) return;
+            try {
+                const rows = JSON.parse(decodeURIComponent(escape(atob(m[1]))));
+                const items = rows.map(r => ({ title: String(r[0]), platform: String(r[1] || 'PC'), rom: !!r[2] }));
+                localStorage.setItem('gameOS_pc_library', JSON.stringify({ user: user.username, items }));
+            } catch (e) { /* ignore malformed hash */ }
+            history.replaceState(null, '', location.pathname + location.search);
+        }
         async function refreshPcGames() {
             const c = pcConn(); if (!c || !user) return;
             try {
@@ -181,15 +192,17 @@
                 if (r.ok) localStorage.setItem('gameOS_pc_library', JSON.stringify({ user: user.username, items: await r.json() }));
                 else localStorage.removeItem('gameOS_pc_library');
             } catch (e) { /* PC offline or blocked as mixed content; keep cached list */ }
-            renderPcLib();
+            fillPlatforms(); renderPcLib();
         }
         function pcPlayUrl(c, i) {
-            return 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&launch=' + encodeURIComponent(i.title) + (i.rom ? '&platform=' + encodeURIComponent(i.platform) : '');
+            return 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(i.title) + (i.rom ? '&platform=' + encodeURIComponent(i.platform) : '');
         }
         function renderPcLib() {
             const c = pcConn(), items = c && user ? pcLib() : [];
-            $('pcLibHead').hidden = !items.length;
-            $('pcLibList').innerHTML = items.map((i, n) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div><button class="btn app-more" data-pcplay="${n}">▶ Play</button></div>`).join('');
+            const q = $('libSearch').value.trim().toLowerCase(), plat = $('libPlatform').value, src = $('libSource').value;
+            const shown = src === 'lib' ? [] : items.map((i, n) => ({ i, n })).filter(({ i }) => i.title.toLowerCase().includes(q) && (!plat || (i.platform || 'PC') === plat));
+            $('pcLibHead').hidden = !shown.length;
+            $('pcLibList').innerHTML = shown.map(({ i, n }) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div><button class="btn app-more" data-pcplay="${n}">▶ Stream</button></div>`).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -277,8 +290,8 @@
         let libPlatform = '', libSort = 'name', libShow = '';
         function fillPlatforms() {
             const sel = $('libPlatform'), cur = sel.value;
-            const plats = [...new Set(library.map(g => g.platform).filter(Boolean))].sort();
-            sel.innerHTML = '<option value="">All platforms</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)} (${library.filter(g => g.platform === p).length})</option>`).join('');
+            const plats = [...new Set([...library.map(g => g.platform), ...(pcConn() ? pcLib().map(i => i.platform || 'PC') : [])].filter(Boolean))].sort();
+            sel.innerHTML = '<option value="">All platforms</option>' + plats.map(p => `<option value="${esc(p)}">${esc(getPlatformIcon(p))} ${esc(p)} (${library.filter(g => g.platform === p).length + (pcConn() ? pcLib().filter(i => (i.platform || 'PC') === p).length : 0)})</option>`).join('');
             sel.value = plats.includes(cur) ? cur : '';
         }
         function renderLibrary() {
@@ -301,6 +314,8 @@
             }[libSort];
             if (libShow === 'recentPlayed') list = list.filter(g => !!g.lastPlayedAt);
             list.sort(cmp);
+            if ($('libSource').value === 'pc') list = [];
+            renderPcLib();
             $('libCount').textContent = list.length + ' game' + (list.length === 1 ? '' : 's') + ' · ⏱ ' + fmtPlaytime(list.reduce((n, g) => n + minutesOf(g), 0)) + ' · 🏆 ' + list.reduce((n, g) => n + achOf(g), 0);
             $('libList').innerHTML = list.length ? list.map(g =>
                 row(g, `<button class="app-fav" data-p="${esc(g.platform)}" data-t="${esc(g.title)}">${isFav(g) ? '❤️' : '🤍'}</button><button class="app-fav app-del" data-p="${esc(g.platform)}" data-t="${esc(g.title)}" aria-label="Remove from library">🗑️</button>`)).join('') : empty('No games found.');
@@ -417,7 +432,7 @@
                 const inPc = pcHas(g);
                 pcBox.innerHTML = `<small>${inPc ? '✅ Installed on your PC' : ''}</small><button class="btn app-more" id="detailPcPlay">🖥 Play on PC (stream)</button>`;
                 $('detailPlay').before(pcBox);
-                $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&launch=' + encodeURIComponent(g.title) + (g.platform && g.platform !== 'PC' ? '&platform=' + encodeURIComponent(g.platform) : ''); };
+                $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(g.title) + (g.platform && g.platform !== 'PC' ? '&platform=' + encodeURIComponent(g.platform) : ''); };
             }
             if (!g._owner && window.GameOSEmu) {
                 const box = $('detailPlay');
@@ -933,7 +948,7 @@
 
             document.querySelectorAll('.app-tabbar button').forEach(b => b.onclick = () => showView(b.dataset.view));
             $('libSearch').addEventListener('input', renderLibrary);
-            ['libPlatform', 'libSort', 'libShow'].forEach(id => $(id).addEventListener('change', renderLibrary));
+            ['libPlatform', 'libSort', 'libShow', 'libSource'].forEach(id => $(id).addEventListener('change', renderLibrary));
             $('streamAddr').value = localStorage.getItem('gameOS_stream_addr') || '';
             $('streamPin').value = localStorage.getItem('gameOS_stream_pin') || '';
             const sc = JSON.parse(localStorage.getItem('gameOS_stream_cfg') || '{}');
@@ -962,7 +977,7 @@
                 localStorage.setItem(devKey, JSON.stringify(l)); renderDevs(); msg.textContent = 'Saved "' + name + '".';
             };
             renderDevs();
-            renderPcLib();
+            importPcHash(); fillPlatforms(); renderPcLib();
             $('pcLibList').addEventListener('click', e => {
                 const b = e.target.closest('[data-pcplay]'), c = pcConn(), i = b && pcLib()[+b.dataset.pcplay];
                 if (i && c) location.href = pcPlayUrl(c, i);
@@ -993,7 +1008,7 @@
                 msg.textContent = '';
                 // The launcher serves its own viewer page (plain http), avoiding mixed-content blocks.
                 saveCfg();
-                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin) + '&user=' + encodeURIComponent(user.username);
+                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname);
             };
             $('settingsNotifBtn').onclick = async () => {
                 if (!('Notification' in window)) return;
