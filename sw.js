@@ -1,17 +1,25 @@
 /* Game OS service worker: offline shell + notification display */
-const CACHE = 'gameos-shell-v6';
-const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'manifest.webmanifest', 'icons/icon-192.png'];
+const CACHE = 'gameos-shell-v7';
+const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'emulator.js', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 self.addEventListener('install', e => {
     e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys()
-        .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+        .then(keys => Promise.all(keys.filter(k => k !== CACHE && k !== 'gameos-emu').map(k => caches.delete(k))))
         .then(() => self.clients.claim()));
 });
 self.addEventListener('fetch', e => {
-    if (e.request.method !== 'GET' || new URL(e.request.url).origin !== location.origin) return;
+    if (e.request.method !== 'GET') return;
+    const u = new URL(e.request.url);
+    if (u.hostname === 'cdn.emulatorjs.org') {
+        // emulator files: cache-first so games run offline
+        e.respondWith(caches.open('gameos-emu').then(c => c.match(e.request).then(hit => hit ||
+            fetch(e.request).then(res => { if (res.ok) c.put(e.request, res.clone()); return res; }))));
+        return;
+    }
+    if (u.origin !== location.origin) return;
     e.respondWith(fetch(e.request).then(res => {
         const copy = res.clone();
         caches.open(CACHE).then(c => c.put(e.request, copy));

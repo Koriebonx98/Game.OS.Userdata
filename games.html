@@ -13,6 +13,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="theme-color" content="#0f172a">
     <script src="pwa.js"></script>
+    <script src="emulator.js"></script>
 </head>
 <body>
     <div class="container" style="max-width:1000px;">
@@ -778,6 +779,10 @@
                         ${g.titleId ? `<span class="games-browse-id">${escapeHtml(String(g.titleId))}</span>` : ''}
                         ${friendBadge}
                     </div>
+                    ${window.GameOSEmu && GameOSEmu.isRetro(plat) ? `<button class="btn-remove-game" style="background:#16a34a;color:#fff;"
+                        onclick="event.stopPropagation(); GameOSEmu.play(this.dataset.p, this.dataset.t)" data-p="${escapeHtml(plat)}" data-t="${escapeHtml(g.title || '')}">▶ Play</button>
+                    <button class="btn-remove-game" style="background:#2563eb;color:#fff;"
+                        onclick="event.stopPropagation(); GameOSEmu.install(this.dataset.p, this.dataset.t).then(ok => ok && (this.textContent='✅ Installed'))" data-p="${escapeHtml(plat)}" data-t="${escapeHtml(g.title || '')}">⬇ Install</button>` : ''}
                     <button class="btn-remove-game"
                         onclick="event.stopPropagation(); handleRemoveGame('${escapeHtml(plat)}', '${escapeHtml(g.title || '')}', this)">
                         🗑️ Remove
