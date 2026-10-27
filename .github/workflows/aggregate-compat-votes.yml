@@ -1,0 +1,112 @@
+# Aggregate Compatibility Votes (hourly)
+#
+# Each vote is written by the browser to the voter's own accounts/<user>/compatibility.json
+# AND to a unique queue file compat-queue/<user>/<platform>__<slug>.json (private data repo).
+# This job merges queued votes (one vote per user per game, so repeats never double count) into
+#   - Game.OS.Private.Data  compatibility/<platform>/<slug>.json
+#   - Koriebonx98/Games.Database  Data/<platform folder>/Compatibility/<slug>.json
+# and then deletes the processed queue files.
+#
+# Required secrets: DATA_REPO_TOKEN (Contents: read/write on Game.OS.Private.Data)
+#                   GAMES_DB_TOKEN  (Contents: read/write on Koriebonx98/Games.Database)
+
+name: Aggregate Compatibility Votes
+
+on:
+  schedule:
+    - cron: "15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aggregate-compat-votes
+  cancel-in-progress: false
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge queued votes
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, re, sys
+          import urllib.request, urllib.error
+
+          if not os.environ.get('DATA_REPO_TOKEN'):
+              print('❌ DATA_REPO_TOKEN secret is not set.'); sys.exit(1)
+          PRIV = 'https://api.github.com/repos/Koriebonx98/Game.OS.Private.Data'
+          GDB = 'https://api.github.com/repos/Koriebonx98/Games.Database'
+          def hdr(tok): return {'Authorization': 'Bearer ' + tok, 'Accept': 'application/vnd.github+json', 'User-Agent': 'gameos-compat'}
+          PH = hdr(os.environ['DATA_REPO_TOKEN'])
+          GH = hdr(os.environ['GAMES_DB_TOKEN']) if os.environ.get('GAMES_DB_TOKEN') else None
+
+          FOLDERS = {'Switch': 'Nintendo - Switch', 'Xbox 360': 'Microsoft - Xbox 360', 'PS3': 'Sony - PlayStation 3',
+                     'PS4': 'Sony - PlayStation 4', 'PS5': 'Sony - PlayStation 5', 'Xbox One': 'Microsoft - Xbox One', 'PC': 'PC'}
+
+          def call(url, h, method='GET', body=None):
+              req = urllib.request.Request(url, method=method, headers=h, data=json.dumps(body).encode() if body else None)
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  t = r.read(); return json.loads(t) if t else {}
+          def read(base, h, path):
+              try:
+                  f = call(f'{base}/contents/{urllib.request.quote(path)}', h)
+                  return json.loads(base64.b64decode(f['content'])), f['sha']
+              except urllib.error.HTTPError as e:
+                  if e.code == 404: return None, None
+                  raise
+          def write(base, h, path, data, msg, sha):
+              body = {'message': msg, 'content': base64.b64encode(json.dumps(data, indent=2, sort_keys=True).encode()).decode()}
+              if sha: body['sha'] = sha
+              call(f'{base}/contents/{urllib.request.quote(path)}', h, 'PUT', body)
+          def slug(t): return (re.sub(r'[^a-z0-9]+', '-', t.lower()).strip('-')[:100]) or 'untitled'
+          def psafe(p): return re.sub(r'[^A-Za-z0-9._+-]', '_', p)
+
+          try: users = [u['name'] for u in call(f'{PRIV}/contents/compat-queue', PH) if u['type'] == 'dir']
+          except urllib.error.HTTPError as e:
+              if e.code == 404: print('Nothing queued.'); sys.exit(0)
+              raise
+
+          groups = {}   # (platform, title) -> [(user, rating, queue path, sha)]
+          for u in users:
+              for f in call(f'{PRIV}/contents/compat-queue/{u}', PH):
+                  q, sha = read(PRIV, PH, f['path'])
+                  if not isinstance(q, dict) or q.get('rating') not in ('green', 'amber', 'red') or not q.get('platform') or not q.get('title'):
+                      groups.setdefault(None, []).append((None, None, f['path'], sha)); continue
+                  # trust the directory name, not the file body, for who voted
+                  groups.setdefault((q['platform'], q['title']), []).append((u.lower(), q['rating'], f['path'], sha))
+
+          for key, items in groups.items():
+              if key is None:
+                  for _, _, p, sha in items: call(f'{PRIV}/contents/{urllib.request.quote(p)}', PH, 'DELETE', {'message': 'Drop invalid queue file', 'sha': sha})
+                  continue
+              plat, title = key
+              path = f'compatibility/{psafe(plat)}/{slug(title)}.json'
+              doc, sha = read(PRIV, PH, path)
+              doc = doc if isinstance(doc, dict) else {}
+              votes = doc.get('votes') if isinstance(doc.get('votes'), dict) else {}
+              for user, rating, _, _ in items: votes.setdefault(user, rating)   # first vote per user wins
+              doc = {'title': doc.get('title') or title, 'platform': plat, 'votes': votes}
+              write(PRIV, PH, path, doc, f'Aggregate compatibility: {title} ({plat})', sha)
+              ok = True
+              folder = FOLDERS.get(plat)
+              if GH and folder:
+                  counts = {'green': 0, 'amber': 0, 'red': 0}
+                  for v in votes.values():
+                      if v in counts: counts[v] += 1
+                  gpath = f'Data/{folder}/Compatibility/{slug(title)}.json'
+                  try:
+                      _, gsha = read(GDB, GH, gpath)
+                      write(GDB, GH, gpath, {'title': doc['title'], 'platform': plat, 'compatibility': counts, 'totalVotes': len(votes)},
+                            f'Compatibility votes: {title} ({plat})', gsha)
+                  except Exception as e:
+                      print(f'⚠️ Games.Database write failed for {title}: {e}'); ok = False
+              if ok:
+                  for _, _, p, qsha in items:
+                      call(f'{PRIV}/contents/{urllib.request.quote(p)}', PH, 'DELETE', {'message': 'Processed compatibility vote', 'sha': qsha})
+              print(f'✅ {title} ({plat}): {len(votes)} votes')
+          PYEOF

@@ -1,0 +1,105 @@
+# Test Compatibility Vote (manual)
+#
+# Queues a vote exactly like the website does (compat-queue/<user>/<platform>__<slug>.json),
+# runs "Aggregate Compatibility Votes", waits for it, then checks the aggregated file
+# compatibility/<platform>/<slug>.json contains the vote and the queue file was consumed.
+#
+# Run: Actions → Test Compatibility Vote → Run workflow (defaults: Skate 3 / Xbox 360 / green).
+# Set "username" to the admin account's username.
+# Required secret: DATA_REPO_TOKEN
+
+name: Test Compatibility Vote
+
+on:
+  workflow_dispatch:
+    inputs:
+      username:
+        description: "Voting account (admin username)"
+        required: true
+      platform:
+        description: "Platform"
+        required: true
+        default: "Xbox 360"
+      title:
+        description: "Game title"
+        required: true
+        default: "Skate 3"
+      rating:
+        description: "Vote (green = Playable, amber = In Game, red = No Boot)"
+        required: true
+        default: "green"
+        type: choice
+        options: [green, amber, red]
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Queue vote, aggregate, verify
+        env:
+          DATA_REPO_TOKEN: ${{ secrets.DATA_REPO_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          USERNAME: ${{ inputs.username }}
+          PLATFORM: ${{ inputs.platform }}
+          TITLE: ${{ inputs.title }}
+          RATING: ${{ inputs.rating }}
+        run: |
+          python3 << 'PYEOF'
+          import json, base64, os, re, sys, time, datetime
+          import urllib.request, urllib.error, urllib.parse
+
+          if not os.environ.get('DATA_REPO_TOKEN'):
+              print('❌ DATA_REPO_TOKEN secret is not set.'); sys.exit(1)
+          E = os.environ
+          user, plat, title, rating = E['USERNAME'].lower(), E['PLATFORM'], E['TITLE'], E['RATING']
+          slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')[:100] or 'untitled'
+          psafe = re.sub(r'[^A-Za-z0-9._+-]', '_', plat)
+          PRIV = 'https://api.github.com/repos/Koriebonx98/Game.OS.Private.Data'
+          SELF = f"https://api.github.com/repos/{E['GITHUB_REPOSITORY']}"
+          def h(t): return {'Authorization': 'Bearer ' + t, 'Accept': 'application/vnd.github+json', 'User-Agent': 'gameos-test'}
+          PH, SH = h(E['DATA_REPO_TOKEN']), h(E['GH_TOKEN'])
+          def call(url, hd, method='GET', body=None):
+              req = urllib.request.Request(url, method=method, headers=hd, data=json.dumps(body).encode() if body else None)
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  t = r.read(); return json.loads(t) if t else {}
+          def read(path):
+              try:
+                  f = call(f'{PRIV}/contents/{urllib.parse.quote(path)}', PH)
+                  return json.loads(base64.b64decode(f['content'])), f['sha']
+              except urllib.error.HTTPError as e:
+                  if e.code == 404: return None, None
+                  raise
+
+          qpath = f'compat-queue/{user}/{psafe}__{slug}.json'
+          apath = f'compatibility/{psafe}/{slug}.json'
+          _, sha = read(qpath)
+          body = {'message': f'Test: queue compatibility vote: {title} ({plat})',
+                  'content': base64.b64encode(json.dumps({'username': user, 'platform': plat, 'title': title, 'rating': rating,
+                            'votedAt': datetime.datetime.utcnow().isoformat() + 'Z'}, indent=2).encode()).decode()}
+          if sha: body['sha'] = sha
+          call(f'{PRIV}/contents/{urllib.parse.quote(qpath)}', PH, 'PUT', body)
+          print(f'✅ queued {qpath}')
+
+          t0 = datetime.datetime.utcnow()
+          call(f"{SELF}/actions/workflows/aggregate-compat-votes.yml/dispatches", SH, 'POST', {'ref': E.get('GITHUB_REF_NAME', 'main')})
+          run = None
+          for _ in range(40):
+              time.sleep(6)
+              runs = call(f"{SELF}/actions/workflows/aggregate-compat-votes.yml/runs?event=workflow_dispatch&per_page=5", SH)['workflow_runs']
+              fresh = [r for r in runs if datetime.datetime.strptime(r['created_at'], '%Y-%m-%dT%H:%M:%SZ') >= t0.replace(microsecond=0)]
+              if fresh and fresh[0]['status'] == 'completed': run = fresh[0]; break
+          if not run: print('❌ aggregate run did not finish in time'); sys.exit(1)
+          print('aggregate conclusion:', run['conclusion'], run['html_url'])
+          if run['conclusion'] != 'success': sys.exit(1)
+
+          doc, _ = read(apath)
+          ok = bool(doc) and doc.get('votes', {}).get(user) is not None
+          q, _ = read(qpath)
+          print('aggregated file:', json.dumps(doc))
+          print('vote recorded:', ok, '| queue consumed:', q is None)
+          sys.exit(0 if ok and q is None else 1)
+          PYEOF
