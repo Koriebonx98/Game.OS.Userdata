@@ -83,11 +83,28 @@ jobs:
                   if isinstance(q.get('titleId'), str) and re.fullmatch(r'[A-Za-z0-9_-]{1,64}', q['titleId']): tids.setdefault((q['platform'], q['title']), q['titleId'])
                   groups.setdefault((q['platform'], q['title']), []).append((u.lower(), q['rating'], f['path'], sha))
 
+          _plat_cache = {}
+          def lookup_tid(plat, title):
+              # votes without a title ID: find it in Games.Database <platform>.Games.json (same source as achievements)
+              if plat not in _plat_cache:
+                  try:
+                      req = urllib.request.Request(f'https://raw.githubusercontent.com/Koriebonx98/Games.Database/main/{urllib.request.quote(plat)}.Games.json', headers={'User-Agent': 'gameos-compat'})
+                      with urllib.request.urlopen(req, timeout=60) as r: _plat_cache[plat] = json.loads(r.read())
+                  except Exception as e:
+                      print(f'⚠️ could not load {plat}.Games.json: {e}'); _plat_cache[plat] = []
+              for g in _plat_cache[plat] if isinstance(_plat_cache[plat], list) else []:
+                  if not isinstance(g, dict): continue
+                  if str(g.get('Title') or g.get('game_name') or g.get('title') or '').strip().lower() == title.strip().lower():
+                      tid = str(g.get('TitleID') or g.get('title_id') or g.get('titleid') or g.get('id') or '')
+                      if re.fullmatch(r'[A-Za-z0-9_-]{1,64}', tid): return tid
+              return None
+
           for key, items in groups.items():
               if key is None:
                   for _, _, p, sha in items: call(f'{PRIV}/contents/{urllib.request.quote(p)}', PH, 'DELETE', {'message': 'Drop invalid queue file', 'sha': sha})
                   continue
               plat, title = key
+              if not tids.get(key): tids[key] = lookup_tid(plat, title)
               path = f'compatibility/{psafe(plat)}/{slug(title)}.json'
               doc, sha = read(PRIV, PH, path)
               doc = doc if isinstance(doc, dict) else {}

@@ -27,7 +27,7 @@ on:
       titleId:
         description: "Game title ID (folder under Data/<platform>/Games/ in Games.Database)"
         required: false
-        default: ""
+        default: "454108E6"
       rating:
         description: "Vote (green = Playable, amber = In Game, red = No Boot)"
         required: true
