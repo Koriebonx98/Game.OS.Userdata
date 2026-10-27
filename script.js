@@ -3618,7 +3618,7 @@ function _gamesDbHeaders() {
  * 1 MB Contents-API limit that would affect Switch.Games.json and PS3.Games.json.
  */
 /**
- * Record a game in the shared "New" feed (store/new-games.json) — client-side (GitHub mode).
+ * Record a game in the store feed (store/new-games.json).
  * Best-effort: failures never block the add/edit that triggered it.
  */
 async function _recordNewGameFeed(platform, game, source) {
@@ -3638,6 +3638,23 @@ async function _recordNewGameFeed(platform, game, source) {
         });
         await githubWrite('store/new-games.json', rest.slice(0, 100), `New games feed: ${title} (${platform})`, file ? file.sha : undefined);
     } catch (e) { console.warn('New games feed update failed:', e.message); }
+}
+
+async function getUpdatedGameFeed() {
+    let feed = [];
+    const backend = typeof getBackendBase === 'function' ? getBackendBase() : '';
+    if (backend) {
+        const response = await fetch(`${backend}/api/new-games`);
+        if (!response.ok) throw new Error(`Could not load updated games: ${response.status}`);
+        const data = await response.json();
+        feed = data.games;
+    } else {
+        const file = await githubRead('store/new-games.json');
+        feed = file && Array.isArray(file.content) ? file.content : [];
+    }
+    return (Array.isArray(feed) ? feed : [])
+        .filter(entry => entry && entry.title && entry.platform && entry.source === 'admin-edit')
+        .sort((a, b) => String(b.addedAt || '').localeCompare(String(a.addedAt || '')));
 }
 
 async function _gamesDbWriteFile(platform, content, message) {
@@ -6399,7 +6416,7 @@ function _buildGameModalFields(game) {
 
 
 /** Store categories that can be assigned to a game by admins. */
-const STORE_CATEGORIES = ['New', 'Updated', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
+const STORE_CATEGORIES = ['Updated', 'Exclusive', 'Featured', 'Free', 'Popular', 'Coming Soon'];
 
 /** Normalise a game's categories into an array of strings. */
 function getGameCategories(game) {
