@@ -59,6 +59,8 @@
             </div>
             <div id="libCount" class="app-count"></div>
             <div id="libList" class="app-list"></div>
+            <h2 class="app-h2" id="pcLibHead" hidden>🖥 On your PC &amp; ROMs</h2>
+            <div id="pcLibList" class="app-list"></div>
         </section>
         <section id="view-favourites" class="app-view" hidden>
             <div id="favList" class="app-list"></div>
@@ -112,7 +114,7 @@
             <div class="app-card">
                 <b>PC game streaming</b>
                 <p>Stream your PC screen over Wi-Fi. In the Game OS launcher on your PC, open Settings to see its address and PIN, then enter them here.</p>
-                <input id="streamAddr" class="app-search" type="text" placeholder="PC address, e.g. 192.168.1.20:47632" autocapitalize="none" autocorrect="off">
+                <input id="streamAddr" class="app-search" type="text" placeholder="PC address, e.g. 192.168.1.20:47632 (or public IP / VPN address to play away from home)" autocapitalize="none" autocorrect="off">
                 <input id="streamPin" class="app-search" type="text" inputmode="numeric" placeholder="PIN" autocomplete="off">
                 <input id="streamName" class="app-search" type="text" maxlength="40" placeholder="Device name, e.g. Living room PC">
                 <button id="streamSaveBtn" class="btn app-more">Save device</button>
@@ -179,6 +181,15 @@
                 if (r.ok) localStorage.setItem('gameOS_pc_library', JSON.stringify({ user: user.username, items: await r.json() }));
                 else localStorage.removeItem('gameOS_pc_library');
             } catch (e) { /* PC offline or blocked as mixed content; keep cached list */ }
+            renderPcLib();
+        }
+        function pcPlayUrl(c, i) {
+            return 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&launch=' + encodeURIComponent(i.title) + (i.rom ? '&platform=' + encodeURIComponent(i.platform) : '');
+        }
+        function renderPcLib() {
+            const c = pcConn(), items = c && user ? pcLib() : [];
+            $('pcLibHead').hidden = !items.length;
+            $('pcLibList').innerHTML = items.map((i, n) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div><button class="btn app-more" data-pcplay="${n}">▶ Play</button></div>`).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -951,6 +962,11 @@
                 localStorage.setItem(devKey, JSON.stringify(l)); renderDevs(); msg.textContent = 'Saved "' + name + '".';
             };
             renderDevs();
+            renderPcLib();
+            $('pcLibList').addEventListener('click', e => {
+                const b = e.target.closest('[data-pcplay]'), c = pcConn(), i = b && pcLib()[+b.dataset.pcplay];
+                if (i && c) location.href = pcPlayUrl(c, i);
+            });
             refreshPcGames();
             $('streamTestBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
