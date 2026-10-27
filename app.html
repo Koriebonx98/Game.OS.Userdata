@@ -608,9 +608,9 @@
                     .map(r => ({ ...r, game: storeGames.find(g => pf(g) === r.platform && gTitle(g).toLowerCase() === r.title.toLowerCase()) }))
                     .filter(r => r.game);
                 storeRecs = saved;
-                if (storeRecs.length < 10) {
+                if (storeRecs.length < 30) {
                     const have = new Set(storeRecs.map(r => r.platform + '|' + r.title.toLowerCase()));
-                    storeRecs = [...storeRecs, ...buildRecommendations(cat, library, skipped, 10, 3).filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()))].slice(0, 10);
+                    storeRecs = [...storeRecs, ...buildRecommendations(cat, library, skipped, 30, 10).filter(r => !have.has(r.platform + '|' + r.title.toLowerCase()))].slice(0, 30);
                     await saveRecommendations(user.username, storeRecs.map(r => ({ title: r.title, platform: r.platform })));
                 }
             } catch (_) {}
@@ -651,7 +651,15 @@
                     const items = []; for (let i = 0; i < storeGames.length && items.length < 20; i++) if (fn(storeGames[i])) items.push(storeGames[i]);
                     return items.length ? `<div class="store-shelf"><h3>${label}</h3><div class="store-shelf-row">${items.map(g => card(g)).join('')}</div></div>` : '';
                 }).join('');
-                if (storeRecs.length) shelves += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">${storeRecs.map(r => card(r.game)).join('')}</div></div>`;
+                if (storeRecs.length) {
+                    const recCard = (r, i) => card(r.game, `<div class="store-rec-actions"><button type="button" class="btn" data-rec="${i}" data-ans="yes">✔ Yes</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="no">✖ No</button><button type="button" class="btn btn-secondary" data-rec="${i}" data-ans="skip">⏭ Skip</button></div>`);
+                    if (storeShowAllRecs) {
+                        shelves += `<div class="store-shelf"><h3>🎯 Recommended for you – all</h3><div class="store-shelf-row" style="flex-wrap:wrap;">${storeRecs.map(recCard).join('')}</div><button type="button" class="btn btn-secondary" data-rec-all="0">← Back</button></div>`;
+                    } else {
+                        const allCard = storeRecs.length > 9 ? `<div class="store-card" data-rec-all="1" style="display:flex;align-items:center;justify-content:center;cursor:pointer;"><div class="store-card-title">All ›</div></div>` : '';
+                        shelves += `<div class="store-shelf"><h3>🎯 Recommended for you</h3><div class="store-shelf-row">${storeRecs.slice(0, 9).map(recCard).join('')}${allCard}</div></div>`;
+                    }
+                }
             }
             $('storeShelves').innerHTML = shelves;
             const feats = [...storeF.features].filter(f => f !== '__wishlist' && f !== '__popular');
