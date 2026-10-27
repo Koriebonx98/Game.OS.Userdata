@@ -114,6 +114,9 @@
                 <p>Stream your PC screen over Wi-Fi. In the Game OS launcher on your PC, open Settings to see its address and PIN, then enter them here.</p>
                 <input id="streamAddr" class="app-search" type="text" placeholder="PC address, e.g. 192.168.1.20:47632" autocapitalize="none" autocorrect="off">
                 <input id="streamPin" class="app-search" type="text" inputmode="numeric" placeholder="PIN" autocomplete="off">
+                <input id="streamName" class="app-search" type="text" maxlength="40" placeholder="Device name, e.g. Living room PC">
+                <button id="streamSaveBtn" class="btn app-more">Save device</button>
+                <div id="streamDevices"></div>
                 <button id="streamBtn" class="btn app-more">Start streaming</button>
                 <button id="streamTestBtn" class="btn app-more">Test connection</button>
                 <small id="streamMsg" class="app-count"></small>
@@ -900,6 +903,28 @@
             $('streamFps').value = sc.fps || '20'; $('streamW').value = sc.w || '1280'; $('streamQ').value = sc.q || '60';
             const saveCfg = () => localStorage.setItem('gameOS_stream_cfg', JSON.stringify({ fps: $('streamFps').value, w: $('streamW').value, q: $('streamQ').value }));
             ['streamFps', 'streamW', 'streamQ'].forEach(id => $(id).addEventListener('change', saveCfg));
+            const devKey = 'gameOS_stream_devices';
+            const getDevs = () => { try { return JSON.parse(localStorage.getItem(devKey) || '[]'); } catch (e) { return []; } };
+            const normAddr = a => a.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+            const renderDevs = () => {
+                const box = $('streamDevices'); box.textContent = '';
+                getDevs().forEach((d, i) => {
+                    const row = document.createElement('div');
+                    const label = document.createElement('b'); label.textContent = d.name + ' (' + d.addr + ') ';
+                    const use = document.createElement('button'); use.className = 'btn app-more'; use.textContent = 'Connect';
+                    use.onclick = () => { $('streamAddr').value = d.addr; $('streamPin').value = d.pin; $('streamName').value = d.name; $('streamBtn').click(); };
+                    const rev = document.createElement('button'); rev.className = 'btn app-more'; rev.textContent = 'Revoke';
+                    rev.onclick = () => { if (!confirm('Forget "' + d.name + '" on this device?')) return; const l = getDevs(); l.splice(i, 1); localStorage.setItem(devKey, JSON.stringify(l)); renderDevs(); };
+                    row.append(label, use, rev); box.appendChild(row);
+                });
+            };
+            $('streamSaveBtn').onclick = () => {
+                const addr = normAddr($('streamAddr').value), pin = $('streamPin').value.trim(), name = $('streamName').value.trim(), msg = $('streamMsg');
+                if (!name || !/^[\w.\-]+(:\d{1,5})?$/.test(addr) || !pin) { msg.textContent = 'Enter a device name, PC address and PIN.'; return; }
+                const l = getDevs().filter(d => d.addr !== addr); l.push({ name, addr, pin });
+                localStorage.setItem(devKey, JSON.stringify(l)); renderDevs(); msg.textContent = 'Saved "' + name + '".';
+            };
+            renderDevs();
             $('streamTestBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
                 const pin = $('streamPin').value.trim(), msg = $('streamMsg');
