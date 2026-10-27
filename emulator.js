@@ -6,8 +6,8 @@
     const EJS_CDN = 'https://cdn.emulatorjs.org/stable/data/';
     const CORES = { gba: 'gba', gb: 'gb', gbc: 'gb', nes: 'nes', snes: 'snes', sfc: 'snes', smc: 'snes',
         n64: 'n64', z64: 'n64', v64: 'n64', nds: 'nds', md: 'segaMD', gen: 'segaMD', smd: 'segaMD', sms: 'segaMS', gg: 'segaGG',
-        pce: 'pce', a26: 'atari2600', lnx: 'lynx', ngp: 'ngp', ws: 'ws', wsc: 'ws', bin: null, cue: null, iso: null };
-    const ACCEPT = '.gba,.gb,.gbc,.nes,.sfc,.smc,.n64,.z64,.v64,.nds,.md,.gen,.smd,.sms,.gg,.pce,.a26,.lnx,.ngp,.ws,.wsc,.zip';
+        pce: 'pce', a26: 'atari2600', lnx: 'lynx', ngp: 'ngp', ws: 'ws', wsc: 'ws', pbp: 'psx', chd: 'psx', bin: null, cue: null, iso: null };
+    const ACCEPT = '.gba,.gb,.gbc,.nes,.sfc,.smc,.n64,.z64,.v64,.nds,.md,.gen,.smd,.sms,.gg,.pce,.a26,.lnx,.ngp,.ws,.wsc,.pbp,.chd,.iso,.zip';
     const DB = 'gameos-roms';
 
     function db() {
@@ -32,6 +32,8 @@
         const ext = (fileName.split('.').pop() || '').toLowerCase();
         if (CORES[ext] && ext !== 'zip') return CORES[ext];
         const p = (platform || '').toLowerCase();
+        if (/^(sony )?(playstation( 1| one)?|ps1|psx|psone)$/.test(p)) return 'psx';
+        if (/^(sony )?(playstation portable|psp)$/.test(p)) return 'psp';
         if (/nintendo 64|\bn64\b/.test(p)) return 'n64';
         if (/\bds\b|nds/.test(p) && !/3ds/.test(p)) return 'nds';
         if (/genesis|mega ?drive/.test(p)) return 'segaMD';
@@ -76,7 +78,7 @@
         // Pass a File (not a blob: URL) so EmulatorJS keeps the file extension needed to detect the ROM type
         const rom = new File([rec.blob], rec.name, { type: 'application/octet-stream' });
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'position:fixed;inset:0;z-index:99999;background:#000;';
+        wrap.style.cssText = 'position:fixed;inset:0;height:100vh;height:100dvh;touch-action:manipulation;z-index:99999;background:#000;';
         const close = document.createElement('button');
         close.textContent = '✕ Close';
         close.style.cssText = 'position:absolute;top:env(safe-area-inset-top,8px);right:8px;z-index:2;padding:8px 12px;';
@@ -87,11 +89,13 @@
         stage.appendChild(holder);
         // Run EmulatorJS in the page itself: iOS WebKit fails to load it from a srcdoc iframe
         Object.assign(window, { EJS_player: '#game', EJS_core: core, EJS_gameUrl: rom, EJS_gameName: title,
-            EJS_pathtodata: EJS_CDN, EJS_startOnLoaded: true });
+            EJS_pathtodata: EJS_CDN, EJS_startOnLoaded: true,
+            EJS_threads: false }); // touch controls are shown automatically on phones/tablets; keyboard/gamepad on desktop
         const loader = document.createElement('script');
         loader.src = EJS_CDN + 'loader.js';
         loader.onerror = () => alert('Could not load the emulator. Check your connection and try again.');
         close.onclick = () => location.reload(); // EmulatorJS cannot be torn down cleanly
+        document.addEventListener('keydown', e => { if (e.key === 'Escape' && e.shiftKey) location.reload(); });
         wrap.append(stage, close);
         document.body.appendChild(wrap);
         document.body.appendChild(loader);
