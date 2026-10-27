@@ -24,6 +24,10 @@ on:
         description: "Game title"
         required: true
         default: "Skate 3"
+      titleId:
+        description: "Game title ID (folder under Data/<platform>/Games/ in Games.Database)"
+        required: false
+        default: ""
       rating:
         description: "Vote (green = Playable, amber = In Game, red = No Boot)"
         required: true
@@ -47,6 +51,8 @@ jobs:
           PLATFORM: ${{ inputs.platform }}
           TITLE: ${{ inputs.title }}
           RATING: ${{ inputs.rating }}
+          TITLE_ID: ${{ inputs.titleId }}
+          GAMES_DB_TOKEN: ${{ secrets.GAMES_DB_TOKEN }}
         run: |
           python3 << 'PYEOF'
           import json, base64, os, re, sys, time, datetime
@@ -74,12 +80,13 @@ jobs:
                   if e.code == 404: return None, None
                   raise
 
+          tid = E.get('TITLE_ID', '').strip()
           qpath = f'compat-queue/{user}/{psafe}__{slug}.json'
           apath = f'compatibility/{psafe}/{slug}.json'
           _, sha = read(qpath)
           body = {'message': f'Test: queue compatibility vote: {title} ({plat})',
                   'content': base64.b64encode(json.dumps({'username': user, 'platform': plat, 'title': title, 'rating': rating,
-                            'votedAt': datetime.datetime.utcnow().isoformat() + 'Z'}, indent=2).encode()).decode()}
+                            'titleId': tid or None, 'votedAt': datetime.datetime.utcnow().isoformat() + 'Z'}, indent=2).encode()).decode()}
           if sha: body['sha'] = sha
           call(f'{PRIV}/contents/{urllib.parse.quote(qpath)}', PH, 'PUT', body)
           print(f'✅ queued {qpath}')
@@ -101,5 +108,15 @@ jobs:
           q, _ = read(qpath)
           print('aggregated file:', json.dumps(doc))
           print('vote recorded:', ok, '| queue consumed:', q is None)
-          sys.exit(0 if ok and q is None else 1)
+          gdb_ok = True
+          FOLDERS = {'Switch': 'Nintendo - Switch', 'Xbox 360': 'Microsoft - Xbox 360', 'PS3': 'Sony - PlayStation 3',
+                     'PS4': 'Sony - PlayStation 4', 'PS5': 'Sony - PlayStation 5', 'Xbox One': 'Microsoft - Xbox One'}
+          if E.get('GAMES_DB_TOKEN') and plat in FOLDERS:
+              gpath = f"Data/{FOLDERS[plat]}/Games/{tid or slug}/compatibility.json"
+              try:
+                  g = call(f"https://api.github.com/repos/Koriebonx98/Games.Database/contents/{urllib.parse.quote(gpath)}", h(E['GAMES_DB_TOKEN']))
+                  print('Games.Database', gpath, base64.b64decode(g['content']).decode())
+              except urllib.error.HTTPError as e:
+                  print('❌ Games.Database file missing:', gpath, e.code); gdb_ok = False
+          sys.exit(0 if ok and q is None and gdb_ok else 1)
           PYEOF

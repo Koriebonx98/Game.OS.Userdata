@@ -2347,7 +2347,8 @@ app.get('/api/me/compatibility', authenticateToken, async (req, res) => {
 app.post('/api/me/compatibility', authenticateToken, async (req, res) => {
     try {
         const { usernameLower } = req.tokenUser;
-        const { platform, title, rating } = req.body || {};
+        const { platform, title, rating, titleId } = req.body || {};
+        const safeTitleId = typeof titleId === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(titleId.trim()) ? titleId.trim() : undefined;
         if (typeof platform !== 'string' || typeof title !== 'string' || !platform.trim() || !title.trim()) {
             return res.status(400).json({ success: false, message: 'platform and title are required.' });
         }
@@ -2374,7 +2375,7 @@ app.post('/api/me/compatibility', authenticateToken, async (req, res) => {
             const queuePath = `compat-queue/${usernameLower}/${safePlat}__${slug}.json`;
             if (!(await getFile(queuePath))) {
                 await putFile(queuePath,
-                    { username: usernameLower, platform, title, rating, votedAt: new Date().toISOString() },
+                    { username: usernameLower, platform, title, rating, titleId: safeTitleId, votedAt: new Date().toISOString() },
                     `Queue compatibility vote: ${title} (${platform})`);
             }
         } catch (qErr) {
