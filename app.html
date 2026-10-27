@@ -393,6 +393,12 @@
                     if (inst) $('detailRomBtn').onclick = async () => { await GameOSEmu.uninstall(g.platform, g.title); draw(); };
                 };
                 draw();
+            } else if (!g._owner) {
+                const sid = String(g.steamAppId || g.appid || '').replace(/\D/g, '');
+                const isIos = /^(ios|iphone|ipad)\b|apple/i.test(g.platform || '');
+                const href = isIos ? 'https://apps.apple.com/search?term=' + encodeURIComponent(g.title)
+                    : sid ? 'steam://run/' + sid : 'https://store.steampowered.com/search/?term=' + encodeURIComponent(g.title);
+                $('detailPlay').innerHTML = `<a class="btn app-more" id="detailPlayBtn" href="${esc(href)}"${href.startsWith('http') ? ' target="_blank" rel="noopener noreferrer"' : ''}>▶ Play</a>`;
             }
             let dbGame = null;
             try {
