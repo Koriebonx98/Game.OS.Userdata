@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using GameLauncher.Services;
 using GameLauncher.ViewModels;
 
@@ -300,6 +301,15 @@ public partial class MainWindow : Window
             }
         }
 
+        // Game detail: arrow keys move the highlight between every control on the page
+        if (vm.ShowDetail && !vm.ShowQuickMenu && !IsTextInputFocused() &&
+            e.Key is Key.Up or Key.Down or Key.Left or Key.Right &&
+            DetailHost?.HandleNavKey(e.Key, activateWithEnter: false) == true)
+        {
+            e.Handled = true;
+            return;
+        }
+
         // XB360 dashboard navigation
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
@@ -329,9 +339,39 @@ public partial class MainWindow : Window
             }
         }
 
-        // Default/PS5/Switch dashboard navigation
+        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        bool isDefaultDash = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isDefaultDash && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        {
+            switch (e.Key)
+            {
+                case Key.Right:
+                case Key.Down:
+                    vm.DashboardVm.MoveDefaultFocus(1);
+                    e.Handled = true;
+                    return;
+                case Key.Left:
+                    if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
+                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Up:
+                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    e.Handled = true;
+                    return;
+                case Key.Enter:
+                    vm.DashboardVm.OpenDefaultFocused();
+                    e.Handled = true;
+                    return;
+                case Key.X:
+                    vm.DashboardVm.PlayDefaultFocused();
+                    e.Handled = true;
+                    return;
+            }
+        }
+
+        // PS5/Switch dashboard navigation
         bool usesCardDashboardNavigation =
-            string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigation && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
@@ -370,7 +410,8 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.X:
-                    vm.DashboardVm.ActivateFocusedTile();
+                    // X → launch the highlighted game
+                    vm.DashboardVm.LaunchFocusedTile();
                     e.Handled = true;
                     return;
             }
@@ -465,7 +506,8 @@ public partial class MainWindow : Window
                 }
                 else if (vm.ShowDetail)
                 {
-                    vm.DetailVm.CloseCommand.Execute(null);
+                    if (DetailHost != null) DetailHost.HandleBack();
+                    else vm.DetailVm.CloseCommand.Execute(null);
                     e.Handled = true;
                 }
                 else if (vm.ShowFriendProfile)
@@ -769,6 +811,12 @@ public partial class MainWindow : Window
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ShowDetail))
+        {
+            OnShowDetailChanged(_boundVm.ShowDetail);
+            return;
+        }
+
         if (_boundVm == null || e.PropertyName != nameof(MainViewModel.ShowQuickMenu))
             return;
 
@@ -776,6 +824,42 @@ public partial class MainWindow : Window
         if (!_boundVm.ShowQuickMenu)
             _quickMenuWindow?.Hide();
     }
+
+    // ── Game detail navigation ────────────────────────────────────────────────
+
+    private GameDetailView? DetailHost => this.FindControl<GameDetailView>("GameDetailHost");
+
+    private int _detailFocusToken;
+
+    /// <summary>Highlights Play when the detail page opens; clears stale focus when it closes.</summary>
+    private void OnShowDetailChanged(bool show)
+    {
+        int token = ++_detailFocusToken;
+        if (!show)
+        {
+            FocusManager?.ClearFocus();
+            return;
+        }
+
+        // Detail data (installed state etc.) can arrive a moment after the page opens,
+        // so retry until the user moves the highlight themselves.
+        void TryFocus()
+        {
+            if (token != _detailFocusToken || _boundVm?.ShowDetail != true) return;
+            var focused = FocusManager?.GetFocusedElement() as Control;
+            if (focused == null || !(DetailHost?.IsVisualAncestorOf(focused) ?? false) || _detailAutoFocused == focused)
+            {
+                DetailHost?.FocusDefault();
+                _detailAutoFocused = FocusManager?.GetFocusedElement() as Control;
+            }
+        }
+        _detailAutoFocused = null;
+        Dispatcher.UIThread.Post(TryFocus, DispatcherPriority.Background);
+        DispatcherTimer.RunOnce(TryFocus, TimeSpan.FromMilliseconds(350));
+        DispatcherTimer.RunOnce(TryFocus, TimeSpan.FromMilliseconds(1200));
+    }
+
+    private Control? _detailAutoFocused;
 
     // ── XInput controller support ─────────────────────────────────────────────
 
@@ -1016,6 +1100,26 @@ public partial class MainWindow : Window
             return;
         }
 
+        // Game detail: D-pad moves the highlight, A activates, B / Y go back
+        if (vm.ShowDetail && !vm.IsNavExpanded)
+        {
+            switch (key)
+            {
+                case Key.Up:
+                case Key.Down:
+                case Key.Left:
+                case Key.Right:
+                case Key.Enter:
+                    DetailHost?.HandleNavKey(key, activateWithEnter: true);
+                    return;
+                case Key.Escape:
+                case Key.Y:
+                    if (DetailHost != null) DetailHost.HandleBack();
+                    else vm.DetailVm.CloseCommand.Execute(null);
+                    return;
+            }
+        }
+
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
@@ -1031,9 +1135,34 @@ public partial class MainWindow : Window
             }
         }
 
-        // Default / PS5 / Switch dashboard navigation
+        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        bool isDefaultDashController = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isDefaultDashController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        {
+            switch (key)
+            {
+                case Key.Right:
+                case Key.Down:
+                    vm.DashboardVm.MoveDefaultFocus(1);
+                    return;
+                case Key.Left:
+                    if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
+                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    return;
+                case Key.Up:
+                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    return;
+                case Key.Enter:
+                    vm.DashboardVm.OpenDefaultFocused();
+                    return;
+                case Key.X:
+                    vm.DashboardVm.PlayDefaultFocused();
+                    return;
+            }
+        }
+
+        // PS5 / Switch dashboard navigation
         bool usesCardDashboardNavigationController =
-            string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "PS5",    StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigationController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
@@ -1066,8 +1195,8 @@ public partial class MainWindow : Window
                     vm.DashboardVm.ActivateFocusedTile();
                     return;
                 case Key.X:
-                    if (vm.DashboardVm.HasFocusedCard)
-                        vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null);
+                    // X → launch the highlighted game
+                    vm.DashboardVm.LaunchFocusedTile();
                     return;
             }
         }

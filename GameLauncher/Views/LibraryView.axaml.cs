@@ -18,7 +18,9 @@ public partial class LibraryView : UserControl
 
     private void FocusSearchBox()
     {
-        var box = this.FindControl<TextBox>("LibrarySearchBox");
-        box?.Focus();
+        if (DataContext is ViewModels.LibraryViewModel { IsPs5GamesLib: true })
+            this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib")?.FocusSearchBox();
+        else
+            this.FindControl<GamesLib.DefaultGamesLib>("DefaultLib")?.FocusSearchBox();
     }
 }

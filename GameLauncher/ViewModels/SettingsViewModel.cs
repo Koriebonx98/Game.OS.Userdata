@@ -151,6 +151,11 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available launcher design themes for Settings → Design.</summary>
     public IReadOnlyList<string> AvailableDesignThemes { get; } = new[] { "Default", "XB360", "PS5", "Wii", "Switch", "SteamBPM" };
 
+    /// <summary>Selected Games (library) page layout.</summary>
+    [ObservableProperty] private string _gamesTheme = "Default";
+    /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5" };
+
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
     /// <summary>Available quick-menu styles.</summary>
@@ -750,6 +755,7 @@ public partial class SettingsViewModel : ViewModelBase
         StreamAudioEnabled = appSettings.StreamAudioEnabled;
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
+        GamesTheme                 = NormaliseGamesTheme(appSettings.GamesTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
@@ -953,6 +959,7 @@ public partial class SettingsViewModel : ViewModelBase
             CompatibilityOverlayMode   = CompatibilityOverlayMode,
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
+            GamesTheme                 = NormaliseGamesTheme(GamesTheme),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
@@ -1072,6 +1079,9 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(trimmed, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return "Default";
     }
+
+    private static string NormaliseGamesTheme(string value) =>
+        string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";
 
     private static string NormaliseQuickMenuTheme(string value)
     {

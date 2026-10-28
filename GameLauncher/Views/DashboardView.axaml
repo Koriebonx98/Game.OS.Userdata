@@ -967,12 +967,14 @@
                     </StackPanel>
                     <!-- "Continue Playing" for last-played, "View Details" for featured store game -->
                     <Button Classes="btn-primary" Width="160"
+                            Classes.focused="{Binding IsHeroFocused}"
                             HorizontalContentAlignment="Center" Margin="0,8,0,0"
                             Command="{Binding ContinuePlayingCommand}"
                             IsVisible="{Binding IsFeaturedLastPlayed}">
                         ▶  Continue Playing
                     </Button>
                     <Button Classes="btn-primary" Width="140"
+                            Classes.focused="{Binding IsHeroFocused}"
                             HorizontalContentAlignment="Center" Margin="0,8,0,0"
                             Command="{Binding OpenFeaturedDetailCommand}"
                             IsVisible="{Binding !IsFeaturedLastPlayed}">
