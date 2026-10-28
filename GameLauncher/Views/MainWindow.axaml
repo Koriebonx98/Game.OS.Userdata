@@ -84,7 +84,7 @@
 
                     <!-- Game detail overlay -->
                     <Border IsVisible="{Binding ShowDetail}" Classes="detail-overlay-surface">
-                        <views:GameDetailView DataContext="{Binding DetailVm}"/>
+                        <views:GameDetailView x:Name="GameDetailHost" DataContext="{Binding DetailVm}"/>
                     </Border>
 
                     <!-- Friend profile overlay -->

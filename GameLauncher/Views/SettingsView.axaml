@@ -1092,6 +1092,17 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
+                                <TextBlock Text="Library"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableGamesThemes}"
+                                          SelectedItem="{Binding GamesTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="Layout of the Library (My Games) page. Default is the standard grid; PS5 shows PlayStation-style tiles."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
                                 <TextBlock Text="Quick Menu Style"
                                            FontSize="13" Foreground="#e6edf3"/>
                                 <ComboBox Classes="form-input"

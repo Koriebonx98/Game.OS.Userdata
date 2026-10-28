@@ -336,6 +336,7 @@ public partial class DashboardViewModel : ViewModelBase
         Ps5RecentGames.Clear();
         foreach (var card in RecentLocalGames.Take(MaxPs5RecentGames))
             Ps5RecentGames.Add(card);
+        _defaultFocusIndex = int.MinValue; // re-seeded after the hero is resolved
 
         LocalLibraryGames.Clear();
         if (localCards != null)
@@ -481,6 +482,8 @@ public partial class DashboardViewModel : ViewModelBase
             IsFeaturedLastPlayed = false;
             DevLogService.Log($"[Dashboard] FeaturedGame = store fallback '{FeaturedGame?.Title ?? "(none)"}' — no games played yet.");
         }
+
+        ResetDefaultFocus();
 
         SteamHeroMetaText = IsFeaturedLastPlayed
             ? string.IsNullOrWhiteSpace(_heroLocalCard?.PlaytimeLabel)
@@ -732,6 +735,63 @@ public partial class DashboardViewModel : ViewModelBase
         if (IsAllGamesFocused) NavigateToAllGames();
         else if (IsStoreFocused) OpenFeaturedDetail();
         else OpenFocusedCardDetail();
+    }
+
+    /// <summary>X button: launches the highlighted game; Store / All Games tiles just open.</summary>
+    public void LaunchFocusedTile()
+    {
+        if (IsAllGamesFocused) NavigateToAllGames();
+        else if (IsStoreFocused) OpenFeaturedDetail();
+        else PlayFocusedCard();
+    }
+
+    // ── Default dashboard focus: hero "Continue Playing" button, then the Continue Playing cards ──
+    private int _defaultFocusIndex = int.MinValue;
+    [ObservableProperty] private bool _isHeroFocused;
+
+    private bool HasHero => FeaturedGame != null;
+    private int DefaultFirstIndex => HasHero ? -1 : 0;
+
+    /// <summary>True when the first focusable item (hero button, or first card without a hero) is highlighted.</summary>
+    public bool IsAtDefaultFirstItem => _defaultFocusIndex <= DefaultFirstIndex;
+
+    /// <summary>Moves the highlight across hero → Continue Playing cards (clamped).</summary>
+    public void MoveDefaultFocus(int delta)
+    {
+        if (_defaultFocusIndex == int.MinValue) { SetDefaultFocus(DefaultFirstIndex); return; }
+        SetDefaultFocus(_defaultFocusIndex + delta);
+    }
+
+    /// <summary>Highlights the first item so the dashboard never shows without a visible selection.</summary>
+    public void ResetDefaultFocus() => SetDefaultFocus(DefaultFirstIndex);
+
+    private void SetDefaultFocus(int index)
+    {
+        index = Math.Clamp(index, DefaultFirstIndex, Math.Max(DefaultFirstIndex, RecentLocalGames.Count - 1));
+        _defaultFocusIndex = index;
+        foreach (var c in RecentLocalGames) c.IsFocused = false;
+        IsHeroFocused = index < 0 && HasHero;
+        if (index >= 0 && index < RecentLocalGames.Count)
+            RecentLocalGames[index].IsFocused = true;
+        OnPropertyChanged(nameof(IsAtDefaultFirstItem));
+    }
+
+    /// <summary>A button: opens the info page of the highlighted hero / card.</summary>
+    public void OpenDefaultFocused()
+    {
+        if (_defaultFocusIndex == int.MinValue) ResetDefaultFocus();
+        if (_defaultFocusIndex < 0) OpenFeaturedDetail();
+        else if (_defaultFocusIndex < RecentLocalGames.Count)
+            OnOpenFocusedCardDetail?.Invoke(RecentLocalGames[_defaultFocusIndex]);
+    }
+
+    /// <summary>X button: launches the highlighted hero / card.</summary>
+    public void PlayDefaultFocused()
+    {
+        if (_defaultFocusIndex == int.MinValue) ResetDefaultFocus();
+        if (_defaultFocusIndex < 0) ContinuePlaying();
+        else if (_defaultFocusIndex < RecentLocalGames.Count)
+            OnPlayFocusedCard?.Invoke(RecentLocalGames[_defaultFocusIndex]);
     }
 
     private void UpdateFocusedCard()

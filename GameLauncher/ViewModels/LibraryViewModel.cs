@@ -22,6 +22,16 @@ public partial class LibraryViewModel : ViewModelBase
     // ── Unified "My Games" list (LocalGames + Repacks + ROMs) ─────────────
     private List<LocalGameCardVm> _allMyGames = new();
 
+    /// <summary>Selected Games page layout ("Default" or "PS5"); pushed from Settings by MainViewModel.</summary>
+    [ObservableProperty] private string _gamesTheme = "Default";
+    public bool IsPs5GamesLib     => string.Equals(GamesTheme, "PS5", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGamesLib => !IsPs5GamesLib;
+    partial void OnGamesThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsPs5GamesLib));
+        OnPropertyChanged(nameof(IsDefaultGamesLib));
+    }
+
     [ObservableProperty] private string _filterPlatform = "All";
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private int    _totalGames;

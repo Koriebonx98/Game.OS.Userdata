@@ -914,6 +914,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
         LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
         LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
+        LibraryVm.GamesTheme = SettingsVm.GamesTheme;
+        SettingsVm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
+                LibraryVm.GamesTheme = SettingsVm.GamesTheme;
+        };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>

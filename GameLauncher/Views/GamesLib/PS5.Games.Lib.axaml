@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GamesLib.Ps5GamesLib"
+             x:DataType="vm:LibraryViewModel"
+             Background="#0D0D0D">
+
+    <!--
+        PS5.Games.Lib — PlayStation 5 style Games (library) page.
+        Edit this file to change the "PS5" Games theme; Default.Games.Lib.axaml holds the default one.
+        The tile highlighted by the D-pad (IsFocused) is lifted and ringed in white.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.ps5-lib-card">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="Margin" Value="10,10,14,18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.ps5-lib-card /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-card:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1F1F1F"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-card.focused">
+            <Setter Property="RenderTransform" Value="scale(1.08)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-card.focused /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#FFFFFF"/>
+            <Setter Property="Background" Value="#2A2A2A"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-chip">
+            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Foreground" Value="#B3B3B3"/>
+            <Setter Property="Background" Value="#1F1F1F"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-chip.filter-chip-active">
+            <Setter Property="Foreground" Value="#0D0D0D"/>
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.ps5-lib-chip.filter-chip-active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="32,24,32,0">
+
+        <!-- Header + search -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Games" FontSize="30" FontWeight="Bold" Foreground="#FFFFFF"/>
+                <TextBlock Text="{Binding TotalGames, StringFormat='   {0} in your collection'}"
+                           FontSize="13" Foreground="#9E9E9E" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
+            </StackPanel>
+            <TextBox Grid.Column="1"
+                     Name="LibrarySearchBox"
+                     Classes="form-input"
+                     IsTabStop="False"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search games…"
+                     Width="240" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Platform dropdown + install-status chips -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,10">
+            <ComboBox ItemsSource="{Binding Platforms}"
+                      SelectedItem="{Binding FilterPlatform}"
+                      MinWidth="180"
+                      VerticalAlignment="Center"/>
+            <Button Classes="ps5-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterAll}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="All">
+                <TextBlock Text="All" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="ps5-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Installed">
+                <TextBlock Text="Installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="ps5-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Uninstalled">
+                <TextBlock Text="Not installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+        </StackPanel>
+
+        <!-- Tile grid -->
+        <ScrollViewer Grid.Row="2"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="0,0,0,28">
+            <ItemsControl ItemsSource="{Binding FilteredMyGames}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LocalGameCardVm">
+                        <Button Classes="ps5-lib-card"
+                                Classes.focused="{Binding IsFocused}"
+                                Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                                CommandParameter="{Binding}">
+                            <StackPanel>
+                                <Border Height="180" CornerRadius="12" ClipToBounds="True">
+                                    <views:CoverImage
+                                        ImageUrl="{Binding CoverUrl}"
+                                        FallbackText="{Binding EffectiveTitle}"
+                                        FallbackGradient="{Binding CoverGradient}"
+                                        SubText="{Binding Platform}"
+                                        LetterFontSize="56"
+                                        ImageCornerRadius="12"
+                                        Height="180"/>
+                                </Border>
+                                <TextBlock Text="{Binding EffectiveTitle}"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                           TextTrimming="CharacterEllipsis"
+                                           Margin="6,8,6,0"/>
+                                <TextBlock Text="{Binding Platform}"
+                                           FontSize="11" Foreground="#9E9E9E"
+                                           Margin="6,2,6,8"/>
+                            </StackPanel>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+    </Grid>
+</UserControl>
