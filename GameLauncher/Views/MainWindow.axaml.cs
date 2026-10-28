@@ -186,8 +186,25 @@ public partial class MainWindow : Window
     ///   Y                  → focus search box (library / store)
     ///   X                  → cycle filter (library platform / store platform)
     /// </summary>
+    /// <summary>
+    /// After a navigation key, scrolls the highlighted (focused / active) item into view so the
+    /// page and side lists follow the controller cursor.
+    /// </summary>
+    private void ScheduleScrollHighlightedIntoView()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var target = this.GetVisualDescendants().OfType<Control>().FirstOrDefault(c =>
+                c.IsEffectivelyVisible &&
+                (c.Classes.Contains("focused") ||
+                 (c.Classes.Contains("active") && c.Classes.Contains("settings-nav-item"))));
+            target?.BringIntoView();
+        }, DispatcherPriority.Background);
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        ScheduleScrollHighlightedIntoView();
         if (DataContext is not MainViewModel vm) return;
 
         // Left Shift + Left Ctrl → Quick Menu toggle (takes priority).
@@ -1090,6 +1107,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void HandleControllerKey(Key key)
     {
+        ScheduleScrollHighlightedIntoView();
         if (_boundVm == null) return;
         var vm = _boundVm;
 
