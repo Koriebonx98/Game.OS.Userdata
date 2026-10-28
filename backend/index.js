@@ -1987,18 +1987,21 @@ app.post('/api/auth/token', async (req, res) => {
         const tokenHash  = hashToken(rawToken);
         const issuedAt   = new Date().toISOString();
 
-        // Persist hash in the user's profile
-        const updated = {
-            ...accountFile.content,
-            api_token_hash:       tokenHash,
-            api_token_issued_at:  issuedAt
-        };
-        await putFile(
-            `accounts/${accountKey}/profile.json`,
-            updated,
-            `Issue API token for: ${accountKey}`,
-            accountFile.sha
-        );
+        // Temporary test backends can keep the token in memory without writing
+        // test data into the private account repository.
+        if (process.env.GAMEOS_TOKEN_CACHE_ONLY !== 'true') {
+            const updated = {
+                ...accountFile.content,
+                api_token_hash:       tokenHash,
+                api_token_issued_at:  issuedAt
+            };
+            await putFile(
+                `accounts/${accountKey}/profile.json`,
+                updated,
+                `Issue API token for: ${accountKey}`,
+                accountFile.sha
+            );
+        }
 
         // Cache the token immediately so authenticated requests succeed even if
         // GitHub's API hasn't yet returned the updated profile (propagation delay).
