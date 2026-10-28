@@ -644,6 +644,7 @@ document.getElementById('back').onclick=async function(e){e.preventDefault();
  if(/^https?:\/\//i.test(retUrl)){var l=await libReady;if(l.length){var j=JSON.stringify(l.map(function(g){return[g.title,g.platform,g.rom?1:0]}));
   location.href=retUrl+'#pclib='+btoa(unescape(encodeURIComponent(j)));return}location.href=retUrl;return}
  history.back()};
+if(new URLSearchParams(location.search).get('sync')==='1'&&/^https?:\/\//i.test(retUrl))libReady.then(function(){document.getElementById('back').click()});
 (function(){var u=new URLSearchParams(location.search),lt=u.get('launch');if(lt){var pf=u.get('platform');fetch('/launch?pin='+pinQ+'&user='+userQ+'&title='+encodeURIComponent(lt)+(pf?'&rom=1&platform='+encodeURIComponent(pf):'')).catch(function(){})}})();
 var vid=document.getElementById('v'),vws=null,vgen=0;
 function startMjpeg(){vid.style.display='none';s.style.display='block';go()}
