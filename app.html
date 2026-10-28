@@ -206,10 +206,12 @@
             const c = pcConn(), items = user ? pcLib() : [];
             const q = $('libSearch').value.trim().toLowerCase(), plat = $('libPlatform').value, src = $('libSource').value;
             const shown = src === 'lib' ? [] : items.map((i, n) => ({ i, n })).filter(({ i }) => i.title.toLowerCase().includes(q) && (!plat || (i.platform || 'PC') === plat));
-            const inLibrary = i => library.some(g => (g.title || '').toLowerCase() === i.title.toLowerCase() && g.platform === (i.platform || 'PC'));
-            const cards = shown.filter(({ i }) => !inLibrary(i));
-            $('pcLibHead').hidden = !cards.length;
-            $('pcLibList').innerHTML = cards.map(({ i }) => row({ title: i.title, platform: i.platform || 'PC', coverUrl: pcCover(i) }, '')).join('');
+            $('pcLibHead').hidden = !shown.length;
+            $('pcLibList').innerHTML = shown.map(({ i }) => {
+                const p = i.platform || 'PC';
+                const lg = library.find(g => g.platform === p && (g.title || '').toLowerCase() === i.title.toLowerCase());
+                return row({ ...(lg || {}), title: i.title, platform: p, coverUrl: (lg && lg.coverUrl) || pcCover(i) }, '');
+            }).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
