@@ -420,50 +420,10 @@ public partial class MainWindow : Window
         // Library controller navigation (when not in a text input so Y can open search)
         if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            bool inSearch = IsTextInputFocused();
-            switch (e.Key)
+            if (HandleLibraryKey(vm, e.Key, IsTextInputFocused()))
             {
-                // Y → focus search box (mirrors PS/Xbox "search" shortcut)
-                case Key.Y when !inSearch:
-                    vm.LibraryVm.FocusSearchRequested?.Invoke();
-                    e.Handled = true;
-                    return;
-                // X → cycle platform filter
-                case Key.X when !inSearch:
-                    vm.LibraryVm.CyclePlatform(1);
-                    e.Handled = true;
-                    return;
-                case Key.Left when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    e.Handled = true;
-                    return;
-                case Key.Right when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    e.Handled = true;
-                    return;
-                // Up/Down → move focused game card
-                case Key.Up when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    e.Handled = true;
-                    return;
-                case Key.Down when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    e.Handled = true;
-                    return;
-                // Enter/A → open focused game info
-                case Key.Enter when !inSearch:
-                    vm.LibraryVm.ActivateFocusedGame();
-                    e.Handled = true;
-                    return;
-                // LB (PageUp) → cycle install filter backward; RB (PageDown) → forward
-                case Key.PageUp when !inSearch:
-                    vm.LibraryVm.CycleInstallFilter(-1);
-                    e.Handled = true;
-                    return;
-                case Key.PageDown when !inSearch:
-                    vm.LibraryVm.CycleInstallFilter(1);
-                    e.Handled = true;
-                    return;
+                e.Handled = true;
+                return;
             }
         }
 
@@ -576,6 +536,65 @@ public partial class MainWindow : Window
         int pageIdx = System.Array.IndexOf(_navPages, vm.ActivePage);
         vm.NavHighlightIndex = pageIdx >= 0 ? pageIdx : 0;
         vm.IsNavExpanded = true;
+    }
+
+    /// <summary>
+    /// Games-library controller/keyboard handling shared by both input paths.
+    /// Returns true when the key was consumed. Up/Down move a row, Left/Right move a card,
+    /// X opens the filter box, Y opens the on-screen keyboard, B closes either overlay.
+    /// </summary>
+    private static bool HandleLibraryKey(MainViewModel vm, Key key, bool inSearch)
+    {
+        var lib = vm.LibraryVm;
+
+        if (lib.IsKeyboardOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:     lib.MoveKeyboard(-1, 0); break;
+                case Key.Down:   lib.MoveKeyboard(1, 0);  break;
+                case Key.Left:   lib.MoveKeyboard(0, -1); break;
+                case Key.Right:  lib.MoveKeyboard(0, 1);  break;
+                case Key.Enter:  lib.PressKeyboardKey();  break;
+                case Key.X:      lib.BackspaceSearch();   break;
+                case Key.Y:
+                case Key.Escape:
+                case Key.BrowserBack: lib.CloseKeyboard(); break;
+                default: return true; // swallow everything else while open
+            }
+            return true;
+        }
+
+        if (lib.IsFilterMenuOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:    lib.MoveFilterMenu(-1); break;
+                case Key.Down:  lib.MoveFilterMenu(1);  break;
+                case Key.Enter: lib.ApplyFilterMenuSelection(); break;
+                case Key.X:
+                case Key.Escape:
+                case Key.BrowserBack: lib.CloseFilterMenu(); break;
+                default: return true;
+            }
+            return true;
+        }
+
+        if (inSearch) return false;
+
+        switch (key)
+        {
+            case Key.Y:        lib.OpenKeyboard();           return true;
+            case Key.X:        lib.OpenFilterMenu();         return true;
+            case Key.Left:     lib.MoveGameFocus(-1);        return true;
+            case Key.Right:    lib.MoveGameFocus(1);         return true;
+            case Key.Up:       lib.MoveGameFocusRow(-1);     return true;
+            case Key.Down:     lib.MoveGameFocusRow(1);      return true;
+            case Key.Enter:    lib.ActivateFocusedGame();    return true;
+            case Key.PageUp:   lib.CycleInstallFilter(-1);   return true;
+            case Key.PageDown: lib.CycleInstallFilter(1);    return true;
+        }
+        return false;
     }
 
     /// <summary>Returns true when a TextBox or similar input control has keyboard focus.</summary>
@@ -1204,36 +1223,8 @@ public partial class MainWindow : Window
         // Library controller navigation shortcuts
         if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            switch (key)
-            {
-                case Key.Y:
-                    Dispatcher.UIThread.Post(() => vm.LibraryVm.FocusSearchRequested?.Invoke());
-                    return;
-                case Key.X:
-                    vm.LibraryVm.CyclePlatform(1);
-                    return;
-                case Key.Left:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    return;
-                case Key.Right:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    return;
-                case Key.Up:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    return;
-                case Key.Down:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    return;
-                case Key.Enter:
-                    vm.LibraryVm.ActivateFocusedGame();
-                    return;
-                case Key.PageUp:
-                    vm.LibraryVm.CycleInstallFilter(-1);
-                    return;
-                case Key.PageDown:
-                    vm.LibraryVm.CycleInstallFilter(1);
-                    return;
-            }
+            if (HandleLibraryKey(vm, key, false))
+                return;
         }
 
         // Store controller navigation
