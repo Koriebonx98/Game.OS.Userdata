@@ -2636,7 +2636,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (string.IsNullOrEmpty(achievementsUrl))
             {
                 var dbGames = await GameOsClient.FetchGamesDatabaseAsync(game.Platform);
-                var dbGame  = FindDatabaseGame(dbGames, game.Title, game.TitleId);
+                var dbGame  = FindDatabaseGame(dbGames, game.Title, game.TitleId, game.SteamAppId);
                 achievementsUrl = dbGame?.AchievementsUrl;
             }
 
@@ -2879,7 +2879,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 .GroupBy(s => s.Platform, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(
                     g => g.Key,
-                    g => g.Select(s => (s.Title, s.TitleId)).ToList(),
+                    g => g.Select(s => (s.Title, s.TitleId, s.SteamAppId)).ToList(),
                     StringComparer.OrdinalIgnoreCase);
 
             foreach (var (platform, entries) in byPlatform)
@@ -2889,20 +2889,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
                     if (dbGames.Count == 0) continue;
 
-                    foreach (var (title, titleId) in entries)
+                    foreach (var (title, titleId, steamAppId) in entries)
                     {
-                        var db = FindDatabaseGame(dbGames, title, titleId);
+                        var db = FindDatabaseGame(dbGames, title, titleId, steamAppId);
                         if (db == null) continue;
 
                         var card = LibraryVm.FindMyGameCard(title, platform);
                         if (card == null) continue;
 
-                        // Resolve the real game title for TitleID-based ROM cards
-                        // (e.g. a PS4 folder named "CUSA00572" → "God of War Ragnarök").
-                        // This must be updated regardless of whether we have a cover URL.
-                        string? realTitle = (!string.IsNullOrEmpty(titleId) &&
-                                             db.Title != null &&
-                                             !string.Equals(card.Title, db.Title, StringComparison.OrdinalIgnoreCase))
+                        // Prefer the canonical database title for matched local games,
+                        // including PC games resolved by Steam AppId.
+                        string? realTitle = !string.IsNullOrEmpty(db.Title) &&
+                                            !string.Equals(card.Title, db.Title, StringComparison.Ordinal)
                                             ? db.Title : null;
 
                         string? coverUrl = string.IsNullOrEmpty(card.CoverUrl)
@@ -2942,7 +2940,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             var toEnrich = DashboardVm.RecentLocalGames
                 .Where(c => string.IsNullOrEmpty(c.CoverUrl))
                 .Select(c => (c.EffectiveTitle, c.Platform,
-                              TitleId: c.SourceRom?.TitleId ?? c.SourceCloudGame?.TitleId))
+                              TitleId: c.SourceRom?.TitleId ?? c.SourceCloudGame?.TitleId,
+                              SteamAppId: c.SourceCloudGame?.SteamAppId))
                 .Where(t => !string.IsNullOrEmpty(t.Platform))
                 .Distinct()
                 .ToList();
@@ -2960,9 +2959,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
                     if (dbGames.Count == 0) continue;
 
-                    foreach (var (title, _, titleId) in entries)
+                    foreach (var (title, _, titleId, steamAppId) in entries)
                     {
-                        var db = FindDatabaseGame(dbGames, title, titleId);
+                        var db = FindDatabaseGame(dbGames, title, titleId, steamAppId);
                         if (string.IsNullOrEmpty(db?.CoverUrl)) continue;
 
                         string cover = db.CoverUrl!;
@@ -3012,7 +3011,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform);
-            dbGame = FindDatabaseGame(dbGames, localTitle, titleId);
+            dbGame = FindDatabaseGame(dbGames, localTitle, titleId, steamAppId);
 
             // Resolve effective Steam AppId: prefer the caller's value, fall back to DB entry
             if (steamAppId <= 0 && dbGame?.AppId.HasValue == true)
@@ -3082,7 +3081,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 bool anyUpdated = false;
                 foreach (var game in platformGames)
                 {
-                    var dbGame = FindDatabaseGame(dbGames, game.Title, game.TitleId);
+                    var dbGame = FindDatabaseGame(dbGames, game.Title, game.TitleId, game.SteamAppId);
                     if (dbGame == null) continue;
 
                     // Only fill in fields that are still empty
@@ -3156,8 +3155,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle)
         => FindDatabaseGame(dbGames, localTitle, null);
 
-    private static DatabaseGame? FindDatabaseGame(List<DatabaseGame> dbGames, string localTitle, string? titleId)
+    private static DatabaseGame? FindDatabaseGame(
+        List<DatabaseGame> dbGames, string localTitle, string? titleId, long? steamAppId = null)
     {
+        // Steam AppIds are stable identifiers and avoid title mismatches from scanner/store naming.
+        if (steamAppId is > 0)
+        {
+            var byAppId = dbGames.FirstOrDefault(g => g.AppId == steamAppId);
+            if (byAppId != null) return byAppId;
+        }
+
         // 0. TitleID lookup (most precise — works for PS3/PS4/Switch folder-named games)
         if (!string.IsNullOrEmpty(titleId))
         {
@@ -5521,13 +5528,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             // Snapshot local games on the UI thread to avoid collection-modified exceptions
-            List<(string Title, string Platform, string? TitleId)> sources = new();
+            List<(string Title, string Platform, string? TitleId, long? SteamAppId)> sources = new();
             await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
             {
                 foreach (var g in LibraryVm.LocalGames)
-                    sources.Add((g.Title, "PC", null));
+                    sources.Add((g.Title, "PC", null, g.SteamAppId > 0 ? g.SteamAppId : null));
                 foreach (var r in LibraryVm.LocalRoms)
-                    sources.Add((r.Title, r.Platform, r.TitleId));
+                    sources.Add((r.Title, r.Platform, r.TitleId, null));
             });
 
             if (sources.Count == 0) return;
@@ -5564,11 +5571,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform).ConfigureAwait(false);
                         if (dbGames.Count == 0) continue;
 
-                        foreach (var (title, _, titleId) in pendingEntries)
+                        foreach (var (title, _, titleId, steamAppId) in pendingEntries)
                         {
                             try
                             {
-                                var dbGame = FindDatabaseGame(dbGames, title, titleId);
+                                var dbGame = FindDatabaseGame(dbGames, title, titleId, steamAppId);
                                 if (dbGame == null) continue;
 
                                 // Resolve the effective cache key: scanner titleId → database titleId → title

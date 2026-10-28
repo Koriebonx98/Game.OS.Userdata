@@ -340,13 +340,20 @@ public partial class LibraryViewModel : ViewModelBase
     }
 
     /// <summary>
-    /// Returns a snapshot of all platform/title/titleId tuples in the My Games list so
-    /// MainViewModel can enrich cover art without accessing private fields.
+    /// Returns a snapshot of game identifiers in the My Games list so MainViewModel
+    /// can enrich card metadata without accessing private fields.
     /// </summary>
-    public IReadOnlyList<(string Title, string Platform, string? TitleId)> GetMyGameSources()
+    public IReadOnlyList<(string Title, string Platform, string? TitleId, long? SteamAppId)> GetMyGameSources()
     {
         return _allMyGames
-            .Select(c => (c.Title, c.Platform, c.SourceRom?.TitleId ?? c.SourceCloudGame?.TitleId))
+            .Select(c => (
+                c.Title,
+                c.Platform,
+                c.SourceRom?.TitleId ?? c.SourceCloudGame?.TitleId,
+                c.SourceCloudGame?.SteamAppId ??
+                    (c.SourceGame is { SteamAppId: > 0 } sourceGame
+                        ? sourceGame.SteamAppId
+                        : (long?)null)))
             .Distinct()
             .ToList();
     }
