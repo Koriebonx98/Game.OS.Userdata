@@ -2,6 +2,7 @@ using System;
 using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
@@ -185,8 +186,25 @@ public partial class MainWindow : Window
     ///   Y                  → focus search box (library / store)
     ///   X                  → cycle filter (library platform / store platform)
     /// </summary>
+    /// <summary>
+    /// After a navigation key, scrolls the highlighted (focused / active) item into view so the
+    /// page and side lists follow the controller cursor.
+    /// </summary>
+    private void ScheduleScrollHighlightedIntoView()
+    {
+        Dispatcher.UIThread.Post(() =>
+        {
+            var target = this.GetVisualDescendants().OfType<Control>().FirstOrDefault(c =>
+                c.IsEffectivelyVisible &&
+                (c.Classes.Contains("focused") ||
+                 (c.Classes.Contains("active") && c.Classes.Contains("settings-nav-item"))));
+            target?.BringIntoView();
+        }, DispatcherPriority.Background);
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
+        ScheduleScrollHighlightedIntoView();
         if (DataContext is not MainViewModel vm) return;
 
         // Left Shift + Left Ctrl → Quick Menu toggle (takes priority).
@@ -417,53 +435,24 @@ public partial class MainWindow : Window
             }
         }
 
+        if (!vm.IsSettings) _settingsInContent = false;
+        // Settings controller navigation (left menu ↔ right content)
+        if (vm.IsSettings && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (HandleSettingsKey(vm, e.Key, IsTextInputFocused()))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Library controller navigation (when not in a text input so Y can open search)
         if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            bool inSearch = IsTextInputFocused();
-            switch (e.Key)
+            if (HandleLibraryKey(vm, e.Key, IsTextInputFocused()))
             {
-                // Y → focus search box (mirrors PS/Xbox "search" shortcut)
-                case Key.Y when !inSearch:
-                    vm.LibraryVm.FocusSearchRequested?.Invoke();
-                    e.Handled = true;
-                    return;
-                // X → cycle platform filter
-                case Key.X when !inSearch:
-                    vm.LibraryVm.CyclePlatform(1);
-                    e.Handled = true;
-                    return;
-                case Key.Left when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    e.Handled = true;
-                    return;
-                case Key.Right when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    e.Handled = true;
-                    return;
-                // Up/Down → move focused game card
-                case Key.Up when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    e.Handled = true;
-                    return;
-                case Key.Down when !inSearch:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    e.Handled = true;
-                    return;
-                // Enter/A → open focused game info
-                case Key.Enter when !inSearch:
-                    vm.LibraryVm.ActivateFocusedGame();
-                    e.Handled = true;
-                    return;
-                // LB (PageUp) → cycle install filter backward; RB (PageDown) → forward
-                case Key.PageUp when !inSearch:
-                    vm.LibraryVm.CycleInstallFilter(-1);
-                    e.Handled = true;
-                    return;
-                case Key.PageDown when !inSearch:
-                    vm.LibraryVm.CycleInstallFilter(1);
-                    e.Handled = true;
-                    return;
+                e.Handled = true;
+                return;
             }
         }
 
@@ -576,6 +565,167 @@ public partial class MainWindow : Window
         int pageIdx = System.Array.IndexOf(_navPages, vm.ActivePage);
         vm.NavHighlightIndex = pageIdx >= 0 ? pageIdx : 0;
         vm.IsNavExpanded = true;
+    }
+
+    // ── Settings page navigation ──────────────────────────────────────────
+    private static readonly string[] _settingsSections =
+        ["app", "emulator", "playtime", "sync", "account", "customise", "design",
+         "system", "notifications", "developer", "controller"];
+
+    /// <summary>True while the D-pad cursor is in the right-hand settings content.</summary>
+    private bool _settingsInContent;
+
+    private SettingsView? FindSettingsView() =>
+        this.GetVisualDescendants().OfType<SettingsView>().FirstOrDefault();
+
+    private static bool IsSettingsContentControl(Control c) =>
+        c.Focusable && c.IsEffectivelyVisible && c.IsEffectivelyEnabled && c.IsTabStop &&
+        !c.Classes.Contains("settings-nav-item") &&
+        (c is Button or ToggleButton or ComboBox or TextBox or Slider or NumericUpDown);
+
+    private bool EnterSettingsContent()
+    {
+        var view = FindSettingsView();
+        var first = view?.GetVisualDescendants().OfType<Control>().FirstOrDefault(IsSettingsContentControl);
+        if (first == null) return false;
+        first.Focus(NavigationMethod.Directional);
+        first.BringIntoView();
+        return true;
+    }
+
+    private void ActivateSettingsFocused()
+    {
+        switch (FocusManager?.GetFocusedElement())
+        {
+            case ToggleButton t: t.IsChecked = !(t.IsChecked ?? false); break;
+            case Button b:
+                if (b.Command?.CanExecute(b.CommandParameter) == true) b.Command.Execute(b.CommandParameter);
+                else b.RaiseEvent(new Avalonia.Interactivity.RoutedEventArgs(Button.ClickEvent));
+                break;
+            case ComboBox c: c.IsDropDownOpen = !c.IsDropDownOpen; break;
+        }
+    }
+
+    /// <summary>
+    /// Settings: Up/Down pick a category on the left; A enters the category's options;
+    /// B goes back to the left menu; B on the left menu closes Settings.
+    /// </summary>
+    private bool HandleSettingsKey(MainViewModel vm, Key key, bool inTextInput)
+    {
+        var sv = vm.SettingsVm;
+        if (!_settingsInContent)
+        {
+            switch (key)
+            {
+                case Key.Up:
+                case Key.Down:
+                {
+                    int idx = Array.IndexOf(_settingsSections, sv.SelectedSection);
+                    idx = Math.Clamp((idx < 0 ? 0 : idx) + (key == Key.Up ? -1 : 1), 0, _settingsSections.Length - 1);
+                    sv.SelectSectionCommand.Execute(_settingsSections[idx]);
+                    return true;
+                }
+                case Key.Enter:
+                case Key.Right:
+                    _settingsInContent = EnterSettingsContent();
+                    return true;
+                case Key.Escape:
+                case Key.BrowserBack:
+                    vm.NavigateCommand.Execute("dashboard");
+                    return true;
+            }
+            return false;
+        }
+
+        if (inTextInput && key != Key.Escape && key != Key.BrowserBack) return false;
+
+        // A ComboBox with an open drop-down handles its own keys.
+        if (FocusManager?.GetFocusedElement() is ComboBox { IsDropDownOpen: true } && key != Key.Escape)
+            return false;
+
+        switch (key)
+        {
+            case Key.Up:
+            case Key.Down:
+            {
+                var items = FindSettingsView()?.GetVisualDescendants().OfType<Control>()
+                                .Where(IsSettingsContentControl).ToList();
+                if (items == null || items.Count == 0) return true;
+                int cur = items.IndexOf(FocusManager?.GetFocusedElement() as Control ?? items[0]);
+                int nxt = Math.Clamp((cur < 0 ? 0 : cur) + (key == Key.Up ? -1 : 1), 0, items.Count - 1);
+                items[nxt].Focus(NavigationMethod.Directional);
+                items[nxt].BringIntoView();
+                return true;
+            }
+            case Key.Enter:
+                ActivateSettingsFocused();
+                return true;
+            case Key.Escape:
+            case Key.BrowserBack:
+                _settingsInContent = false;
+                FocusManager?.ClearFocus();
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Games-library controller/keyboard handling shared by both input paths.
+    /// Returns true when the key was consumed. Up/Down move a row, Left/Right move a card,
+    /// X opens the filter box, Y opens the on-screen keyboard, B closes either overlay.
+    /// </summary>
+    private static bool HandleLibraryKey(MainViewModel vm, Key key, bool inSearch)
+    {
+        var lib = vm.LibraryVm;
+
+        if (lib.IsKeyboardOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:     lib.MoveKeyboard(-1, 0); break;
+                case Key.Down:   lib.MoveKeyboard(1, 0);  break;
+                case Key.Left:   lib.MoveKeyboard(0, -1); break;
+                case Key.Right:  lib.MoveKeyboard(0, 1);  break;
+                case Key.Enter:  lib.PressKeyboardKey();  break;
+                case Key.X:      lib.BackspaceSearch();   break;
+                case Key.Y:
+                case Key.Escape:
+                case Key.BrowserBack: lib.CloseKeyboard(); break;
+                default: return true; // swallow everything else while open
+            }
+            return true;
+        }
+
+        if (lib.IsFilterMenuOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:    lib.MoveFilterMenu(-1); break;
+                case Key.Down:  lib.MoveFilterMenu(1);  break;
+                case Key.Enter: lib.ApplyFilterMenuSelection(); break;
+                case Key.X:
+                case Key.Escape:
+                case Key.BrowserBack: lib.CloseFilterMenu(); break;
+                default: return true;
+            }
+            return true;
+        }
+
+        if (inSearch) return false;
+
+        switch (key)
+        {
+            case Key.Y:        lib.OpenKeyboard();           return true;
+            case Key.X:        lib.OpenFilterMenu();         return true;
+            case Key.Left:     lib.MoveGameFocus(-1);        return true;
+            case Key.Right:    lib.MoveGameFocus(1);         return true;
+            case Key.Up:       lib.MoveGameFocusRow(-1);     return true;
+            case Key.Down:     lib.MoveGameFocusRow(1);      return true;
+            case Key.Enter:    lib.ActivateFocusedGame();    return true;
+            case Key.PageUp:   lib.CycleInstallFilter(-1);   return true;
+            case Key.PageDown: lib.CycleInstallFilter(1);    return true;
+        }
+        return false;
     }
 
     /// <summary>Returns true when a TextBox or similar input control has keyboard focus.</summary>
@@ -957,6 +1107,7 @@ public partial class MainWindow : Window
     /// </summary>
     private void HandleControllerKey(Key key)
     {
+        ScheduleScrollHighlightedIntoView();
         if (_boundVm == null) return;
         var vm = _boundVm;
 
@@ -1201,39 +1352,19 @@ public partial class MainWindow : Window
             }
         }
 
+        if (!vm.IsSettings) _settingsInContent = false;
+        // Settings controller navigation (left menu ↔ right content)
+        if (vm.IsSettings && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (HandleSettingsKey(vm, key, false))
+                return;
+        }
+
         // Library controller navigation shortcuts
         if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            switch (key)
-            {
-                case Key.Y:
-                    Dispatcher.UIThread.Post(() => vm.LibraryVm.FocusSearchRequested?.Invoke());
-                    return;
-                case Key.X:
-                    vm.LibraryVm.CyclePlatform(1);
-                    return;
-                case Key.Left:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    return;
-                case Key.Right:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    return;
-                case Key.Up:
-                    vm.LibraryVm.MoveGameFocus(-1);
-                    return;
-                case Key.Down:
-                    vm.LibraryVm.MoveGameFocus(1);
-                    return;
-                case Key.Enter:
-                    vm.LibraryVm.ActivateFocusedGame();
-                    return;
-                case Key.PageUp:
-                    vm.LibraryVm.CycleInstallFilter(-1);
-                    return;
-                case Key.PageDown:
-                    vm.LibraryVm.CycleInstallFilter(1);
-                    return;
-            }
+            if (HandleLibraryKey(vm, key, false))
+                return;
         }
 
         // Store controller navigation

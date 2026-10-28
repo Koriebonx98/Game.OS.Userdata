@@ -322,6 +322,12 @@ public partial class QuickMenuViewModel : ViewModelBase
             return true;
         }
 
+        if (IsXb360Theme && Xb360RecentSubMode)
+        {
+            Xb360RecentSubMode = false;
+            return true;
+        }
+
         // XB360 friends sub-navigation: context menu open → close it first.
         if (IsXb360Theme && Xb360FriendsSubMode && Xb360FriendContextMenuOpen)
         {
@@ -365,10 +371,79 @@ public partial class QuickMenuViewModel : ViewModelBase
         SelectedHubIndex = next;
     }
 
+    // ── Quick settings toggles (settings blade) ───────────────────────────
+    /// <summary>Wired by MainViewModel so the guide can flip a few common settings.</summary>
+    public SettingsViewModel? SettingsVm { get; set; }
+
+    [RelayCommand] private void QuickToggleIntro()    => QuickToggle(v => v.ShowIntroVideo = !v.ShowIntroVideo);
+    [RelayCommand] private void QuickToggleMinimize() => QuickToggle(v => v.MinimizeOnGameLaunch = !v.MinimizeOnGameLaunch);
+    [RelayCommand] private void QuickToggleFriendOnline() => QuickToggle(v => v.NotifyFriendOnline = !v.NotifyFriendOnline);
+
+    private void QuickToggle(Action<SettingsViewModel> flip)
+    {
+        if (SettingsVm == null) return;
+        flip(SettingsVm);
+        SettingsVm.SaveCommand.Execute(null);
+    }
+
+    // ── XB360 recent-games submenu (5 recent + "All") ─────────────────────
+    public sealed partial class Xb360RecentRow : ObservableObject
+    {
+        public string Title { get; init; } = "";
+        public string Subtitle { get; init; } = "";
+        public LocalGameCardVm? Card { get; init; }
+        [ObservableProperty] private bool _isHighlighted;
+    }
+
+    [ObservableProperty] private bool _xb360RecentSubMode;
+    [ObservableProperty] private int  _xb360RecentIndex;
+    public ObservableCollection<Xb360RecentRow> Xb360RecentRows { get; } = new();
+
+    [RelayCommand]
+    private void OpenXb360Recent()
+    {
+        Xb360RecentRows.Clear();
+        foreach (var g in RecentGames.Take(MaxRecentGames))
+            Xb360RecentRows.Add(new Xb360RecentRow { Title = g.EffectiveTitle, Subtitle = g.Platform, Card = g });
+        Xb360RecentRows.Add(new Xb360RecentRow { Title = "All", Subtitle = "Open games library" });
+        Xb360RecentIndex = 0;
+        RefreshXb360RecentRows();
+        Xb360RecentSubMode = true;
+    }
+
+    [RelayCommand]
+    private void ActivateXb360RecentRowItem(Xb360RecentRow? row)
+    {
+        if (row == null) return;
+        Xb360RecentIndex = Xb360RecentRows.IndexOf(row);
+        ActivateXb360RecentRow();
+    }
+
+    private void ActivateXb360RecentRow()
+    {
+        if (Xb360RecentIndex < 0 || Xb360RecentIndex >= Xb360RecentRows.Count) return;
+        var row = Xb360RecentRows[Xb360RecentIndex];
+        if (row.Card != null) LaunchRecentGameCommand.Execute(row.Card);
+        else OpenLibraryPageCommand.Execute(null);
+    }
+
+    private void RefreshXb360RecentRows()
+    {
+        for (int i = 0; i < Xb360RecentRows.Count; i++)
+            Xb360RecentRows[i].IsHighlighted = i == Xb360RecentIndex;
+    }
+
     /// <summary>Moves the Up/Down cursor within the XB360 center item list.</summary>
     public void MoveXb360CenterItem(int delta)
     {
         if (!IsXb360Theme || Xb360BladeId != "main") return;
+
+        if (Xb360RecentSubMode)
+        {
+            Xb360RecentIndex = Math.Clamp(Xb360RecentIndex + delta, 0, Xb360RecentRows.Count - 1);
+            RefreshXb360RecentRows();
+            return;
+        }
 
         // When in friends sub-navigation, navigate the friend list instead.
         if (Xb360FriendsSubMode)
@@ -490,6 +565,12 @@ public partial class QuickMenuViewModel : ViewModelBase
                 return;
         }
 
+        if (Xb360RecentSubMode)
+        {
+            ActivateXb360RecentRow();
+            return;
+        }
+
         // If already in friends sub-navigation, delegate to that handler.
         if (Xb360FriendsSubMode)
         {
@@ -522,12 +603,10 @@ public partial class QuickMenuViewModel : ViewModelBase
                 OpenInboxPageCommand.Execute(null);
                 break;
             case "notifications":
-                OpenNotificationsPageCommand.Execute(null);
+                OpenBrowserCommand.Execute(null);
                 break;
             case "recent":
-                OnNavigatePage?.Invoke("library");
-                OnRequestLauncherForeground?.Invoke();
-                OnDismiss?.Invoke();
+                OpenXb360RecentCommand.Execute(null);
                 break;
             case "downloads":
                 OpenDownloadsPageCommand.Execute(null);
@@ -968,6 +1047,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         Xb360BladeId = "main";
         // Reset friends sub-navigation state.
         Xb360FriendsSubMode = false;
+        Xb360RecentSubMode = false;
         Xb360SelectedFriendIndex = 0;
         Xb360FriendContextMenuOpen = false;
         Xb360FriendContextIndex = 0;

@@ -430,6 +430,23 @@ public partial class LibraryViewModel : ViewModelBase
         SetFocusedGameAt(next);
     }
 
+    /// <summary>Supplies the number of cards per row (set by the view from the live layout).</summary>
+    public Func<int>? ColumnsProvider { get; set; }
+
+    /// <summary>Moves focus one row up (−1) or down (+1), keeping the same column.</summary>
+    public void MoveGameFocusRow(int direction)
+    {
+        if (FilteredMyGames.Count == 0 || FocusedGameIndex < 0)
+        {
+            MoveGameFocus(0);
+            return;
+        }
+        int cols = Math.Max(1, ColumnsProvider?.Invoke() ?? 1);
+        int next = FocusedGameIndex + direction * cols;
+        if (next < 0 || next >= FilteredMyGames.Count) return;
+        SetFocusedGameAt(next);
+    }
+
     /// <summary>Opens the detail overlay for the currently focused game card.</summary>
     public void ActivateFocusedGame()
     {
@@ -472,6 +489,156 @@ public partial class LibraryViewModel : ViewModelBase
             HasFocusedGame = false;
         }
     }
+
+    // ── Filter box (X) ────────────────────────────────────────────────────
+    [ObservableProperty] private bool _isFilterMenuOpen;
+    [ObservableProperty] private int  _filterMenuIndex;
+
+    /// <summary>Entries shown in the filter box: install statuses first, then platforms.</summary>
+    public List<(string Kind, string Value, string Label)> FilterMenuEntries()
+    {
+        var list = new List<(string, string, string)>
+        {
+            ("Install", "All", "All games"),
+            ("Install", "Installed", "Installed"),
+            ("Install", "Uninstalled", "Not installed"),
+        };
+        foreach (var plat in Platforms) list.Add(("Platform", plat, plat));
+        return list;
+    }
+
+    public ObservableCollection<FilterMenuItem> FilterMenuItems { get; } = new();
+
+    public sealed partial class FilterMenuItem : ObservableObject
+    {
+        public string Kind  { get; init; } = "";
+        public string Value { get; init; } = "";
+        public string Label { get; init; } = "";
+        [ObservableProperty] private bool _isHighlighted;
+        [ObservableProperty] private bool _isActive;
+    }
+
+    public void OpenFilterMenu()
+    {
+        FilterMenuItems.Clear();
+        foreach (var (k, v, l) in FilterMenuEntries())
+            FilterMenuItems.Add(new FilterMenuItem { Kind = k, Value = v, Label = l });
+        FilterMenuIndex = 0;
+        RefreshFilterMenu();
+        IsFilterMenuOpen = true;
+    }
+
+    [RelayCommand] public void CloseFilterMenu() => IsFilterMenuOpen = false;
+
+    public void MoveFilterMenu(int delta)
+    {
+        if (FilterMenuItems.Count == 0) return;
+        FilterMenuIndex = Math.Clamp(FilterMenuIndex + delta, 0, FilterMenuItems.Count - 1);
+        RefreshFilterMenu();
+    }
+
+    public void ApplyFilterMenuSelection()
+    {
+        if (FilterMenuIndex < 0 || FilterMenuIndex >= FilterMenuItems.Count) return;
+        var item = FilterMenuItems[FilterMenuIndex];
+        if (item.Kind == "Install") FilterInstallStatus = item.Value;
+        else FilterPlatform = item.Value;
+        RefreshFilterMenu();
+    }
+
+    private void RefreshFilterMenu()
+    {
+        for (int i = 0; i < FilterMenuItems.Count; i++)
+        {
+            var it = FilterMenuItems[i];
+            it.IsHighlighted = i == FilterMenuIndex;
+            it.IsActive = it.Kind == "Install" ? it.Value == FilterInstallStatus
+                                               : it.Value == FilterPlatform;
+        }
+    }
+
+    // ── On-screen keyboard (Y) ────────────────────────────────────────────
+    public static readonly string[][] KeyboardRows =
+    {
+        new[] { "1","2","3","4","5","6","7","8","9","0" },
+        new[] { "Q","W","E","R","T","Y","U","I","O","P" },
+        new[] { "A","S","D","F","G","H","J","K","L","'" },
+        new[] { "Z","X","C","V","B","N","M",":","-","." },
+        new[] { "Space","Backspace","Clear","Done" },
+    };
+
+    [ObservableProperty] private bool _isKeyboardOpen;
+    [ObservableProperty] private int  _keyboardRow;
+    [ObservableProperty] private int  _keyboardCol;
+
+    public ObservableCollection<KeyboardRowVm> KeyboardRowItems { get; } = new();
+
+    public sealed partial class KeyboardKeyVm : ObservableObject
+    {
+        public string Label { get; init; } = "";
+        public bool IsWide => Label.Length > 1;
+        [ObservableProperty] private bool _isHighlighted;
+    }
+
+    public sealed class KeyboardRowVm
+    {
+        public List<KeyboardKeyVm> Keys { get; init; } = new();
+    }
+
+    public void OpenKeyboard()
+    {
+        if (KeyboardRowItems.Count == 0)
+            foreach (var row in KeyboardRows)
+                KeyboardRowItems.Add(new KeyboardRowVm { Keys = row.Select(k => new KeyboardKeyVm { Label = k }).ToList() });
+        KeyboardRow = 1; KeyboardCol = 0;
+        RefreshKeyboard();
+        IsKeyboardOpen = true;
+    }
+
+    [RelayCommand] public void CloseKeyboard() => IsKeyboardOpen = false;
+
+    public void MoveKeyboard(int dRow, int dCol)
+    {
+        if (KeyboardRowItems.Count == 0) return;
+        int r = Math.Clamp(KeyboardRow + dRow, 0, KeyboardRowItems.Count - 1);
+        int rowLen = KeyboardRowItems[r].Keys.Count;
+        int c = dRow != 0 ? Math.Min(KeyboardCol, rowLen - 1)
+                          : Math.Clamp(KeyboardCol + dCol, 0, rowLen - 1);
+        KeyboardRow = r; KeyboardCol = c;
+        RefreshKeyboard();
+    }
+
+    public void PressKeyboardKey()
+    {
+        if (KeyboardRow >= KeyboardRowItems.Count) return;
+        var key = KeyboardRowItems[KeyboardRow].Keys[KeyboardCol].Label;
+        switch (key)
+        {
+            case "Space":     SearchText += " "; break;
+            case "Backspace": BackspaceSearch(); break;
+            case "Clear":     SearchText = ""; break;
+            case "Done":      IsKeyboardOpen = false; break;
+            default:          SearchText += key.ToLowerInvariant(); break;
+        }
+    }
+
+    public void BackspaceSearch()
+    {
+        if (SearchText.Length > 0) SearchText = SearchText[..^1];
+    }
+
+    private void RefreshKeyboard()
+    {
+        for (int r = 0; r < KeyboardRowItems.Count; r++)
+            for (int c = 0; c < KeyboardRowItems[r].Keys.Count; c++)
+                KeyboardRowItems[r].Keys[c].IsHighlighted = r == KeyboardRow && c == KeyboardCol;
+    }
+
+    /// <summary>True while the filter box or on-screen keyboard is covering the library.</summary>
+    public bool IsOverlayOpen => IsFilterMenuOpen || IsKeyboardOpen;
+
+    partial void OnIsFilterMenuOpenChanged(bool value) => OnPropertyChanged(nameof(IsOverlayOpen));
+    partial void OnIsKeyboardOpenChanged(bool value)   => OnPropertyChanged(nameof(IsOverlayOpen));
 
     private static readonly string[] _installFilters = { "All", "Installed", "Uninstalled" };
 

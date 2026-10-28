@@ -85,4 +85,17 @@ public static class GameReviewService
             name = name.Replace(c, '_');
         return name;
     }
+
+    /// <summary>Loads cached compatibility reports from <c>compatibility.json</c> next to reviews.json.</summary>
+    public static List<Models.GameCompatibility> LoadCompatibility(string platform, string title)
+    {
+        string path = Path.Combine(Path.GetDirectoryName(GetReviewsPath(platform, title))!, "compatibility.json");
+        if (!File.Exists(path)) return new List<Models.GameCompatibility>();
+        try
+        {
+            return JsonSerializer.Deserialize<List<Models.GameCompatibility>>(File.ReadAllText(path), _json)
+                   ?? new List<Models.GameCompatibility>();
+        }
+        catch { return new List<Models.GameCompatibility>(); }
+    }
 }

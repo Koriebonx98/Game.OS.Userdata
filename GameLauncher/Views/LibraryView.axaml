@@ -15,5 +15,6 @@
     <Panel>
         <lib:DefaultGamesLib Name="DefaultLib" IsVisible="{Binding IsDefaultGamesLib}"/>
         <lib:Ps5GamesLib     Name="Ps5Lib"     IsVisible="{Binding IsPs5GamesLib}"/>
+        <lib:GamesLibOverlays/>
     </Panel>
 </UserControl>

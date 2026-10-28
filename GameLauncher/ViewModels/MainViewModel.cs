@@ -298,6 +298,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LaunchFromCard(card);
     }
 
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "ShowWindow")]
+    private static extern bool BrowserShowWindow(IntPtr h, int cmd);
+    [System.Runtime.InteropServices.DllImport("user32.dll", EntryPoint = "SetForegroundWindow")]
+    private static extern bool BrowserSetForegroundWindow(IntPtr h);
+
     public MainViewModel()
     {
         _client       = new GameOsClient();
@@ -361,10 +366,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (card == null) return;
             LaunchFromCard(card);
         };
+        QuickMenuVm.SettingsVm = SettingsVm;
         QuickMenuVm.OnOpenBrowser = () =>
         {
             try
             {
+                if (OperatingSystem.IsWindows())
+                {
+                    foreach (var name in new[] { "chrome", "msedge", "firefox", "brave", "opera", "vivaldi" })
+                        foreach (var proc in System.Diagnostics.Process.GetProcessesByName(name))
+                        {
+                            var h = proc.MainWindowHandle;
+                            if (h == IntPtr.Zero) continue;
+                            BrowserShowWindow(h, 9);
+                            BrowserSetForegroundWindow(h);
+                            return;
+                        }
+                }
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = DefaultBrowserUrl,

@@ -491,7 +491,17 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var r in all)
             Reviews.Add(r);
         HasReviews = Reviews.Count > 0;
+        AverageRatingLabel = HasReviews
+            ? $"{Reviews.Average(r => r.Rating):0.0} / 5  ({Reviews.Count})"
+            : "No ratings yet";
+
+        CompatibilityReports.Clear();
+        foreach (var c in Services.GameReviewService.LoadCompatibility(Platform, Title))
+            CompatibilityReports.Add(c);
+        HasCompatibilityReports = CompatibilityReports.Count > 0;
     }
+
+    [ObservableProperty] private string _averageRatingLabel = "No ratings yet";
 
     // ── Per-game compatibility reports ────────────────────────────────────────
     public System.Collections.ObjectModel.ObservableCollection<Models.GameCompatibility> CompatibilityReports { get; } = new();
@@ -2694,6 +2704,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
+                    // The detail page may now show a different game — don't leak this unlock into it.
+                    if (!string.Equals(Title, gameTitle, StringComparison.OrdinalIgnoreCase)) return;
                     var existing = Achievements.FirstOrDefault(a =>
                         string.Equals(a.AchievementId, resolvedId, StringComparison.OrdinalIgnoreCase) ||
                         string.Equals(a.Name, resolvedName, StringComparison.OrdinalIgnoreCase) ||
@@ -3741,6 +3753,8 @@ public partial class GameDetailViewModel : ViewModelBase
         // is re-fetched — which can happen when ID/name formatting differences between
         // the emulator save file and the Games.Database template cause the primary merge
         // to miss an already-known unlock.
+        string requestPlatform = Platform;
+        string requestTitle    = Title;
         var currentUnlockedSnapshot = Achievements
             .Where(a => !string.IsNullOrEmpty(a.UnlockedAt))
             .Select(a => new Achievement
@@ -4050,10 +4064,15 @@ public partial class GameDetailViewModel : ViewModelBase
             if (list.Count > 0)
             {
                 int total = list.Count;
-                string snapshotPlatform = Platform;
-                string snapshotTitle    = Title;
+                string snapshotPlatform = requestPlatform;
+                string snapshotTitle    = requestTitle;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
+                    // Another game was opened while this fetch was in flight — drop the
+                    // result so its achievements never bleed into the wrong game page.
+                    if (!string.Equals(Platform, snapshotPlatform, StringComparison.Ordinal) ||
+                        !string.Equals(Title, snapshotTitle, StringComparison.Ordinal))
+                        return;
                     PopulateAchievements(list);
                     // Notify MainViewModel so the library card denominator can be updated
                     // (e.g. "3 / 98" instead of "3 / 3" when only unlocked were cached)
