@@ -14,6 +14,7 @@
     <meta name="theme-color" content="#0f172a">
     <script src="pwa.js"></script>
     <script src="emulator.js?v=emu8"></script>
+    <script src="appnav.js?v=1" defer></script>
 </head>
 <body class="app-body">
     <header class="app-header">
@@ -653,12 +654,16 @@
         }
         // Reload library, play history and achievements so data is never stale
         let refreshing = false;
+        let lastRefreshSig = '';
         async function refreshData() {
             if (refreshing || !user) return;
             refreshing = true;
             try {
                 const lib = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
                 const log = MODE === 'demo' ? [] : await getActivityLogGitHub(user.username).catch(() => activityLog);
+                const sig = JSON.stringify([lib, log]);
+                if (sig === lastRefreshSig) return;
+                lastRefreshSig = sig;
                 library = lib; activityLog = log;
                 applyPlayHistory();
                 await loadUserAch();
