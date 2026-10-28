@@ -933,10 +933,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
         LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
         LibraryVm.GamesTheme = SettingsVm.GamesTheme;
+        LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         SettingsVm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
                 LibraryVm.GamesTheme = SettingsVm.GamesTheme;
+            if (e.PropertyName == nameof(SettingsViewModel.KeyboardTheme))
+                LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;

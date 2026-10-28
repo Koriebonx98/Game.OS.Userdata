@@ -1103,6 +1103,17 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
+                                <TextBlock Text="On-Screen Keyboard"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableKeyboardThemes}"
+                                          SelectedItem="{Binding KeyboardTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="Default is the standard on-screen keyboard; PS5 uses a PlayStation-style keyboard."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
                                 <TextBlock Text="Quick Menu Style"
                                            FontSize="13" Foreground="#e6edf3"/>
                                 <ComboBox Classes="form-input"
