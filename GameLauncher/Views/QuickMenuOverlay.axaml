@@ -472,10 +472,10 @@
 
                                     <Button Classes="xb360-guide-item"
                                             Classes.cursor="{Binding Xb360CursorNotifications}"
-                                            Command="{Binding OpenNotificationsPageCommand}">
+                                            Command="{Binding OpenBrowserCommand}">
                                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
-                                            <TextBlock Grid.Column="0" Text="Activity" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
-                                            <TextBlock Grid.Column="1" Text="⚡" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="0" Text="Browser" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
+                                            <TextBlock Grid.Column="1" Text="🌐" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
                                         </Grid>
                                     </Button>
                                     <Rectangle Height="1" Fill="#d7d7d7"/>

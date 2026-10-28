@@ -522,7 +522,7 @@ public partial class QuickMenuViewModel : ViewModelBase
                 OpenInboxPageCommand.Execute(null);
                 break;
             case "notifications":
-                OpenNotificationsPageCommand.Execute(null);
+                OpenBrowserCommand.Execute(null);
                 break;
             case "recent":
                 OnNavigatePage?.Invoke("library");

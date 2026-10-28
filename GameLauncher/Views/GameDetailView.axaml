@@ -176,15 +176,8 @@
                                 <TextBlock Text="↙" FontSize="16" VerticalAlignment="Center"/>
                             </Button>
                             <Button Classes="btn-secondary"
-                                    Padding="16,12"
-                                    ToolTip.Tip="Open Exophase Achievements"
-                                    Command="{Binding OpenExophasePageCommand}"
-                                    IsVisible="{Binding HasExophaseUrl}">
-                                <TextBlock Text="🏆" FontSize="16" VerticalAlignment="Center"/>
-                            </Button>
-                            <Button Classes="btn-secondary"
                                     Padding="12,12"
-                                    ToolTip.Tip="Sync Exophase Now"
+                                    ToolTip.Tip="Refresh Achievements"
                                     Command="{Binding SyncExophaseNowCommand}"
                                     IsEnabled="{Binding !IsExophaseSyncing}"
                                     IsVisible="{Binding HasExophaseUrl}">
