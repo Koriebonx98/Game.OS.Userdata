@@ -1,10 +1,15 @@
+using System.Linq;
 using Avalonia.Controls;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 using GameLauncher.ViewModels;
 
 namespace GameLauncher.Views;
 
 public partial class StoreView : UserControl
 {
+    private StoreViewModel? _vm;
+
     public StoreView()
     {
         InitializeComponent();
@@ -13,18 +18,42 @@ public partial class StoreView : UserControl
 
     private void OnDataContextChanged(object? sender, System.EventArgs e)
     {
-        if (DataContext is StoreViewModel vm)
-            vm.FocusSearchRequested = FocusSearchBox;
+        _vm = DataContext as StoreViewModel;
+        if (_vm == null) return;
+        _vm.FocusSearchRequested = () => _vm.OpenKeyboard();
+        _vm.ColumnsProvider = GetColumns;
+        _vm.ScrollFocusedIntoView = () => Dispatcher.UIThread.Post(BringFocusedIntoView, DispatcherPriority.Background);
     }
 
-    private void FocusSearchBox()
+    private Control? ActiveRoot() => _vm is { IsPs5Store: true }
+        ? this.FindControl<Control>("Ps5StoreView")
+        : this.FindControl<Control>("DefaultStoreView");
+
+    /// <summary>The visible card grid (the WrapPanel of the active tab).</summary>
+    private WrapPanel? CardPanel() => ActiveRoot()?.GetVisualDescendants()
+        .OfType<WrapPanel>().FirstOrDefault(p => p.IsEffectivelyVisible && p.Children.Count > 0);
+
+    private int GetColumns()
     {
-        // Focus whichever search box is currently visible
-        var gamesBox = this.FindControl<TextBox>("StoreSearchBox");
-        var appsBox  = this.FindControl<TextBox>("AppStoreSearchBox");
-        if (gamesBox?.IsVisible == true)
-            gamesBox.Focus();
-        else
-            appsBox?.Focus();
+        var panel = CardPanel();
+        if (panel == null || panel.Children.Count == 0) return 1;
+        var first = panel.Children[0];
+        double slot = first.Bounds.Width + first.Margin.Left + first.Margin.Right;
+        return slot <= 0 ? 1 : System.Math.Max(1, (int)(panel.Bounds.Width / slot));
+    }
+
+    private void BringFocusedIntoView()
+    {
+        var panel = CardPanel();
+        if (panel == null) return;
+        foreach (var child in panel.Children)
+        {
+            if (child.DataContext is Models.IStoreFocusable { IsFocused: true } ||
+                child.GetVisualDescendants().OfType<Control>().Any(c => c.Classes.Contains("focused")))
+            {
+                child.BringIntoView();
+                return;
+            }
+        }
     }
 }

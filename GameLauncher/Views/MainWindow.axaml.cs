@@ -459,25 +459,10 @@ public partial class MainWindow : Window
         // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            bool inSearch = IsTextInputFocused();
-            switch (e.Key)
+            if (HandleStoreKey(vm, e.Key, IsTextInputFocused()))
             {
-                // Y → focus search box
-                case Key.Y when !inSearch:
-                    vm.StoreVm.FocusSearchRequested?.Invoke();
-                    e.Handled = true;
-                    return;
-                // X → cycle platform filter
-                case Key.X when !inSearch:
-                    vm.StoreVm.CyclePlatform();
-                    e.Handled = true;
-                    return;
-                // LB/RB → switch Games / App Store tabs
-                case Key.PageUp:
-                case Key.PageDown:
-                    vm.StoreVm.CycleTab();
-                    e.Handled = true;
-                    return;
+                e.Handled = true;
+                return;
             }
         }
 
@@ -724,6 +709,65 @@ public partial class MainWindow : Window
             case Key.Enter:    lib.ActivateFocusedGame();    return true;
             case Key.PageUp:   lib.CycleInstallFilter(-1);   return true;
             case Key.PageDown: lib.CycleInstallFilter(1);    return true;
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// Store / App Store controller handling shared by both input paths.
+    /// D-pad moves the highlighted card, A opens it, X opens the filter menu,
+    /// Y opens the on-screen keyboard, B closes either overlay, LB/RB switch tabs.
+    /// </summary>
+    private static bool HandleStoreKey(MainViewModel vm, Key key, bool inSearch)
+    {
+        var st = vm.StoreVm;
+
+        if (st.IsKeyboardOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:     st.MoveKeyboard(-1, 0); break;
+                case Key.Down:   st.MoveKeyboard(1, 0);  break;
+                case Key.Left:   st.MoveKeyboard(0, -1); break;
+                case Key.Right:  st.MoveKeyboard(0, 1);  break;
+                case Key.Enter:  st.PressKeyboardKey();  break;
+                case Key.X:      st.BackspaceSearch();   break;
+                case Key.Y:
+                case Key.Escape:
+                case Key.BrowserBack: st.CloseKeyboard(); break;
+                default: return true;
+            }
+            return true;
+        }
+
+        if (st.IsFilterMenuOpen)
+        {
+            switch (key)
+            {
+                case Key.Up:    st.MoveFilterMenu(-1); break;
+                case Key.Down:  st.MoveFilterMenu(1);  break;
+                case Key.Enter: st.ApplyFilterMenuSelection(); break;
+                case Key.X:
+                case Key.Escape:
+                case Key.BrowserBack: st.CloseFilterMenu(); break;
+                default: return true;
+            }
+            return true;
+        }
+
+        if (inSearch) return false;
+
+        switch (key)
+        {
+            case Key.Y:        st.OpenKeyboard();       return true;
+            case Key.X:        st.OpenFilterMenu();     return true;
+            case Key.Left:     st.MoveFocus(-1);        return true;
+            case Key.Right:    st.MoveFocus(1);         return true;
+            case Key.Up:       st.MoveFocusRow(-1);     return true;
+            case Key.Down:     st.MoveFocusRow(1);      return true;
+            case Key.Enter:    st.ActivateFocused();    return true;
+            case Key.PageUp:
+            case Key.PageDown: st.CycleTab();           return true;
         }
         return false;
     }
@@ -1370,19 +1414,8 @@ public partial class MainWindow : Window
         // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
-            switch (key)
-            {
-                case Key.Y:
-                    Dispatcher.UIThread.Post(() => vm.StoreVm.FocusSearchRequested?.Invoke());
-                    return;
-                case Key.X:
-                    vm.StoreVm.CyclePlatform();
-                    return;
-                case Key.PageUp:
-                case Key.PageDown:
-                    vm.StoreVm.CycleTab();
-                    return;
-            }
+            if (HandleStoreKey(vm, key, false))
+                return;
         }
 
         // Global navigation — back, page prev/next, nav sidebar, and confirm

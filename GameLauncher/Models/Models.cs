@@ -358,8 +358,27 @@ namespace GameLauncher.Models
         [JsonPropertyName("addedAt")]    public string  AddedAt    { get; set; } = "";
     }
 
-    public class StoreGame
+    /// <summary>Store card that can be highlighted by controller/keyboard navigation.</summary>
+    public interface IStoreFocusable
     {
+        bool IsFocused { get; set; }
+    }
+
+    public class StoreGame : System.ComponentModel.INotifyPropertyChanged, IStoreFocusable
+    {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        private bool _isFocused;
+        public bool IsFocused
+        {
+            get => _isFocused;
+            set
+            {
+                if (_isFocused == value) return;
+                _isFocused = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsFocused)));
+            }
+        }
+
         public string        Title           { get; set; } = "";
         public string        Platform        { get; set; } = "";
         public string        Genre           { get; set; } = "";
@@ -817,8 +836,21 @@ namespace GameLauncher.Models
     // ── App Store entry (from Koriebonx98/AppStore- repository) ──────────────
 
     /// <summary>An application entry from the public Koriebonx98/AppStore- repository.</summary>
-    public class AppStoreEntry
+    public class AppStoreEntry : System.ComponentModel.INotifyPropertyChanged, IStoreFocusable
     {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+        private bool _isFocused;
+        public bool IsFocused
+        {
+            get => _isFocused;
+            set
+            {
+                if (_isFocused == value) return;
+                _isFocused = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsFocused)));
+            }
+        }
+
         [JsonPropertyName("Name")]               public string  Name              { get; set; } = "";
         [JsonPropertyName("GameName")]           public string  GameName          { get; set; } = "";
         [JsonPropertyName("Url")]                public string  Url               { get; set; } = "";
