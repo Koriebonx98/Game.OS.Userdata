@@ -491,7 +491,17 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var r in all)
             Reviews.Add(r);
         HasReviews = Reviews.Count > 0;
+        AverageRatingLabel = HasReviews
+            ? $"{Reviews.Average(r => r.Rating):0.0} / 5  ({Reviews.Count})"
+            : "No ratings yet";
+
+        CompatibilityReports.Clear();
+        foreach (var c in Services.GameReviewService.LoadCompatibility(Platform, Title))
+            CompatibilityReports.Add(c);
+        HasCompatibilityReports = CompatibilityReports.Count > 0;
     }
+
+    [ObservableProperty] private string _averageRatingLabel = "No ratings yet";
 
     // ── Per-game compatibility reports ────────────────────────────────────────
     public System.Collections.ObjectModel.ObservableCollection<Models.GameCompatibility> CompatibilityReports { get; } = new();

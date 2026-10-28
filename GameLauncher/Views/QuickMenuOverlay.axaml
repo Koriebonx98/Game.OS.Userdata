@@ -208,6 +208,14 @@
         <Style Selector="Button.qm-xb360-side-btn.active TextBlock">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+        <Style Selector="Button.xb360-sub-action-btn.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#118714"/>
+            <Setter Property="TextBlock.Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn.cursor">
+            <Setter Property="BorderBrush" Value="#ffd44d"/>
+            <Setter Property="BorderThickness" Value="3"/>
+        </Style>
         <Style Selector="Button.xb360-guide-item.cursor /template/ ContentPresenter">
             <Setter Property="Background" Value="#118714"/>
         </Style>
@@ -482,7 +490,7 @@
 
                                     <Button Classes="xb360-guide-item"
                                             Classes.cursor="{Binding Xb360CursorRecent}"
-                                            Command="{Binding OpenLibraryPageCommand}">
+                                            Command="{Binding OpenXb360RecentCommand}">
                                         <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="10">
                                             <TextBlock Grid.Column="0" Text="Recent Games" Classes="xb360-guide-row-text" VerticalAlignment="Center"/>
                                             <TextBlock Grid.Column="1" Text="{Binding Xb360RecentGamesCount}" Classes="xb360-guide-row-value" VerticalAlignment="Center"/>
@@ -649,10 +657,25 @@
                                             <TextBlock Text="Activity" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
                                             <Button Classes="xb360-sub-action-btn" Command="{Binding OpenNotificationsPageCommand}">View Activity</Button>
                                         </StackPanel>
-                                        <StackPanel IsVisible="{Binding Xb360CursorRecent}" Spacing="10">
+                                        <StackPanel IsVisible="{Binding Xb360CursorRecent}" Spacing="6">
                                             <TextBlock Text="Recent Games" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
-                                            <TextBlock Text="{Binding Xb360RecentGamesCount, StringFormat='{}{0} played'}" FontSize="13" Foreground="#444"/>
-                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenLibraryPageCommand}">Browse Library</Button>
+                                            <ItemsControl ItemsSource="{Binding Xb360RecentRows}" IsVisible="{Binding Xb360RecentSubMode}">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:QuickMenuViewModel+Xb360RecentRow">
+                                                        <Button Classes="xb360-sub-action-btn" Margin="0,2"
+                                                                HorizontalAlignment="Stretch"
+                                                                Classes.cursor="{Binding IsHighlighted}"
+                                                                Command="{Binding $parent[ItemsControl].DataContext.ActivateXb360RecentRowItemCommand}"
+                                                                CommandParameter="{Binding}">
+                                                            <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                                        </Button>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            <TextBlock Text="{Binding Xb360RecentGamesCount, StringFormat='{}{0} played'}" FontSize="13" Foreground="#444"
+                                                       IsVisible="{Binding !Xb360RecentSubMode}"/>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding OpenXb360RecentCommand}"
+                                                    IsVisible="{Binding !Xb360RecentSubMode}">Show recent games</Button>
                                         </StackPanel>
                                         <StackPanel IsVisible="{Binding Xb360CursorDownloads}" Spacing="10">
                                             <TextBlock Text="Downloads" FontWeight="SemiBold" FontSize="15" Foreground="#1a1a1a"/>
@@ -684,7 +707,10 @@
                             <StackPanel IsVisible="{Binding Xb360SettingsBladeActive}"
                                         VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="16">
                                 <TextBlock Text="Settings" FontWeight="SemiBold" FontSize="20" Foreground="#1a1a1a" HorizontalAlignment="Center"/>
-                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenSettingsPageCommand}">Open Settings</Button>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding QuickToggleIntroCommand}">Toggle intro video</Button>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding QuickToggleMinimizeCommand}">Toggle minimise on launch</Button>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding QuickToggleFriendOnlineCommand}">Toggle friend-online alerts</Button>
+                                <Button Classes="xb360-sub-action-btn" Command="{Binding OpenSettingsPageCommand}">All</Button>
                             </StackPanel>
 
                             <!-- Profile blade panel -->

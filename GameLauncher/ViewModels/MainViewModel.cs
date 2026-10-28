@@ -366,6 +366,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (card == null) return;
             LaunchFromCard(card);
         };
+        QuickMenuVm.SettingsVm = SettingsVm;
         QuickMenuVm.OnOpenBrowser = () =>
         {
             try

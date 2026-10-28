@@ -163,17 +163,18 @@
                             </Button>
                             <Button Classes="btn-secondary"
                                     Padding="12,12"
-                                    ToolTip.Tip="Sync saves with Ludusavi"
-                                    Command="{Binding SyncWithLudusaviCommand}"
-                                    IsEnabled="{Binding !IsLudusaviSyncing}">
+                                    ToolTip.Tip="Backup / Restore saves">
                                 <TextBlock Text="☁" FontSize="16" VerticalAlignment="Center"/>
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    Padding="12,12"
-                                    ToolTip.Tip="Restore saves from backup"
-                                    Command="{Binding RestoreWithLudusaviCommand}"
-                                    IsEnabled="{Binding !IsLudusaviRestoring}">
-                                <TextBlock Text="↙" FontSize="16" VerticalAlignment="Center"/>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
+                                        <MenuItem Header="☁  Backup saves"
+                                                  Command="{Binding SyncWithLudusaviCommand}"
+                                                  IsEnabled="{Binding !IsLudusaviSyncing}"/>
+                                        <MenuItem Header="↙  Restore saves"
+                                                  Command="{Binding RestoreWithLudusaviCommand}"
+                                                  IsEnabled="{Binding !IsLudusaviRestoring}"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
                             </Button>
                             <Button Classes="btn-secondary"
                                     Padding="12,12"
@@ -1109,6 +1110,30 @@
                     </StackPanel>
                 </Border>
 
+                <!-- ── Compatibility reports section ── -->
+                <Border Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="🖥  Compatibility" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <TextBlock Text="No compatibility reports yet."
+                                   FontSize="12" Foreground="#8b949e"
+                                   IsVisible="{Binding !HasCompatibilityReports}"/>
+                        <ItemsControl ItemsSource="{Binding CompatibilityReports}"
+                                      IsVisible="{Binding HasCompatibilityReports}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:GameCompatibility">
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Summary}" FontSize="13" Foreground="#E6EDF3"/>
+                                        <TextBlock FontSize="11" Foreground="#8b949e">
+                                            <Run Text="{Binding Cpu}"/><Run Text="  ·  "/><Run Text="{Binding Gpu}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
                 <!-- ── Reviews section ── -->
                 <Border Background="#161b22" CornerRadius="12"
                         Padding="24,20" Margin="0,0,0,24">
@@ -1121,6 +1146,8 @@
                                 <TextBlock Text="Reviews"
                                            FontSize="16" FontWeight="Bold"
                                            Foreground="White" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding AverageRatingLabel}" FontSize="12"
+                                           Foreground="#f0a030" VerticalAlignment="Center"/>
                                 <Border CornerRadius="10" Padding="8,3" Background="#f0a030"
                                         VerticalAlignment="Center"
                                         IsVisible="{Binding HasReviews}">
