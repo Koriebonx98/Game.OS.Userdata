@@ -3,6 +3,7 @@
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
+             xmlns:gi="using:GameLauncher.Views.GameInfoLib"
              xmlns:wv="clr-namespace:AvaloniaWebView;assembly=Avalonia.WebView"
              xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
              x:Class="GameLauncher.Views.GameDetailView"
@@ -43,415 +44,11 @@
             <StackPanel Margin="32,24,32,32" Spacing="0">
 
                 <!-- Hero: cover + info side by side -->
-                <Grid ColumnDefinitions="240,*" Margin="0,0,0,28">
-
-                    <!-- Cover image -->
-                    <Border Grid.Column="0" CornerRadius="12" ClipToBounds="True"
-                            Width="220" Height="300" HorizontalAlignment="Left">
-                        <views:CoverImage
-                            ImageUrl="{Binding CoverUrl}"
-                            FallbackText="{Binding Title}"
-                            FallbackGradient="{Binding CoverGradient}"
-                            SubText="{Binding Genre}"
-                            LetterFontSize="80"
-                            ImageCornerRadius="12"
-                            Width="220" Height="300"/>
-                    </Border>
-
-                    <!-- Info panel -->
-                    <StackPanel Grid.Column="1" Margin="28,0,0,0" Spacing="10"
-                                VerticalAlignment="Top">
-
-                        <TextBlock Text="{Binding Title}"
-                                   FontSize="32" FontWeight="Bold"
-                                   Foreground="White" TextWrapping="Wrap"/>
-
-                        <!-- Badges row -->
-                        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                            <Border CornerRadius="4" Padding="10,4" Background="#1f6feb">
-                                <TextBlock Text="{Binding Platform}"
-                                           FontSize="12" FontWeight="Bold" Foreground="White"/>
-                            </Border>
-                            <Border CornerRadius="4" Padding="10,4" Background="#21262d"
-                                    IsVisible="{Binding Genre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                <TextBlock Text="{Binding Genre}"
-                                           FontSize="12" Foreground="#c9d1d9"/>
-                            </Border>
-                            <Border CornerRadius="4" Padding="10,4" Background="#21262d"
-                                    IsVisible="{Binding ReleaseYear, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                <TextBlock Text="{Binding ReleaseYear}"
-                                           FontSize="12" Foreground="#8b949e"/>
-                            </Border>
-                            <!-- Region/Language badge for ROM games -->
-                            <Border CornerRadius="4" Padding="10,4" Background="#1a3a1a"
-                                    IsVisible="{Binding HasRegions}">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <TextBlock Text="🌍" FontSize="10" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding RegionsLabel}"
-                                               FontSize="11" Foreground="#3fb950"/>
-                                </StackPanel>
-                            </Border>
-                            <!-- TitleId / AppId badge — shown for ROM/emulated and Steam games -->
-                            <Border CornerRadius="4" Padding="10,4" Background="#1c2128"
-                                    IsVisible="{Binding HasDisplayTitleId}">
-                                <TextBlock Text="{Binding DisplayTitleId}"
-                                           FontSize="11" Foreground="#8b949e"
-                                           FontFamily="Consolas,Menlo,monospace"/>
-                            </Border>
-                        </StackPanel>
-
-                        <!-- Rating -->
-                        <StackPanel Orientation="Horizontal" Spacing="10">
-                            <TextBlock Text="{Binding RatingStars}"
-                                       FontSize="20" Foreground="#c9d1d9"/>
-                        </StackPanel>
-
-                        <!-- Price — only shown when explicitly set (not for store games) -->
-                        <TextBlock Text="{Binding Price}"
-                                   FontSize="24" FontWeight="Bold"
-                                   Foreground="#3fb950"
-                                   IsVisible="False"/>
-
-                        <!-- Description -->
-                        <TextBlock Text="{Binding Description}"
-                                   FontSize="14" Foreground="#c9d1d9"
-                                   TextWrapping="Wrap" MaxWidth="560"
-                                   IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                   Margin="0,8,0,0"/>
-
-                        <!-- Per-game playtime -->
-                        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0"
-                                    IsVisible="{Binding HasPlaytime}">
-                            <TextBlock Text="⏱" FontSize="13" VerticalAlignment="Center"/>
-                            <TextBlock Text="{Binding PlaytimeLabel}"
-                                       FontSize="13" Foreground="#0ea5e9"
-                                       FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </StackPanel>
-
-                        <!-- ── Action buttons: Play + ··· when installed ── -->
-                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,16,0,0"
-                                    IsVisible="{Binding IsInstalled}">
-                            <!-- Play / Playing... / Resume button -->
-                            <!-- "Resume" state: game is running and user returned to launcher -->
-                            <Button Classes="btn-primary"
-                                    Classes.btn-resume="{Binding PlayButtonIsResume}"
-                                    Padding="24,12"
-                                    Command="{Binding LaunchGameCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="▶" FontSize="16" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding PlayButtonLabel}" FontSize="15" FontWeight="Bold"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <!-- More options (···) button — opens settings panel -->
-                            <Button Classes="btn-secondary"
-                                    Padding="16,12" ToolTip.Tip="Game Settings"
-                                    Command="{Binding ShowMoreOptionsCommand}">
-                                <TextBlock Text="···" FontSize="18" FontWeight="Bold"
-                                           VerticalAlignment="Center"/>
-                            </Button>
-                            <!-- Mods button — visible for Nintendo Switch games -->
-                            <Button Classes="btn-secondary"
-                                    Padding="16,12" ToolTip.Tip="Manage Mods"
-                                    Command="{Binding OpenModsPanelCommand}"
-                                    IsVisible="{Binding IsSwitch}">
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <TextBlock Text="🧩" FontSize="14" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Mods" FontSize="14" FontWeight="SemiBold"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    Padding="12,12"
-                                    ToolTip.Tip="Backup / Restore saves">
-                                <TextBlock Text="☁" FontSize="16" VerticalAlignment="Center"/>
-                                <Button.Flyout>
-                                    <MenuFlyout Placement="BottomEdgeAlignedLeft">
-                                        <MenuItem Header="☁  Backup saves"
-                                                  Command="{Binding SyncWithLudusaviCommand}"
-                                                  IsEnabled="{Binding !IsLudusaviSyncing}"/>
-                                        <MenuItem Header="↙  Restore saves"
-                                                  Command="{Binding RestoreWithLudusaviCommand}"
-                                                  IsEnabled="{Binding !IsLudusaviRestoring}"/>
-                                    </MenuFlyout>
-                                </Button.Flyout>
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    Padding="12,12"
-                                    ToolTip.Tip="Refresh Achievements"
-                                    Command="{Binding SyncExophaseNowCommand}"
-                                    IsEnabled="{Binding !IsExophaseSyncing}"
-                                    IsVisible="{Binding HasExophaseUrl}">
-                                <TextBlock Text="↻" FontSize="14" VerticalAlignment="Center"/>
-                            </Button>
-                            <!-- Controller profiles button — always visible for installed games -->
-                            <Button Classes="btn-secondary"
-                                    Padding="14,12"
-                                    ToolTip.Tip="Controller Profiles"
-                                    Command="{Binding ToggleControllerPanelCommand}">
-                                <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
-                            </Button>
-                        </StackPanel>
-                        <TextBlock Text="{Binding ExophaseSyncStatus}"
-                                   FontSize="12"
-                                   Margin="0,6,0,0"
-                                   Foreground="#58a6ff"
-                                   IsVisible="{Binding ExophaseSyncStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        <TextBlock Text="{Binding LudusaviSyncStatus}"
-                                   FontSize="12"
-                                   Margin="0,4,0,0"
-                                   Foreground="#3fb950"
-                                   IsVisible="{Binding LudusaviSyncStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-                        <!-- ── Play local video file using built-in VLC ── -->
-                        <Button Classes="btn-secondary"
-                                Margin="0,10,0,0"
-                                Padding="16,10"
-                                HorizontalAlignment="Left"
-                                Command="{Binding PlayLocalVideoCommand}"
-                                ToolTip.Tip="Play a local video file in-app (VLC)">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <TextBlock Text="🎬" FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="Play File" FontSize="13" FontWeight="SemiBold"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                        <!-- ── Install button when repack available ── -->
-                        <StackPanel Margin="0,16,0,0" Spacing="6"
-                                    IsVisible="{Binding IsRepack}">
-                            <Button Classes="btn-success"
-                                    Padding="24,12"
-                                    HorizontalAlignment="Left"
-                                    IsEnabled="{Binding !IsExtracting}"
-                                    Command="{Binding InstallRepackCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
-                                    <TextBlock Text="{Binding InstallButtonLabel}" FontSize="15" FontWeight="Bold"
-                                              VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <TextBlock Text="{Binding RepackSizeLabel}"
-                                      FontSize="11" Foreground="#8b949e"
-                                      IsVisible="{Binding RepackSizeLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                            <Border IsVisible="{Binding ShowInstallSourcePicker}"
-                                    Background="#161b22" CornerRadius="10"
-                                    Padding="16,14" Margin="0,4,0,0">
-                                <StackPanel Spacing="10">
-                                    <TextBlock Text="Choose install source"
-                                              FontSize="14" FontWeight="Bold" Foreground="White"/>
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                       <Button Classes="btn-secondary"
-                                               Padding="16,10"
-                                               Command="{Binding ChooseRepackInstallSourceCommand}">
-                                           Repack/zip
-                                       </Button>
-                                       <Button Classes="btn-secondary"
-                                               Padding="16,10"
-                                               Command="{Binding ChooseSteamInstallSourceCommand}">
-                                           Steam
-                                       </Button>
-                                       <Button Classes="btn-secondary"
-                                               Padding="12,10"
-                                               Command="{Binding CancelInstallSourceCommand}">
-                                           Cancel
-                                       </Button>
-                                    </StackPanel>
-                                </StackPanel>
-                            </Border>
-                            <!-- Extraction progress bar -->
-                            <Border IsVisible="{Binding IsExtracting}"
-                                    Background="#161b22" CornerRadius="8"
-                                    Padding="12,10" Margin="0,4,0,0">
-                                <StackPanel Spacing="6">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="⏳" FontSize="13" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Extracting…"
-                                                   FontSize="12" Foreground="#8b949e"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding ExtractionProgress, StringFormat='{}{0:F0}%'}"
-                                                   FontSize="12" Foreground="#0ea5e9"
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <ProgressBar Value="{Binding ExtractionProgress}"
-                                                 Minimum="0" Maximum="100"
-                                                 Height="6" CornerRadius="3"
-                                                 Foreground="#0ea5e9"
-                                                 Background="#21262d"/>
-                                </StackPanel>
-                            </Border>
-                            <!-- Install status message (visible after extraction completes / fails) -->
-                            <TextBlock Text="{Binding InstallStatusMessage}"
-                                       FontSize="12" FontWeight="SemiBold"
-                                       Foreground="{Binding InstallStatusForeground}"
-                                       IsVisible="{Binding InstallStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                       TextWrapping="Wrap" Margin="0,4,0,0"/>
-                        </StackPanel>
-
-                        <!-- ── Install via Steam (Steam-API game, not installed locally, no repack) ── -->
-                        <StackPanel Margin="0,16,0,0" Spacing="6"
-                                    IsVisible="{Binding ShowStandaloneSteamInstall}">
-                            <Button Classes="btn-success"
-                                    Padding="24,12"
-                                    Command="{Binding InstallViaSteamCommand}">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
-                                               VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-                            <TextBlock Text="Opens the Steam client to download and install this game."
-                                       FontSize="11" Foreground="#8b949e"/>
-                        </StackPanel>
-
-                        <!-- ── Cloud-only placeholder (game in library but not installed locally) ── -->
-                        <StackPanel Margin="0,16,0,0" Spacing="8"
-                                    IsVisible="{Binding IsCloudOnly}">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <Button Classes="btn-secondary"
-                                        Padding="24,12"
-                                        IsEnabled="False">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                </Button>
-                            </StackPanel>
-                            <TextBlock Text="This game is in your library but not installed on this device."
-                                       FontSize="11" Foreground="#8b949e"/>
-                        </StackPanel>
-
-                        <!-- ── Repack available badge (shown when game installed AND repack exists) ── -->
-                        <Border IsVisible="{Binding HasMatchingRepack}"
-                                Background="#2d1b00" CornerRadius="6"
-                                Padding="12,8" Margin="0,10,0,0"
-                                HorizontalAlignment="Left">
-                            <TextBlock Text="{Binding MatchingRepackLabel}"
-                                       FontSize="12" Foreground="#f0a030"
-                                       FontWeight="SemiBold"/>
-                        </Border>
-
-                        <!-- ── "Launch via Steam" option (for installed Steam games) ── -->
-                        <Border IsVisible="{Binding HasSteamLaunchOption}"
-                                Background="#0d2137" CornerRadius="8"
-                                Padding="14,10" Margin="0,8,0,0"
-                                HorizontalAlignment="Left">
-                            <StackPanel Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="🎮" FontSize="14" VerticalAlignment="Center"/>
-                                <TextBlock Text="▶ Launch via Steam"
-                                           FontSize="13" FontWeight="SemiBold"
-                                           Foreground="#58a6ff" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- ── Store page button ── -->
-                        <Button Classes="btn-secondary"
-                                Padding="20,10" Margin="0,10,0,0"
-                                HorizontalAlignment="Left"
-                                IsVisible="{Binding HasStoreUrl}"
-                                Command="{Binding OpenStorePageCommand}">
-                            <TextBlock Text="{Binding StoreButtonLabel}"
-                                       FontSize="13" FontWeight="SemiBold"
-                                       Foreground="#58a6ff"/>
-                        </Button>
-
-                        <!-- ── Drive picker (shown after clicking Install on an archive) ── -->
-                        <Border IsVisible="{Binding ShowDrivePicker}"
-                                Background="#161b22" CornerRadius="10"
-                                Padding="16,14" Margin="0,12,0,0">
-                            <StackPanel Spacing="10">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="💾" FontSize="16" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Choose Install Location"
-                                               FontSize="14" FontWeight="Bold"
-                                               Foreground="White" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <TextBlock Text="Select a drive with a Games folder (or create one):"
-                                           FontSize="12" Foreground="#8b949e"/>
-                                <ItemsControl ItemsSource="{Binding InstallDrives}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="models:InstallDriveOption">
-                                            <Button Margin="0,0,0,6"
-                                                    Background="#21262d"
-                                                    BorderThickness="0"
-                                                    CornerRadius="8"
-                                                    Padding="12,10"
-                                                    HorizontalAlignment="Stretch"
-                                                    HorizontalContentAlignment="Left"
-                                                    Cursor="Hand"
-                                                    Command="{Binding $parent[UserControl].DataContext.SelectInstallDriveCommand}"
-                                                    CommandParameter="{Binding}">
-                                                <Grid ColumnDefinitions="*,Auto">
-                                                    <StackPanel Grid.Column="0" Spacing="2">
-                                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                                            <TextBlock Text="💿" FontSize="14"/>
-                                                            <TextBlock Text="{Binding DriveRoot}"
-                                                                       FontSize="13" FontWeight="SemiBold"
-                                                                       Foreground="White"/>
-                                                            <Border CornerRadius="4" Padding="6,2"
-                                                                    Background="#3fb950"
-                                                                    IsVisible="{Binding GamesExists}">
-                                                                <TextBlock Text="Games ✓" FontSize="10"
-                                                                           Foreground="White" FontWeight="Bold"/>
-                                                            </Border>
-                                                            <Border CornerRadius="4" Padding="6,2"
-                                                                    Background="#1f6feb"
-                                                                    IsVisible="{Binding !GamesExists}">
-                                                                <TextBlock Text="+ Add Games" FontSize="10"
-                                                                           Foreground="White" FontWeight="Bold"/>
-                                                            </Border>
-                                                        </StackPanel>
-                                                        <TextBlock Text="{Binding GamesFolderPath}"
-                                                                   FontSize="11" Foreground="#8b949e"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                    </StackPanel>
-                                                    <TextBlock Grid.Column="1"
-                                                               Text="{Binding FreeSpaceLabel}"
-                                                               FontSize="12" Foreground="#3fb950"
-                                                               VerticalAlignment="Center"
-                                                               Margin="12,0,0,0"/>
-                                                </Grid>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                                <Button Classes="btn-secondary" Padding="12,8"
-                                        Command="{Binding CancelInstallCommand}">
-                                    Cancel
-                                </Button>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Local game install info -->
-                        <Border IsVisible="{Binding IsInstalled}"
-                                Background="#0d3d1a" CornerRadius="8"
-                                Padding="14,12" Margin="0,8,0,0">
-                            <StackPanel Spacing="6">
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="💿" FontSize="16" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Installed on Drive"
-                                               FontSize="13" FontWeight="Bold"
-                                               Foreground="#3fb950" VerticalAlignment="Center"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="Drive:" FontSize="12" Foreground="#8b949e"/>
-                                    <TextBlock Text="{Binding ActiveDriveLabel}"
-                                               FontSize="12" Foreground="White" FontWeight="SemiBold"/>
-                                </StackPanel>
-                                <StackPanel Orientation="Horizontal" Spacing="10">
-                                    <TextBlock Text="Type:" FontSize="12" Foreground="#8b949e"/>
-                                    <TextBlock Text="{Binding ActiveExeType}"
-                                               FontSize="12" Foreground="#3fb950" FontWeight="Bold"/>
-                                </StackPanel>
-                                <TextBlock Text="{Binding ActiveDrivePath}"
-                                           FontSize="11" Foreground="#8b949e"
-                                           TextTrimming="CharacterEllipsis"/>
-                            </StackPanel>
-                        </Border>
-                    </StackPanel>
-                </Grid>
+                <!-- Hero: chosen by Settings → Design → Game Info (Views/GameInfoLib/Default.GameInfo.axaml / PS5.GameInfo.axaml) -->
+                <Panel Margin="0,0,0,28">
+                    <gi:DefaultGameInfo IsVisible="{Binding IsDefaultGameInfo}"/>
+                    <gi:Ps5GameInfo IsVisible="{Binding IsPs5GameInfo}"/>
+                </Panel>
 
                 <!-- ── Multi-drive switcher ── -->
                 <Border IsVisible="{Binding HasMultipleDrives}"
@@ -1115,7 +712,38 @@
                         Padding="24,20" Margin="0,0,0,24">
                     <StackPanel Spacing="10">
                         <TextBlock Text="🖥  Compatibility" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                        <TextBlock Text="No compatibility reports yet."
+                        <!-- Community votes (same as the website): Playable / In Game / No Boot -->
+                        <StackPanel Spacing="8" IsVisible="{Binding ShowCompatVotes}">
+                            <TextBlock Text="{Binding CompatSummary}" FontSize="14" FontWeight="SemiBold" Foreground="#E6EDF3"/>
+                            <Border Height="10" CornerRadius="5" Background="#21262d" HorizontalAlignment="Left"
+                                    Width="420" ClipToBounds="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="{Binding CompatGreenWidth}" Background="#3fb950"/>
+                                    <Border Width="{Binding CompatAmberWidth}" Background="#f0a030"/>
+                                    <Border Width="{Binding CompatRedWidth}" Background="#f85149"/>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <TextBlock Text="{Binding CompatGreen, StringFormat='🟢 Playable: {0}'}" FontSize="12" Foreground="#3fb950"/>
+                                <TextBlock Text="{Binding CompatAmber, StringFormat='🟠 In Game: {0}'}" FontSize="12" Foreground="#f0a030"/>
+                                <TextBlock Text="{Binding CompatRed, StringFormat='🔴 No Boot: {0}'}" FontSize="12" Foreground="#f85149"/>
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding CanVoteCompat}" Spacing="6">
+                                <TextBlock Text="Do the ROMs work? One vote per user: Green = Playable, Amber = In Game, Red = No Boot."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟢 Playable"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="green"/>
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟠 In Game"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="amber"/>
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🔴 No Boot"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="red"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock Text="{Binding CompatVoteStatus}" FontSize="11" Foreground="#8b949e"
+                                       IsVisible="{Binding CompatVoteStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                        <TextBlock Text="No hardware reports yet."
                                    FontSize="12" Foreground="#8b949e"
                                    IsVisible="{Binding !HasCompatibilityReports}"/>
                         <ItemsControl ItemsSource="{Binding CompatibilityReports}"
@@ -1195,11 +823,15 @@
                             <StackPanel Spacing="10">
                                 <TextBlock Text="Your Rating (1–5 stars)"
                                            FontSize="12" FontWeight="SemiBold" Foreground="#8b949e"/>
-                                <NumericUpDown Value="{Binding NewReviewRating}"
-                                              Minimum="1" Maximum="5" Increment="1"
-                                              Foreground="White" Background="#21262d"
-                                              BorderBrush="#30363d" CornerRadius="6"
-                                              HorizontalAlignment="Left" Width="120"/>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="1★" Command="{Binding SetReviewRatingCommand}" CommandParameter="1"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="2★" Command="{Binding SetReviewRatingCommand}" CommandParameter="2"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="3★" Command="{Binding SetReviewRatingCommand}" CommandParameter="3"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="4★" Command="{Binding SetReviewRatingCommand}" CommandParameter="4"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="5★" Command="{Binding SetReviewRatingCommand}" CommandParameter="5"/>
+                                    <TextBlock Text="{Binding ReviewStarsPreview}" FontSize="18" Foreground="#f1c40f"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
                                 <TextBox Text="{Binding NewReviewNote}"
                                          Watermark="Write your review here… (optional)"
                                          Background="#21262d" Foreground="White"

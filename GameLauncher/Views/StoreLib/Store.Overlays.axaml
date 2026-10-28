@@ -1,0 +1,129 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.StoreLib.StoreOverlays"
+             x:DataType="vm:StoreViewModel"
+             IsHitTestVisible="{Binding IsOverlayOpen}">
+
+    <!--
+        Controller overlays shared by every Games theme (Default, PS5, ...):
+          X → filter box (Up/Down choose, A applies, B/X closes)
+          Y → on-screen keyboard (D-pad moves, A types, X backspace, B/Y closes)
+        Restyle here, or copy this file per theme if a theme needs its own look.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Border.osk-key">
+            <Setter Property="Background" Value="#21262d"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Padding" Value="0,12"/>
+            <Setter Property="MinWidth" Value="44"/>
+        </Style>
+        <Style Selector="Border.osk-key.wide">
+            <Setter Property="MinWidth" Value="110"/>
+        </Style>
+        <Style Selector="Border.osk-key TextBlock, Border.filter-row TextBlock">
+            <Setter Property="Foreground" Value="#E6EDF3"/>
+        </Style>
+        <Style Selector="Border.osk-key.hl > TextBlock, Border.filter-row.hl TextBlock">
+            <Setter Property="Foreground" Value="#0d1117"/>
+        </Style>
+        <Style Selector="Border.osk-key.hl">
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Border.ps5">
+            <Setter Property="Background" Value="#E6101018"/>
+            <Setter Property="BorderBrush" Value="#0070D1"/>
+            <Setter Property="CornerRadius" Value="24"/>
+        </Style>
+        <Style Selector="Border.ps5 Border.osk-key">
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="Background" Value="#2B2B38"/>
+        </Style>
+        <Style Selector="Border.ps5 Border.osk-key.hl">
+            <Setter Property="Background" Value="#0070D1"/>
+        </Style>
+        <Style Selector="Border.ps5 Border.osk-key.hl > TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Border.filter-row">
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.filter-row.hl">
+            <Setter Property="Background" Value="#FFFFFF"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- Filter box -->
+        <Border IsVisible="{Binding IsFilterMenuOpen}" Background="#CC000000">
+            <Border Width="360" MaxHeight="480" VerticalAlignment="Center" HorizontalAlignment="Center"
+                    Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
+                    CornerRadius="14" Padding="14">
+                <DockPanel>
+                    <TextBlock DockPanel.Dock="Top" Text="Filters" FontSize="18" FontWeight="Bold"
+                               Foreground="White" Margin="4,0,0,10"/>
+                    <TextBlock DockPanel.Dock="Bottom" Text="A Select    B Close" FontSize="11"
+                               Foreground="#8b949e" Margin="4,10,0,0"/>
+                    <ScrollViewer>
+                        <ItemsControl ItemsSource="{Binding FilterMenuItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:StoreViewModel+FilterMenuItem">
+                                    <Border Classes="filter-row" Classes.hl="{Binding IsHighlighted}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <TextBlock Text="{Binding Label}" FontSize="14"
+                                                      />
+                                            <TextBlock Grid.Column="1" Text="✓" IsVisible="{Binding IsActive}"
+                                                       Foreground="#3fb950" FontWeight="Bold"/>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Border>
+
+        <!-- On-screen keyboard -->
+        <Border IsVisible="{Binding IsKeyboardOpen}" Background="#CC000000">
+            <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40"
+                    Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
+                    Classes.ps5="{Binding IsPs5Keyboard}"
+                    CornerRadius="14" Padding="16">
+                <StackPanel Spacing="4">
+                    <Border Background="#0d1117" CornerRadius="8" Padding="12,10" Margin="3,0,3,8">
+                        <TextBlock Text="{Binding ActiveSearchText, StringFormat='🔍  {0}'}"
+                                   FontSize="18" Foreground="White"/>
+                    </Border>
+                    <ItemsControl ItemsSource="{Binding KeyboardRowItems}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:StoreViewModel+KeyboardRowVm">
+                                <ItemsControl ItemsSource="{Binding Keys}" HorizontalAlignment="Center">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:StoreViewModel+KeyboardKeyVm">
+                                            <Border Classes="osk-key"
+                                                    Classes.wide="{Binding IsWide}"
+                                                    Classes.hl="{Binding IsHighlighted}">
+                                                <TextBlock Text="{Binding Label}" FontSize="15"
+                                                           HorizontalAlignment="Center"
+                                                          />
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="A Type    X Backspace    Y / B Close" FontSize="11"
+                               Foreground="#8b949e" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+                </StackPanel>
+            </Border>
+        </Border>
+    </Panel>
+</UserControl>

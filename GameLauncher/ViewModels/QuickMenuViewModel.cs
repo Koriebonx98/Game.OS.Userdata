@@ -455,6 +455,16 @@ public partial class QuickMenuViewModel : ViewModelBase
         Xb360CenterIndex = Math.Clamp(Xb360CenterIndex + delta, 0, Xb360CenterItemKeys.Length - 1);
     }
 
+    partial void OnXb360SelectedFriendIndexChanged(int value) => RefreshXb360FriendHighlight();
+    partial void OnXb360FriendsSubModeChanged(bool value)     => RefreshXb360FriendHighlight();
+
+    /// <summary>Marks the friend row under the cursor so the right-hand list shows a visible highlight.</summary>
+    private void RefreshXb360FriendHighlight()
+    {
+        for (int i = 0; i < Friends.Count; i++)
+            Friends[i].IsHighlighted = Xb360FriendsSubMode && i == Xb360SelectedFriendIndex;
+    }
+
     /// <summary>Moves Up/Down within the friends sub-panel.</summary>
     public void MoveXb360FriendSelection(int delta)
     {
@@ -467,6 +477,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         }
         if (Friends.Count == 0) return;
         Xb360SelectedFriendIndex = Math.Clamp(Xb360SelectedFriendIndex + delta, 0, Friends.Count - 1);
+        RefreshXb360FriendHighlight();
         OnPropertyChanged(nameof(Xb360HighlightedFriendUsername));
     }
 
@@ -592,6 +603,7 @@ public partial class QuickMenuViewModel : ViewModelBase
                     Xb360SelectedFriendIndex = 0;
                     Xb360FriendContextMenuOpen = false;
                     Xb360FriendsSubMode = true;
+                    RefreshXb360FriendHighlight();
                     NotifyXb360FriendContextProps();
                     OnPropertyChanged(nameof(Xb360HighlightedFriendUsername));
                 }
@@ -1133,8 +1145,22 @@ public partial class QuickMenuViewModel : ViewModelBase
     }
 }
 
-public class FriendPresenceVm
+public class FriendPresenceVm : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private bool _isHighlighted;
+    /// <summary>True while the XB360 guide cursor is on this friend row (right-hand list).</summary>
+    public bool IsHighlighted
+    {
+        get => _isHighlighted;
+        set
+        {
+            if (_isHighlighted == value) return;
+            _isHighlighted = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsHighlighted)));
+        }
+    }
+
     public string Username { get; set; } = "";
     public string CurrentGame { get; set; } = "";
     public string Status { get; set; } = "Online";

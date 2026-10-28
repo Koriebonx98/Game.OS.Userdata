@@ -371,6 +371,260 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         SelectedPlatform = list[(idx + 1) % list.Count];
     }
 
+
+    // ── Themes (pushed from Settings by MainViewModel) ─────────────────────
+    [ObservableProperty] private string _gamesTheme = "Default";
+    public bool IsPs5Store     => string.Equals(GamesTheme, "PS5", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultStore => !IsPs5Store;
+    partial void OnGamesThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsPs5Store));
+        OnPropertyChanged(nameof(IsDefaultStore));
+    }
+
+    [ObservableProperty] private string _keyboardTheme = "Default";
+    public bool IsPs5Keyboard     => string.Equals(KeyboardTheme, "PS5", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultKeyboard => !IsPs5Keyboard;
+    partial void OnKeyboardThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsPs5Keyboard));
+        OnPropertyChanged(nameof(IsDefaultKeyboard));
+    }
+
+    // ── Controller / keyboard card focus ───────────────────────────────────
+    /// <summary>Returns the number of cards per row (measured from the live panel); wired by StoreView.</summary>
+    public Func<int>? ColumnsProvider { get; set; }
+    /// <summary>Asks the view to scroll the focused card into view.</summary>
+    public Action? ScrollFocusedIntoView { get; set; }
+
+    private IStoreFocusable? _focused;
+
+    private IReadOnlyList<IStoreFocusable> ActiveItems() => IsAppStoreTab
+        ? FilteredAppStoreEntries.Cast<IStoreFocusable>().ToList()
+        : FilteredStore.Cast<IStoreFocusable>().ToList();
+
+    public void ClearFocus()
+    {
+        if (_focused != null) _focused.IsFocused = false;
+        _focused = null;
+    }
+
+    private void FocusAt(IReadOnlyList<IStoreFocusable> items, int index)
+    {
+        ClearFocus();
+        if (index < 0 || index >= items.Count) return;
+        _focused = items[index];
+        _focused.IsFocused = true;
+        ScrollFocusedIntoView?.Invoke();
+    }
+
+    private int FocusedIndex(IReadOnlyList<IStoreFocusable> items)
+    {
+        if (_focused == null) return -1;
+        for (int i = 0; i < items.Count; i++)
+            if (ReferenceEquals(items[i], _focused)) return i;
+        return -1;
+    }
+
+    /// <summary>Left/Right (cols = 1 step) — first press focuses the first card.</summary>
+    public void MoveFocus(int delta)
+    {
+        var items = ActiveItems();
+        if (items.Count == 0) return;
+        int cur = FocusedIndex(items);
+        FocusAt(items, cur < 0 ? 0 : Math.Clamp(cur + delta, 0, items.Count - 1));
+    }
+
+    /// <summary>Up/Down — moves a whole row.</summary>
+    public void MoveFocusRow(int direction)
+    {
+        var items = ActiveItems();
+        if (items.Count == 0) return;
+        int cur = FocusedIndex(items);
+        if (cur < 0) { FocusAt(items, 0); return; }
+        int cols = Math.Max(1, ColumnsProvider?.Invoke() ?? 1);
+        int next = cur + direction * cols;
+        if (next < 0 || next >= items.Count) return;
+        FocusAt(items, next);
+    }
+
+    public void ActivateFocused()
+    {
+        switch (_focused)
+        {
+            case StoreGame g:      OnOpenDetail?.Invoke(g); break;
+            case AppStoreEntry a:  OpenAppUrl(a); break;
+        }
+    }
+
+    // ── Filter box (X) ────────────────────────────────────────────────────
+    [ObservableProperty] private bool _isFilterMenuOpen;
+    [ObservableProperty] private int  _filterMenuIndex;
+
+    public sealed partial class FilterMenuItem : ObservableObject
+    {
+        public string Kind  { get; init; } = "";
+        public string Value { get; init; } = "";
+        public string Label { get; init; } = "";
+        [ObservableProperty] private bool _isHighlighted;
+        [ObservableProperty] private bool _isActive;
+    }
+
+    public ObservableCollection<FilterMenuItem> FilterMenuItems { get; } = new();
+
+    public void OpenFilterMenu()
+    {
+        FilterMenuItems.Clear();
+        if (IsAppStoreTab)
+        {
+            foreach (var g in AppStoreGenres)
+                FilterMenuItems.Add(new FilterMenuItem { Kind = "AppGenre", Value = g, Label = g });
+        }
+        else
+        {
+            foreach (var p in Platforms)
+                FilterMenuItems.Add(new FilterMenuItem { Kind = "Platform", Value = p, Label = p });
+            foreach (var g in Genres)
+                FilterMenuItems.Add(new FilterMenuItem { Kind = "Genre", Value = g, Label = "Genre: " + g });
+        }
+        FilterMenuIndex = 0;
+        RefreshFilterMenu();
+        IsFilterMenuOpen = true;
+    }
+
+    [RelayCommand] public void CloseFilterMenu() => IsFilterMenuOpen = false;
+
+    public void MoveFilterMenu(int delta)
+    {
+        if (FilterMenuItems.Count == 0) return;
+        FilterMenuIndex = Math.Clamp(FilterMenuIndex + delta, 0, FilterMenuItems.Count - 1);
+        RefreshFilterMenu();
+    }
+
+    public void ApplyFilterMenuSelection()
+    {
+        if (FilterMenuIndex < 0 || FilterMenuIndex >= FilterMenuItems.Count) return;
+        var item = FilterMenuItems[FilterMenuIndex];
+        switch (item.Kind)
+        {
+            case "Platform": SelectedPlatform = item.Value; break;
+            case "Genre":    FilterGenre = item.Value; break;
+            case "AppGenre": AppStoreGenreFilter = item.Value; break;
+        }
+        ClearFocus();
+        RefreshFilterMenu();
+    }
+
+    private void RefreshFilterMenu()
+    {
+        for (int i = 0; i < FilterMenuItems.Count; i++)
+        {
+            var it = FilterMenuItems[i];
+            it.IsHighlighted = i == FilterMenuIndex;
+            it.IsActive = it.Kind switch
+            {
+                "Platform" => it.Value == SelectedPlatform,
+                "Genre"    => it.Value == FilterGenre,
+                _          => it.Value == AppStoreGenreFilter,
+            };
+        }
+    }
+
+    // ── On-screen keyboard (Y) ────────────────────────────────────────────
+    public static readonly string[][] KeyboardRows =
+    {
+        new[] { "1","2","3","4","5","6","7","8","9","0" },
+        new[] { "Q","W","E","R","T","Y","U","I","O","P" },
+        new[] { "A","S","D","F","G","H","J","K","L","'" },
+        new[] { "Z","X","C","V","B","N","M",":","-","." },
+        new[] { "Space","Backspace","Clear","Done" },
+    };
+
+    [ObservableProperty] private bool _isKeyboardOpen;
+    [ObservableProperty] private int  _keyboardRow;
+    [ObservableProperty] private int  _keyboardCol;
+
+    public ObservableCollection<KeyboardRowVm> KeyboardRowItems { get; } = new();
+
+    public sealed partial class KeyboardKeyVm : ObservableObject
+    {
+        public string Label { get; init; } = "";
+        public bool IsWide => Label.Length > 1;
+        [ObservableProperty] private bool _isHighlighted;
+    }
+
+    public sealed class KeyboardRowVm
+    {
+        public List<KeyboardKeyVm> Keys { get; init; } = new();
+    }
+
+    /// <summary>Text currently being edited by the on-screen keyboard (depends on the active tab).</summary>
+    public string ActiveSearchText => IsAppStoreTab ? AppStoreSearchText : SearchText;
+
+    private void SetActiveSearchText(string value)
+    {
+        if (IsAppStoreTab) AppStoreSearchText = value; else SearchText = value;
+        OnPropertyChanged(nameof(ActiveSearchText));
+    }
+
+    public void OpenKeyboard()
+    {
+        if (KeyboardRowItems.Count == 0)
+            foreach (var row in KeyboardRows)
+                KeyboardRowItems.Add(new KeyboardRowVm { Keys = row.Select(k => new KeyboardKeyVm { Label = k }).ToList() });
+        KeyboardRow = 1; KeyboardCol = 0;
+        RefreshKeyboard();
+        OnPropertyChanged(nameof(ActiveSearchText));
+        IsKeyboardOpen = true;
+    }
+
+    [RelayCommand] public void CloseKeyboard() { IsKeyboardOpen = false; ClearFocus(); }
+
+    public void MoveKeyboard(int dRow, int dCol)
+    {
+        if (KeyboardRowItems.Count == 0) return;
+        int r = Math.Clamp(KeyboardRow + dRow, 0, KeyboardRowItems.Count - 1);
+        int rowLen = KeyboardRowItems[r].Keys.Count;
+        int c = dRow != 0 ? Math.Min(KeyboardCol, rowLen - 1)
+                          : Math.Clamp(KeyboardCol + dCol, 0, rowLen - 1);
+        KeyboardRow = r; KeyboardCol = c;
+        RefreshKeyboard();
+    }
+
+    public void PressKeyboardKey()
+    {
+        if (KeyboardRow >= KeyboardRowItems.Count) return;
+        var key = KeyboardRowItems[KeyboardRow].Keys[KeyboardCol].Label;
+        switch (key)
+        {
+            case "Space":     SetActiveSearchText(ActiveSearchText + " "); break;
+            case "Backspace": BackspaceSearch(); break;
+            case "Clear":     SetActiveSearchText(""); break;
+            case "Done":      CloseKeyboard(); break;
+            default:          SetActiveSearchText(ActiveSearchText + key.ToLowerInvariant()); break;
+        }
+    }
+
+    public void BackspaceSearch()
+    {
+        var t = ActiveSearchText;
+        if (t.Length > 0) SetActiveSearchText(t[..^1]);
+    }
+
+    private void RefreshKeyboard()
+    {
+        for (int r = 0; r < KeyboardRowItems.Count; r++)
+            for (int c = 0; c < KeyboardRowItems[r].Keys.Count; c++)
+                KeyboardRowItems[r].Keys[c].IsHighlighted = r == KeyboardRow && c == KeyboardCol;
+    }
+
+    /// <summary>True while the filter box or on-screen keyboard is covering the store.</summary>
+    public bool IsOverlayOpen => IsFilterMenuOpen || IsKeyboardOpen;
+    partial void OnIsFilterMenuOpenChanged(bool value) => OnPropertyChanged(nameof(IsOverlayOpen));
+    partial void OnIsKeyboardOpenChanged(bool value)   => OnPropertyChanged(nameof(IsOverlayOpen));
+
+    partial void OnIsAppStoreTabChanged(bool value) => ClearFocus();
+
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
 

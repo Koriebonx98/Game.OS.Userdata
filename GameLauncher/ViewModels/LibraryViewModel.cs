@@ -32,6 +32,16 @@ public partial class LibraryViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsDefaultGamesLib));
     }
 
+    /// <summary>On-screen keyboard style ("Default" or "PS5"); pushed from Settings.</summary>
+    [ObservableProperty] private string _keyboardTheme = "Default";
+    public bool IsPs5Keyboard     => string.Equals(KeyboardTheme, "PS5", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultKeyboard => !IsPs5Keyboard;
+    partial void OnKeyboardThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsPs5Keyboard));
+        OnPropertyChanged(nameof(IsDefaultKeyboard));
+    }
+
     [ObservableProperty] private string _filterPlatform = "All";
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private int    _totalGames;

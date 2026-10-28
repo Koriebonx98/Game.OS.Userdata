@@ -383,6 +383,18 @@
         <Setter Property="Background" Value="#21262d"/>
     </Style>
 
+    <!-- Controller/keyboard focus highlight for store cards -->
+    <Style Selector="Button.store-card-btn.focused /template/ ContentPresenter">
+        <Setter Property="Background" Value="#21262d"/>
+        <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="3"/>
+    </Style>
+    <Style Selector="Border.store-app-card.focused">
+        <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="3"/>
+        <Setter Property="Background" Value="#21262d"/>
+    </Style>
+
     <!-- ─── Platform Filter Chip ─── -->
     <Style Selector="Button.platform-chip">
         <Setter Property="Background" Value="#21262d"/>

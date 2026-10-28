@@ -59,7 +59,8 @@ public partial class GameDetailView : UserControl
     public void HandleBack()
     {
         if (DataContext is not GameDetailViewModel vm) return;
-        if (vm.IsVlcPlayerOpen)          CloseVlcOverlay();
+        if (vm.IsActionMenuOpen)         vm.CloseActionMenuCommand.Execute(null);
+        else if (vm.IsVlcPlayerOpen)     CloseVlcOverlay();
         else if (vm.IsTrailerPlayerOpen) vm.CloseTrailerPlayerCommand.Execute(null);
         else if (vm.ShowModsPanel)       vm.CloseModsPanelCommand.Execute(null);
         else if (vm.ShowSettings)        vm.CloseSettingsCommand.Execute(null);

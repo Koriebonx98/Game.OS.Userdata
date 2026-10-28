@@ -86,6 +86,38 @@ public static class GameReviewService
         return name;
     }
 
+    private static string CompatVotesPath(string platform, string title) =>
+        Path.Combine(Path.GetDirectoryName(GetReviewsPath(platform, title))!, "compat-votes.json");
+
+    /// <summary>Community compatibility votes (user → "green"/"amber"/"red"), same model as the website.</summary>
+    public static Dictionary<string, string> LoadCompatVotes(string platform, string title)
+    {
+        string path = CompatVotesPath(platform, title);
+        if (!File.Exists(path)) return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var d = JsonSerializer.Deserialize<Dictionary<string, string>>(File.ReadAllText(path), _json);
+            return new Dictionary<string, string>(d ?? new(), StringComparer.OrdinalIgnoreCase);
+        }
+        catch { return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); }
+    }
+
+    /// <summary>Records a user's vote. Returns false when the user has already voted (one vote per user per game).</summary>
+    public static bool AddCompatVote(string platform, string title, string username, string rating)
+    {
+        var votes = LoadCompatVotes(platform, title);
+        if (votes.ContainsKey(username)) return false;
+        votes[username] = rating;
+        try
+        {
+            string path = CompatVotesPath(platform, title);
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            File.WriteAllText(path, JsonSerializer.Serialize(votes, _json));
+        }
+        catch { /* best-effort */ }
+        return true;
+    }
+
     /// <summary>Loads cached compatibility reports from <c>compatibility.json</c> next to reviews.json.</summary>
     public static List<Models.GameCompatibility> LoadCompatibility(string platform, string title)
     {
