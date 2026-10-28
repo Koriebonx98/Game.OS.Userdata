@@ -201,8 +201,10 @@
             const c = pcConn(), items = user ? pcLib() : [];
             const q = $('libSearch').value.trim().toLowerCase(), plat = $('libPlatform').value, src = $('libSource').value;
             const shown = src === 'lib' ? [] : items.map((i, n) => ({ i, n })).filter(({ i }) => i.title.toLowerCase().includes(q) && (!plat || (i.platform || 'PC') === plat));
-            $('pcLibHead').hidden = !shown.length;
-            $('pcLibList').innerHTML = shown.map(({ i, n }) => `<div class="app-row"><span>${esc(getPlatformIcon(i.platform))}</span><div class="app-row-info"><b>${esc(i.title)}</b><small>${esc(i.rom ? i.platform + ' ROM' : 'PC game')}</small></div>${c ? `<button class="btn app-more" data-pcplay="${n}">▶ Stream</button>` : ''}</div>`).join('');
+            const inLibrary = i => library.some(g => (g.title || '').toLowerCase() === i.title.toLowerCase() && g.platform === (i.platform || 'PC'));
+            const cards = shown.filter(({ i }) => !inLibrary(i));
+            $('pcLibHead').hidden = !cards.length;
+            $('pcLibList').innerHTML = cards.map(({ i }) => row({ title: i.title, platform: i.platform || 'PC' }, '')).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -371,7 +373,7 @@
         }
         function findGame(p, t, f) {
             const inLib = l => (l || []).find(g => g.title === t && g.platform === p);
-            return inLib(library) || (f && inLib(friendLibs[f])) || inLib(getFavourites(user.username)) || { title: t, platform: p };
+            return inLib(library) || (f && inLib(friendLibs[f])) || inLib(getFavourites(user.username)) || inLib(pcLib().map(i => ({ title: i.title, platform: i.platform || 'PC' }))) || { title: t, platform: p };
         }
         function openFromEvent(e) {
             if (e.target.closest('.app-fav, .app-del')) return false;
@@ -978,10 +980,6 @@
             };
             renderDevs();
             importPcHash(); fillPlatforms(); renderPcLib();
-            $('pcLibList').addEventListener('click', e => {
-                const b = e.target.closest('[data-pcplay]'), c = pcConn(), i = b && pcLib()[+b.dataset.pcplay];
-                if (i && c) location.href = pcPlayUrl(c, i);
-            });
             refreshPcGames();
             $('streamTestBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
