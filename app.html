@@ -197,6 +197,11 @@
         function pcPlayUrl(c, i) {
             return 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(i.title) + (i.rom ? '&platform=' + encodeURIComponent(i.platform) : '');
         }
+        function pcCover(i) {
+            const p = i.platform || 'PC', t = i.title.toLowerCase();
+            const g = storeGames.find(x => storePlatOf.get(x) === p && (x.Title || x.game_name || x.title || '').toLowerCase() === t);
+            return g ? getGameCoverUrl(g) : '';
+        }
         function renderPcLib() {
             const c = pcConn(), items = user ? pcLib() : [];
             const q = $('libSearch').value.trim().toLowerCase(), plat = $('libPlatform').value, src = $('libSource').value;
@@ -204,7 +209,7 @@
             const inLibrary = i => library.some(g => (g.title || '').toLowerCase() === i.title.toLowerCase() && g.platform === (i.platform || 'PC'));
             const cards = shown.filter(({ i }) => !inLibrary(i));
             $('pcLibHead').hidden = !cards.length;
-            $('pcLibList').innerHTML = cards.map(({ i }) => row({ title: i.title, platform: i.platform || 'PC' }, '')).join('');
+            $('pcLibList').innerHTML = cards.map(({ i }) => row({ title: i.title, platform: i.platform || 'PC', coverUrl: pcCover(i) }, '')).join('');
         }
         function fmtPlaytime(min) {
             const h = Math.floor(min / 60);
@@ -680,6 +685,7 @@
             storeGames.sort((a, b) => gTitle(a).toLowerCase().localeCompare(gTitle(b).toLowerCase()));
             await loadStoreRecs();
             renderStore();
+            renderPcLib();
         }
         const catalogByPlat = () => { const c = {}; storeGames.forEach(g => (c[pf(g)] = c[pf(g)] || []).push(g)); return c; };
         async function loadStoreRecs() {
