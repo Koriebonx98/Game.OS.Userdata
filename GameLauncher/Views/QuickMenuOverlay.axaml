@@ -285,6 +285,14 @@
         <Style Selector="Button.xb360-sub-action-btn.cursor TextBlock">
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
+        <Style Selector="Border.xb360-friend-row.cursor">
+            <Setter Property="Background" Value="#0e9a12"/>
+            <Setter Property="BorderBrush" Value="#ffd44d"/>
+        </Style>
+        <Style Selector="Border.xb360-friend-row.cursor TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid>
@@ -561,7 +569,9 @@
                                             <ItemsControl ItemsSource="{Binding Friends}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:FriendPresenceVm">
-                                                        <Border Padding="6,4" Margin="0,1" CornerRadius="4"
+                                                        <Border Classes="xb360-friend-row" Classes.cursor="{Binding IsHighlighted}"
+                                                                Padding="6,4" Margin="0,1" CornerRadius="4"
+                                                                BorderThickness="3" BorderBrush="Transparent"
                                                                 Background="#e8e8e8">
                                                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
                                                                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
@@ -614,15 +624,15 @@
                                                     <TextBlock Text="{Binding Xb360HighlightedFriendUsername}"
                                                                FontWeight="SemiBold" FontSize="13" Foreground="#1a1a1a"/>
                                                     <Button Classes="xb360-sub-action-btn"
-                                                            Classes.active="{Binding Xb360FriendContextView}"
+                                                            Classes.cursor="{Binding Xb360FriendContextView}"
                                                             Command="{Binding ViewFriendCommand}"
                                                             CommandParameter="{Binding Xb360HighlightedFriendUsername}">View Profile</Button>
                                                     <Button Classes="xb360-sub-action-btn"
-                                                            Classes.active="{Binding Xb360FriendContextInvite}"
+                                                            Classes.cursor="{Binding Xb360FriendContextInvite}"
                                                             Command="{Binding InviteFriendCommand}"
                                                             CommandParameter="{Binding Xb360HighlightedFriendUsername}">Invite</Button>
                                                     <Button Classes="xb360-sub-action-btn"
-                                                            Classes.active="{Binding Xb360FriendContextMessage}"
+                                                            Classes.cursor="{Binding Xb360FriendContextMessage}"
                                                             Command="{Binding MessageFriendCommand}"
                                                             CommandParameter="{Binding Xb360HighlightedFriendUsername}">Message</Button>
                                                     <TextBlock Text="🔴 B  Back" FontSize="11" Foreground="#555"/>
