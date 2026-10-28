@@ -202,10 +202,49 @@ public partial class MainWindow : Window
         }, DispatcherPriority.Background);
     }
 
+    /// <summary>
+    /// Controller-friendly drop-downs: while any ComboBox is open, Up/Down move the highlighted
+    /// choice, A/Enter confirms and B/Esc closes it — wherever the ComboBox lives.
+    /// Returns true when the key was consumed.
+    /// </summary>
+    private bool HandleOpenComboBoxKey(Key key)
+    {
+        var focused = FocusManager?.GetFocusedElement() as Control;
+        var combo = focused as ComboBox ?? focused?.GetVisualAncestors().OfType<ComboBox>().FirstOrDefault();
+        if (combo is not { IsDropDownOpen: true }) return false;
+
+        int count = combo.ItemCount;
+        switch (key)
+        {
+            case Key.Up:
+            case Key.Down:
+                if (count > 0)
+                {
+                    int cur = combo.SelectedIndex;
+                    int next = Math.Clamp((cur < 0 ? 0 : cur) + (key == Key.Up ? -1 : 1), 0, count - 1);
+                    combo.SelectedIndex = next;
+                    combo.ContainerFromIndex(next)?.BringIntoView();
+                }
+                return true;
+            case Key.Enter:
+            case Key.Escape:
+            case Key.BrowserBack:
+                combo.IsDropDownOpen = false;
+                combo.Focus(NavigationMethod.Directional);
+                return true;
+            case Key.Left:
+            case Key.Right:
+                return true;
+        }
+        return false;
+    }
+
     private void OnKeyDown(object? sender, KeyEventArgs e)
     {
         ScheduleScrollHighlightedIntoView();
         if (DataContext is not MainViewModel vm) return;
+
+        if (HandleOpenComboBoxKey(e.Key)) { e.Handled = true; return; }
 
         // Left Shift + Left Ctrl → Quick Menu toggle (takes priority).
         // Handle both orderings: user may press Shift first then Ctrl, or Ctrl first then Shift.
@@ -1154,6 +1193,8 @@ public partial class MainWindow : Window
         ScheduleScrollHighlightedIntoView();
         if (_boundVm == null) return;
         var vm = _boundVm;
+
+        if (HandleOpenComboBoxKey(key)) return;
 
         // If the overlay quick menu window is visible, forward all input to its VM.
         if (_quickMenuWindow?.IsVisible == true)

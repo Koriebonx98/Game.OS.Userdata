@@ -261,6 +261,30 @@
         <Style Selector="Button.xb360-sub-danger-btn TextBlock">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+        <!-- XB360: clear, high-contrast selection (left list + right panel); declared last so it wins -->
+        <Style Selector="Button.xb360-guide-item.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0e9a12"/>
+            <Setter Property="BorderBrush" Value="#ffd44d"/>
+            <Setter Property="BorderThickness" Value="4,2,2,2"/>
+        </Style>
+        <Style Selector="Button.xb360-guide-item.cursor TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn /template/ ContentPresenter">
+            <Setter Property="Background" Value="#6b6b6b"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#118714"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn:focus /template/ ContentPresenter, Button.xb360-sub-action-btn.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#0e9a12"/>
+            <Setter Property="BorderBrush" Value="#ffd44d"/>
+            <Setter Property="BorderThickness" Value="3"/>
+        </Style>
+        <Style Selector="Button.xb360-sub-action-btn.cursor TextBlock">
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
     </UserControl.Styles>
 
     <Grid>

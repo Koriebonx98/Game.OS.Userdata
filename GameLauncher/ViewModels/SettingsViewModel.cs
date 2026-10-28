@@ -154,6 +154,9 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Selected Games (library) page layout.</summary>
     [ObservableProperty] private string _gamesTheme = "Default";
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
+    /// <summary>Game Info card layout ("Default" or "PS5").</summary>
+    [ObservableProperty] private string _gameInfoTheme = "Default";
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5" };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
@@ -760,6 +763,7 @@ public partial class SettingsViewModel : ViewModelBase
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         GamesTheme                 = NormaliseGamesTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
+        GameInfoTheme              = NormaliseGamesTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
@@ -965,6 +969,7 @@ public partial class SettingsViewModel : ViewModelBase
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
             GamesTheme                 = NormaliseGamesTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
+            GameInfoTheme              = NormaliseGamesTheme(GameInfoTheme),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,

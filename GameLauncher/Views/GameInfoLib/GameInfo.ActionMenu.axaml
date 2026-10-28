@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.GameInfoLib.GameInfoActionMenu"
+             x:DataType="vm:GameDetailViewModel">
+
+    <!--
+        Inline action menu shared by every Game Info theme. Opened by "···" (More) or the ☁ button.
+        All entries are normal buttons, so D-pad / A work through the detail page's controller navigation;
+        B (back) closes the menu first.
+    -->
+    <Border IsVisible="{Binding IsActionMenuOpen}"
+            Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
+            CornerRadius="10" Padding="8" Margin="0,10,0,0" HorizontalAlignment="Left">
+        <StackPanel Spacing="4" MinWidth="260">
+            <TextBlock Text="{Binding ActionMenuTitle}" FontSize="12" FontWeight="Bold"
+                       Foreground="#8b949e" Margin="8,2,0,4"/>
+
+            <!-- More (···) -->
+            <StackPanel Spacing="4" IsVisible="{Binding IsMoreMenu}">
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuOpenSettingsCommand}" Content="⚙  Game Settings"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuOpenControllerCommand}" Content="🎮  Controller Profiles"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuOpenModsCommand}" Content="🧩  Manage Mods"
+                        IsVisible="{Binding IsSwitch}"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuRefreshAchievementsCommand}" Content="↻  Refresh Achievements"
+                        IsVisible="{Binding HasExophaseUrl}"/>
+            </StackPanel>
+
+            <!-- Cloud -->
+            <StackPanel Spacing="4" IsVisible="{Binding IsCloudMenu}">
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuBackupCommand}" Content="☁  Backup saves"
+                        IsEnabled="{Binding !IsLudusaviSyncing}"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuRestoreCommand}" Content="↙  Restore saves"
+                        IsEnabled="{Binding !IsLudusaviRestoring}"/>
+            </StackPanel>
+
+            <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                    Command="{Binding CloseActionMenuCommand}" Content="✕  Close"/>
+        </StackPanel>
+    </Border>
+</UserControl>

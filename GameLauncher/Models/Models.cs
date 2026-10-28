@@ -532,6 +532,9 @@ namespace GameLauncher.Models
         /// <summary>Layout of the Games (library) page: "Default" or "PS5".</summary>
         [JsonPropertyName("gamesTheme")] public string GamesTheme { get; set; } = "Default";
 
+        /// <summary>Game Info card layout: "Default" or "PS5".</summary>
+        [JsonPropertyName("gameInfoTheme")] public string GameInfoTheme { get; set; } = "Default";
+
         /// <summary>On-screen keyboard style: "Default" or "PS5".</summary>
         [JsonPropertyName("keyboardTheme")] public string KeyboardTheme { get; set; } = "Default";
 

@@ -482,7 +482,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private string _currentUsername = "";
 
     /// <summary>Wired by MainViewModel after login to attach the logged-in username.</summary>
-    public void SetCurrentUser(string username) => _currentUsername = username;
+    public void SetCurrentUser(string username) { _currentUsername = username; RefreshCompatVotes(); }
 
     private void LoadReviews()
     {
@@ -499,6 +499,7 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var c in Services.GameReviewService.LoadCompatibility(Platform, Title))
             CompatibilityReports.Add(c);
         HasCompatibilityReports = CompatibilityReports.Count > 0;
+        RefreshCompatVotes();
     }
 
     [ObservableProperty] private string _averageRatingLabel = "No ratings yet";
@@ -507,6 +508,69 @@ public partial class GameDetailViewModel : ViewModelBase
     public System.Collections.ObjectModel.ObservableCollection<Models.GameCompatibility> CompatibilityReports { get; } = new();
     [ObservableProperty] private bool   _hasCompatibilityReports;
     [ObservableProperty] private bool   _showCompatibilityPanel;
+
+    // ── Community compatibility votes (same model as the website) ─────────────
+    private const double CompatBarWidth = 420;
+    [ObservableProperty] private int    _compatGreen;
+    [ObservableProperty] private int    _compatAmber;
+    [ObservableProperty] private int    _compatRed;
+    [ObservableProperty] private string _compatSummary = "No votes yet";
+    [ObservableProperty] private string _compatVoteStatus = "";
+    [ObservableProperty] private bool   _canVoteCompat;
+    [ObservableProperty] private bool   _showCompatVotes;
+    [ObservableProperty] private double _compatGreenWidth;
+    [ObservableProperty] private double _compatAmberWidth;
+    [ObservableProperty] private double _compatRedWidth;
+
+    private static bool IsPcPlatformName(string p) =>
+        string.IsNullOrWhiteSpace(p) || p.Equals("PC", StringComparison.OrdinalIgnoreCase) ||
+        p.Equals("Windows", StringComparison.OrdinalIgnoreCase) || p.Equals("Steam", StringComparison.OrdinalIgnoreCase);
+
+    private void RefreshCompatVotes()
+    {
+        ShowCompatVotes = !IsPcPlatformName(Platform);
+        var votes = Services.GameReviewService.LoadCompatVotes(Platform, Title);
+        CompatGreen = votes.Values.Count(v => v == "green");
+        CompatAmber = votes.Values.Count(v => v == "amber");
+        CompatRed   = votes.Values.Count(v => v == "red");
+        int total = CompatGreen + CompatAmber + CompatRed;
+        CompatGreenWidth = total == 0 ? 0 : CompatBarWidth * CompatGreen / total;
+        CompatAmberWidth = total == 0 ? 0 : CompatBarWidth * CompatAmber / total;
+        CompatRedWidth   = total == 0 ? 0 : CompatBarWidth * CompatRed / total;
+
+        string verdict = "";
+        int best = Math.Max(CompatGreen, Math.Max(CompatAmber, CompatRed));
+        if (total > 0)
+            verdict = (best == CompatGreen ? "🟢 Playable" : best == CompatAmber ? "🟠 In Game" : "🔴 No Boot") + " – ";
+        CompatSummary = $"{verdict}{total} vote{(total == 1 ? "" : "s")}";
+
+        bool voted = !string.IsNullOrEmpty(_currentUsername) && votes.TryGetValue(_currentUsername, out var mine);
+        if (voted)
+        {
+            votes.TryGetValue(_currentUsername, out var r);
+            CompatVoteStatus = "You voted: " + (r == "green" ? "Playable" : r == "amber" ? "In Game" : "No Boot");
+        }
+        else CompatVoteStatus = string.IsNullOrEmpty(_currentUsername) ? "Log in to vote." : "";
+        CanVoteCompat = ShowCompatVotes && !voted && !string.IsNullOrEmpty(_currentUsername);
+    }
+
+    [RelayCommand]
+    private void VoteCompat(string? rating)
+    {
+        if (rating is not ("green" or "amber" or "red") || string.IsNullOrEmpty(_currentUsername)) return;
+        if (!Services.GameReviewService.AddCompatVote(Platform, Title, _currentUsername, rating))
+            CompatVoteStatus = "You have already voted.";
+        RefreshCompatVotes();
+    }
+
+    [RelayCommand]
+    private void SetReviewRating(string? stars)
+    {
+        if (int.TryParse(stars, out var n) && n is >= 1 and <= 5) NewReviewRating = n;
+    }
+
+    public string ReviewStarsPreview => new string('★', NewReviewRating) + new string('☆', 5 - NewReviewRating);
+    partial void OnNewReviewRatingChanged(int value) => OnPropertyChanged(nameof(ReviewStarsPreview));
 
     [RelayCommand]
     private void ToggleCompatibilityPanel() => ShowCompatibilityPanel = !ShowCompatibilityPanel;
@@ -3198,6 +3262,59 @@ public partial class GameDetailViewModel : ViewModelBase
             }
         }
         catch { }
+    }
+
+    // ── Game Info theme + inline action menu (··· and ☁) ────────────────────
+    /// <summary>Game Info card layout ("Default" or "PS5"); pushed from Settings by MainViewModel.</summary>
+    [ObservableProperty] private string _gameInfoTheme = "Default";
+    public bool IsPs5GameInfo     => string.Equals(GameInfoTheme, "PS5", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGameInfo => !IsPs5GameInfo;
+    partial void OnGameInfoThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsPs5GameInfo));
+        OnPropertyChanged(nameof(IsDefaultGameInfo));
+    }
+
+    [ObservableProperty] private bool   _isActionMenuOpen;
+    [ObservableProperty] private string _actionMenuKind = "";
+    public bool   IsMoreMenu  => ActionMenuKind == "more";
+    public bool   IsCloudMenu => ActionMenuKind == "cloud";
+    public string ActionMenuTitle => IsCloudMenu ? "CLOUD SAVES" : "GAME OPTIONS";
+    partial void OnActionMenuKindChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsMoreMenu));
+        OnPropertyChanged(nameof(IsCloudMenu));
+        OnPropertyChanged(nameof(ActionMenuTitle));
+    }
+
+    private void ToggleActionMenu(string kind)
+    {
+        if (IsActionMenuOpen && ActionMenuKind == kind) { IsActionMenuOpen = false; return; }
+        ActionMenuKind = kind;
+        IsActionMenuOpen = true;
+    }
+
+    [RelayCommand] private void ToggleMoreMenu()  => ToggleActionMenu("more");
+    [RelayCommand] private void ToggleCloudMenu() => ToggleActionMenu("cloud");
+    [RelayCommand] public void CloseActionMenu()  => IsActionMenuOpen = false;
+
+    [RelayCommand] private void MenuOpenSettings()   { IsActionMenuOpen = false; OpenSettings(); }
+    [RelayCommand] private void MenuOpenController() { IsActionMenuOpen = false; ToggleControllerPanel(); }
+    [RelayCommand] private void MenuOpenMods()       { IsActionMenuOpen = false; OpenModsPanel(); }
+    [RelayCommand] private async System.Threading.Tasks.Task MenuRefreshAchievements()
+    {
+        IsActionMenuOpen = false;
+        await SyncExophaseNowAsync();
+    }
+    [RelayCommand] private async System.Threading.Tasks.Task MenuBackup()
+    {
+        IsActionMenuOpen = false;
+        await SyncWithLudusaviAsync();
+    }
+    [RelayCommand] private async System.Threading.Tasks.Task MenuRestore()
+    {
+        IsActionMenuOpen = false;
+        await RestoreWithLudusaviAsync();
     }
 
     /// <summary>Opens the game settings panel (exe select, arguments, pre/post launch, folder ops).</summary>
