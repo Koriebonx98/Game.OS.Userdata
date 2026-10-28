@@ -122,6 +122,7 @@
                 <div id="streamDevices"></div>
                 <button id="streamBtn" class="btn app-more">Start streaming</button>
                 <button id="streamTestBtn" class="btn app-more">Test connection</button>
+                <button id="streamRefreshBtn" class="btn app-more">Refresh PC games &amp; ROMs</button>
                 <small id="streamMsg" class="app-count"></small>
                 <b>Stream settings</b>
                 <select id="streamFps" class="app-search"><option value="10">10 fps</option><option value="15">15 fps</option><option value="20">20 fps</option><option value="30">30 fps</option><option value="60">60 fps</option></select>
@@ -1003,6 +1004,15 @@
                     const q = mbps >= 20 && l <= 40 ? 'Good' : mbps >= 8 && l <= 100 ? 'OK' : 'Bad';
                     msg.textContent = q + ' connection — ' + mbps.toFixed(1) + ' Mbps, ' + l.toFixed(0) + ' ms';
                 } catch (e) { msg.textContent = 'Test failed — open the stream page and use its Test connection button.'; }
+            };
+            $('streamRefreshBtn').onclick = () => {
+                const addr = normAddr($('streamAddr').value), pin = $('streamPin').value.trim(), msg = $('streamMsg');
+                if (!/^[\w.\-]+(:\d{1,5})?$/.test(addr) || !pin) { msg.textContent = 'Enter the PC address and PIN (pair your PC) first.'; return; }
+                localStorage.setItem('gameOS_stream_addr', addr);
+                localStorage.setItem('gameOS_stream_pin', pin);
+                msg.textContent = 'Syncing from your PC…';
+                // Mixed content blocks direct reads on iOS, so the PC page loads the list and returns here with it.
+                location.href = 'http://' + addr + '/?pin=' + encodeURIComponent(pin) + '&user=' + encodeURIComponent(user.username) + '&sync=1&ret=' + encodeURIComponent(location.origin + location.pathname);
             };
             $('streamBtn').onclick = async () => {
                 const addr = $('streamAddr').value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
