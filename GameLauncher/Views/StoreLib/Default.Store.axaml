@@ -254,7 +254,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:StoreGame">
-                                <Button Classes="store-card-btn" Width="180"
+                                <Button Classes="store-card-btn" Classes.focused="{Binding IsFocused}" Width="180"
                                         Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                                         CommandParameter="{Binding}">
                                     <StackPanel Spacing="6">
@@ -286,7 +286,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:StoreGame">
-                                <Button Classes="store-card-btn" Width="180"
+                                <Button Classes="store-card-btn" Classes.focused="{Binding IsFocused}" Width="180"
                                         Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                                         CommandParameter="{Binding}">
                                     <StackPanel Spacing="6">
@@ -318,7 +318,7 @@
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:StoreGame">
-                                <Button Classes="store-card-btn" Width="180"
+                                <Button Classes="store-card-btn" Classes.focused="{Binding IsFocused}" Width="180"
                                         Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                                         CommandParameter="{Binding}">
                                     <StackPanel Spacing="6">

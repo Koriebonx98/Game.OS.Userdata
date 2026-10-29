@@ -533,6 +533,11 @@ public partial class MainWindow : Window
                     vm.IsNavExpanded = false;
                     e.Handled = true;
                 }
+                else if (vm.IsLibrary && !IsTextInputFocused())
+                {
+                    vm.NavigateCommand.Execute("dashboard");
+                    e.Handled = true;
+                }
                 break;
 
             // LB / PageUp → previous page (always works regardless of nav state)
