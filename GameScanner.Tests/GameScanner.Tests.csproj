@@ -24,5 +24,6 @@
     <Compile Include="../GameLauncher/Services/EmulatorSavePathResolver.cs" />
     <Compile Include="../GameLauncher/Services/EmulatorSettingsService.cs" />
     <Compile Include="../GameLauncher/Services/SteamEmuAchievementService.cs" />
+    <Compile Include="../GameLauncher/Services/GameReviewService.cs" />
   </ItemGroup>
 </Project>
