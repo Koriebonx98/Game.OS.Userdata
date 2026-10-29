@@ -1462,7 +1462,7 @@ class Program
         return passed;
     }
 
-    private static async Task ScanDirectory(GameScannerService scanner, string driveRoot)
+    private static async Task ScanDirectory(GameScannerService scanner, string driveRoot, bool forceRescan = false)
     {
         // On Linux, $HOME is always included in GetDriveRoots(), so placing Games/, Repacks/
         // and Roms/ symlinks there ensures the scanner finds our TestData sub-directories.
@@ -1495,7 +1495,10 @@ class Program
                 cleanRoms = true;
             }
 
-            await scanner.StartAsync();
+            if (forceRescan)
+                await scanner.RescanAsync();
+            else
+                await scanner.StartAsync();
         }
         finally
         {
@@ -1543,7 +1546,7 @@ class Program
             WriteSizedFile(Path.Combine(ps4TitleIdDir, "patch.pkg"), 40);
             WriteSizedFile(Path.Combine(ps4TitleIdDir, "notes.dat"), 10); // non-ROM file counted in folder size
 
-            await ScanDirectory(scanner, tempRoot);
+            await ScanDirectory(scanner, tempRoot, forceRescan: true);
 
             var ps3TitleIdRom = detectedRoms.FirstOrDefault(r =>
                 string.Equals(r.Platform, "PS3", StringComparison.OrdinalIgnoreCase) &&

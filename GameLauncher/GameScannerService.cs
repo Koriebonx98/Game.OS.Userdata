@@ -1121,7 +1121,7 @@ public sealed class GameScannerService : IDisposable
     {
         try
         {
-            var emittedScopes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var emittedScopes = new Dictionary<string, LocalRom>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var entry in Directory.EnumerateFiles(gamesDir, "*", SearchOption.AllDirectories))
             {
@@ -1146,9 +1146,16 @@ public sealed class GameScannerService : IDisposable
                     });
                     continue;
                 }
-                if (!emittedScopes.Add(Path.GetFullPath(scopeDir))) continue;
+                string scopeKey = Path.GetFullPath(scopeDir);
+                if (emittedScopes.TryGetValue(scopeKey, out var existing))
+                {
+                    if (!string.Equals(existing.FilePath, entry, StringComparison.OrdinalIgnoreCase))
+                        existing.AdditionalPaths.Add(entry);
+                    continue;
+                }
 
                 BuildPs3Ps4RomEntry(gamesDir, scopeDir, entry, platform, results);
+                emittedScopes[scopeKey] = results[^1];
             }
         }
         catch (UnauthorizedAccessException) { }
