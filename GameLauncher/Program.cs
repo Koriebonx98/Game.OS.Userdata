@@ -1,6 +1,5 @@
 using Avalonia;
 using Avalonia.Skia;
-using Avalonia.WebView.Desktop;
 using System;
 using System.Runtime.InteropServices;
 
@@ -44,8 +43,7 @@ internal sealed class Program
         var builder = AppBuilder.Configure<App>()
                                 .UsePlatformDetect()
                                 .WithInterFont()
-                                .LogToTrace()
-                                .UseDesktopWebView();
+                                .LogToTrace();
 
         if (forceSwRenderer)
         {

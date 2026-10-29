@@ -5,7 +5,6 @@ using Avalonia.Markup.Xaml;
 using Avalonia.Markup.Xaml.Styling;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
-using AvaloniaWebView;
 using GameLauncher.Models;
 using GameLauncher.Services;
 using GameLauncher.ViewModels;
@@ -37,12 +36,6 @@ public partial class App : Application
         Path.Combine(AppContext.BaseDirectory, "Data", "Intro", "Intro.mp4");
 
     public override void Initialize() => AvaloniaXamlLoader.Load(this);
-
-    public override void RegisterServices()
-    {
-        base.RegisterServices();
-        AvaloniaWebViewBuilder.Initialize(default);
-    }
 
     public override void OnFrameworkInitializationCompleted()
     {

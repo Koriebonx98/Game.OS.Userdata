@@ -4,8 +4,7 @@
              xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
              xmlns:gi="using:GameLauncher.Views.GameInfoLib"
-             xmlns:wv="clr-namespace:AvaloniaWebView;assembly=Avalonia.WebView"
-             xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
+                  xmlns:vlc="clr-namespace:LibVLCSharp.Avalonia;assembly=LibVLCSharp.Avalonia"
              x:Class="GameLauncher.Views.GameDetailView"
              x:Name="GameDetailViewRoot"
              x:DataType="vm:GameDetailViewModel"
@@ -1338,11 +1337,10 @@
             </Border>
 
             <!-- WebView fills the remaining area and plays the YouTube embed URL -->
-            <wv:WebView Grid.Row="1"
-                        x:Name="TrailerWebView"
-                        HorizontalAlignment="Stretch"
-                        VerticalAlignment="Stretch"
-                        Url="{Binding TrailerEmbedUrl}"/>
+            <TextBlock Grid.Row="1"
+                       Text="Use “Open in Browser” below to watch the trailer."
+                       Foreground="#8b949e" FontSize="14"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
             <!-- Status bar with fallback "Watch in Browser" button -->
             <Border Grid.Row="2" Background="#0d1117" Padding="12,8">
