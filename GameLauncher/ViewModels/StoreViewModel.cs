@@ -98,6 +98,35 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     public ObservableCollection<StoreGame> NewGames { get; } = new();
     public bool HasNewGames => NewGames.Count > 0;
 
+    // ── Storefront shelves (same shelves as the website store) ────────────
+    private const int ShelfMax = 20;
+    public ObservableCollection<StoreGame> UpdatedShelf    { get; } = new();
+    public ObservableCollection<StoreGame> ExclusivesShelf { get; } = new();
+    public ObservableCollection<StoreGame> ComingSoonShelf { get; } = new();
+    public bool HasUpdatedShelf    => UpdatedShelf.Count > 0;
+    public bool HasExclusivesShelf => ExclusivesShelf.Count > 0;
+    public bool HasComingSoonShelf => ComingSoonShelf.Count > 0;
+    /// <summary>Shelves are shown on the unfiltered home view only, like a storefront.</summary>
+    public bool ShowShelves => IsGamesTab && string.IsNullOrWhiteSpace(SearchText) && FilterGenre == "All";
+
+    private void RebuildShelves()
+    {
+        static void Fill(ObservableCollection<StoreGame> target, IEnumerable<StoreGame> src)
+        {
+            target.Clear();
+            foreach (var g in src.Take(ShelfMax)) target.Add(g);
+        }
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+        Fill(UpdatedShelf, _allStore.Where(g => g.HasCategory("Updated") || (g.UpdatedAt is { } d && d > cutoff))
+                                    .OrderByDescending(g => g.UpdatedAt ?? DateTime.MinValue));
+        Fill(ExclusivesShelf, _allStore.Where(g => g.HasCategory("Exclusive")));
+        Fill(ComingSoonShelf, _allStore.Where(g => g.HasCategory("Coming Soon")));
+        OnPropertyChanged(nameof(HasUpdatedShelf));
+        OnPropertyChanged(nameof(HasExclusivesShelf));
+        OnPropertyChanged(nameof(HasComingSoonShelf));
+        OnPropertyChanged(nameof(ShowShelves));
+    }
+
     private async Task LoadNewGamesAsync()
     {
         try
@@ -298,6 +327,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     private void RebuildCollections()
     {
+        RebuildShelves();
         Featured.Clear();
         foreach (var g in _allStore.Where(s => s.IsFeatured))
             Featured.Add(g);
@@ -682,6 +712,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                     AchievementsUrl = g.AchievementsUrl,
                     Screenshots     = g.Screenshots,
                     StorePageUrl    = g.StorePageUrl,
+                    Categories      = g.Categories,
+                    UpdatedAt       = DateTime.TryParse(g.UpdatedAt, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var upd) ? upd : null,
                 })
                 .ToList();
 
@@ -720,6 +752,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                         AchievementsUrl = g.AchievementsUrl,
                         Screenshots     = g.Screenshots,
                         StorePageUrl    = g.StorePageUrl,
+                        Categories      = g.Categories,
                     })
                     .ToList();
                 StatusMessage = $"Offline — showing cached {platform} data.";
@@ -753,6 +786,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     private void ApplyFilter()
     {
+        OnPropertyChanged(nameof(ShowShelves));
         FilteredStore.Clear();
         var results = _allStore.AsEnumerable();
 

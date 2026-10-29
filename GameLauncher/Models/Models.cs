@@ -397,6 +397,11 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
         public string?       StorePageUrl    { get; set; }
+        /// <summary>Store categories from the Games.Database (e.g. Exclusive, Coming Soon, Updated).</summary>
+        public List<string>? Categories      { get; set; }
+        /// <summary>Last-modified time from the Games.Database, when present.</summary>
+        public System.DateTime? UpdatedAt    { get; set; }
+        public bool HasCategory(string c) => Categories != null && Categories.Any(x => string.Equals(x, c, System.StringComparison.OrdinalIgnoreCase));
         private string? _compatBorder;
         /// <summary>Card border colour from community compat votes: green / amber / red (transparent when no votes).</summary>
         public string CompatBorderBrush => _compatBorder ??= GameLauncher.Services.GameReviewService.GetCompatVerdictColor(Platform, Title);
@@ -926,6 +931,10 @@ namespace GameLauncher.Models
         public string?       ReleaseYear     { get; set; }
         /// <summary>Alternate / known titles for fuzzy matching (e.g. ["GoW", "God of War 2018"]).</summary>
         public List<string>? AlternateNames  { get; set; }
+        /// <summary>Store categories such as "Exclusive", "Coming Soon", "Updated" (same field the website uses).</summary>
+        public List<string>? Categories      { get; set; }
+        /// <summary>Last-modified timestamp from updated_at / updated / last_updated / modified.</summary>
+        public string?       UpdatedAt       { get; set; }
     }
 
     /// <summary>

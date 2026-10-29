@@ -244,6 +244,102 @@
             </ItemsControl>
         </ScrollViewer>
 
+                <StackPanel IsVisible="{Binding HasUpdatedShelf}">
+            <StackPanel IsVisible="{Binding ShowShelves}">
+                <TextBlock Text="🔄  Updated" Classes="section-header" Margin="0,0,0,12"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,28">
+                    <ItemsControl ItemsSource="{Binding UpdatedShelf}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:StoreGame">
+                                <Button Classes="store-card-btn" Width="180"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel Spacing="6">
+                                        <Border Height="100" CornerRadius="8" ClipToBounds="True"
+                                                BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}">
+                                            <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                LetterFontSize="40" ImageCornerRadius="8" Height="100"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="White" TextWrapping="Wrap" MaxHeight="36"/>
+                                        <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding HasExclusivesShelf}">
+            <StackPanel IsVisible="{Binding ShowShelves}">
+                <TextBlock Text="⭐  Exclusives" Classes="section-header" Margin="0,0,0,12"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,28">
+                    <ItemsControl ItemsSource="{Binding ExclusivesShelf}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:StoreGame">
+                                <Button Classes="store-card-btn" Width="180"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel Spacing="6">
+                                        <Border Height="100" CornerRadius="8" ClipToBounds="True"
+                                                BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}">
+                                            <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                LetterFontSize="40" ImageCornerRadius="8" Height="100"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="White" TextWrapping="Wrap" MaxHeight="36"/>
+                                        <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </StackPanel>
+
+        <StackPanel IsVisible="{Binding HasComingSoonShelf}">
+            <StackPanel IsVisible="{Binding ShowShelves}">
+                <TextBlock Text="⏳  Coming Soon" Classes="section-header" Margin="0,0,0,12"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,28">
+                    <ItemsControl ItemsSource="{Binding ComingSoonShelf}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16"/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:StoreGame">
+                                <Button Classes="store-card-btn" Width="180"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel Spacing="6">
+                                        <Border Height="100" CornerRadius="8" ClipToBounds="True"
+                                                BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}">
+                                            <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                LetterFontSize="40" ImageCornerRadius="8" Height="100"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="Bold"
+                                                   Foreground="White" TextWrapping="Wrap" MaxHeight="36"/>
+                                        <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+        </StackPanel>
+
         <!-- Featured banner -->
         <TextBlock Text="⭐  Featured &amp; New Releases"
                    Classes="section-header" Margin="0,0,0,12"
