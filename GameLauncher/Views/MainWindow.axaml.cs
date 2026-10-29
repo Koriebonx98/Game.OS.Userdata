@@ -1044,6 +1044,10 @@ public partial class MainWindow : Window
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(MainViewModel.ShowDetail) or nameof(MainViewModel.IsHome)
+            or nameof(MainViewModel.IsLibrary) or nameof(MainViewModel.IsStore))
+            Dispatcher.UIThread.Post(() => this.FindControl<ScrollViewer>("MainPageScroll")?.ScrollToHome(), DispatcherPriority.Loaded);
+
         if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ShowDetail))
         {
             OnShowDetailChanged(_boundVm.ShowDetail);

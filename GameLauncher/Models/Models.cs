@@ -397,6 +397,22 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
         public string?       StorePageUrl    { get; set; }
+        private string? _compatBorderColor;
+        /// <summary>Card border colour from community compat votes: green/amber/red (majority), else transparent.</summary>
+        public string CompatBorderColor => _compatBorderColor ??= ComputeCompatColor();
+        private string ComputeCompatColor()
+        {
+            try
+            {
+                var votes = GameLauncher.Services.GameReviewService.LoadCompatVotes(Platform, Title);
+                int g = 0, am = 0, r = 0;
+                foreach (var v in votes.Values) { if (v == "green") g++; else if (v == "amber") am++; else if (v == "red") r++; }
+                int best = System.Math.Max(g, System.Math.Max(am, r));
+                if (best == 0) return "Transparent";
+                return best == g ? "#3fb950" : best == am ? "#d29922" : "#f85149";
+            }
+            catch { return "Transparent"; }
+        }
         public string        RatingStars     =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));

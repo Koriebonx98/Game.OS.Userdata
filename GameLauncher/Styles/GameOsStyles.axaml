@@ -364,7 +364,7 @@
     <!-- ─── Store Card Button (clickable version) ─── -->
     <Style Selector="Button.store-card-btn">
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="BorderThickness" Value="3"/>
         <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Width" Value="200"/>
         <Setter Property="Margin" Value="0,0,12,12"/>
@@ -375,6 +375,8 @@
 
     <Style Selector="Button.store-card-btn /template/ ContentPresenter">
         <Setter Property="Background" Value="#161b22"/>
+        <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}"/>
+        <Setter Property="BorderThickness" Value="{TemplateBinding BorderThickness}"/>
         <Setter Property="CornerRadius" Value="10"/>
         <Setter Property="Padding" Value="0"/>
     </Style>

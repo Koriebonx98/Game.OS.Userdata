@@ -30,6 +30,7 @@ public partial class GameDetailView : UserControl
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        Dispatcher.UIThread.Post(() => this.FindControl<ScrollViewer>("DetailScroll")?.ScrollToHome(), DispatcherPriority.Loaded);
         if (DataContext is GameDetailViewModel vm)
         {
             vm.BrowseLaunchPathRequested  = OnBrowseLaunchPathRequested;

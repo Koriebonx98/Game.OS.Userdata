@@ -361,6 +361,7 @@
             <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:StoreGame">
                     <Button Classes="store-card-btn" Classes.focused="{Binding IsFocused}"
+                            BorderBrush="{Binding CompatBorderColor}" BorderThickness="3"
                             Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                             CommandParameter="{Binding}">
                         <StackPanel>
