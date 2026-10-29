@@ -49,16 +49,8 @@ public partial class StoreView : UserControl
 
     private void BringFocusedIntoView()
     {
-        var panel = CardPanel();
-        if (panel == null) return;
-        foreach (var child in panel.Children)
-        {
-            if (child.DataContext is Models.IStoreFocusable { IsFocused: true } ||
-                child.GetVisualDescendants().OfType<Control>().Any(c => c.Classes.Contains("focused")))
-            {
-                child.BringIntoView();
-                return;
-            }
-        }
+        var focused = ActiveRoot()?.GetVisualDescendants().OfType<Control>()
+            .FirstOrDefault(c => c.IsEffectivelyVisible && c.Classes.Contains("focused"));
+        focused?.BringIntoView();
     }
 }

@@ -527,26 +527,83 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         return -1;
     }
 
-    /// <summary>Left/Right (cols = 1 step) — first press focuses the first card.</summary>
-    public void MoveFocus(int delta)
+    /// <summary>
+    /// Navigation rows: each visible storefront shelf is one horizontal row, followed by the
+    /// card grid split into rows of the measured column count.
+    /// </summary>
+    private List<List<IStoreFocusable>> BuildRows()
     {
-        var items = ActiveItems();
-        if (items.Count == 0) return;
-        int cur = FocusedIndex(items);
-        FocusAt(items, cur < 0 ? 0 : Math.Clamp(cur + delta, 0, items.Count - 1));
+        var rows = new List<List<IStoreFocusable>>();
+        if (IsAppStoreTab)
+        {
+            AddGridRows(rows, FilteredAppStoreEntries.Cast<IStoreFocusable>().ToList());
+            return rows;
+        }
+        if (ShowShelves)
+        {
+            foreach (var shelf in new[] { NewGames, UpdatedShelf, ExclusivesShelf, ComingSoonShelf })
+                if (shelf.Count > 0) rows.Add(shelf.Cast<IStoreFocusable>().ToList());
+        }
+        AddGridRows(rows, FilteredStore.Cast<IStoreFocusable>().ToList());
+        return rows;
     }
 
-    /// <summary>Up/Down — moves a whole row.</summary>
+    private void AddGridRows(List<List<IStoreFocusable>> rows, List<IStoreFocusable> items)
+    {
+        int cols = Math.Max(1, ColumnsProvider?.Invoke() ?? 1);
+        for (int i = 0; i < items.Count; i += cols)
+            rows.Add(items.GetRange(i, Math.Min(cols, items.Count - i)));
+    }
+
+    private bool FindFocus(List<List<IStoreFocusable>> rows, out int row, out int col)
+    {
+        row = col = -1;
+        if (_focused == null) return false;
+        for (int r = 0; r < rows.Count; r++)
+        {
+            col = rows[r].FindIndex(x => ReferenceEquals(x, _focused));
+            if (col >= 0) { row = r; return true; }
+        }
+        return false;
+    }
+
+    private void FocusCell(List<List<IStoreFocusable>> rows, int row, int col)
+    {
+        ClearFocus();
+        _focused = rows[row][col];
+        _focused.IsFocused = true;
+        ScrollFocusedIntoView?.Invoke();
+    }
+
+    /// <summary>Left/Right — first press focuses the first card; wraps to the adjacent row at the ends.</summary>
+    public void MoveFocus(int delta)
+    {
+        var rows = BuildRows();
+        if (rows.Count == 0) return;
+        if (!FindFocus(rows, out int r, out int c)) { FocusCell(rows, 0, 0); return; }
+        c += delta;
+        if (c < 0)
+        {
+            if (r == 0) return;
+            r--; c = rows[r].Count - 1;
+        }
+        else if (c >= rows[r].Count)
+        {
+            if (r >= rows.Count - 1) return;
+            r++; c = 0;
+        }
+        FocusCell(rows, r, c);
+    }
+
+    /// <summary>Up/Down — moves to the adjacent row (shelf or grid row), keeping the column.</summary>
     public void MoveFocusRow(int direction)
     {
-        var items = ActiveItems();
-        if (items.Count == 0) return;
-        int cur = FocusedIndex(items);
-        if (cur < 0) { FocusAt(items, 0); return; }
-        int cols = Math.Max(1, ColumnsProvider?.Invoke() ?? 1);
-        int next = cur + direction * cols;
-        if (next < 0 || next >= items.Count) return;
-        FocusAt(items, next);
+        var rows = BuildRows();
+        if (rows.Count == 0) return;
+        if (!FindFocus(rows, out int r, out int c)) { FocusCell(rows, 0, 0); return; }
+        int nr = r + direction;
+        if (nr < 0 || nr >= rows.Count) return;
+        FocusCell(rows, nr, Math.Min(c, rows[nr].Count - 1));
     }
 
     public void ActivateFocused()
@@ -739,6 +796,46 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         _ = LoadPlatformAsync(value, _loadCts.Token);
     }
 
+    /// <summary>
+    /// Default "All" view: merges every platform database into the curated catalog
+    /// (de-duplicated by platform + title) so the whole store is browsable without picking a platform.
+    /// </summary>
+    private async Task LoadAllPlatformsAsync(CancellationToken ct)
+    {
+        var known = new HashSet<string>(
+            _allStore.Select(g => g.Platform + "|" + g.Title), StringComparer.OrdinalIgnoreCase);
+        IsLoading      = true;
+        LoadingMessage = "Loading all games…";
+        try
+        {
+            foreach (var platform in Platforms.ToList().Where(p => p != "All"))
+            {
+                if (ct.IsCancellationRequested) return;
+                try
+                {
+                    var db = await GameOsClient.FetchGamesDatabaseAsync(platform, ct);
+                    if (ct.IsCancellationRequested) return;
+                    var added = db.Select(g => ToStoreGame(g, platform))
+                        .Where(g => !string.IsNullOrEmpty(g.Title) && known.Add(g.Platform + "|" + g.Title))
+                        .ToList();
+                    if (added.Count == 0) continue;
+                    _allStore = _allStore.Concat(added).ToList();
+                    RebuildCollections();
+                }
+                catch (OperationCanceledException) { return; }
+                catch { /* best-effort: skip platforms that fail to load */ }
+            }
+        }
+        finally
+        {
+            if (!ct.IsCancellationRequested)
+            {
+                IsLoading      = false;
+                LoadingMessage = "";
+            }
+        }
+    }
+
     private async Task LoadPlatformAsync(
         string platform, CancellationToken ct)
     {
@@ -747,6 +844,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
             // Restore curated catalog instantly — no network needed
             _allStore = new List<StoreGame>(_allStoreBase);
             RebuildCollections();
+            await LoadAllPlatformsAsync(ct);
             return;
         }
 
