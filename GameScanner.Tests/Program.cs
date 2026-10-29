@@ -551,7 +551,7 @@ class Program
 
     // Runs the scanner by creating temporary symlinks in $HOME so that the standard
     // GetDriveRoots() scan path picks up the TestData Games/, Repacks/ and Roms/ directories,
-    // then forces a scan so cached results from a previous fixture cannot be reused.
+    // then calls StartAsync() which is the normal public entry point.
 
     /// <summary>
     /// Creates a temporary fake storefront folder structure, runs the scanner against it,
@@ -1374,7 +1374,7 @@ class Program
                     Directory.CreateSymbolicLink(gamesLink, gamesDir);
                     cleanLink = true;
                 }
-                await scanner.RescanAsync();
+                await scanner.StartAsync();
             }
             finally
             {
@@ -1462,7 +1462,7 @@ class Program
         return passed;
     }
 
-    private static async Task ScanDirectory(GameScannerService scanner, string driveRoot)
+    private static async Task ScanDirectory(GameScannerService scanner, string driveRoot, bool forceRescan = false)
     {
         // On Linux, $HOME is always included in GetDriveRoots(), so placing Games/, Repacks/
         // and Roms/ symlinks there ensures the scanner finds our TestData sub-directories.
@@ -1495,7 +1495,10 @@ class Program
                 cleanRoms = true;
             }
 
-            await scanner.StartAsync();
+            if (forceRescan)
+                await scanner.RescanAsync();
+            else
+                await scanner.StartAsync();
         }
         finally
         {
@@ -1543,7 +1546,7 @@ class Program
             WriteSizedFile(Path.Combine(ps4TitleIdDir, "patch.pkg"), 40);
             WriteSizedFile(Path.Combine(ps4TitleIdDir, "notes.dat"), 10); // non-ROM file counted in folder size
 
-            await ScanDirectory(scanner, tempRoot);
+            await ScanDirectory(scanner, tempRoot, forceRescan: true);
 
             var ps3TitleIdRom = detectedRoms.FirstOrDefault(r =>
                 string.Equals(r.Platform, "PS3", StringComparison.OrdinalIgnoreCase) &&
