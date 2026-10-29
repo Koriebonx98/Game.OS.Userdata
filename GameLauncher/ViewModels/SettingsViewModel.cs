@@ -163,7 +163,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
-    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5" };
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";

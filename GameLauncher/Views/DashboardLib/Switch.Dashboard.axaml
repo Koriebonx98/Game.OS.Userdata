@@ -13,8 +13,8 @@
     -->
     <UserControl.Styles>
         <Style Selector="Button.sw-tile">
-            <Setter Property="Width" Value="204"/>
-            <Setter Property="Height" Value="204"/>
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="Height" Value="150"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -43,8 +43,8 @@
             <Setter Property="BorderBrush" Value="#00c3e3"/>
         </Style>
         <Style Selector="Border.sw-empty">
-            <Setter Property="Width" Value="204"/>
-            <Setter Property="Height" Value="204"/>
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="Height" Value="150"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="BorderBrush" Value="#f0b323"/>
@@ -58,20 +58,20 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.sw-round">
-            <Setter Property="Width" Value="52"/>
-            <Setter Property="Height" Value="52"/>
+            <Setter Property="Width" Value="42"/>
+            <Setter Property="Height" Value="42"/>
             <Setter Property="Margin" Value="7,0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="#3a3d44"/>
             <Setter Property="Foreground" Value="#f1f1f1"/>
             <Setter Property="FontSize" Value="22"/>
-            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="CornerRadius" Value="21"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="Button.sw-round /template/ ContentPresenter">
-            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="CornerRadius" Value="21"/>
         </Style>
         <Style Selector="Button.sw-round:pointerover">
             <Setter Property="Background" Value="#4a4e57"/>
@@ -86,7 +86,7 @@
         <Grid RowDefinitions="Auto,*,Auto,Auto">
 
             <!-- Profile + clock -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="28,22,28,0">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="28,12,28,0">
                 <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20"
                         Background="#e8e8e8" BorderBrush="#f0b323" BorderThickness="2">
                     <TextBlock Text="{Binding SteamProfileInitial}" Foreground="#2b2b2b" FontWeight="Bold" FontSize="18"
@@ -106,7 +106,7 @@
                     <Button Classes="sw-tile" Classes.focused="{Binding IsStoreFocused}"
                             Command="{Binding OpenFeaturedDetailCommand}">
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="🛍" FontSize="64" HorizontalAlignment="Center" Foreground="#ff7d1a"/>
+                            <TextBlock Text="🛍" FontSize="48" HorizontalAlignment="Center" Foreground="#ff7d1a"/>
                             <TextBlock Text="Store" FontSize="16" HorizontalAlignment="Center" Foreground="#f1f1f1" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Button>
@@ -125,7 +125,7 @@
                                                           FallbackText="{Binding EffectiveTitle}"
                                                           FallbackGradient="{Binding CoverGradient}"
                                                           SubText="{Binding Platform}"
-                                                          LetterFontSize="60"/>
+                                                          LetterFontSize="44"/>
                                     </Border>
                                 </Button>
                             </DataTemplate>
@@ -135,7 +135,7 @@
                     <Button Classes="sw-tile" Classes.focused="{Binding IsAllGamesFocused}"
                             Command="{Binding NavigateToAllGamesCommand}">
                         <StackPanel VerticalAlignment="Center">
-                            <TextBlock Text="▦" FontSize="64" HorizontalAlignment="Center" Foreground="#00c3e3"/>
+                            <TextBlock Text="▦" FontSize="48" HorizontalAlignment="Center" Foreground="#00c3e3"/>
                             <TextBlock Text="All Games" FontSize="16" HorizontalAlignment="Center" Foreground="#f1f1f1" Margin="0,8,0,0"/>
                         </StackPanel>
                     </Button>
@@ -154,7 +154,7 @@
             </ScrollViewer>
 
             <!-- Round shortcut bar -->
-            <Border Grid.Row="2" Classes="sw-bar" Margin="0,0,0,10">
+            <Border Grid.Row="2" Classes="sw-bar" Margin="0,0,0,4">
                 <StackPanel Orientation="Horizontal">
                     <Button Classes="sw-round" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"
                             ToolTip.Tip="All Games"/>
@@ -168,7 +168,7 @@
             </Border>
 
             <!-- Button hints -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,6,28,16">
+            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,2,28,8">
                 <TextBlock Text="Ⓧ  Play" Classes="sw-hint"/>
                 <TextBlock Text="Ⓐ  OK" Classes="sw-hint"/>
             </StackPanel>
