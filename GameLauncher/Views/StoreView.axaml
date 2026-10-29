@@ -22,6 +22,14 @@
         <store:Ps5Store Name="Ps5StoreView" IsVisible="{Binding IsSonyStore}"/>
         <store:XboxStore Name="XboxStoreView" IsVisible="{Binding IsXboxStore}"/>
         <store:NintendoStore Name="NintendoStoreView" IsVisible="{Binding IsNintendoStore}"/>
+        <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,0,24,20"
+                    HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                    IsVisible="{Binding !IsOverlayOpen}">
+            <Button Content="☰  Filters" Click="OnFiltersClick" Padding="14,8" CornerRadius="8"
+                    Background="#E6161b22" Foreground="White" BorderBrush="#30363d" BorderThickness="1"/>
+            <Button Content="⌨  Keyboard" Click="OnKeyboardClick" Padding="14,8" CornerRadius="8"
+                    Background="#E6161b22" Foreground="White" BorderBrush="#30363d" BorderThickness="1"/>
+        </StackPanel>
         <store:StoreOverlays/>
     </Panel>
 </UserControl>
