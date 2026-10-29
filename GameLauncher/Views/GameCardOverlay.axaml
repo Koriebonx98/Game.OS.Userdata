@@ -80,9 +80,16 @@
             <Setter Property="Width" Value="52"/>
             <Setter Property="Height" Value="52"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="IsHitTestVisible" Value="False"/>
             <Setter Property="Background" Value="#f2f6fa"/>
-            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.gc-ach:pointerover, Button.gc-ach.focused">
+            <Setter Property="BorderBrush" Value="#3aa0e8"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-ach:pointerover, Border.gc-card.sw Button.gc-ach.focused">
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
         </Style>
         <Style Selector="Button.gc-all">
             <Setter Property="Width" Value="64"/>
@@ -163,16 +170,32 @@
                             </ItemsControl.ItemsPanel>
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:Achievement">
-                                    <Border Width="52" Height="52" CornerRadius="6" ClipToBounds="True"
-                                            Opacity="{Binding LockedOpacity}" ToolTip.Tip="{Binding Name}">
-                                        <views:CoverImage ImageUrl="{Binding IconUrl}" FallbackText="🏆" LetterFontSize="22"/>
-                                    </Border>
+                                    <Button Classes="gc-ach" Classes.focused="{Binding IsCardFocused}"
+                                            Opacity="{Binding LockedOpacity}" ToolTip.Tip="{Binding Name}"
+                                            Command="{Binding $parent[UserControl].DataContext.GameCardSelectAchievementCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Border CornerRadius="4" ClipToBounds="True">
+                                            <views:CoverImage ImageUrl="{Binding IconUrl}" FallbackText="🏆" LetterFontSize="22"/>
+                                        </Border>
+                                    </Button>
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button Classes="gc-all" Content="Show all"
                                 Classes.focused="{Binding $parent[UserControl].DataContext.GameCardAllFocused}"
                                 Command="{Binding $parent[UserControl].DataContext.GameCardToggleAllCommand}"/>
+                    </StackPanel>
+
+                    <!-- Selected achievement detail -->
+                    <StackPanel Spacing="2" HorizontalAlignment="Center" MaxWidth="360"
+                                DataContext="{Binding $parent[UserControl].DataContext}" x:DataType="vm:MainViewModel"
+                                IsVisible="{Binding HasGameCardSelectedAchievement}">
+                        <TextBlock Classes="gc-title" Text="{Binding GameCardSelectedAchievement.Name}" FontSize="14"
+                                   FontWeight="Bold" TextAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Classes="gc-sub" Text="{Binding GameCardSelectedAchievement.Description}" FontSize="12"
+                                   TextAlignment="Center" TextWrapping="Wrap"/>
+                        <TextBlock Classes="gc-sub" Text="{Binding GameCardSelectedAchievement.StatusLabel}" FontSize="11"
+                                   TextAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Full list -->

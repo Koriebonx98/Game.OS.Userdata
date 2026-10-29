@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Net;
 using System.Text.Json.Serialization;
@@ -118,8 +119,17 @@ namespace GameLauncher.Models
         [JsonPropertyName("storage")]public string? Storage{ get; set; }
     }
 
-    public class Achievement
+    public class Achievement : INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler? PropertyChanged;
+        private bool _isCardFocused;
+        /// <summary>Controller focus highlight on the Wii/Switch game card shelf.</summary>
+        [JsonIgnore] public bool IsCardFocused
+        {
+            get => _isCardFocused;
+            set { if (_isCardFocused != value) { _isCardFocused = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsCardFocused))); } }
+        }
+
         [JsonPropertyName("platform")]      public string  Platform      { get; set; } = "";
         [JsonPropertyName("gameTitle")]     public string  GameTitle     { get; set; } = "";
         [JsonPropertyName("achievementId")] public string  AchievementId { get; set; } = "";

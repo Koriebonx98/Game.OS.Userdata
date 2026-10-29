@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.IO;
 using System.Net.Http;
 using System.Threading;
@@ -188,6 +189,38 @@ public partial class CoverImage : UserControl
         catch { color = default; return false; }
     }
 
+    // Decoded covers are kept in memory (and downloads on disk) so re-opening a page shows them instantly.
+    private const int DecodeWidth = 360;
+    private const int MaxCachedBitmaps = 800;
+    private static readonly ConcurrentDictionary<string, Bitmap> _bitmapCache = new();
+    private static readonly SemaphoreSlim _netGate = new(8);
+    private static readonly string _diskCacheDir = Path.Combine(Path.GetTempPath(), "GameOS-CoverCache");
+
+    private static Bitmap Decode(byte[] bytes)
+    {
+        using var ms = new MemoryStream(bytes);
+        try { return Bitmap.DecodeToWidth(ms, DecodeWidth); }
+        catch { ms.Position = 0; return new Bitmap(ms); }
+    }
+
+    private static void CacheBitmap(string key, Bitmap bmp)
+    {
+        if (_bitmapCache.Count >= MaxCachedBitmaps) _bitmapCache.Clear();
+        _bitmapCache[key] = bmp;
+    }
+
+    private static string DiskPath(string url)
+    {
+        var hash = Convert.ToHexString(System.Security.Cryptography.SHA1.HashData(System.Text.Encoding.UTF8.GetBytes(url)));
+        return Path.Combine(_diskCacheDir, hash + ".img");
+    }
+
+    private void ShowBitmap(Bitmap bitmap)
+    {
+        if (this.FindControl<Image>("CoverImg") is { } img) img.Source = bitmap;
+        if (this.FindControl<Border>("ImgBorder") is { } ib) ib.IsVisible = true;
+    }
+
     private void TriggerLoad(string? url, string? localCachePath = null)
     {
         // Cancel any previous load
@@ -200,33 +233,29 @@ public partial class CoverImage : UserControl
             imgBorder.IsVisible = false;
 
         // Prefer local cache file over network fetch (instant, works offline)
-        if (!string.IsNullOrEmpty(localCachePath) && File.Exists(localCachePath))
+        bool useFile = !string.IsNullOrEmpty(localCachePath) && File.Exists(localCachePath);
+        string? key = useFile ? localCachePath : url;
+        if (string.IsNullOrWhiteSpace(key)) return;
+
+        if (_bitmapCache.TryGetValue(key, out var cached))
         {
-            _ = LoadImageFromFileAsync(localCachePath);
+            ShowBitmap(cached);
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(url)) return;
-
         var cts = new CancellationTokenSource();
         _loadCts = cts;
-        _ = LoadImageAsync(url, cts.Token);
+        if (useFile) _ = LoadImageFromFileAsync(localCachePath!, cts.Token);
+        else _ = LoadImageAsync(url!, cts.Token);
     }
 
-    private async Task LoadImageFromFileAsync(string path)
+    private async Task LoadImageFromFileAsync(string path, CancellationToken ct)
     {
         try
         {
-            var bytes  = await File.ReadAllBytesAsync(path).ConfigureAwait(false);
-            await using var ms = new MemoryStream(bytes);
-            var bitmap = new Bitmap(ms);
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                if (this.FindControl<Image>("CoverImg") is { } img)
-                    img.Source = bitmap;
-                if (this.FindControl<Border>("ImgBorder") is { } ib)
-                    ib.IsVisible = true;
-            });
+            var bitmap = await Task.Run(async () => Decode(await File.ReadAllBytesAsync(path, ct)), ct);
+            CacheBitmap(path, bitmap);
+            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); });
         }
         catch { /* best-effort — fall through to gradient fallback */ }
     }
@@ -240,25 +269,32 @@ public partial class CoverImage : UserControl
 
         try
         {
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(15));
-
-            var bytes = await _http.GetByteArrayAsync(uri, timeoutCts.Token);
-            if (ct.IsCancellationRequested) return;
-
-            await using var ms = new MemoryStream(bytes);
-            var bitmap = new Bitmap(ms);
-
-            await Dispatcher.UIThread.InvokeAsync(() =>
+            var disk = DiskPath(url);
+            Bitmap bitmap;
+            if (File.Exists(disk))
             {
+                bitmap = await Task.Run(async () => Decode(await File.ReadAllBytesAsync(disk, ct)), ct);
+            }
+            else
+            {
+                await _netGate.WaitAsync(ct);
+                byte[] bytes;
+                try
+                {
+                    using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                    timeoutCts.CancelAfter(TimeSpan.FromSeconds(15));
+                    bytes = await _http.GetByteArrayAsync(uri, timeoutCts.Token);
+                }
+                finally { _netGate.Release(); }
                 if (ct.IsCancellationRequested) return;
 
-                if (this.FindControl<Image>("CoverImg") is { } img)
-                    img.Source = bitmap;
+                bitmap = await Task.Run(() => Decode(bytes), ct);
+                try { Directory.CreateDirectory(_diskCacheDir); await File.WriteAllBytesAsync(disk, bytes, CancellationToken.None); }
+                catch { /* disk cache is optional */ }
+            }
 
-                if (this.FindControl<Border>("ImgBorder") is { } ib)
-                    ib.IsVisible = true;
-            });
+            CacheBitmap(url, bitmap);
+            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); });
         }
         catch (OperationCanceledException) { }
         catch
