@@ -220,6 +220,65 @@ namespace GameLauncher.Services
             return (content, file.Sha);
         }
 
+        /// <summary>Repo path of a game's aggregated compatibility votes (mirrors <c>_gameCompatPath</c> in script.js).</summary>
+        public static string GameCompatPath(string platform, string title)
+        {
+            string plat = System.Text.RegularExpressions.Regex.Replace(platform ?? "", @"[^A-Za-z0-9._+-]", "_");
+            string slug = System.Text.RegularExpressions.Regex.Replace((title ?? "").ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+            if (slug.Length > 100) slug = slug[..100];
+            if (slug.Length == 0) slug = "untitled";
+            return $"compatibility/{plat}/{slug}.json";
+        }
+
+        /// <summary>Community compatibility votes ({ username → green/amber/red }) the website shows; null when none exist.</summary>
+        public async Task<Dictionary<string, string>?> GetGameCompatVotesAsync(
+            string platform, string title, CancellationToken ct = default)
+        {
+            var (doc, _) = await ReadFileAsync<JsonElement?>(GameCompatPath(platform, title), ct);
+            if (doc is not { ValueKind: JsonValueKind.Object } root ||
+                !root.TryGetProperty("votes", out var votes) || votes.ValueKind != JsonValueKind.Object) return null;
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var p in votes.EnumerateObject())
+                if (p.Value.ValueKind == JsonValueKind.String) map[p.Name] = p.Value.GetString()!;
+            return map;
+        }
+
+        /// <summary>Community review stats (ratingSum, ratingCount) from stats/popularity.&lt;platform&gt;.json; null when absent.</summary>
+        public async Task<(double Sum, int Count)?> GetGameRatingStatAsync(
+            string platform, string title, CancellationToken ct = default)
+        {
+            string plat = System.Text.RegularExpressions.Regex.Replace(platform ?? "", @"[^A-Za-z0-9._+-]", "_");
+            var (doc, _) = await ReadFileAsync<JsonElement?>($"stats/popularity.{plat}.json", ct);
+            if (doc is not { ValueKind: JsonValueKind.Object } root) return null;
+            foreach (var p in root.EnumerateObject())
+            {
+                if (!string.Equals(p.Name, title, StringComparison.OrdinalIgnoreCase) || p.Value.ValueKind != JsonValueKind.Object) continue;
+                double sum = p.Value.TryGetProperty("ratingSum", out var rs) && rs.ValueKind == JsonValueKind.Number ? rs.GetDouble() : 0;
+                int cnt = p.Value.TryGetProperty("ratingCount", out var rc) && rc.ValueKind == JsonValueKind.Number ? rc.GetInt32() : 0;
+                return (sum, cnt);
+            }
+            return null;
+        }
+
+        /// <summary>Queues a vote for the hourly aggregation workflow (mirrors <c>_recordGameCompat</c> in script.js).</summary>
+        public async Task QueueGameCompatVoteAsync(
+            string username, string platform, string title, string rating, string? titleId, CancellationToken ct = default)
+        {
+            string user = username.ToLowerInvariant();
+            string agg  = GameCompatPath(platform, title);
+            int slash = agg.IndexOf('/', "compatibility/".Length);
+            string queuePath = $"compat-queue/{user}/{agg["compatibility/".Length..slash]}__{agg[(slash + 1)..]}";
+            var (existing, _) = await ReadFileAsync<JsonElement?>(queuePath, ct);
+            if (existing != null) return;
+            string? safeId = !string.IsNullOrWhiteSpace(titleId) &&
+                System.Text.RegularExpressions.Regex.IsMatch(titleId.Trim(), "^[A-Za-z0-9_-]+$") ? titleId.Trim() : null;
+            await WriteFileAsync(queuePath, new Dictionary<string, object?>
+            {
+                ["username"] = user, ["platform"] = platform, ["title"] = title, ["rating"] = rating,
+                ["titleId"] = safeId, ["votedAt"] = DateTime.UtcNow.ToString("o"),
+            }, $"Queue compatibility vote: {title} ({platform})", null, ct);
+        }
+
         /// <summary>
         /// Create or overwrite a JSON file in the data repository.
         /// Pass <paramref name="sha"/> when overwriting an existing file.
@@ -1795,6 +1854,15 @@ namespace GameLauncher.Services
                     null;
                 if (string.IsNullOrWhiteSpace(exophaseUrl)) exophaseUrl = null;
 
+                double igdbRating = 0;
+                foreach (var rk in new[] { "igdb_rating", "igdbRating", "igdb_score", "IGDBRating" })
+                    if (item.TryGetProperty(rk, out var rv))
+                    {
+                        double d = rv.ValueKind == JsonValueKind.Number ? rv.GetDouble()
+                                 : rv.ValueKind == JsonValueKind.String && double.TryParse(rv.GetString(), System.Globalization.CultureInfo.InvariantCulture, out var pd) ? pd : 0;
+                        if (d > 0) { igdbRating = d > 5 ? d / 20 : d; break; }
+                    }
+
                 // Store page URL — explicit field or construct from appid
                 string? storePageUrl =
                     item.TryGetProperty("storeUrl",   out var su1) && su1.ValueKind == JsonValueKind.String ? su1.GetString() :
@@ -1906,6 +1974,8 @@ namespace GameLauncher.Services
                         if (mUrl.Length == 0 || !Uri.TryCreate(mUrl, UriKind.Absolute, out var mUri) ||
                             (mUri.Scheme != Uri.UriSchemeHttp && mUri.Scheme != Uri.UriSchemeHttps)) continue;
                         var entry = new GameModEntry { Name = mName.Length > 0 ? mName : mUrl, Url = mUrl };
+                        if (m.TryGetProperty("description", out var md) && md.ValueKind == JsonValueKind.String)
+                            entry.Description = md.GetString() ?? "";
                         if (m.TryGetProperty("genres", out var mg) && mg.ValueKind == JsonValueKind.Array)
                             entry.Genres = mg.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String)
                                 .Select(x => x.GetString()!).Where(x => x.Length > 0).ToList();
@@ -1928,6 +1998,7 @@ namespace GameLauncher.Services
                         TrailerUrl      = trailerUrl,
                         AchievementsUrl = achievementsUrl,
                         ExophaseUrl     = exophaseUrl,
+                        IgdbRating      = igdbRating,
                         Screenshots     = screenshots,
                         StorePageUrl    = storePageUrl,
                         Genre           = genre,
@@ -1952,6 +2023,7 @@ namespace GameLauncher.Services
                             TrailerUrl      = trailerUrl,
                             AchievementsUrl = achievementsUrl,
                             ExophaseUrl     = exophaseUrl,
+                            IgdbRating      = igdbRating,
                             Screenshots     = screenshots,
                             StorePageUrl    = storePageUrl,
                             Genre           = genre,

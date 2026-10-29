@@ -67,6 +67,8 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private bool _hasRecentLocalGames;
     public ObservableCollection<LocalGameCardVm> RecentLocalGames { get; } = new();
     public ObservableCollection<LocalGameCardVm> Ps5RecentGames { get; } = new();
+    /// <summary>Placeholder outlined slots after the Switch dashboard's tiles (the Switch shows empty slots).</summary>
+    public ObservableCollection<int> SwitchEmptySlots { get; } = new();
     public ObservableCollection<LocalGameCardVm> SteamRecentSideGames { get; } = new();
     /// <summary>True when there are local Game.OS games available for the XB360 "Games Library" strip.</summary>
     [ObservableProperty] private bool _hasLocalLibraryGames;
@@ -336,6 +338,8 @@ public partial class DashboardViewModel : ViewModelBase
         Ps5RecentGames.Clear();
         foreach (var card in RecentLocalGames.Take(MaxPs5RecentGames))
             Ps5RecentGames.Add(card);
+        SwitchEmptySlots.Clear();
+        for (int i = Ps5RecentGames.Count; i < 4; i++) SwitchEmptySlots.Add(i);
         _defaultFocusIndex = int.MinValue; // re-seeded after the hero is resolved
 
         LocalLibraryGames.Clear();
@@ -350,6 +354,7 @@ public partial class DashboardViewModel : ViewModelBase
             }
         }
         HasLocalLibraryGames = LocalLibraryGames.Count > 0;
+        RebuildWiiPages();
 
         // ── Hero / Featured ───────────────────────────────────────────────────
         // Show the most recently played game (local, cloud library, or activity-only)

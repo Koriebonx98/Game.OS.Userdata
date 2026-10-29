@@ -28,7 +28,7 @@
     </Style>
     
     <Style Selector="UserControl.dashboard-root">
-        <Setter Property="Background" Value="#e8e8e8"/>
+        <Setter Property="Background" Value="#f3f4f6"/>
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════════════════════════════════ -->
@@ -127,7 +127,8 @@
         <Setter Property="Background" Value="#dae8f2"/>
         <Setter Property="BorderBrush" Value="#a8c8d8"/>
         <Setter Property="BorderThickness" Value="2,1,2,0"/>
-        <Setter Property="Height" Value="72"/>
+        <Setter Property="Height" Value="84"/>
+        <Setter Property="CornerRadius" Value="60,60,0,0"/>
         <Setter Property="VerticalAlignment" Value="Bottom"/>
         <Setter Property="Padding" Value="32,8"/>
     </Style>
@@ -142,8 +143,8 @@
     <!-- Clock time display -->
     <Style Selector="TextBlock.wii-clock-time">
         <Setter Property="Foreground" Value="#333333"/>
-        <Setter Property="FontSize" Value="40"/>
-        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="FontSize" Value="24"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="FontFamily" Value="Arial"/>
         <Setter Property="TextAlignment" Value="Center"/>
     </Style>
@@ -193,6 +194,80 @@
         <Setter Property="FontSize" Value="18"/>
         <Setter Property="TextAlignment" Value="Center"/>
         <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+
+    <!-- ═══════════════════════════════════════════════════════════════════════════════════════ -->
+    <!-- WII MENU CHANNELS (game channels on page 1 / My Library pages) -->
+    <!-- ═══════════════════════════════════════════════════════════════════════════════════════ -->
+    <Style Selector="Button.wii-ch">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="BorderBrush" Value="#d4dde6"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+    </Style>
+    <Style Selector="Button.wii-ch:pointerover, Button.wii-ch.focused">
+        <Setter Property="BorderBrush" Value="#3aa0e8"/>
+        <Setter Property="BorderThickness" Value="4"/>
+    </Style>
+    <Style Selector="Border.wii-channel-empty">
+        <Setter Property="Background" Value="#e6e8eb"/>
+        <Setter Property="BorderBrush" Value="#d9dce0"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="CornerRadius" Value="4"/>
+    </Style>
+    <Style Selector="Border.wii-channel-label">
+        <Setter Property="Background" Value="#f2f6fa"/>
+        <Setter Property="Padding" Value="6,4"/>
+    </Style>
+    <Style Selector="TextBlock.wii-channel-name">
+        <Setter Property="Foreground" Value="#333333"/>
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+    <Style Selector="Button.wii-page-arrow">
+        <Setter Property="Width" Value="52"/>
+        <Setter Property="Height" Value="52"/>
+        <Setter Property="CornerRadius" Value="26"/>
+        <Setter Property="Background" Value="#ffffff"/>
+        <Setter Property="Foreground" Value="#3aa0e8"/>
+        <Setter Property="BorderBrush" Value="#a8c8d8"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.wii-page-arrow:disabled">
+        <Setter Property="Opacity" Value="0.3"/>
+    </Style>
+    <Style Selector="Border.wii-page-dot">
+        <Setter Property="Width" Value="10"/>
+        <Setter Property="Height" Value="10"/>
+        <Setter Property="CornerRadius" Value="5"/>
+        <Setter Property="Background" Value="#c3d0dc"/>
+    </Style>
+    <Style Selector="Border.wii-page-dot.active">
+        <Setter Property="Background" Value="#3aa0e8"/>
+    </Style>
+    <Style Selector="Button.wii-status-orb-button">
+        <Setter Property="Width" Value="48"/>
+        <Setter Property="Height" Value="48"/>
+        <Setter Property="CornerRadius" Value="24"/>
+        <Setter Property="Background" Value="#87ceeb"/>
+        <Setter Property="BorderBrush" Value="#5a9fd4"/>
+        <Setter Property="BorderThickness" Value="2"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,16,0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
     </Style>
 
     <!-- ═══════════════════════════════════════════════════════════════════════════════════════ -->

@@ -1,0 +1,317 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.QuickMenuLib.HubQuickMenu"
+             x:DataType="vm:QuickMenuViewModel">
+
+        <Grid RowDefinitions="*,Auto" IsVisible="{Binding UsesHubLayout}">
+            <!-- Center overlays -->
+            <Grid Grid.Row="0" Margin="24,24,24,12">
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsHomePage}"
+                        Width="540"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Current Session" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding CurrentGameTitle}" Foreground="#ECECEC" FontSize="15" IsVisible="{Binding IsPlayingGame}" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding CurrentSessionLabel}" Foreground="#B3B3B3" FontSize="12"/>
+
+                        <Button Classes="btn-primary" Command="{Binding ExitGameCommand}" IsVisible="{Binding IsPlayingGame}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Text="⏹" FontSize="14"/>
+                                <TextBlock Text="Exit Game" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Button>
+
+                        <Button Classes="btn-secondary"
+                                IsVisible="{Binding HasAchievementsProgress}"
+                                Command="{Binding OpenAchievementsCommand}">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="🏆 Achievements" Foreground="#ECECEC" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding AchievementsLabel}" Foreground="#FFD400" FontSize="12"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsSwitcherPage}"
+                        Width="540"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Switcher" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <ItemsControl ItemsSource="{Binding SwitcherItems}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:QuickMenuSwitcherItemVm">
+                                    <Button Classes="btn-secondary"
+                                            Command="{Binding $parent[UserControl].DataContext.OpenPageFromSwitcherCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="{Binding Title}" Foreground="#ECECEC" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding Subtitle}" Foreground="#9E9E9E" FontSize="11"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1"
+                                                       Text="✓"
+                                                       IsVisible="{Binding IsActive}"
+                                                       VerticalAlignment="Center"
+                                                       Foreground="#00AEEF"
+                                                       FontWeight="Bold"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsRecentGamesPage}"
+                        Width="640"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Recent Games" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <ItemsControl ItemsSource="{Binding RecentGames}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LocalGameCardVm">
+                                    <Button Classes="btn-secondary"
+                                            Command="{Binding $parent[UserControl].DataContext.LaunchRecentGameCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="72,*,Auto" ColumnSpacing="10">
+                                            <Border Grid.Column="0" Width="72" Height="46" CornerRadius="6" ClipToBounds="True">
+                                                <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                                  FallbackText="{Binding EffectiveTitle}"
+                                                                  FallbackGradient="{Binding CoverGradient}"
+                                                                  SubText="{Binding Platform}"
+                                                                  LetterFontSize="20"
+                                                                  ImageCornerRadius="6"
+                                                                  Height="46"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" Spacing="2">
+                                                <TextBlock Text="{Binding EffectiveTitle}" Foreground="#ECECEC" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Platform}" Foreground="#9E9E9E" FontSize="11"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="▶" Foreground="#00AEEF" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="No recent games found." Foreground="#9E9E9E" FontSize="12" IsVisible="{Binding !HasRecentGames}"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsNotificationsPage}"
+                        Width="480"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Notifications" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding UnreadMessageCount, StringFormat='Unread messages: {0}'}" Foreground="#ECECEC"/>
+                        <TextBlock Text="{Binding LastMessagePreview}" Foreground="#9E9E9E" TextWrapping="Wrap"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenNotificationsPageCommand}">Open Inbox</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsDownloadsPage}"
+                        Width="480"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Downloads" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding PendingDownloadCount, StringFormat='Ready installs / updates: {0}'}" Foreground="#ECECEC"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenDownloadsPageCommand}">Open Library</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsFriendsPage}"
+                        Width="560"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Friends" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <ItemsControl ItemsSource="{Binding QuickFriends}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:FriendPresenceVm">
+                                    <Border Background="#33222222" CornerRadius="8" Padding="10">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="10">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Username}" Foreground="#ECECEC" FontWeight="SemiBold"/>
+                                                <TextBlock Text="{Binding StatusLabel}" Foreground="#9E9E9E" FontSize="11"/>
+                                            </StackPanel>
+                                            <Button Grid.Column="1" Classes="btn-secondary" Padding="8,4">
+                                                <TextBlock Text="Profile"/>
+                                                <Button.Flyout>
+                                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                        <MenuItem Header="Invite">
+                                                            <MenuItem Header="Crossplay"
+                                                                      Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                                      CommandParameter="{Binding Username, StringFormat='{}{0}|Crossplay'}"/>
+                                                            <MenuItem Header="Radmin"
+                                                                      Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                                      CommandParameter="{Binding Username, StringFormat='{}{0}|Radmin'}"/>
+                                                            <MenuItem Header="OnlineFix"
+                                                                      Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                                      CommandParameter="{Binding Username, StringFormat='{}{0}|OnlineFix'}"/>
+                                                            <MenuItem Header="Steam"
+                                                                      Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                                      CommandParameter="{Binding Username, StringFormat='{}{0}|Steam'}"/>
+                                                        </MenuItem>
+                                                        <MenuItem Header="Message"
+                                                                  Command="{Binding $parent[UserControl].DataContext.MessageFriendCommand}"
+                                                                  CommandParameter="{Binding Username}"/>
+                                                        <MenuItem Header="View"
+                                                                  Command="{Binding $parent[UserControl].DataContext.ViewFriendCommand}"
+                                                                  CommandParameter="{Binding Username}"/>
+                                                    </MenuFlyout>
+                                                </Button.Flyout>
+                                            </Button>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding InviteStatusMessage}" Foreground="#9E9E9E" FontSize="11"
+                                   IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenFriendsPageCommand}">Open Friends Page</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsInboxPage}"
+                        Width="520"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Inbox" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding UnreadMessageCount, StringFormat='Unread messages: {0}'}" Foreground="#ECECEC"/>
+                        <TextBlock Text="{Binding LastMessagePreview}" Foreground="#9E9E9E" TextWrapping="Wrap"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenInboxPageCommand}">Open Inbox Page</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsMediaPage}"
+                        Width="520"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="12">
+                        <TextBlock Text="Media Controls" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                            <Button Classes="btn-secondary" Command="{Binding MediaPreviousCommand}" Padding="16,10">⏮</Button>
+                            <Button Classes="btn-secondary" Command="{Binding MediaPlayPauseCommand}" Padding="16,10">⏯</Button>
+                            <Button Classes="btn-secondary" Command="{Binding MediaNextCommand}" Padding="16,10">⏭</Button>
+                        </StackPanel>
+                        <TextBlock Text="{Binding MediaStatusLabel}" Foreground="#9E9E9E" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsBrowserPage}"
+                        Width="520"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Browser" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="Open your default web browser." Foreground="#9E9E9E"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenBrowserCommand}">Open Browser</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsPowerPage}"
+                        Width="420"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Power" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <Button Classes="btn-secondary" Command="{Binding PowerSignOutCommand}">Sign Out</Button>
+                        <Button Classes="btn-secondary" Command="{Binding PowerSwitchAccountCommand}">Switch Account</Button>
+                        <Button Classes="btn-danger" Command="{Binding PowerExitApplicationCommand}">Exit App</Button>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsAchievementsPage}"
+                        Width="560"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Achievements" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding AchievementsLabel}" Foreground="#FFD400" IsVisible="{Binding HasAchievementsProgress}"/>
+                        <ItemsControl ItemsSource="{Binding Achievements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:QuickMenuAchievementVm">
+                                    <Border Background="#33222222" CornerRadius="8" Padding="10">
+                                        <StackPanel Spacing="2">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="{Binding StatusIcon}"/>
+                                                <TextBlock Text="{Binding Name}" Foreground="#ECECEC" FontWeight="SemiBold"/>
+                                            </StackPanel>
+                                            <TextBlock Text="{Binding Description}" Foreground="#9E9E9E" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Bottom quick menu bar -->
+            <Border Grid.Row="1"
+                    Classes="qm-bottom-shell"
+                    Height="260"
+                    Margin="0,0,0,24"
+                    Padding="18,12">
+                <Grid RowDefinitions="Auto,*">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                        <StackPanel HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding MenuTitle}" FontSize="30" FontWeight="SemiBold" Foreground="#FFF" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding MenuSubtitle}" FontSize="16" Foreground="#AAFFFFFF" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                        <Button Grid.Column="1" Classes="btn-secondary" Command="{Binding DismissCommand}" Width="42" Height="42">✕</Button>
+                    </Grid>
+
+                    <StackPanel Grid.Row="1"
+                                Orientation="Horizontal"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Bottom"
+                                Margin="0,0,0,36"
+                                Spacing="10">
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsHomePage}" Command="{Binding SelectHomeCommand}" Width="72" Height="56">🏠</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsSwitcherPage}" Command="{Binding SelectSwitcherCommand}" Width="72" Height="56">🗂</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsRecentGamesPage}" Command="{Binding SelectRecentGamesCommand}" Width="72" Height="56">🎮</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsNotificationsPage}" Command="{Binding SelectNotificationsCommand}" Width="72" Height="56">🔔</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}" Width="72" Height="56">⬇</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" Width="72" Height="56">👥</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" Width="72" Height="56">📬</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" Width="72" Height="56">🏆</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}" Width="72" Height="56">🎵</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}" Width="72" Height="56">🌐</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}" Width="72" Height="56">⏻</Button>
+                        <Button Classes="btn-danger qm-hub-btn" Command="{Binding ExitGameCommand}" IsVisible="{Binding IsPlayingGame}" Width="90" Height="56">⏹ Exit</Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+</UserControl>

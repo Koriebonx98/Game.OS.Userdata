@@ -932,6 +932,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
         LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
         LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
+        LibraryVm.OnBackToDashboard = () => Navigate("dashboard");
         LibraryVm.GamesTheme = SettingsVm.GamesTheme;
         LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         StoreVm.GamesTheme = SettingsVm.GamesTheme;

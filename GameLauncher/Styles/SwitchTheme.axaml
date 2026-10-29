@@ -3,6 +3,9 @@
 
     <!-- Nintendo Switch inspired shell -->
     <Style Selector="Border.dashboard-ps5-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+    <Style Selector="Border.dashboard-switch-layout">
         <Setter Property="IsVisible" Value="True"/>
     </Style>
     <Style Selector="Border.dashboard-xb360-layout">

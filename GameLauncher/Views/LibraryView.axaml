@@ -11,10 +11,12 @@
         Settings → Design → Games:
           Views/GamesLib/Default.Games.Lib.axaml   ("Default")
           Views/GamesLib/PS5.Games.Lib.axaml       ("PS5")
+          Views/GamesLib/Wii.Games.Lib.axaml       ("Wii")
     -->
     <Panel>
         <lib:DefaultGamesLib Name="DefaultLib" IsVisible="{Binding IsDefaultGamesLib}"/>
         <lib:Ps5GamesLib     Name="Ps5Lib"     IsVisible="{Binding IsPs5GamesLib}"/>
+        <lib:WiiGamesLib     Name="WiiLib"     IsVisible="{Binding IsWiiGamesLib}"/>
         <lib:GamesLibOverlays/>
     </Panel>
 </UserControl>

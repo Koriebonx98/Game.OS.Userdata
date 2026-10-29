@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.DashboardLib.WiiDashboard"
+             x:DataType="vm:DashboardViewModel">
+
+    <!--
+        Wii Menu: 4×3 channel grid of recently played games with a ▶ arrow and the curved "Wii Menu" bar.
+        Page 1 = recently played games (this file); the next page is the Library, drawn by the chosen Games design
+        (GamesLib/Wii.Games.Lib.axaml when "Wii").
+        Controller: D-pad moves, Right past the last column opens the Library, A = game info, X = launch.
+    -->
+    <Border Classes="dashboard-wii-layout" Background="#f3f4f6">
+        <Grid RowDefinitions="*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="14,14,6,0">
+                <ItemsControl Grid.Column="0" ItemsSource="{Binding WiiChannels}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <UniformGrid Columns="4" Rows="3"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:WiiChannelVm">
+                            <Panel Margin="5">
+                                <Border Classes="wii-channel-empty" IsVisible="{Binding IsEmpty}"/>
+                                <Button Classes="wii-ch" Classes.focused="{Binding IsFocused}" IsVisible="{Binding HasCard}"
+                                        HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
+                                        ToolTip.Tip="{Binding Card.EffectiveTitle}"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenWiiChannelCommand}"
+                                        CommandParameter="{Binding}">
+                                    <views:CoverImage ImageUrl="{Binding Card.CoverUrl}"
+                                                      FallbackText="{Binding Card.EffectiveTitle}"
+                                                      FallbackGradient="{Binding Card.CoverGradient}"
+                                                      LetterFontSize="34"/>
+                                </Button>
+                            </Panel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Grid.Column="1" Classes="wii-page-arrow" Content="▶" Margin="6,0,0,0"
+                        Command="{Binding WiiNextPageCommand}" ToolTip.Tip="My Library"/>
+            </Grid>
+
+            <!-- Curved Wii Menu bar: Wii button, SD card, title + date, envelope -->
+            <Border Grid.Row="1" Classes="wii-bottom-bar">
+                <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
+                    <Border Grid.Column="0" Classes="wii-status-orb-left">
+                        <TextBlock Text="Wii" Classes="wii-orb-text"/>
+                    </Border>
+                    <Border Grid.Column="1" Width="22" Height="28" Margin="14,0,0,0" CornerRadius="3"
+                            Background="#ffffff" BorderBrush="#a8c8d8" BorderThickness="2"
+                            VerticalAlignment="Center"/>
+                    <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Wii Menu" Classes="wii-clock-time" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding WiiClockDate}" Classes="wii-clock-date" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                    <Button Grid.Column="3" Classes="wii-status-orb-button" Command="{Binding NavigateToInboxCommand}">
+                        <TextBlock Text="✉" Classes="wii-orb-text"/>
+                    </Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>

@@ -494,6 +494,10 @@ public partial class GameDetailViewModel : ViewModelBase
         AverageRatingLabel = HasReviews
             ? $"{Reviews.Average(r => r.Rating):0.0} / 5  ({Reviews.Count})"
             : "No ratings yet";
+        _localRatingSum   = Reviews.Sum(r => r.Rating);
+        _localRatingCount = Reviews.Count;
+        RefreshRatingLabels();
+        LoadRemoteRatingStat();
 
         CompatibilityReports.Clear();
         foreach (var c in Services.GameReviewService.LoadCompatibility(Platform, Title))
@@ -503,6 +507,52 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [ObservableProperty] private string _averageRatingLabel = "No ratings yet";
+
+    // ── Ratings block (same lines as the website's game info: Game OS users + IGDB) ──
+    [ObservableProperty] private string _gameOsRatingLabel = "Game OS users: No ratings yet";
+    [ObservableProperty] private string _igdbRatingLabel   = "IGDB: No ratings yet";
+    private double _igdbRating;
+    private double _localRatingSum;
+    private int    _localRatingCount;
+    private (double Sum, int Count)? _remoteRatingStat;
+    private string _remoteRatingKey = "";
+
+    private static string StarsText(double v) { int r = (int)Math.Round(v); return new string('★', r) + new string('☆', 5 - r); }
+
+    private void RefreshRatingLabels()
+    {
+        // The shared stats already include the user's own uploaded review, so prefer them over local data
+        double sum = _remoteRatingStat is { Count: > 0 } ? _remoteRatingStat.Value.Sum : _localRatingSum;
+        int    cnt = _remoteRatingStat is { Count: > 0 } ? _remoteRatingStat.Value.Count : _localRatingCount;
+        GameOsRatingLabel = cnt > 0
+            ? $"Game OS users: {StarsText(sum / cnt)} {sum / cnt:0.0} ({cnt} review{(cnt == 1 ? "" : "s")})"
+            : "Game OS users: No ratings yet";
+        IgdbRatingLabel = _igdbRating > 0 ? $"IGDB: {StarsText(_igdbRating)} {_igdbRating:0.0}" : "IGDB: No ratings yet";
+    }
+
+    private void LoadRemoteRatingStat()
+    {
+        if (string.IsNullOrWhiteSpace(Title)) return;
+        string platform = Platform, title = Title, key = platform + "|" + title;
+        if (key == _remoteRatingKey) return;
+        _remoteRatingKey = key;
+        _remoteRatingStat = null;
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                var stat = await svc.GetGameRatingStatAsync(platform, title);
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (_remoteRatingKey != key) return;
+                    _remoteRatingStat = stat;
+                    RefreshRatingLabels();
+                });
+            }
+            catch (Exception ex) { Services.DevLogService.Log($"[Ratings] Remote stats failed: {ex.Message}"); }
+        });
+    }
 
     // ── Per-game compatibility reports ────────────────────────────────────────
     public System.Collections.ObjectModel.ObservableCollection<Models.GameCompatibility> CompatibilityReports { get; } = new();
@@ -526,10 +576,41 @@ public partial class GameDetailViewModel : ViewModelBase
         string.IsNullOrWhiteSpace(p) || p.Equals("PC", StringComparison.OrdinalIgnoreCase) ||
         p.Equals("Windows", StringComparison.OrdinalIgnoreCase) || p.Equals("Steam", StringComparison.OrdinalIgnoreCase);
 
+    private Dictionary<string, string> _remoteCompatVotes = new(StringComparer.OrdinalIgnoreCase);
+    private string _remoteCompatKey = "";
+
+    /// <summary>Fetches the community votes the website shows (compatibility/&lt;platform&gt;/&lt;title&gt;.json).</summary>
+    private void LoadRemoteCompatVotes()
+    {
+        if (IsPcPlatformName(Platform) || string.IsNullOrWhiteSpace(Title)) return;
+        string key = Platform + "|" + Title;
+        if (key == _remoteCompatKey) return;
+        _remoteCompatKey = key;
+        string platform = Platform, title = Title;
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                using var svc = new Services.GitHubDataService();
+                var votes = await svc.GetGameCompatVotesAsync(platform, title);
+                if (votes == null) return;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (_remoteCompatKey != key) return;
+                    _remoteCompatVotes = votes;
+                    RefreshCompatVotes();
+                });
+            }
+            catch (Exception ex) { Services.DevLogService.Log($"[Compat] Remote votes failed: {ex.Message}"); }
+        });
+    }
+
     private void RefreshCompatVotes()
     {
         ShowCompatVotes = !IsPcPlatformName(Platform);
-        var votes = Services.GameReviewService.LoadCompatVotes(Platform, Title);
+        LoadRemoteCompatVotes();
+        var votes = new Dictionary<string, string>(_remoteCompatVotes, StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in Services.GameReviewService.LoadCompatVotes(Platform, Title)) votes[kv.Key] = kv.Value;
         CompatGreen = votes.Values.Count(v => v == "green");
         CompatAmber = votes.Values.Count(v => v == "amber");
         CompatRed   = votes.Values.Count(v => v == "red");
@@ -560,6 +641,20 @@ public partial class GameDetailViewModel : ViewModelBase
         if (rating is not ("green" or "amber" or "red") || string.IsNullOrEmpty(_currentUsername)) return;
         if (!Services.GameReviewService.AddCompatVote(Platform, Title, _currentUsername, rating))
             CompatVoteStatus = "You have already voted.";
+        else
+        {
+            string platform = Platform, title = Title, user = _currentUsername;
+            string? titleId = _currentLocalRom?.TitleId ?? _databaseTitleId;
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    using var svc = new Services.GitHubDataService();
+                    await svc.QueueGameCompatVoteAsync(user, platform, title, rating, titleId);
+                }
+                catch (Exception ex) { Services.DevLogService.Log($"[Compat] Vote upload failed: {ex.Message}"); }
+            });
+        }
         RefreshCompatVotes();
     }
 
@@ -880,6 +975,12 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [RelayCommand] private void CloseModBrowser() => IsModBrowserOpen = false;
+
+    [RelayCommand]
+    private void ToggleModDetail(GameModEntry? mod)
+    {
+        if (mod != null) mod.IsExpanded = !mod.IsExpanded;
+    }
 
     [RelayCommand]
     private void OpenModUrl(GameModEntry? mod)
@@ -3883,6 +3984,8 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulateTrailer(dbGame.TrailerUrl);
         ExophaseUrl = dbGame.ExophaseUrl;
+        _igdbRating = dbGame.IgdbRating;
+        RefreshRatingLabels();
         PopulateScreenshots(dbGame.Screenshots);
         RefreshDisplayTitleId();
 

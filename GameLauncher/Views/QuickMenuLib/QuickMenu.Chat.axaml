@@ -1,0 +1,84 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.QuickMenuLib.QuickMenuChat"
+             x:DataType="vm:QuickMenuViewModel">
+
+        <Border IsVisible="{Binding ShowChatWindow}"
+                Background="#CC0d1117"
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Stretch">
+            <Border Width="320"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Background="#161b22"
+                    BorderBrush="#30363d"
+                    BorderThickness="1"
+                    CornerRadius="10"
+                    Padding="12">
+                <Grid RowDefinitions="Auto,*,Auto" RowSpacing="10">
+                    <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                        <TextBlock Text="{Binding ChatFriendUsername}"
+                                   FontSize="13" FontWeight="Bold"
+                                   Foreground="White"
+                                   VerticalAlignment="Center"/>
+                        <Button Grid.Column="1"
+                                Classes="btn-secondary"
+                                Padding="8,4"
+                                Command="{Binding CloseChatWindowCommand}">
+                            <TextBlock Text="✕" FontSize="12" FontWeight="Bold"/>
+                        </Button>
+                    </Grid>
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  MaxHeight="220">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="Loading messages..."
+                                       Foreground="#8b949e"
+                                       IsVisible="{Binding IsChatBusy}"/>
+                            <TextBlock Text="{Binding ChatError}"
+                                       Foreground="#f85149"
+                                       IsVisible="{Binding ChatError, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            <ItemsControl ItemsSource="{Binding ChatMessages}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Message">
+                                        <Border Background="#21262d" CornerRadius="8" Padding="8,6">
+                                            <StackPanel Spacing="2">
+                                                <TextBlock Text="{Binding From}"
+                                                           FontSize="10" FontWeight="Bold"
+                                                           Foreground="#0ea5e9"/>
+                                                <TextBlock Text="{Binding Text}"
+                                                           FontSize="12"
+                                                           Foreground="#e6edf3"
+                                                           TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <TextBox Grid.Column="0"
+                                 Text="{Binding NewChatMessage}"
+                                 Watermark="Type a message..."
+                                 Background="#21262d"
+                                 BorderBrush="#30363d"
+                                 Foreground="White"
+                                 CornerRadius="6"
+                                 Padding="8,6"/>
+                        <Button Grid.Column="1"
+                                Classes="btn-primary"
+                                Padding="12,6"
+                                IsEnabled="{Binding !IsChatBusy}"
+                                Command="{Binding SendChatMessageCommand}">
+                            Send
+                        </Button>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Border>
+</UserControl>
