@@ -26,29 +26,6 @@ public partial class SettingsView : UserControl
         }
     }
 
-    private async void OnCopyStreamAddressClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
-        await CopyStreamValueAsync(vm => vm.StreamAddress);
-
-    private async void OnCopyStreamPinClicked(object? sender, Avalonia.Interactivity.RoutedEventArgs e) =>
-        await CopyStreamValueAsync(vm => vm.StreamPin);
-
-    private async System.Threading.Tasks.Task CopyStreamValueAsync(Func<SettingsViewModel, string> getValue)
-    {
-        if (DataContext is not SettingsViewModel vm ||
-            TopLevel.GetTopLevel(this)?.Clipboard is not { } clipboard)
-            return;
-
-        try
-        {
-            await clipboard.SetTextAsync(getValue(vm));
-            vm.StreamCopyStatus = "Copied to clipboard.";
-        }
-        catch
-        {
-            vm.StreamCopyStatus = "Could not access the clipboard.";
-        }
-    }
-
     private async void OnBrowseRequested(EmulatorRowVm row)
     {
         var topLevel = TopLevel.GetTopLevel(this);

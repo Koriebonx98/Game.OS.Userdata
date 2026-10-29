@@ -25,10 +25,17 @@ public partial class LibraryViewModel : ViewModelBase
     /// <summary>Selected Games page layout ("Default" or "PS5"); pushed from Settings by MainViewModel.</summary>
     [ObservableProperty] private string _gamesTheme = "Default";
     public bool IsPs5GamesLib     => string.Equals(GamesTheme, "PS5", System.StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGamesLib => !IsPs5GamesLib;
+    public bool IsWiiGamesLib     => string.Equals(GamesTheme, "Wii", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGamesLib => !IsPs5GamesLib && !IsWiiGamesLib;
+
+    /// <summary>Slides back to the dashboard (the Wii Games page's left arrow); wired by MainViewModel.</summary>
+    public Action? OnBackToDashboard { get; set; }
+    [RelayCommand] private void BackToDashboard() => OnBackToDashboard?.Invoke();
+
     partial void OnGamesThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5GamesLib));
+        OnPropertyChanged(nameof(IsWiiGamesLib));
         OnPropertyChanged(nameof(IsDefaultGamesLib));
     }
 

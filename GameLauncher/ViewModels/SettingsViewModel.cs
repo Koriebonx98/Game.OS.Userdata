@@ -156,7 +156,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
-    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5" };
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii" };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
     [ObservableProperty] private string _storeTheme = "Default";
     public IReadOnlyList<string> AvailableStoreThemes { get; } = new[] { "Default", "Sony", "Xbox", "Nintendo" };
@@ -764,7 +764,7 @@ public partial class SettingsViewModel : ViewModelBase
         StreamAudioEnabled = appSettings.StreamAudioEnabled;
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
-        GamesTheme                 = NormaliseGamesTheme(appSettings.GamesTheme);
+        GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
         GameInfoTheme              = NormaliseGamesTheme(appSettings.GameInfoTheme);
@@ -971,7 +971,7 @@ public partial class SettingsViewModel : ViewModelBase
             CompatibilityOverlayMode   = CompatibilityOverlayMode,
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
-            GamesTheme                 = NormaliseGamesTheme(GamesTheme),
+            GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
             GameInfoTheme              = NormaliseGamesTheme(GameInfoTheme),
@@ -1102,6 +1102,9 @@ public partial class SettingsViewModel : ViewModelBase
             if (string.Equals(v, t, StringComparison.OrdinalIgnoreCase)) return t;
         return "Default";
     }
+
+    private static string NormaliseGamesLibTheme(string value) =>
+        string.Equals((value ?? "").Trim(), "Wii", StringComparison.OrdinalIgnoreCase) ? "Wii" : NormaliseGamesTheme(value);
 
     private static string NormaliseGamesTheme(string value) =>
         string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";

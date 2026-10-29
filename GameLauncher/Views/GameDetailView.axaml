@@ -93,10 +93,689 @@
                     </StackPanel>
                 </Border>
 
-                <!-- ── Settings panel (shown when ··· is clicked) ── -->
-                <Border IsVisible="{Binding ShowSettings}"
+
+                <!-- ── Achievements section (above media) ── -->
+                <Border IsVisible="{Binding HasAchievements}"
+                        Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+                        <TextBlock Text="{Binding AchievementsLabel}"
+                                   Classes="section-header" Margin="0"/>
+                        <ItemsControl ItemsSource="{Binding VisibleAchievements}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel/>
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:Achievement">
+                                    <Border Background="#161b22" CornerRadius="8"
+                                            Padding="12,10" Margin="0,0,8,8"
+                                            Width="260"
+                                            Opacity="{Binding LockedOpacity}">
+                                        <StackPanel Orientation="Horizontal" Spacing="10">
+                                            <!-- Achievement icon -->
+                                            <Border Width="40" Height="40" CornerRadius="6"
+                                                    ClipToBounds="True" Background="#21262d">
+                                                <views:CoverImage
+                                                    ImageUrl="{Binding IconUrl}"
+                                                    FallbackText="🏆"
+                                                    LetterFontSize="18"
+                                                    ImageCornerRadius="6"
+                                                    Width="40" Height="40"/>
+                                            </Border>
+                                            <!-- Name + description -->
+                                            <StackPanel Spacing="2" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}"
+                                                           FontSize="12" FontWeight="SemiBold"
+                                                           Foreground="#58a6ff"
+                                                           TextWrapping="Wrap" MaxWidth="180"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="11" Foreground="#8b949e"
+                                                           TextWrapping="Wrap" MaxWidth="180"
+                                                           MaxLines="2"/>
+                                                <TextBlock Text="{Binding StatusLabel}"
+                                                           FontSize="10" Foreground="#f1c40f"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <!-- More / Less button -->
+                        <Button Classes="btn-secondary" Padding="14,8"
+                                HorizontalAlignment="Left"
+                                IsVisible="{Binding HasMoreAchievements}"
+                                Command="{Binding ToggleShowAllAchievementsCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="▼  Show More Achievements"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           IsVisible="{Binding !ShowAllAchievements}"/>
+                                <TextBlock Text="▲  Show Less"
+                                           FontSize="12" FontWeight="SemiBold"
+                                           IsVisible="{Binding ShowAllAchievements}"/>
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Compatibility reports section ── -->
+                <Border Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="🖥  Compatibility" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                        <!-- Community votes (same as the website): Playable / In Game / No Boot -->
+                        <StackPanel Spacing="8" IsVisible="{Binding ShowCompatVotes}">
+                            <TextBlock Text="{Binding CompatSummary}" FontSize="14" FontWeight="SemiBold" Foreground="#E6EDF3"/>
+                            <Border Height="10" CornerRadius="5" Background="#21262d" HorizontalAlignment="Left"
+                                    Width="420" ClipToBounds="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <Border Width="{Binding CompatGreenWidth}" Background="#3fb950"/>
+                                    <Border Width="{Binding CompatAmberWidth}" Background="#f0a030"/>
+                                    <Border Width="{Binding CompatRedWidth}" Background="#f85149"/>
+                                </StackPanel>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <TextBlock Text="{Binding CompatGreen, StringFormat='🟢 Playable: {0}'}" FontSize="12" Foreground="#3fb950"/>
+                                <TextBlock Text="{Binding CompatAmber, StringFormat='🟠 In Game: {0}'}" FontSize="12" Foreground="#f0a030"/>
+                                <TextBlock Text="{Binding CompatRed, StringFormat='🔴 No Boot: {0}'}" FontSize="12" Foreground="#f85149"/>
+                            </StackPanel>
+                            <StackPanel IsVisible="{Binding CanVoteCompat}" Spacing="6">
+                                <TextBlock Text="Do the ROMs work? One vote per user: Green = Playable, Amber = In Game, Red = No Boot."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟢 Playable"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="green"/>
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟠 In Game"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="amber"/>
+                                    <Button Classes="btn-secondary" Padding="14,8" Content="🔴 No Boot"
+                                            Command="{Binding VoteCompatCommand}" CommandParameter="red"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <TextBlock Text="{Binding CompatVoteStatus}" FontSize="11" Foreground="#8b949e"
+                                       IsVisible="{Binding CompatVoteStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                        <TextBlock Text="No hardware reports yet."
+                                   FontSize="12" Foreground="#8b949e"
+                                   IsVisible="{Binding !HasCompatibilityReports}"/>
+                        <ItemsControl ItemsSource="{Binding CompatibilityReports}"
+                                      IsVisible="{Binding HasCompatibilityReports}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:GameCompatibility">
+                                    <StackPanel Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Summary}" FontSize="13" Foreground="#E6EDF3"/>
+                                        <TextBlock FontSize="11" Foreground="#8b949e">
+                                            <Run Text="{Binding Cpu}"/><Run Text="  ·  "/><Run Text="{Binding Gpu}"/>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Reviews section ── -->
+                <Border Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+
+                        <!-- Section header with toggle button -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="⭐" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Reviews"
+                                           FontSize="16" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding GameOsRatingLabel}" FontSize="12" Foreground="#f0a030"/>
+                                    <TextBlock Text="{Binding IgdbRatingLabel}" FontSize="12" Foreground="#f0a030"/>
+                                </StackPanel>
+                                <Border CornerRadius="10" Padding="8,3" Background="#f0a030"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding HasReviews}">
+                                    <TextBlock Text="{Binding Reviews.Count}"
+                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn-secondary"
+                                    Padding="14,6"
+                                    Command="{Binding ToggleReviewPanelCommand}">
+                                <TextBlock Text="Write a Review" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- Existing reviews list -->
+                        <ItemsControl ItemsSource="{Binding Reviews}"
+                                      IsVisible="{Binding HasReviews}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:GameReview">
+                                    <Border Background="#21262d" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,6">
+                                        <StackPanel Spacing="4">
+                                            <Grid ColumnDefinitions="*,Auto">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding Username}"
+                                                           FontSize="13" FontWeight="SemiBold"
+                                                           Foreground="#58a6ff"/>
+                                                <TextBlock Grid.Column="1"
+                                                           Text="{Binding StarLabel}"
+                                                           FontSize="14" Foreground="#f1c40f"/>
+                                            </Grid>
+                                            <TextBlock Text="{Binding Note}"
+                                                       FontSize="12" Foreground="#c9d1d9"
+                                                       TextWrapping="Wrap"
+                                                       IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Write review form -->
+                        <Border IsVisible="{Binding ShowReviewPanel}"
+                                Background="#0d1117" CornerRadius="8" Padding="16,14">
+                            <StackPanel Spacing="10">
+                                <TextBlock Text="Your Rating (1–5 stars)"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="#8b949e"/>
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="1★" Command="{Binding SetReviewRatingCommand}" CommandParameter="1"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="2★" Command="{Binding SetReviewRatingCommand}" CommandParameter="2"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="3★" Command="{Binding SetReviewRatingCommand}" CommandParameter="3"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="4★" Command="{Binding SetReviewRatingCommand}" CommandParameter="4"/>
+                                    <Button Classes="btn-secondary" Padding="10,6" Content="5★" Command="{Binding SetReviewRatingCommand}" CommandParameter="5"/>
+                                    <TextBlock Text="{Binding ReviewStarsPreview}" FontSize="18" Foreground="#f1c40f"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
+                                <TextBox Text="{Binding NewReviewNote}"
+                                         Watermark="Write your review here… (optional)"
+                                         Background="#21262d" Foreground="White"
+                                         BorderBrush="#30363d" CornerRadius="6"
+                                         Padding="10,8" FontSize="12" AcceptsReturn="True"
+                                         Height="80"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-success" Padding="16,8"
+                                            Command="{Binding SubmitReviewCommand}">
+                                        <TextBlock Text="Submit Review" FontSize="13" FontWeight="SemiBold"/>
+                                    </Button>
+                                    <Button Classes="btn-secondary" Padding="14,8"
+                                            Command="{Binding ToggleReviewPanelCommand}">
+                                        <TextBlock Text="Cancel" FontSize="13"/>
+                                    </Button>
+                                </StackPanel>
+                                <TextBlock Text="{Binding ReviewStatus}"
+                                           FontSize="12" Foreground="#3fb950"
+                                           IsVisible="{Binding ReviewStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Controller Profiles section ── -->
+                <Border IsVisible="{Binding ShowControllerPanel}"
                         Background="#161b22" CornerRadius="12"
                         Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+
+                        <!-- Section header -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Controller Profiles"
+                                           FontSize="16" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding HasControllerProfiles}">
+                                    <TextBlock Text="{Binding ControllerProfiles.Count}"
+                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                            </StackPanel>
+                            <Button Grid.Column="1" Classes="btn-secondary"
+                                    Padding="14,6"
+                                    Command="{Binding ShowCreateProfileFormCommand}"
+                                    IsVisible="{Binding !ShowNewProfileForm}">
+                                <TextBlock Text="+ New Profile" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </Grid>
+
+                        <!-- Active profile indicator -->
+                        <Border Background="#0d2a0d" CornerRadius="6" Padding="10,6"
+                                IsVisible="{Binding HasControllerProfiles}">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="Active:" Foreground="#8b949e" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding ActiveControllerProfileName}"
+                                           Foreground="#3fb950" FontSize="12" FontWeight="SemiBold"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock Text="(injected into game when running)"
+                                           Foreground="#8b949e" FontSize="11" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Saved profiles list -->
+                        <ItemsControl ItemsSource="{Binding ControllerProfiles}"
+                                      IsVisible="{Binding HasControllerProfiles}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Border Background="#0d1117" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,8">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" Spacing="2">
+                                                <TextBlock Text="{Binding ProfileName}"
+                                                           FontSize="14" FontWeight="SemiBold"
+                                                           Foreground="White"/>
+                                                <TextBlock Text="{Binding Description}"
+                                                           FontSize="12" Foreground="#8b949e"
+                                                           IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                                           TextWrapping="Wrap"/>
+                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                                                    <TextBlock FontSize="11" Foreground="#30363d">
+                                                        <TextBlock.Text>
+                                                            <MultiBinding StringFormat="by {0}  ·  {1}">
+                                                                <Binding Path="Author"/>
+                                                                <Binding Path="CreatedAt"/>
+                                                            </MultiBinding>
+                                                        </TextBlock.Text>
+                                                    </TextBlock>
+                                                </StackPanel>
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="1" Orientation="Horizontal"
+                                                        Spacing="6" VerticalAlignment="Center">
+                                               <!-- Activate for injection -->
+                                                <Button Classes="btn-secondary" Padding="10,6"
+                                                       ToolTip.Tip="Use this profile when game is running"
+                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                   <TextBlock Text="▶ Activate" FontSize="11"/>
+                                                </Button>
+                                               <!-- Edit mapping -->
+                                               <Button Classes="btn-secondary" Padding="10,6"
+                                                       ToolTip.Tip="Edit button mappings"
+                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
+                                                       CommandParameter="{Binding ProfileName}">
+                                                   <TextBlock Text="✏ Edit" FontSize="11"/>
+                                               </Button>
+                                                <!-- Upload to Games.Database -->
+                                                <Button Classes="btn-secondary" Padding="10,6"
+                                                        ToolTip.Tip="Share to Games.Database"
+                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).UploadProfileToDbCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                    <TextBlock Text="↑ Share" FontSize="11"/>
+                                                </Button>
+                                                <!-- Delete -->
+                                                <Button Classes="btn-danger" Padding="10,6"
+                                                        ToolTip.Tip="Delete this profile"
+                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).DeleteControllerProfileCommand}"
+                                                        CommandParameter="{Binding ProfileName}">
+                                                    <TextBlock Text="🗑" FontSize="13"/>
+                                                </Button>
+                                            </StackPanel>
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Empty state -->
+                        <TextBlock Text="No profiles yet — click '+ New Profile' to create a button mapping for this game."
+                                   FontSize="13" Foreground="#8b949e" TextWrapping="Wrap"
+                                   IsVisible="{Binding !HasControllerProfiles}"/>
+
+                        <!-- ── Button mapping editor form ── -->
+                        <Border IsVisible="{Binding ShowNewProfileForm}"
+                                Background="#0d1117" CornerRadius="8" Padding="16,14">
+                            <StackPanel Spacing="12">
+
+                                <TextBlock Text="🎮  Button Mapping Editor"
+                                           FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                <TextBlock FontSize="11" Foreground="#6e7681" TextWrapping="Wrap">
+                                    Assign a keyboard key, mouse button, or media key to each controller input.
+                                    Format: Key:Enter · Key:Ctrl+Shift+Esc · Mouse:LeftClick · Media:PlayPause · Empty
+                                </TextBlock>
+
+                                <!-- Profile name + description -->
+                                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
+                                    <TextBox Grid.Row="0" Grid.Column="0"
+                                             Margin="0,0,6,6"
+                                             Watermark="Profile name (e.g. Navigation, FPS…)"
+                                             Text="{Binding NewProfileName}"
+                                             Background="#161b22" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="10,8" FontSize="13"/>
+                                    <TextBox Grid.Row="0" Grid.Column="1"
+                                             Margin="6,0,0,6"
+                                             Watermark="Description (optional)"
+                                             Text="{Binding NewProfileDescription}"
+                                             Background="#161b22" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6"
+                                             Padding="10,8" FontSize="13"/>
+                                </Grid>
+
+                                <!-- Column header row -->
+                                <Grid ColumnDefinitions="*,*,*">
+                                    <TextBlock Grid.Column="0" Text="Button"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"/>
+                                    <TextBlock Grid.Column="1" Text="Press action"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
+                                               Margin="6,0,0,0"/>
+                                    <TextBlock Grid.Column="2" Text="Hold action"
+                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
+                                               Margin="6,0,0,0"/>
+                                </Grid>
+
+                                <!-- Per-button rows -->
+                                <ItemsControl ItemsSource="{Binding MappingRows}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:ButtonMappingRowVm">
+                                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,5">
+                                                <TextBlock Grid.Column="0"
+                                                           Text="{Binding DisplayName}"
+                                                           FontSize="12" Foreground="#e6edf3"
+                                                           VerticalAlignment="Center"/>
+                                                <TextBox Grid.Column="1"
+                                                         Margin="6,0,3,0"
+                                                         Text="{Binding PressAction}"
+                                                         Watermark="Empty"
+                                                         Background="#21262d" Foreground="White"
+                                                         BorderBrush="#30363d" CornerRadius="4"
+                                                         Padding="8,5" FontSize="12"
+                                                         FontFamily="Consolas,Courier New,monospace"/>
+                                                <TextBox Grid.Column="2"
+                                                         Margin="3,0,0,0"
+                                                         Text="{Binding HoldAction}"
+                                                         Watermark="Empty"
+                                                         Background="#21262d" Foreground="White"
+                                                         BorderBrush="#30363d" CornerRadius="4"
+                                                         Padding="8,5" FontSize="12"
+                                                         FontFamily="Consolas,Courier New,monospace"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- Save / Cancel buttons -->
+                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
+                                    <Button Classes="btn-primary" Padding="16,8"
+                                            Command="{Binding CreateControllerProfileCommand}">
+                                        <TextBlock Text="💾  Save Profile" FontSize="13" FontWeight="SemiBold"/>
+                                    </Button>
+                                    <Button Classes="btn-secondary" Padding="14,8"
+                                            Command="{Binding CancelCreateProfileCommand}">
+                                        <TextBlock Text="Cancel" FontSize="13"/>
+                                    </Button>
+                                </StackPanel>
+
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Sync to cloud row -->
+                        <StackPanel Orientation="Horizontal" Spacing="10"
+                                    IsVisible="{Binding HasControllerProfiles}">
+                            <Button Classes="btn-secondary" Padding="14,7"
+                                    IsEnabled="{Binding !IsControllerSyncing}"
+                                    Command="{Binding SyncProfilesToCloudCommand}">
+                                <TextBlock Text="☁ Sync to Cloud" FontSize="12" FontWeight="SemiBold"/>
+                            </Button>
+                        </StackPanel>
+
+                        <!-- Status message -->
+                        <TextBlock Text="{Binding ControllerStatus}"
+                                   FontSize="12" Foreground="#3fb950"
+                                   IsVisible="{Binding ControllerStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Nintendo Switch Ryujinx Mods section ── -->
+                <Border IsVisible="{Binding ShowModsPanel}"
+                        Background="#161b22" CornerRadius="12"
+                        Padding="24,20" Margin="0,0,0,24">
+                    <StackPanel Spacing="14">
+
+                        <!-- Section header -->
+                        <Grid ColumnDefinitions="*,Auto">
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🧩" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Ryujinx Mods"
+                                           FontSize="16" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
+                                        VerticalAlignment="Center"
+                                        IsVisible="{Binding HasSwitchMods}">
+                                    <TextBlock Text="{Binding SwitchMods.Count}"
+                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                            </StackPanel>
+                            <!-- Close button -->
+                            <Button Grid.Column="1"
+                                    Command="{Binding CloseModsPanelCommand}"
+                                    Background="Transparent" BorderThickness="0"
+                                    Padding="6,4" Cursor="Hand"
+                                    ToolTip.Tip="Close"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="✕" FontSize="14" Foreground="#8b949e"/>
+                            </Button>
+                        </Grid>
+
+                        <TextBlock Text="Enable or disable mods for this game in Ryujinx."
+                                   FontSize="12" Foreground="#8b949e"/>
+
+                        <!-- mods.json file path hint -->
+                        <Border IsVisible="{Binding SwitchModsJsonPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                Background="#21262d" CornerRadius="6" Padding="10,6">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📄" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding SwitchModsJsonPath}"
+                                           FontSize="10" Foreground="#6e7681"
+                                           TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Mod list -->
+                        <ItemsControl ItemsSource="{Binding SwitchMods}"
+                                      IsVisible="{Binding HasSwitchMods}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:RyujinxModVm">
+                                    <Border Background="#21262d" CornerRadius="8"
+                                            Padding="14,10" Margin="0,0,0,6">
+                                        <Grid ColumnDefinitions="*,Auto">
+
+                                            <!-- Mod info -->
+                                            <StackPanel Grid.Column="0" Spacing="4"
+                                                        VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                                    <TextBlock Text="{Binding Name}"
+                                                               FontSize="13" FontWeight="SemiBold"
+                                                               Foreground="White"/>
+                                                    <!-- Enabled/Disabled badge -->
+                                                    <Border CornerRadius="4" Padding="6,2"
+                                                            Background="{Binding StatusBackground}">
+                                                        <TextBlock Text="{Binding StatusLabel}"
+                                                                   FontSize="10" FontWeight="Bold"
+                                                                   Foreground="{Binding StatusForeground}"/>
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding Path}"
+                                                           FontSize="10" Foreground="#6e7681"
+                                                           TextTrimming="CharacterEllipsis"
+                                                           MaxWidth="500"/>
+                                            </StackPanel>
+
+                                            <!-- Toggle button -->
+                                            <Button Grid.Column="1"
+                                                    Padding="14,7"
+                                                    CornerRadius="6"
+                                                    BorderThickness="0"
+                                                    Cursor="Hand"
+                                                    VerticalAlignment="Center"
+                                                    Command="{Binding $parent[UserControl].DataContext.ToggleSwitchModCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Button.Background>
+                                                    <SolidColorBrush Color="{Binding ToggleBackground}"/>
+                                                </Button.Background>
+                                                <TextBlock Text="{Binding ToggleLabel}"
+                                                           FontSize="12" FontWeight="Bold"
+                                                           Foreground="{Binding ToggleForeground}"/>
+                                            </Button>
+
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <!-- Empty state: mods.json exists but has no entries -->
+                        <Border IsVisible="{Binding ModsJsonExistsButEmpty}"
+                                Background="#21262d" CornerRadius="8" Padding="16,12">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="No mods found in mods.json."
+                                           FontSize="13" Foreground="#8b949e"/>
+                                <TextBlock Text="Add mods to the mods folder, then re-open this panel."
+                                           FontSize="11" Foreground="#6e7681"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Empty state: mods.json not yet created (no mods folder set up) -->
+                        <Border IsVisible="{Binding ShowModsNotFoundMessage}"
+                                Background="#21262d" CornerRadius="8" Padding="16,12">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="No mods.json found for this game."
+                                           FontSize="13" Foreground="#8b949e"/>
+                                <TextBlock Text="Place mods in the mods folder and re-open this panel."
+                                           FontSize="11" Foreground="#6e7681"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Status message -->
+                        <TextBlock Text="{Binding SwitchModsStatus}"
+                                   FontSize="12" Foreground="#3fb950"
+                                   IsVisible="{Binding SwitchModsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                        <!-- Open Mods Folder button -->
+                        <Button Classes="btn-secondary"
+                                Padding="14,8"
+                                Command="{Binding OpenSwitchModsFolderCommand}"
+                                HorizontalAlignment="Left">
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="📂" FontSize="13" VerticalAlignment="Center"/>
+                                <TextBlock Text="Open Mods Folder" FontSize="12"
+                                           FontWeight="SemiBold" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- ── Media row: Trailer (left) + Screenshots (right) on the same row.
+                     WrapPanel collapses gracefully when only one child is visible. ── -->
+                <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
+
+                    <!-- Trailer (first in media) -->
+                    <Border IsVisible="{Binding HasTrailer}"
+                            Background="#161b22" CornerRadius="10"
+                            Padding="20,16" Margin="0,0,16,16">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="🎬  Trailer"
+                                       Classes="section-header" Margin="0"/>
+
+                            <!-- YouTube embed-style player preview -->
+                            <Button Background="Transparent" BorderThickness="0"
+                                    Padding="0" HorizontalAlignment="Left"
+                                    Command="{Binding OpenTrailerCommand}"
+                                    Cursor="Hand">
+                                <Border CornerRadius="10" ClipToBounds="True"
+                                        Width="400" Height="225">
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                            <GradientStop Color="#0d1117" Offset="0"/>
+                                            <GradientStop Color="#161b22" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                    <!-- Black letterbox with play icon — like an embedded player -->
+                                    <Grid>
+                                        <!-- Centered play button (YouTube-style) -->
+                                        <StackPanel HorizontalAlignment="Center"
+                                                    VerticalAlignment="Center" Spacing="12">
+                                            <Border Width="80" Height="80" CornerRadius="40"
+                                                    HorizontalAlignment="Center"
+                                                    Opacity="0.90">
+                                                <Border.Background>
+                                                    <SolidColorBrush Color="#FF0000"/>
+                                                </Border.Background>
+                                                <TextBlock Text="▶" FontSize="34"
+                                                           FontWeight="Black"
+                                                           Foreground="White"
+                                                           HorizontalAlignment="Center"
+                                                           VerticalAlignment="Center"
+                                                           Margin="6,0,0,0"/>
+                                            </Border>
+                                            <TextBlock Text="▶  Watch Trailer"
+                                                       FontSize="13" FontWeight="SemiBold"
+                                                       Foreground="#c9d1d9"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                        <!-- YouTube URL bar at bottom -->
+                                        <Border VerticalAlignment="Bottom"
+                                                Background="#0000008a"
+                                                Padding="12,6">
+                                            <TextBlock Text="{Binding TrailerUrl}"
+                                                       FontSize="10" Foreground="#8b949e"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Screenshots (same row as trailer when trailer is present) -->
+                    <Border IsVisible="{Binding HasScreenshots}"
+                            Background="#161b22" CornerRadius="10"
+                            Padding="20,16" Margin="0,0,0,16">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="📸  Screenshots"
+                                       Classes="section-header" Margin="0"/>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding Screenshots}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal" Spacing="12"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border CornerRadius="8" ClipToBounds="True"
+                                                    Width="300" Height="169">
+                                                <views:CoverImage
+                                                    ImageUrl="{Binding}"
+                                                    LetterFontSize="1"
+                                                    ImageCornerRadius="8"
+                                                    Width="300" Height="169"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
+                </WrapPanel>
+
+            </StackPanel>
+        </ScrollViewer>
+
+    </Grid>
+
+    <!-- ── Console-style Game Settings / Cloud menu (modal) ── -->
+    <gi:GameInfoActionMenu x:Name="ActionMenuHost"/>
+
+    <!-- ── Game Settings modal (console-style menu, like Mods) ── -->
+    <Border x:Name="SettingsHost" IsVisible="{Binding ShowSettings}" Background="#CC000000" ZIndex="50">
+                <!-- ── Settings panel (shown when ··· is clicked) ── -->
+                <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
+                        CornerRadius="16" Padding="24,20" Width="720" MaxHeight="640"
+                        HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="16">
 
                         <!-- Panel header -->
@@ -641,680 +1320,9 @@
                                    IsVisible="{Binding SettingsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                     </StackPanel>
+                </ScrollViewer>
                 </Border>
-
-                <!-- ── Achievements section (above media) ── -->
-                <Border IsVisible="{Binding HasAchievements}"
-                        Margin="0,0,0,24">
-                    <StackPanel Spacing="14">
-                        <TextBlock Text="{Binding AchievementsLabel}"
-                                   Classes="section-header" Margin="0"/>
-                        <ItemsControl ItemsSource="{Binding VisibleAchievements}">
-                            <ItemsControl.ItemsPanel>
-                                <ItemsPanelTemplate>
-                                    <WrapPanel/>
-                                </ItemsPanelTemplate>
-                            </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:Achievement">
-                                    <Border Background="#161b22" CornerRadius="8"
-                                            Padding="12,10" Margin="0,0,8,8"
-                                            Width="260"
-                                            Opacity="{Binding LockedOpacity}">
-                                        <StackPanel Orientation="Horizontal" Spacing="10">
-                                            <!-- Achievement icon -->
-                                            <Border Width="40" Height="40" CornerRadius="6"
-                                                    ClipToBounds="True" Background="#21262d">
-                                                <views:CoverImage
-                                                    ImageUrl="{Binding IconUrl}"
-                                                    FallbackText="🏆"
-                                                    LetterFontSize="18"
-                                                    ImageCornerRadius="6"
-                                                    Width="40" Height="40"/>
-                                            </Border>
-                                            <!-- Name + description -->
-                                            <StackPanel Spacing="2" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="#58a6ff"
-                                                           TextWrapping="Wrap" MaxWidth="180"/>
-                                                <TextBlock Text="{Binding Description}"
-                                                           FontSize="11" Foreground="#8b949e"
-                                                           TextWrapping="Wrap" MaxWidth="180"
-                                                           MaxLines="2"/>
-                                                <TextBlock Text="{Binding StatusLabel}"
-                                                           FontSize="10" Foreground="#f1c40f"/>
-                                            </StackPanel>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                        <!-- More / Less button -->
-                        <Button Classes="btn-secondary" Padding="14,8"
-                                HorizontalAlignment="Left"
-                                IsVisible="{Binding HasMoreAchievements}"
-                                Command="{Binding ToggleShowAllAchievementsCommand}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="▼  Show More Achievements"
-                                           FontSize="12" FontWeight="SemiBold"
-                                           IsVisible="{Binding !ShowAllAchievements}"/>
-                                <TextBlock Text="▲  Show Less"
-                                           FontSize="12" FontWeight="SemiBold"
-                                           IsVisible="{Binding ShowAllAchievements}"/>
-                            </StackPanel>
-                        </Button>
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Compatibility reports section ── -->
-                <Border Background="#161b22" CornerRadius="12"
-                        Padding="24,20" Margin="0,0,0,24">
-                    <StackPanel Spacing="10">
-                        <TextBlock Text="🖥  Compatibility" FontSize="16" FontWeight="Bold" Foreground="White"/>
-                        <!-- Community votes (same as the website): Playable / In Game / No Boot -->
-                        <StackPanel Spacing="8" IsVisible="{Binding ShowCompatVotes}">
-                            <TextBlock Text="{Binding CompatSummary}" FontSize="14" FontWeight="SemiBold" Foreground="#E6EDF3"/>
-                            <Border Height="10" CornerRadius="5" Background="#21262d" HorizontalAlignment="Left"
-                                    Width="420" ClipToBounds="True">
-                                <StackPanel Orientation="Horizontal">
-                                    <Border Width="{Binding CompatGreenWidth}" Background="#3fb950"/>
-                                    <Border Width="{Binding CompatAmberWidth}" Background="#f0a030"/>
-                                    <Border Width="{Binding CompatRedWidth}" Background="#f85149"/>
-                                </StackPanel>
-                            </Border>
-                            <StackPanel Orientation="Horizontal" Spacing="16">
-                                <TextBlock Text="{Binding CompatGreen, StringFormat='🟢 Playable: {0}'}" FontSize="12" Foreground="#3fb950"/>
-                                <TextBlock Text="{Binding CompatAmber, StringFormat='🟠 In Game: {0}'}" FontSize="12" Foreground="#f0a030"/>
-                                <TextBlock Text="{Binding CompatRed, StringFormat='🔴 No Boot: {0}'}" FontSize="12" Foreground="#f85149"/>
-                            </StackPanel>
-                            <StackPanel IsVisible="{Binding CanVoteCompat}" Spacing="6">
-                                <TextBlock Text="Do the ROMs work? One vote per user: Green = Playable, Amber = In Game, Red = No Boot."
-                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟢 Playable"
-                                            Command="{Binding VoteCompatCommand}" CommandParameter="green"/>
-                                    <Button Classes="btn-secondary" Padding="14,8" Content="🟠 In Game"
-                                            Command="{Binding VoteCompatCommand}" CommandParameter="amber"/>
-                                    <Button Classes="btn-secondary" Padding="14,8" Content="🔴 No Boot"
-                                            Command="{Binding VoteCompatCommand}" CommandParameter="red"/>
-                                </StackPanel>
-                            </StackPanel>
-                            <TextBlock Text="{Binding CompatVoteStatus}" FontSize="11" Foreground="#8b949e"
-                                       IsVisible="{Binding CompatVoteStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        </StackPanel>
-                        <TextBlock Text="No hardware reports yet."
-                                   FontSize="12" Foreground="#8b949e"
-                                   IsVisible="{Binding !HasCompatibilityReports}"/>
-                        <ItemsControl ItemsSource="{Binding CompatibilityReports}"
-                                      IsVisible="{Binding HasCompatibilityReports}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:GameCompatibility">
-                                    <StackPanel Margin="0,0,0,8">
-                                        <TextBlock Text="{Binding Summary}" FontSize="13" Foreground="#E6EDF3"/>
-                                        <TextBlock FontSize="11" Foreground="#8b949e">
-                                            <Run Text="{Binding Cpu}"/><Run Text="  ·  "/><Run Text="{Binding Gpu}"/>
-                                        </TextBlock>
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Reviews section ── -->
-                <Border Background="#161b22" CornerRadius="12"
-                        Padding="24,20" Margin="0,0,0,24">
-                    <StackPanel Spacing="14">
-
-                        <!-- Section header with toggle button -->
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="⭐" FontSize="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="Reviews"
-                                           FontSize="16" FontWeight="Bold"
-                                           Foreground="White" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding AverageRatingLabel}" FontSize="12"
-                                           Foreground="#f0a030" VerticalAlignment="Center"/>
-                                <Border CornerRadius="10" Padding="8,3" Background="#f0a030"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding HasReviews}">
-                                    <TextBlock Text="{Binding Reviews.Count}"
-                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                            </StackPanel>
-                            <Button Grid.Column="1" Classes="btn-secondary"
-                                    Padding="14,6"
-                                    Command="{Binding ToggleReviewPanelCommand}">
-                                <TextBlock Text="Write a Review" FontSize="12" FontWeight="SemiBold"/>
-                            </Button>
-                        </Grid>
-
-                        <!-- Existing reviews list -->
-                        <ItemsControl ItemsSource="{Binding Reviews}"
-                                      IsVisible="{Binding HasReviews}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="models:GameReview">
-                                    <Border Background="#21262d" CornerRadius="8"
-                                            Padding="14,10" Margin="0,0,0,6">
-                                        <StackPanel Spacing="4">
-                                            <Grid ColumnDefinitions="*,Auto">
-                                                <TextBlock Grid.Column="0"
-                                                           Text="{Binding Username}"
-                                                           FontSize="13" FontWeight="SemiBold"
-                                                           Foreground="#58a6ff"/>
-                                                <TextBlock Grid.Column="1"
-                                                           Text="{Binding StarLabel}"
-                                                           FontSize="14" Foreground="#f1c40f"/>
-                                            </Grid>
-                                            <TextBlock Text="{Binding Note}"
-                                                       FontSize="12" Foreground="#c9d1d9"
-                                                       TextWrapping="Wrap"
-                                                       IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                        </StackPanel>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- Write review form -->
-                        <Border IsVisible="{Binding ShowReviewPanel}"
-                                Background="#0d1117" CornerRadius="8" Padding="16,14">
-                            <StackPanel Spacing="10">
-                                <TextBlock Text="Your Rating (1–5 stars)"
-                                           FontSize="12" FontWeight="SemiBold" Foreground="#8b949e"/>
-                                <StackPanel Orientation="Horizontal" Spacing="6">
-                                    <Button Classes="btn-secondary" Padding="10,6" Content="1★" Command="{Binding SetReviewRatingCommand}" CommandParameter="1"/>
-                                    <Button Classes="btn-secondary" Padding="10,6" Content="2★" Command="{Binding SetReviewRatingCommand}" CommandParameter="2"/>
-                                    <Button Classes="btn-secondary" Padding="10,6" Content="3★" Command="{Binding SetReviewRatingCommand}" CommandParameter="3"/>
-                                    <Button Classes="btn-secondary" Padding="10,6" Content="4★" Command="{Binding SetReviewRatingCommand}" CommandParameter="4"/>
-                                    <Button Classes="btn-secondary" Padding="10,6" Content="5★" Command="{Binding SetReviewRatingCommand}" CommandParameter="5"/>
-                                    <TextBlock Text="{Binding ReviewStarsPreview}" FontSize="18" Foreground="#f1c40f"
-                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
-                                </StackPanel>
-                                <TextBox Text="{Binding NewReviewNote}"
-                                         Watermark="Write your review here… (optional)"
-                                         Background="#21262d" Foreground="White"
-                                         BorderBrush="#30363d" CornerRadius="6"
-                                         Padding="10,8" FontSize="12" AcceptsReturn="True"
-                                         Height="80"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Classes="btn-success" Padding="16,8"
-                                            Command="{Binding SubmitReviewCommand}">
-                                        <TextBlock Text="Submit Review" FontSize="13" FontWeight="SemiBold"/>
-                                    </Button>
-                                    <Button Classes="btn-secondary" Padding="14,8"
-                                            Command="{Binding ToggleReviewPanelCommand}">
-                                        <TextBlock Text="Cancel" FontSize="13"/>
-                                    </Button>
-                                </StackPanel>
-                                <TextBlock Text="{Binding ReviewStatus}"
-                                           FontSize="12" Foreground="#3fb950"
-                                           IsVisible="{Binding ReviewStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                            </StackPanel>
-                        </Border>
-
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Controller Profiles section ── -->
-                <Border IsVisible="{Binding ShowControllerPanel}"
-                        Background="#161b22" CornerRadius="12"
-                        Padding="24,20" Margin="0,0,0,24">
-                    <StackPanel Spacing="14">
-
-                        <!-- Section header -->
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="🎮" FontSize="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="Controller Profiles"
-                                           FontSize="16" FontWeight="Bold"
-                                           Foreground="White" VerticalAlignment="Center"/>
-                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding HasControllerProfiles}">
-                                    <TextBlock Text="{Binding ControllerProfiles.Count}"
-                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                            </StackPanel>
-                            <Button Grid.Column="1" Classes="btn-secondary"
-                                    Padding="14,6"
-                                    Command="{Binding ShowCreateProfileFormCommand}"
-                                    IsVisible="{Binding !ShowNewProfileForm}">
-                                <TextBlock Text="+ New Profile" FontSize="12" FontWeight="SemiBold"/>
-                            </Button>
-                        </Grid>
-
-                        <!-- Active profile indicator -->
-                        <Border Background="#0d2a0d" CornerRadius="6" Padding="10,6"
-                                IsVisible="{Binding HasControllerProfiles}">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="Active:" Foreground="#8b949e" FontSize="12" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding ActiveControllerProfileName}"
-                                           Foreground="#3fb950" FontSize="12" FontWeight="SemiBold"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock Text="(injected into game when running)"
-                                           Foreground="#8b949e" FontSize="11" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Saved profiles list -->
-                        <ItemsControl ItemsSource="{Binding ControllerProfiles}"
-                                      IsVisible="{Binding HasControllerProfiles}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Border Background="#0d1117" CornerRadius="8"
-                                            Padding="14,10" Margin="0,0,0,8">
-                                        <Grid ColumnDefinitions="*,Auto">
-                                            <StackPanel Grid.Column="0" Spacing="2">
-                                                <TextBlock Text="{Binding ProfileName}"
-                                                           FontSize="14" FontWeight="SemiBold"
-                                                           Foreground="White"/>
-                                                <TextBlock Text="{Binding Description}"
-                                                           FontSize="12" Foreground="#8b949e"
-                                                           IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                                           TextWrapping="Wrap"/>
-                                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                                                    <TextBlock FontSize="11" Foreground="#30363d">
-                                                        <TextBlock.Text>
-                                                            <MultiBinding StringFormat="by {0}  ·  {1}">
-                                                                <Binding Path="Author"/>
-                                                                <Binding Path="CreatedAt"/>
-                                                            </MultiBinding>
-                                                        </TextBlock.Text>
-                                                    </TextBlock>
-                                                </StackPanel>
-                                            </StackPanel>
-                                            <StackPanel Grid.Column="1" Orientation="Horizontal"
-                                                        Spacing="6" VerticalAlignment="Center">
-                                               <!-- Activate for injection -->
-                                                <Button Classes="btn-secondary" Padding="10,6"
-                                                       ToolTip.Tip="Use this profile when game is running"
-                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).ActivateControllerProfileCommand}"
-                                                        CommandParameter="{Binding ProfileName}">
-                                                   <TextBlock Text="▶ Activate" FontSize="11"/>
-                                                </Button>
-                                               <!-- Edit mapping -->
-                                               <Button Classes="btn-secondary" Padding="10,6"
-                                                       ToolTip.Tip="Edit button mappings"
-                                                       Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).EditControllerProfileCommand}"
-                                                       CommandParameter="{Binding ProfileName}">
-                                                   <TextBlock Text="✏ Edit" FontSize="11"/>
-                                               </Button>
-                                                <!-- Upload to Games.Database -->
-                                                <Button Classes="btn-secondary" Padding="10,6"
-                                                        ToolTip.Tip="Share to Games.Database"
-                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).UploadProfileToDbCommand}"
-                                                        CommandParameter="{Binding ProfileName}">
-                                                    <TextBlock Text="↑ Share" FontSize="11"/>
-                                                </Button>
-                                                <!-- Delete -->
-                                                <Button Classes="btn-danger" Padding="10,6"
-                                                        ToolTip.Tip="Delete this profile"
-                                                        Command="{Binding #GameDetailViewRoot.((vm:GameDetailViewModel)DataContext).DeleteControllerProfileCommand}"
-                                                        CommandParameter="{Binding ProfileName}">
-                                                    <TextBlock Text="🗑" FontSize="13"/>
-                                                </Button>
-                                            </StackPanel>
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- Empty state -->
-                        <TextBlock Text="No profiles yet — click '+ New Profile' to create a button mapping for this game."
-                                   FontSize="13" Foreground="#8b949e" TextWrapping="Wrap"
-                                   IsVisible="{Binding !HasControllerProfiles}"/>
-
-                        <!-- ── Button mapping editor form ── -->
-                        <Border IsVisible="{Binding ShowNewProfileForm}"
-                                Background="#0d1117" CornerRadius="8" Padding="16,14">
-                            <StackPanel Spacing="12">
-
-                                <TextBlock Text="🎮  Button Mapping Editor"
-                                           FontSize="15" FontWeight="Bold" Foreground="White"/>
-                                <TextBlock FontSize="11" Foreground="#6e7681" TextWrapping="Wrap">
-                                    Assign a keyboard key, mouse button, or media key to each controller input.
-                                    Format: Key:Enter · Key:Ctrl+Shift+Esc · Mouse:LeftClick · Media:PlayPause · Empty
-                                </TextBlock>
-
-                                <!-- Profile name + description -->
-                                <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" HorizontalAlignment="Stretch">
-                                    <TextBox Grid.Row="0" Grid.Column="0"
-                                             Margin="0,0,6,6"
-                                             Watermark="Profile name (e.g. Navigation, FPS…)"
-                                             Text="{Binding NewProfileName}"
-                                             Background="#161b22" Foreground="White"
-                                             BorderBrush="#30363d" CornerRadius="6"
-                                             Padding="10,8" FontSize="13"/>
-                                    <TextBox Grid.Row="0" Grid.Column="1"
-                                             Margin="6,0,0,6"
-                                             Watermark="Description (optional)"
-                                             Text="{Binding NewProfileDescription}"
-                                             Background="#161b22" Foreground="White"
-                                             BorderBrush="#30363d" CornerRadius="6"
-                                             Padding="10,8" FontSize="13"/>
-                                </Grid>
-
-                                <!-- Column header row -->
-                                <Grid ColumnDefinitions="*,*,*">
-                                    <TextBlock Grid.Column="0" Text="Button"
-                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"/>
-                                    <TextBlock Grid.Column="1" Text="Press action"
-                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
-                                               Margin="6,0,0,0"/>
-                                    <TextBlock Grid.Column="2" Text="Hold action"
-                                               FontSize="11" FontWeight="SemiBold" Foreground="#8b949e"
-                                               Margin="6,0,0,0"/>
-                                </Grid>
-
-                                <!-- Per-button rows -->
-                                <ItemsControl ItemsSource="{Binding MappingRows}">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:ButtonMappingRowVm">
-                                            <Grid ColumnDefinitions="*,*,*" Margin="0,0,0,5">
-                                                <TextBlock Grid.Column="0"
-                                                           Text="{Binding DisplayName}"
-                                                           FontSize="12" Foreground="#e6edf3"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBox Grid.Column="1"
-                                                         Margin="6,0,3,0"
-                                                         Text="{Binding PressAction}"
-                                                         Watermark="Empty"
-                                                         Background="#21262d" Foreground="White"
-                                                         BorderBrush="#30363d" CornerRadius="4"
-                                                         Padding="8,5" FontSize="12"
-                                                         FontFamily="Consolas,Courier New,monospace"/>
-                                                <TextBox Grid.Column="2"
-                                                         Margin="3,0,0,0"
-                                                         Text="{Binding HoldAction}"
-                                                         Watermark="Empty"
-                                                         Background="#21262d" Foreground="White"
-                                                         BorderBrush="#30363d" CornerRadius="4"
-                                                         Padding="8,5" FontSize="12"
-                                                         FontFamily="Consolas,Courier New,monospace"/>
-                                            </Grid>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-
-                                <!-- Save / Cancel buttons -->
-                                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,6,0,0">
-                                    <Button Classes="btn-primary" Padding="16,8"
-                                            Command="{Binding CreateControllerProfileCommand}">
-                                        <TextBlock Text="💾  Save Profile" FontSize="13" FontWeight="SemiBold"/>
-                                    </Button>
-                                    <Button Classes="btn-secondary" Padding="14,8"
-                                            Command="{Binding CancelCreateProfileCommand}">
-                                        <TextBlock Text="Cancel" FontSize="13"/>
-                                    </Button>
-                                </StackPanel>
-
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Sync to cloud row -->
-                        <StackPanel Orientation="Horizontal" Spacing="10"
-                                    IsVisible="{Binding HasControllerProfiles}">
-                            <Button Classes="btn-secondary" Padding="14,7"
-                                    IsEnabled="{Binding !IsControllerSyncing}"
-                                    Command="{Binding SyncProfilesToCloudCommand}">
-                                <TextBlock Text="☁ Sync to Cloud" FontSize="12" FontWeight="SemiBold"/>
-                            </Button>
-                        </StackPanel>
-
-                        <!-- Status message -->
-                        <TextBlock Text="{Binding ControllerStatus}"
-                                   FontSize="12" Foreground="#3fb950"
-                                   IsVisible="{Binding ControllerStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Nintendo Switch Ryujinx Mods section ── -->
-                <Border IsVisible="{Binding ShowModsPanel}"
-                        Background="#161b22" CornerRadius="12"
-                        Padding="24,20" Margin="0,0,0,24">
-                    <StackPanel Spacing="14">
-
-                        <!-- Section header -->
-                        <Grid ColumnDefinitions="*,Auto">
-                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="10">
-                                <TextBlock Text="🧩" FontSize="18" VerticalAlignment="Center"/>
-                                <TextBlock Text="Ryujinx Mods"
-                                           FontSize="16" FontWeight="Bold"
-                                           Foreground="White" VerticalAlignment="Center"/>
-                                <Border CornerRadius="10" Padding="8,3" Background="#1f6feb"
-                                        VerticalAlignment="Center"
-                                        IsVisible="{Binding HasSwitchMods}">
-                                    <TextBlock Text="{Binding SwitchMods.Count}"
-                                               FontSize="12" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                            </StackPanel>
-                            <!-- Close button -->
-                            <Button Grid.Column="1"
-                                    Command="{Binding CloseModsPanelCommand}"
-                                    Background="Transparent" BorderThickness="0"
-                                    Padding="6,4" Cursor="Hand"
-                                    ToolTip.Tip="Close"
-                                    VerticalAlignment="Center">
-                                <TextBlock Text="✕" FontSize="14" Foreground="#8b949e"/>
-                            </Button>
-                        </Grid>
-
-                        <TextBlock Text="Enable or disable mods for this game in Ryujinx."
-                                   FontSize="12" Foreground="#8b949e"/>
-
-                        <!-- mods.json file path hint -->
-                        <Border IsVisible="{Binding SwitchModsJsonPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
-                                Background="#21262d" CornerRadius="6" Padding="10,6">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="📄" FontSize="11" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding SwitchModsJsonPath}"
-                                           FontSize="10" Foreground="#6e7681"
-                                           TextWrapping="Wrap"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Mod list -->
-                        <ItemsControl ItemsSource="{Binding SwitchMods}"
-                                      IsVisible="{Binding HasSwitchMods}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="vm:RyujinxModVm">
-                                    <Border Background="#21262d" CornerRadius="8"
-                                            Padding="14,10" Margin="0,0,0,6">
-                                        <Grid ColumnDefinitions="*,Auto">
-
-                                            <!-- Mod info -->
-                                            <StackPanel Grid.Column="0" Spacing="4"
-                                                        VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                                    <TextBlock Text="{Binding Name}"
-                                                               FontSize="13" FontWeight="SemiBold"
-                                                               Foreground="White"/>
-                                                    <!-- Enabled/Disabled badge -->
-                                                    <Border CornerRadius="4" Padding="6,2"
-                                                            Background="{Binding StatusBackground}">
-                                                        <TextBlock Text="{Binding StatusLabel}"
-                                                                   FontSize="10" FontWeight="Bold"
-                                                                   Foreground="{Binding StatusForeground}"/>
-                                                    </Border>
-                                                </StackPanel>
-                                                <TextBlock Text="{Binding Path}"
-                                                           FontSize="10" Foreground="#6e7681"
-                                                           TextTrimming="CharacterEllipsis"
-                                                           MaxWidth="500"/>
-                                            </StackPanel>
-
-                                            <!-- Toggle button -->
-                                            <Button Grid.Column="1"
-                                                    Padding="14,7"
-                                                    CornerRadius="6"
-                                                    BorderThickness="0"
-                                                    Cursor="Hand"
-                                                    VerticalAlignment="Center"
-                                                    Command="{Binding $parent[UserControl].DataContext.ToggleSwitchModCommand}"
-                                                    CommandParameter="{Binding}">
-                                                <Button.Background>
-                                                    <SolidColorBrush Color="{Binding ToggleBackground}"/>
-                                                </Button.Background>
-                                                <TextBlock Text="{Binding ToggleLabel}"
-                                                           FontSize="12" FontWeight="Bold"
-                                                           Foreground="{Binding ToggleForeground}"/>
-                                            </Button>
-
-                                        </Grid>
-                                    </Border>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
-
-                        <!-- Empty state: mods.json exists but has no entries -->
-                        <Border IsVisible="{Binding ModsJsonExistsButEmpty}"
-                                Background="#21262d" CornerRadius="8" Padding="16,12">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="No mods found in mods.json."
-                                           FontSize="13" Foreground="#8b949e"/>
-                                <TextBlock Text="Add mods to the mods folder, then re-open this panel."
-                                           FontSize="11" Foreground="#6e7681"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Empty state: mods.json not yet created (no mods folder set up) -->
-                        <Border IsVisible="{Binding ShowModsNotFoundMessage}"
-                                Background="#21262d" CornerRadius="8" Padding="16,12">
-                            <StackPanel Spacing="6">
-                                <TextBlock Text="No mods.json found for this game."
-                                           FontSize="13" Foreground="#8b949e"/>
-                                <TextBlock Text="Place mods in the mods folder and re-open this panel."
-                                           FontSize="11" Foreground="#6e7681"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Status message -->
-                        <TextBlock Text="{Binding SwitchModsStatus}"
-                                   FontSize="12" Foreground="#3fb950"
-                                   IsVisible="{Binding SwitchModsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-
-                        <!-- Open Mods Folder button -->
-                        <Button Classes="btn-secondary"
-                                Padding="14,8"
-                                Command="{Binding OpenSwitchModsFolderCommand}"
-                                HorizontalAlignment="Left">
-                            <StackPanel Orientation="Horizontal" Spacing="6">
-                                <TextBlock Text="📂" FontSize="13" VerticalAlignment="Center"/>
-                                <TextBlock Text="Open Mods Folder" FontSize="12"
-                                           FontWeight="SemiBold" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </Button>
-
-                    </StackPanel>
-                </Border>
-
-                <!-- ── Media row: Trailer (left) + Screenshots (right) on the same row.
-                     WrapPanel collapses gracefully when only one child is visible. ── -->
-                <WrapPanel Orientation="Horizontal" Margin="0,0,0,24">
-
-                    <!-- Trailer (first in media) -->
-                    <Border IsVisible="{Binding HasTrailer}"
-                            Background="#161b22" CornerRadius="10"
-                            Padding="20,16" Margin="0,0,16,16">
-                        <StackPanel Spacing="12">
-                            <TextBlock Text="🎬  Trailer"
-                                       Classes="section-header" Margin="0"/>
-
-                            <!-- YouTube embed-style player preview -->
-                            <Button Background="Transparent" BorderThickness="0"
-                                    Padding="0" HorizontalAlignment="Left"
-                                    Command="{Binding OpenTrailerCommand}"
-                                    Cursor="Hand">
-                                <Border CornerRadius="10" ClipToBounds="True"
-                                        Width="400" Height="225">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
-                                            <GradientStop Color="#0d1117" Offset="0"/>
-                                            <GradientStop Color="#161b22" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <!-- Black letterbox with play icon — like an embedded player -->
-                                    <Grid>
-                                        <!-- Centered play button (YouTube-style) -->
-                                        <StackPanel HorizontalAlignment="Center"
-                                                    VerticalAlignment="Center" Spacing="12">
-                                            <Border Width="80" Height="80" CornerRadius="40"
-                                                    HorizontalAlignment="Center"
-                                                    Opacity="0.90">
-                                                <Border.Background>
-                                                    <SolidColorBrush Color="#FF0000"/>
-                                                </Border.Background>
-                                                <TextBlock Text="▶" FontSize="34"
-                                                           FontWeight="Black"
-                                                           Foreground="White"
-                                                           HorizontalAlignment="Center"
-                                                           VerticalAlignment="Center"
-                                                           Margin="6,0,0,0"/>
-                                            </Border>
-                                            <TextBlock Text="▶  Watch Trailer"
-                                                       FontSize="13" FontWeight="SemiBold"
-                                                       Foreground="#c9d1d9"
-                                                       HorizontalAlignment="Center"/>
-                                        </StackPanel>
-                                        <!-- YouTube URL bar at bottom -->
-                                        <Border VerticalAlignment="Bottom"
-                                                Background="#0000008a"
-                                                Padding="12,6">
-                                            <TextBlock Text="{Binding TrailerUrl}"
-                                                       FontSize="10" Foreground="#8b949e"
-                                                       TextTrimming="CharacterEllipsis"/>
-                                        </Border>
-                                    </Grid>
-                                </Border>
-                            </Button>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Screenshots (same row as trailer when trailer is present) -->
-                    <Border IsVisible="{Binding HasScreenshots}"
-                            Background="#161b22" CornerRadius="10"
-                            Padding="20,16" Margin="0,0,0,16">
-                        <StackPanel Spacing="14">
-                            <TextBlock Text="📸  Screenshots"
-                                       Classes="section-header" Margin="0"/>
-                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                                          VerticalScrollBarVisibility="Disabled">
-                                <ItemsControl ItemsSource="{Binding Screenshots}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <StackPanel Orientation="Horizontal" Spacing="12"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Border CornerRadius="8" ClipToBounds="True"
-                                                    Width="300" Height="169">
-                                                <views:CoverImage
-                                                    ImageUrl="{Binding}"
-                                                    LetterFontSize="1"
-                                                    ImageCornerRadius="8"
-                                                    Width="300" Height="169"/>
-                                            </Border>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                        </StackPanel>
-                    </Border>
-                </WrapPanel>
-
-            </StackPanel>
-        </ScrollViewer>
-
-    </Grid>
-
-    <!-- ── Console-style Game Settings / Cloud menu (modal) ── -->
-    <gi:GameInfoActionMenu x:Name="ActionMenuHost"/>
+    </Border>
 
     <!-- ── In-app trailer player overlay ──────────────────────────────────── -->
     <!-- Shown when IsTrailerPlayerOpen = true; covers the entire detail view  -->

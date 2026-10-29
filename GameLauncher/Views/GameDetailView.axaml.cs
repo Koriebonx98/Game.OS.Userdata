@@ -62,6 +62,9 @@ public partial class GameDetailView : UserControl
     /// <summary>While the modal action menu is open, only controls inside it are navigable.</summary>
     private bool InActiveScope(Control c)
     {
+        if (DataContext is GameDetailViewModel { ShowSettings: true } &&
+            this.FindControl<Control>("SettingsHost") is { } settingsHost)
+            return settingsHost.IsVisualAncestorOf(c);
         if (DataContext is GameDetailViewModel { IsActionMenuOpen: true } or GameDetailViewModel { IsModBrowserOpen: true } &&
             this.FindControl<Control>("ActionMenuHost") is { } host)
             return host.IsVisualAncestorOf(c);
@@ -72,12 +75,12 @@ public partial class GameDetailView : UserControl
     public void HandleBack()
     {
         if (DataContext is not GameDetailViewModel vm) return;
-        if (vm.IsModBrowserOpen)         vm.CloseModBrowserCommand.Execute(null);
+        if (vm.ShowSettings)             vm.CloseSettingsCommand.Execute(null);
+        else if (vm.IsModBrowserOpen)    vm.CloseModBrowserCommand.Execute(null);
         else if (vm.IsActionMenuOpen)    vm.CloseActionMenuCommand.Execute(null);
         else if (vm.IsVlcPlayerOpen)     CloseVlcOverlay();
         else if (vm.IsTrailerPlayerOpen) vm.CloseTrailerPlayerCommand.Execute(null);
         else if (vm.ShowModsPanel)       vm.CloseModsPanelCommand.Execute(null);
-        else if (vm.ShowSettings)        vm.CloseSettingsCommand.Execute(null);
         else                             vm.CloseCommand.Execute(null);
     }
 

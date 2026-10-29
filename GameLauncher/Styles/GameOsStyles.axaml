@@ -312,6 +312,10 @@
     </Style>
 
     <!-- ─── Game Card Button (clickable version) ─── -->
+    <!-- Switch dashboard is hidden unless SwitchTheme.axaml shows it -->
+    <Style Selector="Border.dashboard-switch-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
     <Style Selector="Button.game-card-btn">
         <Setter Property="Padding" Value="0"/>
         <Setter Property="BorderThickness" Value="0"/>

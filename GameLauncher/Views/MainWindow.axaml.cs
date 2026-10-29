@@ -396,6 +396,17 @@ public partial class MainWindow : Window
             }
         }
 
+        // Wii Menu dashboard: 4×3 channel grid, edge keys flip pages
+        bool isWiiDash = string.Equals(vm.SettingsVm.DesignTheme, "Wii", StringComparison.OrdinalIgnoreCase);
+        if (vm.IsHome && isWiiDash && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        {
+            if (HandleWiiDashboardKey(vm, e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Default dashboard: hero "Continue Playing" button + Continue Playing cards
         bool isDefaultDash = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isDefaultDash && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
@@ -746,13 +757,21 @@ public partial class MainWindow : Window
         {
             case Key.Y:        lib.OpenKeyboard();           return true;
             case Key.X:        lib.OpenFilterMenu();         return true;
-            case Key.Left:     lib.MoveGameFocus(-1);        return true;
+            case Key.Left:
+                // Wii Games page: Left off the first column slides back to the Wii dashboard
+                if (lib.IsWiiGamesLib && (lib.FocusedGameIndex < 0 ||
+                    lib.FocusedGameIndex % Math.Max(1, lib.ColumnsProvider?.Invoke() ?? 1) == 0))
+                { vm.NavigateCommand.Execute("dashboard"); return true; }
+                lib.MoveGameFocus(-1);
+                return true;
             case Key.Right:    lib.MoveGameFocus(1);         return true;
             case Key.Up:       lib.MoveGameFocusRow(-1);     return true;
             case Key.Down:     lib.MoveGameFocusRow(1);      return true;
             case Key.Enter:    lib.ActivateFocusedGame();    return true;
             case Key.PageUp:   lib.CycleInstallFilter(-1);   return true;
             case Key.PageDown: lib.CycleInstallFilter(1);    return true;
+            case Key.Escape:
+            case Key.BrowserBack: vm.NavigateCommand.Execute("dashboard"); return true;
         }
         return false;
     }
@@ -812,6 +831,23 @@ public partial class MainWindow : Window
             case Key.Enter:    st.ActivateFocused();    return true;
             case Key.PageUp:
             case Key.PageDown: st.CycleTab();           return true;
+        }
+        return false;
+    }
+
+    /// <summary>Wii Menu controller/keyboard handling shared by both input paths. Returns true when consumed.</summary>
+    private bool HandleWiiDashboardKey(MainViewModel vm, Key key)
+    {
+        switch (key)
+        {
+            case Key.Left:
+                if (!vm.DashboardVm.MoveWiiFocus(-1, 0)) OpenNavWithCurrentHighlight(vm);
+                return true;
+            case Key.Right: vm.DashboardVm.MoveWiiFocus(1, 0);  return true;
+            case Key.Up:    vm.DashboardVm.MoveWiiFocus(0, -1); return true;
+            case Key.Down:  vm.DashboardVm.MoveWiiFocus(0, 1);  return true;
+            case Key.Enter: vm.DashboardVm.OpenWiiFocused();    return true;
+            case Key.X:     vm.DashboardVm.PlayWiiFocused();    return true;
         }
         return false;
     }
@@ -1379,6 +1415,13 @@ public partial class MainWindow : Window
                 case Key.Enter: vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null); return;
                 case Key.Y:     vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null); return;
             }
+        }
+
+        // Wii Menu dashboard
+        if (vm.IsHome && string.Equals(vm.SettingsVm.DesignTheme, "Wii", StringComparison.OrdinalIgnoreCase) &&
+            !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        {
+            if (HandleWiiDashboardKey(vm, key)) return;
         }
 
         // Default dashboard: hero "Continue Playing" button + Continue Playing cards

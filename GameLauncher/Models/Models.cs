@@ -907,10 +907,27 @@ namespace GameLauncher.Models
     }
 
     /// <summary>A community mod link attached to a Games.Database entry ({ name, url, genres }).</summary>
-    public class GameModEntry
+    public class GameModEntry : System.ComponentModel.INotifyPropertyChanged
     {
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
         public string       Name   { get; set; } = "";
         public string       Url    { get; set; } = "";
+        public string       Description { get; set; } = "";
+        public string DisplayDescription => string.IsNullOrWhiteSpace(Description) ? "No description provided." : Description;
+        private bool _isExpanded;
+        /// <summary>Whether the website-style detail (description + open link) is shown under the card.</summary>
+        public bool IsExpanded
+        {
+            get => _isExpanded;
+            set
+            {
+                if (_isExpanded == value) return;
+                _isExpanded = value;
+                PropertyChanged?.Invoke(this, new(nameof(IsExpanded)));
+                PropertyChanged?.Invoke(this, new(nameof(ExpandArrow)));
+            }
+        }
+        public string ExpandArrow => IsExpanded ? "▴" : "▾";
         public List<string> Genres { get; set; } = new();
         public string GenresLabel => Genres.Count == 0 ? "" : string.Join(" · ", Genres);
     }
@@ -930,6 +947,8 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Optional Exophase achievements/trophies page URL for the game.</summary>
         public string?       ExophaseUrl    { get; set; }
+        /// <summary>IGDB rating normalised to 0–5 (0 = none), same rule as the website.</summary>
+        public double        IgdbRating     { get; set; }
         /// <summary>Background/screenshot image URLs (from background_images array).</summary>
         public List<string>? Screenshots     { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop, PlayStation Store).</summary>

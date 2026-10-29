@@ -1,0 +1,174 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GamesLib.WiiGamesLib"
+             x:DataType="vm:LibraryViewModel"
+             Background="#f3f4f6">
+
+    <!--
+        Wii.Games.Lib — Wii Menu style "My Library" (Games) page.
+        Edit this file to change the "Wii" Games theme. It continues the Wii dashboard: the dashboard's
+        "Recently Played" page flows on to this one when the user presses Right, and Left on the first
+        column (or the ◀ button) slides back. Styles are local so it also works with other Design themes.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.wii-lib-ch">
+            <Setter Property="Width" Value="210"/>
+            <Setter Property="Height" Value="168"/>
+            <Setter Property="Margin" Value="9"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#ffffff"/>
+            <Setter Property="BorderBrush" Value="#c3d0dc"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.wii-lib-ch:pointerover, Button.wii-lib-ch.focused">
+            <Setter Property="BorderBrush" Value="#3aa0e8"/>
+            <Setter Property="BorderThickness" Value="4"/>
+        </Style>
+        <Style Selector="Border.wii-lib-label">
+            <Setter Property="Background" Value="#f2f6fa"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+        <Style Selector="TextBlock.wii-lib-name">
+            <Setter Property="Foreground" Value="#333333"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.wii-lib-arrow">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="Background" Value="#ffffff"/>
+            <Setter Property="Foreground" Value="#3aa0e8"/>
+            <Setter Property="BorderBrush" Value="#a8c8d8"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.wii-lib-chip">
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Foreground" Value="#5a6b7a"/>
+            <Setter Property="Background" Value="#ffffff"/>
+            <Setter Property="BorderBrush" Value="#c3d0dc"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.wii-lib-chip.filter-chip-active">
+            <Setter Property="Foreground" Value="#ffffff"/>
+            <Setter Property="Background" Value="#3aa0e8"/>
+            <Setter Property="BorderBrush" Value="#3aa0e8"/>
+        </Style>
+        <Style Selector="Button.wii-lib-chip.filter-chip-active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3aa0e8"/>
+        </Style>
+        <Style Selector="Border.wii-lib-dot">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="#c3d0dc"/>
+        </Style>
+        <Style Selector="Border.wii-lib-dot.active">
+            <Setter Property="Background" Value="#3aa0e8"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12,18,12,0">
+
+        <!-- Header + search -->
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,10">
+            <Button Grid.Column="0" Classes="wii-lib-arrow" Content="◀"
+                    Command="{Binding BackToDashboardCommand}"/>
+            <StackPanel Grid.Column="1" Margin="16,0,0,0" VerticalAlignment="Center">
+                <TextBlock Text="My Library" FontSize="26" FontWeight="Bold" Foreground="#3a8fd0"/>
+                <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games in your collection'}"
+                           FontSize="12" Foreground="#7a8794"/>
+            </StackPanel>
+            <TextBox Grid.Column="2"
+                     Name="LibrarySearchBox"
+                     Classes="form-input"
+                     IsTabStop="False"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search games…"
+                     Width="240" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Platform dropdown + install-status chips -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="68,0,0,6">
+            <ComboBox ItemsSource="{Binding Platforms}"
+                      SelectedItem="{Binding FilterPlatform}"
+                      MinWidth="180"
+                      VerticalAlignment="Center"/>
+            <Button Classes="wii-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterAll}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="All">
+                <TextBlock Text="All" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="wii-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Installed">
+                <TextBlock Text="Installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="wii-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Uninstalled">
+                <TextBlock Text="Not installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+        </StackPanel>
+
+        <!-- Channel grid -->
+        <ScrollViewer Grid.Row="2"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="0,0,0,12">
+            <ItemsControl ItemsSource="{Binding FilteredMyGames}" HorizontalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LocalGameCardVm">
+                        <Button Classes="wii-lib-ch"
+                                Classes.focused="{Binding IsFocused}"
+                                Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                                CommandParameter="{Binding}">
+                            <Grid RowDefinitions="*,Auto">
+                                <Border Grid.Row="0" ClipToBounds="True" CornerRadius="8,8,0,0">
+                                    <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                      FallbackText="{Binding EffectiveTitle}"
+                                                      FallbackGradient="{Binding CoverGradient}"
+                                                      SubText="{Binding Platform}"
+                                                      LetterFontSize="36"/>
+                                </Border>
+                                <Border Grid.Row="1" Classes="wii-lib-label">
+                                    <TextBlock Text="{Binding EffectiveTitle}" Classes="wii-lib-name"/>
+                                </Border>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <!-- Page dots: dashboard • library -->
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8"
+                    HorizontalAlignment="Center" Margin="0,4,0,12">
+            <Border Classes="wii-lib-dot"/>
+            <Border Classes="wii-lib-dot active"/>
+        </StackPanel>
+
+    </Grid>
+</UserControl>

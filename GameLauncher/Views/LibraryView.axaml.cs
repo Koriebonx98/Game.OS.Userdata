@@ -31,9 +31,12 @@ public partial class LibraryView : UserControl
             Dispatcher.UIThread.Post(BringFocusedIntoView, DispatcherPriority.Background);
     }
 
-    private Control? ActiveLib() => _vm is { IsPs5GamesLib: true }
-        ? this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib")
-        : this.FindControl<GamesLib.DefaultGamesLib>("DefaultLib");
+    private Control? ActiveLib() => _vm switch
+    {
+        { IsPs5GamesLib: true } => this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib"),
+        { IsWiiGamesLib: true } => this.FindControl<GamesLib.WiiGamesLib>("WiiLib"),
+        _ => this.FindControl<GamesLib.DefaultGamesLib>("DefaultLib"),
+    };
 
     private WrapPanel? CardPanel() =>
         ActiveLib()?.GetVisualDescendants().OfType<WrapPanel>().FirstOrDefault();
@@ -61,6 +64,8 @@ public partial class LibraryView : UserControl
     {
         if (DataContext is ViewModels.LibraryViewModel { IsPs5GamesLib: true })
             this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib")?.FocusSearchBox();
+        else if (DataContext is ViewModels.LibraryViewModel { IsWiiGamesLib: true })
+            this.FindControl<GamesLib.WiiGamesLib>("WiiLib")?.FocusSearchBox();
         else
             this.FindControl<GamesLib.DefaultGamesLib>("DefaultLib")?.FocusSearchBox();
     }
