@@ -445,6 +445,15 @@ public partial class MainWindow : Window
             }
         }
 
+        if (vm.IsHome && string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase)
+            && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
+            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter
+            && vm.DashboardVm.HandleSwitchBarKey(e.Key.ToString()))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // PS5/Switch dashboard navigation
         bool usesCardDashboardNavigation =
             string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) ||
@@ -1484,6 +1493,12 @@ public partial class MainWindow : Window
                     return;
             }
         }
+
+        if (vm.IsHome && string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase)
+            && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
+            && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter
+            && vm.DashboardVm.HandleSwitchBarKey(key.ToString()))
+            return;
 
         // PS5 / Switch dashboard navigation
         bool usesCardDashboardNavigationController =

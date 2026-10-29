@@ -73,6 +73,10 @@
         <Style Selector="Button.sw-round /template/ ContentPresenter">
             <Setter Property="CornerRadius" Value="21"/>
         </Style>
+        <Style Selector="Button.sw-round.focused">
+            <Setter Property="Background" Value="#00c3e3"/>
+            <Setter Property="RenderTransform" Value="scale(1.15)"/>
+        </Style>
         <Style Selector="Button.sw-round:pointerover">
             <Setter Property="Background" Value="#4a4e57"/>
         </Style>
@@ -82,11 +86,17 @@
         </Style>
     </UserControl.Styles>
 
-    <Border Classes="dashboard-switch-layout" Background="#2b2b2b">
+    <Border Classes="dashboard-switch-layout" Background="#2b2b2b"
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Panel ClipToBounds="True">
         <!-- Hovered game's picture: always behind (ZIndex 0) the tiles and menu (ZIndex 1) -->
-        <views:CoverImage ZIndex="0" IsVisible="{Binding HasSwitchShownCard}" ImageUrl="{Binding SwitchShownCard.CoverUrl}"
-                          FallbackText="" Opacity="0.28" IsHitTestVisible="False"/>
+        <views:CoverImage x:Name="BgCover" ZIndex="0" IsVisible="{Binding HasSwitchShownCard}" ImageUrl="{Binding SwitchShownCard.CoverUrl}"
+                          FallbackText="" Opacity="0.28" IsHitTestVisible="False"
+                          HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <views:CoverImage.Transitions>
+                <Transitions><DoubleTransition Property="Opacity" Duration="0:0:0.25"/></Transitions>
+            </views:CoverImage.Transitions>
+        </views:CoverImage>
         <Grid ZIndex="1" RowDefinitions="Auto,*,Auto">
 
             <!-- Profile + clock -->
@@ -162,15 +172,15 @@
             <!-- Round shortcut bar -->
             <Border Classes="sw-bar" Margin="0,8,0,0">
                 <StackPanel Orientation="Horizontal">
-                    <Button Classes="sw-round" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"
+                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar0}" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"
                             ToolTip.Tip="All Games"/>
-                    <Button Classes="sw-round" Content="🛍" Command="{Binding OpenFeaturedDetailCommand}"
+                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar1}" Content="🛍" Command="{Binding OpenFeaturedDetailCommand}"
                             ToolTip.Tip="Store"/>
-                    <Button Classes="sw-round" Content="👥" Command="{Binding NavigateToFriendsCommand}"
+                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar2}" Content="👥" Command="{Binding NavigateToFriendsCommand}"
                             ToolTip.Tip="Friends"/>
-                    <Button Classes="sw-round" Content="✉" Command="{Binding NavigateToInboxCommand}"
+                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar3}" Content="✉" Command="{Binding NavigateToInboxCommand}"
                             ToolTip.Tip="Inbox"/>
-                    <Button Classes="sw-round" Content="⚙" Command="{Binding NavigateToSettingsCommand}"
+                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar4}" Content="⚙" Command="{Binding NavigateToSettingsCommand}"
                             ToolTip.Tip="Settings"/>
                 </StackPanel>
             </Border>

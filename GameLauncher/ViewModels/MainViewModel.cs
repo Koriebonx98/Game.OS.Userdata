@@ -194,10 +194,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (!value) GameCardShowAll = false;
         GameCardFocus = 0;
+        GameCardSelectedAchievement = null;
         OnPropertyChanged(nameof(ShowDetailPage));
     }
     partial void OnGameCardFocusChanged(int value)
     {
+        var shelf = DetailVm.CardAchievements;
+        for (int i = 0; i < shelf.Count; i++) shelf[i].IsCardFocused = value == AchFocusBase + i;
         OnPropertyChanged(nameof(GameCardPlayFocused));
         OnPropertyChanged(nameof(GameCardInfoFocused));
         OnPropertyChanged(nameof(GameCardAllFocused));
@@ -236,17 +239,49 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             case 0: GameCardPlay(); break;
             case 1: GameCardInfo(); break;
-            default: GameCardToggleAll(); break;
+            case 2: GameCardToggleAll(); break;
+            default:
+                int i = GameCardFocus - AchFocusBase;
+                if (i >= 0 && i < DetailVm.CardAchievements.Count) GameCardSelectAchievement(DetailVm.CardAchievements[i]);
+                break;
         }
     }
 
     public void GameCardMove(int dx, int dy)
     {
-        if (dy > 0 && DetailVm.HasAchievements) GameCardFocus = 2;
-        else if (dy < 0 && GameCardFocus == 2) GameCardFocus = 0;
-        else if (dx < 0 && GameCardFocus == 1) GameCardFocus = 0;
-        else if (dx > 0 && GameCardFocus == 0) GameCardFocus = 1;
+        int n = GameCardShowAll ? 0 : DetailVm.CardAchievements.Count;
+        int f = GameCardFocus;
+        bool inShelf = f >= AchFocusBase;
+        if (dy > 0)
+        {
+            if (f < 2 && DetailVm.HasAchievements) GameCardFocus = n > 0 ? AchFocusBase : 2;
+        }
+        else if (dy < 0)
+        {
+            if (f >= 2) GameCardFocus = 0;
+        }
+        else if (dx != 0)
+        {
+            if (f == 0 && dx > 0) GameCardFocus = 1;
+            else if (f == 1 && dx < 0) GameCardFocus = 0;
+            else if (inShelf)
+            {
+                int i = f - AchFocusBase + dx;
+                if (i < 0) return;
+                GameCardFocus = i >= n ? 2 : AchFocusBase + i;
+            }
+            else if (f == 2 && dx < 0 && n > 0) GameCardFocus = AchFocusBase + n - 1;
+        }
     }
+
+    private const int AchFocusBase = 100;
+    [ObservableProperty] private Achievement? _gameCardSelectedAchievement;
+    public bool HasGameCardSelectedAchievement => GameCardSelectedAchievement != null;
+    partial void OnGameCardSelectedAchievementChanged(Achievement? value) =>
+        OnPropertyChanged(nameof(HasGameCardSelectedAchievement));
+
+    [RelayCommand] private void GameCardSelectAchievement(Achievement? a) =>
+        GameCardSelectedAchievement = ReferenceEquals(GameCardSelectedAchievement, a) ? null : a;
 
     /// <summary>B / Escape: collapses the full achievement list first, then closes the card.</summary>
     public void GameCardBack()

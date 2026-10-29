@@ -6,8 +6,9 @@
              x:Class="GameLauncher.Views.DashboardLib.Ps5Dashboard"
              x:DataType="vm:DashboardViewModel">
 
-    <Border Classes="dashboard-ps5-layout">
-        <Grid RowDefinitions="Auto,180,Auto,Auto,*,Auto">
+    <Border Classes="dashboard-ps5-layout"
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
+        <Grid RowDefinitions="Auto,180,*,Auto">
 
             <!-- Header -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,12">
@@ -82,131 +83,43 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Action buttons - for focused card (keyboard nav) -->
-            <StackPanel Grid.Row="2"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Margin="0,18,0,8"
-                        IsVisible="{Binding HasFocusedCard}">
-                <Button Classes="btn-primary ps5-action-primary"
-                        Width="260" Height="46"
-                        HorizontalContentAlignment="Center"
-                        Command="{Binding PlayFocusedCardCommand}"
-                        Margin="0,0,14,0">
-                    Play Game
-                </Button>
-                <Button Classes="btn-secondary ps5-action-more"
-                        Width="46" Height="46"
-                        HorizontalContentAlignment="Center"
-                        Command="{Binding OpenFocusedCardDetailCommand}"
-                        ToolTip.Tip="More options">
-                    ...
-                </Button>
-            </StackPanel>
-            <!-- Action buttons - for featured game (when no focused card) -->
-            <StackPanel Grid.Row="2"
-                        Orientation="Horizontal"
-                        HorizontalAlignment="Center"
-                        VerticalAlignment="Center"
-                        Margin="0,18,0,8"
-                        IsVisible="{Binding !HasFocusedCard}">
-                <Button Classes="btn-primary ps5-action-primary"
-                        Width="260" Height="46"
-                        HorizontalContentAlignment="Center"
-                        Command="{Binding ContinuePlayingCommand}"
-                        IsVisible="{Binding IsFeaturedLastPlayed}"
-                        Margin="0,0,14,0">
-                    Play Game
-                </Button>
-                <Button Classes="btn-primary ps5-action-primary"
-                        Width="260" Height="46"
-                        HorizontalContentAlignment="Center"
-                        Command="{Binding OpenFeaturedDetailCommand}"
-                        IsVisible="{Binding !IsFeaturedLastPlayed}"
-                        Margin="0,0,14,0">
-                    Play Game
-                </Button>
-                <Button Classes="btn-secondary ps5-action-more"
-                        Width="46" Height="46"
-                        HorizontalContentAlignment="Center"
-                        ToolTip.Tip="More options">
-                    ...
-                </Button>
+            <!-- Store brief (Store tile highlighted) -->
+            <StackPanel Grid.Row="2" Margin="40,14,40,0" Spacing="6" IsVisible="{Binding IsStoreFocused}">
+                <TextBlock Text="Store" Foreground="#00AEEF" FontSize="14" FontWeight="SemiBold"/>
+                <TextBlock Text="{Binding StoreBriefGame.Title}" Foreground="White" FontSize="30" FontWeight="Bold"
+                           TextTrimming="CharacterEllipsis"/>
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <TextBlock Text="{Binding StoreBriefGame.Genre}" Foreground="#B3B3B3" FontSize="14"/>
+                    <TextBlock Text="{Binding StoreBriefGame.Platform}" Foreground="#B3B3B3" FontSize="14"/>
+                    <TextBlock Text="{Binding StoreBriefGame.Price}" Foreground="#00AEEF" FontSize="14" FontWeight="SemiBold"/>
+                </StackPanel>
+                <TextBlock Text="{Binding StoreBriefGame.Description}" Foreground="#B3B3B3" FontSize="15"
+                           TextWrapping="Wrap" MaxLines="3" MaxWidth="760" HorizontalAlignment="Left"/>
             </StackPanel>
 
-            <!-- Store welcome block -->
-            <StackPanel Grid.Row="3"
-                        HorizontalAlignment="Center"
-                        Margin="0,16,0,0"
-                        IsVisible="{Binding !IsFeaturedLastPlayed}">
-                <TextBlock Text="Welcome to the next generation"
-                           Foreground="White"
-                           FontSize="32"
-                           FontWeight="Bold"
-                           HorizontalAlignment="Center"/>
-                <TextBlock Text="From the freshest releases to curated collections, there's something for everyone."
-                           Foreground="#B3B3B3"
-                           FontSize="18"
-                           HorizontalAlignment="Center"
-                           Margin="0,8,0,0"/>
-                <TextBlock Text="Must see"
-                           Foreground="#00AEEF"
-                           FontSize="18"
-                           FontWeight="SemiBold"
-                           HorizontalAlignment="Left"
-                           Margin="40,28,0,0"/>
-            </StackPanel>
-
-            <!-- Achievements panel -->
-            <Border Grid.Row="4"
-                    HorizontalAlignment="Left"
-                    VerticalAlignment="Top"
-                    Margin="28,24,0,18"
-                    Padding="16,12"
-                    Classes="ps5-achievements-panel"
-                    IsVisible="{Binding RecentAchievements.Count}">
-                <StackPanel Width="380">
-                    <DockPanel Margin="0,0,0,8" LastChildFill="True">
-                        <TextBlock DockPanel.Dock="Left"
-                                   Text="{Binding AchievementsCount, StringFormat='{}{0} Trophies'}"
-                                   Foreground="#E6E6E6"
-                                   FontSize="12"
-                                   FontWeight="SemiBold"/>
-                        <TextBlock DockPanel.Dock="Right"
-                                   Text="Achievements"
-                                   Foreground="#9E9E9E"
-                                   FontSize="11"
-                                   Margin="8,0,0,0"/>
-                    </DockPanel>
-                    <Rectangle Height="1" Fill="#2B2B2B" Margin="0,0,0,8"/>
-                    <ItemsControl ItemsSource="{Binding RecentAchievements}">
+            <!-- Trophies of the highlighted game (live as focus moves) -->
+            <Border Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,14,0,0"
+                    Padding="16,12" Classes="ps5-achievements-panel"
+                    IsVisible="{Binding !IsStoreFocused}">
+                <StackPanel Width="420">
+                    <TextBlock Text="{Binding FocusedCardTrophyHeader}" Foreground="#E6E6E6" FontSize="13"
+                               FontWeight="SemiBold" Margin="0,0,0,6" TextTrimming="CharacterEllipsis"/>
+                    <Rectangle Height="1" Fill="#2B2B2B" Margin="0,0,0,6"/>
+                    <TextBlock Text="No trophies yet" Foreground="#9E9E9E" FontSize="12"
+                               IsVisible="{Binding !HasFocusedCardAchievements}"/>
+                    <ItemsControl ItemsSource="{Binding FocusedCardAchievements}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:Achievement">
-                                <Grid Margin="0,4,0,4" ColumnDefinitions="28,*">
-                                    <Border Grid.Column="0"
-                                            Width="20" Height="20"
-                                            CornerRadius="10"
-                                            Background="#FFD400"
-                                            VerticalAlignment="Center"
-                                            HorizontalAlignment="Center">
-                                        <TextBlock Text="T"
-                                                   Foreground="Black"
-                                                   FontWeight="Bold"
-                                                   FontSize="12"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
+                                <Grid Margin="0,3" ColumnDefinitions="28,*" Opacity="{Binding LockedOpacity}">
+                                    <Border Width="20" Height="20" CornerRadius="10" Background="#FFD400"
+                                            VerticalAlignment="Center" HorizontalAlignment="Center">
+                                        <TextBlock Text="T" Foreground="Black" FontWeight="Bold" FontSize="12"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                     </Border>
-                                    <StackPanel Grid.Column="1" Orientation="Vertical" Margin="8,0,0,0">
-                                        <TextBlock Text="{Binding Name}"
-                                                   Foreground="#F2F2F2"
-                                                   FontSize="13"
-                                                   FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   MaxWidth="280"/>
-                                        <TextBlock Text="{Binding GameTitle}"
-                                                   Foreground="#9E9E9E"
-                                                   FontSize="11"/>
+                                    <StackPanel Grid.Column="1" Margin="8,0,0,0">
+                                        <TextBlock Text="{Binding Name}" Foreground="#F2F2F2" FontSize="13"
+                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding StatusLabel}" Foreground="#9E9E9E" FontSize="11"/>
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
@@ -216,11 +129,11 @@
             </Border>
 
             <!-- Bottom status tiles -->
-            <StackPanel Grid.Row="5"
+            <StackPanel Grid.Row="3"
                         Orientation="Horizontal"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Bottom"
-                        Margin="20,0,0,20">
+                        Margin="20,0,0,12">
                 <Border Classes="ps5-status-tile" Width="120" Height="52" Padding="10">
                     <StackPanel>
                         <TextBlock Text="{Binding AchievementsCount}" Classes="ps5-status-value"/>

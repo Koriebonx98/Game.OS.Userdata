@@ -6,7 +6,8 @@
              x:Class="GameLauncher.Views.DashboardLib.Xb360Dashboard"
              x:DataType="vm:DashboardViewModel">
 
-    <Border Classes="dashboard-xb360-layout">
+    <Border Classes="dashboard-xb360-layout"
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Grid RowDefinitions="Auto,Auto,*">
             <!-- Top header bar with user info -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="32,16,32,0">

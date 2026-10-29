@@ -613,6 +613,7 @@ public partial class DashboardViewModel : ViewModelBase
 
         // ── Initialize PS5 focused card ──────────────────────────────────────
         SelectedCardIndex = -1; // Store card is highlighted first
+        SwitchBarIndex = -1;
         UpdateFocusedCard();
 
         // ── Initialize XB360 blade and focus ─────────────────────────────────
@@ -707,6 +708,10 @@ public partial class DashboardViewModel : ViewModelBase
     [ObservableProperty] private string _focusedCardPlaytime = "";
     [ObservableProperty] private bool _hasFocusedCard;
     public ObservableCollection<Achievement> FocusedCardAchievements { get; } = new();
+    public bool HasFocusedCardAchievements => FocusedCardAchievements.Count > 0;
+    [ObservableProperty] private string _focusedCardTrophyHeader = "";
+    /// <summary>Top-rated store title shown as the store brief when the Store tile is highlighted.</summary>
+    public StoreGame? StoreBriefGame => GameCatalog.Store.OrderByDescending(g => g.Rating).FirstOrDefault();
 
     /// <summary>Invoked by MainWindow when Play is pressed for the focused card.</summary>
     public Action<LocalGameCardVm>? OnPlayFocusedCard { get; set; }
@@ -720,6 +725,52 @@ public partial class DashboardViewModel : ViewModelBase
 
     [ObservableProperty] private bool _isStoreFocused = true;
     [ObservableProperty] private bool _isAllGamesFocused;
+
+    /// <summary>Switch dashboard: highlighted button of the round shortcut bar (-1 = the tile row has focus).</summary>
+    [ObservableProperty] private int _switchBarIndex = -1;
+    public bool InSwitchBar => SwitchBarIndex >= 0;
+    public bool SwitchBar0 => SwitchBarIndex == 0;
+    public bool SwitchBar1 => SwitchBarIndex == 1;
+    public bool SwitchBar2 => SwitchBarIndex == 2;
+    public bool SwitchBar3 => SwitchBarIndex == 3;
+    public bool SwitchBar4 => SwitchBarIndex == 4;
+    partial void OnSwitchBarIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(InSwitchBar));
+        OnPropertyChanged(nameof(SwitchBar0));
+        OnPropertyChanged(nameof(SwitchBar1));
+        OnPropertyChanged(nameof(SwitchBar2));
+        OnPropertyChanged(nameof(SwitchBar3));
+        OnPropertyChanged(nameof(SwitchBar4));
+    }
+
+    /// <summary>Handles a D-pad/A press while the Switch shortcut bar is focused or being entered. Returns true when consumed.</summary>
+    public bool HandleSwitchBarKey(string key)
+    {
+        if (!InSwitchBar)
+        {
+            if (key != "Down") return false;
+            SwitchBarIndex = 0;
+            return true;
+        }
+        switch (key)
+        {
+            case "Left":  SwitchBarIndex = Math.Max(0, SwitchBarIndex - 1); break;
+            case "Right": SwitchBarIndex = Math.Min(4, SwitchBarIndex + 1); break;
+            case "Up":    SwitchBarIndex = -1; break;
+            case "Enter":
+                switch (SwitchBarIndex)
+                {
+                    case 0: NavigateToAllGames(); break;
+                    case 1: OpenFeaturedDetail(); break;
+                    case 2: NavigateToFriends(); break;
+                    case 3: NavigateToInbox(); break;
+                    default: NavigateToSettings(); break;
+                }
+                break;
+        }
+        return true;
+    }
 
     /// <summary>True when the first (Store) tile is highlighted.</summary>
     public bool IsAtFirstTile => SelectedCardIndex < 0;
@@ -817,6 +868,10 @@ public partial class DashboardViewModel : ViewModelBase
             FocusedCardPlaytime = "";
             HasFocusedCard  = false;
             FocusedCardAchievements.Clear();
+            if (SelectedCardIndex >= Ps5RecentGames.Count)
+                foreach (var a in RecentAchievements.Take(5)) FocusedCardAchievements.Add(a);
+            FocusedCardTrophyHeader = SelectedCardIndex < 0 ? "" : "Recent trophies";
+            OnPropertyChanged(nameof(HasFocusedCardAchievements));
             NotifySwitchShown();
             return;
         }
@@ -834,9 +889,10 @@ public partial class DashboardViewModel : ViewModelBase
         var related = RecentAchievements
             .Where(a => string.Equals(a.GameTitle, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))
             .ToList();
-        var toShow = related.Count > 0 ? related : RecentAchievements.Take(3).ToList();
-        foreach (var a in toShow)
+        foreach (var a in related.Take(6))
             FocusedCardAchievements.Add(a);
+        FocusedCardTrophyHeader = $"{card.EffectiveTitle} · Trophies";
+        OnPropertyChanged(nameof(HasFocusedCardAchievements));
     }
 
     [RelayCommand]

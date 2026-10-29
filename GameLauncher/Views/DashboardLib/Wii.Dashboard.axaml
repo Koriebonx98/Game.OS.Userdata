@@ -11,12 +11,11 @@
         (GamesLib/Wii.Games.Lib.axaml when "Wii").
         Controller: D-pad moves, Right past the last column opens the Library, A = game info, X = launch.
     -->
-    <Border Classes="dashboard-wii-layout" Background="#f3f4f6">
+    <Border Classes="dashboard-wii-layout" Background="#f3f4f6"
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Grid RowDefinitions="*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,8,6,0">
-                <Viewbox Grid.Column="0" Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="400"
-                         HorizontalAlignment="Center" VerticalAlignment="Center">
-                <ItemsControl Width="760" Height="372" ItemsSource="{Binding WiiChannels}">
+                <ItemsControl Grid.Column="0" ItemsSource="{Binding WiiChannels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="5" Rows="3"/>
@@ -40,7 +39,6 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-                </Viewbox>
                 <Button Grid.Column="1" Classes="wii-page-arrow" Content="▶" Margin="6,0,0,0"
                         Command="{Binding WiiNextPageCommand}" ToolTip.Tip="My Library"/>
             </Grid>
