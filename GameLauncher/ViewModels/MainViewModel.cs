@@ -935,12 +935,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.GamesTheme = SettingsVm.GamesTheme;
         LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         StoreVm.GamesTheme = SettingsVm.GamesTheme;
+        StoreVm.StoreTheme = SettingsVm.StoreTheme;
         DetailVm.GameInfoTheme = SettingsVm.GameInfoTheme;
         StoreVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         SettingsVm.PropertyChanged += (_, e) =>
         {
             if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
                 { LibraryVm.GamesTheme = SettingsVm.GamesTheme; StoreVm.GamesTheme = SettingsVm.GamesTheme; }
+            if (e.PropertyName == nameof(SettingsViewModel.StoreTheme))
+                StoreVm.StoreTheme = SettingsVm.StoreTheme;
             if (e.PropertyName == nameof(SettingsViewModel.KeyboardTheme))
                 { LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme; StoreVm.KeyboardTheme = SettingsVm.KeyboardTheme; }
             if (e.PropertyName == nameof(SettingsViewModel.GameInfoTheme))

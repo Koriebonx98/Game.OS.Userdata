@@ -1,0 +1,142 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             xmlns:models="using:GameLauncher.Models"
+             x:Class="GameLauncher.Views.StoreLib.XboxStore"
+             x:DataType="vm:StoreViewModel"
+             Background="#0E1A0E">
+
+    <!--
+        PS5.Store — Xbox style Store / App Store page.
+        Edit this file to change the "Xbox" theme; Default.Store.axaml holds the default one.
+        The tile highlighted by the D-pad (IsFocused) is lifted and ringed in white.
+        X = filters, Y = on-screen keyboard, LB/RB = Games / App Store tab.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.xbox-store-card">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="180"/>
+            <Setter Property="Margin" Value="10,10,14,18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.xbox-store-card /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="14"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="Padding" Value="0"/>
+        </Style>
+        <Style Selector="Button.xbox-store-card:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1F1F1F"/>
+        </Style>
+        <Style Selector="Button.xbox-store-card.focused">
+            <Setter Property="RenderTransform" Value="scale(1.08)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+        <Style Selector="Button.xbox-store-card.focused /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#107C10"/>
+            <Setter Property="Background" Value="#2A2A2A"/>
+        </Style>
+        <Style Selector="Button.xbox-store-tab">
+            <Setter Property="Padding" Value="18,7"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="Foreground" Value="#0D0D0D"/>
+            <Setter Property="Background" Value="#107C10"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="32,24,32,0">
+
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Store" FontSize="30" FontWeight="Bold" Foreground="#FFFFFF"
+                           IsVisible="{Binding IsGamesTab}"/>
+                <TextBlock Text="App Store" FontSize="30" FontWeight="Bold" Foreground="#FFFFFF"
+                           IsVisible="{Binding IsAppStoreTab}"/>
+                <TextBlock Text="{Binding CatalogCountLabel, StringFormat='   {0}'}"
+                           FontSize="13" Foreground="#9E9E9E" VerticalAlignment="Bottom" Margin="0,0,0,5"
+                           IsVisible="{Binding IsGamesTab}"/>
+            </StackPanel>
+            <TextBox Grid.Column="1" Classes="form-input" IsTabStop="False"
+                     Text="{Binding SearchText}" Watermark="🔍  Search store…"
+                     Width="240" VerticalAlignment="Center" IsVisible="{Binding IsGamesTab}"/>
+            <TextBox Grid.Column="1" Classes="form-input" IsTabStop="False"
+                     Text="{Binding AppStoreSearchText}" Watermark="🔍  Search apps…"
+                     Width="240" VerticalAlignment="Center" IsVisible="{Binding IsAppStoreTab}"/>
+        </Grid>
+
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,10">
+            <Button Classes="xbox-store-tab" Command="{Binding SwitchToGamesTabCommand}"
+                   >
+                <TextBlock Text="🎮  Games" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="xbox-store-tab" Command="{Binding SwitchToAppStoreTabCommand}">
+                <TextBlock Text="📦  Apps" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <TextBlock Text="X Filters    Y Search    LB/RB Tabs" FontSize="11" Foreground="#9E9E9E"
+                       VerticalAlignment="Center" Margin="12,0,0,0"/>
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto" Padding="0,0,0,28">
+            <Panel>
+                <ItemsControl Name="GamesGrid" ItemsSource="{Binding FilteredStore}" IsVisible="{Binding IsGamesTab}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:StoreGame">
+                            <Button Classes="xbox-store-card" Classes.focused="{Binding IsFocused}"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <Border Height="180" CornerRadius="12" ClipToBounds="True">
+                                        <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                          FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                          LetterFontSize="56" ImageCornerRadius="12" Height="180"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                               TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                    <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <ItemsControl Name="AppsGrid" ItemsSource="{Binding FilteredAppStoreEntries}" IsVisible="{Binding IsAppStoreTab}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:AppStoreEntry">
+                            <Button Classes="xbox-store-card" Classes.focused="{Binding IsFocused}"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenAppUrlCommand}"
+                                    CommandParameter="{Binding}">
+                                <StackPanel>
+                                    <Border Height="180" CornerRadius="12" ClipToBounds="True">
+                                        <views:CoverImage ImageUrl="{Binding RawImageUrl}" FallbackText="{Binding Name}"
+                                                          FallbackGradient="#1e1b4b,#312e81" SubText="{Binding Genre}"
+                                                          LetterFontSize="56" ImageCornerRadius="12" Height="180"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                               TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                    <TextBlock Text="{Binding Genre}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Panel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

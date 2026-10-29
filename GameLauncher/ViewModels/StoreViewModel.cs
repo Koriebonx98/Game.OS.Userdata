@@ -374,12 +374,19 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     // ── Themes (pushed from Settings by MainViewModel) ─────────────────────
     [ObservableProperty] private string _gamesTheme = "Default";
-    public bool IsPs5Store     => string.Equals(GamesTheme, "PS5", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultStore => !IsPs5Store;
-    partial void OnGamesThemeChanged(string value)
+    partial void OnGamesThemeChanged(string value) { }
+
+    [ObservableProperty] private string _storeTheme = "Default";
+    public bool IsSonyStore     => string.Equals(StoreTheme, "Sony", StringComparison.OrdinalIgnoreCase);
+    public bool IsXboxStore     => string.Equals(StoreTheme, "Xbox", StringComparison.OrdinalIgnoreCase);
+    public bool IsNintendoStore => string.Equals(StoreTheme, "Nintendo", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultStoreTheme => !IsSonyStore && !IsXboxStore && !IsNintendoStore;
+    partial void OnStoreThemeChanged(string value)
     {
-        OnPropertyChanged(nameof(IsPs5Store));
-        OnPropertyChanged(nameof(IsDefaultStore));
+        OnPropertyChanged(nameof(IsSonyStore));
+        OnPropertyChanged(nameof(IsXboxStore));
+        OnPropertyChanged(nameof(IsNintendoStore));
+        OnPropertyChanged(nameof(IsDefaultStoreTheme));
     }
 
     [ObservableProperty] private string _keyboardTheme = "Default";

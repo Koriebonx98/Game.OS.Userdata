@@ -158,6 +158,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _gameInfoTheme = "Default";
     public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5" };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
+    [ObservableProperty] private string _storeTheme = "Default";
+    public IReadOnlyList<string> AvailableStoreThemes { get; } = new[] { "Default", "Sony", "Xbox", "Nintendo" };
+
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
     public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5" };
@@ -763,6 +766,7 @@ public partial class SettingsViewModel : ViewModelBase
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         GamesTheme                 = NormaliseGamesTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
+        StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
         GameInfoTheme              = NormaliseGamesTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         LogGamesScanner           = appSettings.LogGamesScanner;
@@ -969,6 +973,7 @@ public partial class SettingsViewModel : ViewModelBase
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
             GamesTheme                 = NormaliseGamesTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
+            StoreTheme                 = NormaliseStoreTheme(StoreTheme),
             GameInfoTheme              = NormaliseGamesTheme(GameInfoTheme),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
             LogGamesScanner           = LogGamesScanner,
@@ -1087,6 +1092,14 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(trimmed, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(trimmed, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(trimmed, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
+        return "Default";
+    }
+
+    private static string NormaliseStoreTheme(string value)
+    {
+        var v = (value ?? "").Trim();
+        foreach (var t in new[] { "Sony", "Xbox", "Nintendo" })
+            if (string.Equals(v, t, StringComparison.OrdinalIgnoreCase)) return t;
         return "Default";
     }
 

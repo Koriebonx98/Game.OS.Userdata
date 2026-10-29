@@ -1103,6 +1103,17 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
+                                <TextBlock Text="Store"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableStoreThemes}"
+                                          SelectedItem="{Binding StoreTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="Store page design: Default, Sony (PlayStation), Xbox or Nintendo."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
                                 <TextBlock Text="Game Info"
                                            FontSize="13" Foreground="#e6edf3"/>
                                 <ComboBox Classes="form-input"
