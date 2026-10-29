@@ -28,8 +28,12 @@ public partial class GameDetailView : UserControl
         Unloaded           += OnUnloaded;
     }
 
+    /// <summary>Scrolls the detail page back to the top so playtime and header info are visible.</summary>
+    public void ScrollToTop() => this.FindControl<ScrollViewer>("DetailScroller")?.ScrollToHome();
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        ScrollToTop();
         if (DataContext is GameDetailViewModel vm)
         {
             vm.BrowseLaunchPathRequested  = OnBrowseLaunchPathRequested;

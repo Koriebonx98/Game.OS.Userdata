@@ -68,7 +68,7 @@
                     <TextBlock DockPanel.Dock="Bottom" Text="A Select    B Close" FontSize="11"
                                Foreground="#8b949e" Margin="4,10,0,0"/>
                     <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding FilterMenuItems}">
+                        <ItemsControl x:Name="FilterList" ItemsSource="{Binding FilterMenuItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:StoreViewModel+FilterMenuItem">
                                     <Border Classes="filter-row" Classes.hl="{Binding IsHighlighted}">

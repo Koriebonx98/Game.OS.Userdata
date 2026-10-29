@@ -38,7 +38,7 @@
         </Border>
 
         <!-- ── Content area ── -->
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer Grid.Row="1" x:Name="DetailScroller"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
             <StackPanel Margin="32,24,32,32" Spacing="0">
