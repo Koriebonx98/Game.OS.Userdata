@@ -551,7 +551,7 @@ class Program
 
     // Runs the scanner by creating temporary symlinks in $HOME so that the standard
     // GetDriveRoots() scan path picks up the TestData Games/, Repacks/ and Roms/ directories,
-    // then calls StartAsync() which is the normal public entry point.
+    // then forces a scan so cached results from a previous fixture cannot be reused.
 
     /// <summary>
     /// Creates a temporary fake storefront folder structure, runs the scanner against it,
@@ -1374,7 +1374,7 @@ class Program
                     Directory.CreateSymbolicLink(gamesLink, gamesDir);
                     cleanLink = true;
                 }
-                await scanner.StartAsync();
+                await scanner.RescanAsync();
             }
             finally
             {
