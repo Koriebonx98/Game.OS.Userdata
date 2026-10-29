@@ -23,12 +23,12 @@ public class WiiPageDotVm : ObservableObject
 }
 
 /// <summary>
-/// Wii Menu dashboard: one page of 4×3 channels (recently played). Pressing Right past the last column
+/// Wii Menu dashboard: one page of 5×3 channels (recently played). Pressing Right past the last column
 /// slides on to the Library page, which uses the user's chosen Games design (Wii.Games.Lib.axaml for "Wii").
 /// </summary>
 public partial class DashboardViewModel
 {
-    public const int WiiColumns = 4;
+    public const int WiiColumns = 5;
     public const int WiiRows = 3;
     private const int WiiPageSize = WiiColumns * WiiRows;
 

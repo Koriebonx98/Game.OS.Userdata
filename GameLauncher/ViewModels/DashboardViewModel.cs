@@ -805,6 +805,7 @@ public partial class DashboardViewModel : ViewModelBase
         foreach (var c in Ps5RecentGames)
             c.IsFocused = false;
 
+        NotifySwitchShown();
         IsStoreFocused    = SelectedCardIndex < 0;
         IsAllGamesFocused = SelectedCardIndex >= Ps5RecentGames.Count;
 
@@ -816,6 +817,7 @@ public partial class DashboardViewModel : ViewModelBase
             FocusedCardPlaytime = "";
             HasFocusedCard  = false;
             FocusedCardAchievements.Clear();
+            NotifySwitchShown();
             return;
         }
 
@@ -826,6 +828,7 @@ public partial class DashboardViewModel : ViewModelBase
         FocusedCardPlatform = card.Platform;
         FocusedCardPlaytime = card.PlaytimeLabel;
         HasFocusedCard      = true;
+        NotifySwitchShown();
 
         FocusedCardAchievements.Clear();
         var related = RecentAchievements
@@ -862,6 +865,26 @@ public partial class DashboardViewModel : ViewModelBase
 
     [RelayCommand]
     private void NavigateToInbox() => OnNavigateToPage?.Invoke("inbox");
+
+    [RelayCommand]
+    private void NavigateToSettings() => OnNavigateToPage?.Invoke("settings");
+
+    private LocalGameCardVm? _switchHoverCard;
+    /// <summary>Game under the mouse on the Switch dashboard (null when none).</summary>
+    public LocalGameCardVm? SwitchHoverCard
+    {
+        get => _switchHoverCard;
+        set { if (SetProperty(ref _switchHoverCard, value)) NotifySwitchShown(); }
+    }
+    public LocalGameCardVm? SwitchShownCard => _switchHoverCard ?? FocusedCard;
+    public bool HasSwitchShownCard => SwitchShownCard != null;
+    public string SwitchShownTitle => SwitchShownCard?.EffectiveTitle ?? "";
+    private void NotifySwitchShown()
+    {
+        OnPropertyChanged(nameof(SwitchShownCard));
+        OnPropertyChanged(nameof(HasSwitchShownCard));
+        OnPropertyChanged(nameof(SwitchShownTitle));
+    }
 
     // ── Media blade commands ────────────────────────────────────────────────────
     [RelayCommand]

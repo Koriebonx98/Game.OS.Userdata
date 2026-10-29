@@ -83,7 +83,10 @@
     </UserControl.Styles>
 
     <Border Classes="dashboard-switch-layout" Background="#2b2b2b">
-        <Grid RowDefinitions="Auto,*,Auto,Auto">
+        <Panel>
+        <views:CoverImage IsVisible="{Binding HasSwitchShownCard}" ImageUrl="{Binding SwitchShownCard.CoverUrl}"
+                          FallbackText="" Opacity="0.28" IsHitTestVisible="False"/>
+        <Grid RowDefinitions="Auto,*,Auto">
 
             <!-- Profile + clock -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="28,12,28,0">
@@ -99,9 +102,10 @@
                 </StackPanel>
             </Grid>
 
-            <!-- Tile row -->
-            <ScrollViewer Grid.Row="1" VerticalAlignment="Center"
-                          HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+            <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="14">
+            <TextBlock Text="{Binding SwitchShownTitle}" Foreground="#f1f1f1" FontSize="22" FontWeight="SemiBold"
+                       Height="30" Margin="44,0" TextTrimming="CharacterEllipsis"/>
+            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" Margin="40,0">
                     <Button Classes="sw-tile" Classes.focused="{Binding IsStoreFocused}"
                             Command="{Binding OpenFeaturedDetailCommand}">
@@ -118,6 +122,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:LocalGameCardVm">
                                 <Button Classes="sw-tile" Classes.focused="{Binding IsFocused}"
+                                        PointerEntered="OnTileEnter" PointerExited="OnTileExit"
                                         Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
                                         CommandParameter="{Binding}">
                                     <Border ClipToBounds="True" CornerRadius="2">
@@ -154,7 +159,7 @@
             </ScrollViewer>
 
             <!-- Round shortcut bar -->
-            <Border Grid.Row="2" Classes="sw-bar" Margin="0,0,0,4">
+            <Border Classes="sw-bar" Margin="0,8,0,0">
                 <StackPanel Orientation="Horizontal">
                     <Button Classes="sw-round" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"
                             ToolTip.Tip="All Games"/>
@@ -164,14 +169,18 @@
                             ToolTip.Tip="Friends"/>
                     <Button Classes="sw-round" Content="✉" Command="{Binding NavigateToInboxCommand}"
                             ToolTip.Tip="Inbox"/>
+                    <Button Classes="sw-round" Content="⚙" Command="{Binding NavigateToSettingsCommand}"
+                            ToolTip.Tip="Settings"/>
                 </StackPanel>
             </Border>
+            </StackPanel>
 
             <!-- Button hints -->
-            <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,2,28,8">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,2,28,8">
                 <TextBlock Text="Ⓧ  Play" Classes="sw-hint"/>
                 <TextBlock Text="Ⓐ  OK" Classes="sw-hint"/>
             </StackPanel>
         </Grid>
+        </Panel>
     </Border>
 </UserControl>
