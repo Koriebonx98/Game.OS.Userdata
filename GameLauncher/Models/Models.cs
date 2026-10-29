@@ -1019,8 +1019,12 @@ namespace GameLauncher.Models
             if (tokens.Length >= 2 && tokens.All(t => t.Length <= 4 && _shortTokenRegex.IsMatch(t)))
                 return true;
 
-            return _knownModeTagRegex.IsMatch(value);
+            return _knownModeTagRegex.IsMatch(value) || _regionTagRegex.IsMatch(value);
         }
+
+        private static readonly Regex _regionTagRegex =
+            new(@"^(?:usa|us|europe|eu|japan|jpn|world|pal|ntsc(?:-[a-z])?|region\s*free|multi-?\d*|en(?:,\s*[a-z]{2})*)$",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         private static readonly Regex _titleSeparatorRegex =
             new(@"^(.+?)\s[-:]\s(.+)$", RegexOptions.Compiled);
