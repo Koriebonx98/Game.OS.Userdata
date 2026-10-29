@@ -714,14 +714,14 @@ public partial class LibraryViewModel : ViewModelBase
     /// <summary>True when a local ROM matches the cloud game by platform + TitleID or fuzzy title.</summary>
     private static bool IsRomInstalled(List<LocalRom> roms, string normalizedPlatform, GameLauncher.Models.Game g)
     {
-        string stripped = PlatformHelper.StripSpecialSymbols(g.Title);
+        string stripped = PlatformHelper.NormalizeTitleForComparison(g.Title);
         foreach (var r in roms)
         {
             if (!string.Equals(PlatformHelper.NormalizePlatform(r.Platform), normalizedPlatform, StringComparison.OrdinalIgnoreCase))
                 continue;
             if (!string.IsNullOrEmpty(r.TitleId) && string.Equals(r.TitleId, g.TitleId, StringComparison.OrdinalIgnoreCase))
                 return true;
-            if (string.Equals(PlatformHelper.StripSpecialSymbols(r.Title), stripped, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(PlatformHelper.NormalizeTitleForComparison(r.Title), stripped, StringComparison.OrdinalIgnoreCase))
                 return true;
         }
         return false;
@@ -865,8 +865,8 @@ public partial class LibraryViewModel : ViewModelBase
             if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
                 (cloudTitles.Contains(r.Title) ||
                  cloudTitles.Any(ct => string.Equals(
-                     PlatformHelper.StripSpecialSymbols(ct),
-                     PlatformHelper.StripSpecialSymbols(r.Title),
+                     PlatformHelper.NormalizeTitleForComparison(ct),
+                     PlatformHelper.NormalizeTitleForComparison(r.Title),
                      StringComparison.OrdinalIgnoreCase))))
                 continue;
 
@@ -1011,8 +1011,8 @@ public partial class LibraryViewModel : ViewModelBase
             if (cloudByPlatform.TryGetValue(PlatformHelper.NormalizePlatform(r.Platform), out var cloudTitles) &&
                 (cloudTitles.Contains(r.Title) ||
                  cloudTitles.Any(ct => string.Equals(
-                     PlatformHelper.StripSpecialSymbols(ct),
-                     PlatformHelper.StripSpecialSymbols(r.Title),
+                     PlatformHelper.NormalizeTitleForComparison(ct),
+                     PlatformHelper.NormalizeTitleForComparison(r.Title),
                      StringComparison.OrdinalIgnoreCase))))
                 continue;
 

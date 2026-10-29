@@ -25,9 +25,11 @@ public partial class StoreView : UserControl
         _vm.ScrollFocusedIntoView = () => Dispatcher.UIThread.Post(BringFocusedIntoView, DispatcherPriority.Background);
     }
 
-    private Control? ActiveRoot() => _vm is { IsPs5Store: true }
-        ? this.FindControl<Control>("Ps5StoreView")
-        : this.FindControl<Control>("DefaultStoreView");
+    private Control? ActiveRoot() => this.FindControl<Control>(
+        _vm is { IsSonyStore: true }     ? "Ps5StoreView" :
+        _vm is { IsXboxStore: true }     ? "XboxStoreView" :
+        _vm is { IsNintendoStore: true } ? "NintendoStoreView" :
+                                           "DefaultStoreView");
 
     /// <summary>The visible card grid (the WrapPanel of the active tab).</summary>
     private WrapPanel? CardPanel() => ActiveRoot()?.GetVisualDescendants()

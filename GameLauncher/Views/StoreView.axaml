@@ -8,16 +8,20 @@
 
     <!--
         Host for the Store / App Store page. The layout lives in separate, easy-to-edit files
-        chosen by Settings → Design → Library:
+        chosen by Settings → Design → Store:
           Views/StoreLib/Default.Store.axaml   ("Default")
-          Views/StoreLib/PS5.Store.axaml       ("PS5")
+          Views/StoreLib/PS5.Store.axaml       ("Sony")
+          Views/StoreLib/Xbox.Store.axaml      ("Xbox")
+          Views/StoreLib/Nintendo.Store.axaml  ("Nintendo")
           Views/StoreLib/Store.Overlays.axaml  (controller filter menu + on-screen keyboard)
     -->
     <Panel>
-        <ScrollViewer IsVisible="{Binding IsDefaultStore}">
+        <ScrollViewer IsVisible="{Binding IsDefaultStoreTheme}">
             <store:DefaultStore Name="DefaultStoreView"/>
         </ScrollViewer>
-        <store:Ps5Store Name="Ps5StoreView" IsVisible="{Binding IsPs5Store}"/>
+        <store:Ps5Store Name="Ps5StoreView" IsVisible="{Binding IsSonyStore}"/>
+        <store:XboxStore Name="XboxStoreView" IsVisible="{Binding IsXboxStore}"/>
+        <store:NintendoStore Name="NintendoStoreView" IsVisible="{Binding IsNintendoStore}"/>
         <store:StoreOverlays/>
     </Panel>
 </UserControl>
