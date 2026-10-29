@@ -44,7 +44,7 @@
                     <ScrollViewer x:Name="PageScroller"
                                   HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto"
-                                  IsVisible="{Binding !ShowDetail}">
+                                  IsVisible="{Binding !ShowDetailPage}">
                         <Panel>
                             <Border IsVisible="{Binding IsHome}">
                                 <views:DashboardView DataContext="{Binding DashboardVm}"/>
@@ -85,9 +85,12 @@
                     </ScrollViewer>
 
                     <!-- Game detail overlay -->
-                    <Border IsVisible="{Binding ShowDetail}" Classes="detail-overlay-surface">
+                    <Border IsVisible="{Binding ShowDetailPage}" Classes="detail-overlay-surface">
                         <views:GameDetailView x:Name="GameDetailHost" DataContext="{Binding DetailVm}"/>
                     </Border>
+
+                    <!-- Wii / Switch mini game card -->
+                    <views:GameCardOverlay IsVisible="{Binding ShowGameCard}"/>
 
                     <!-- Friend profile overlay -->
                     <Border IsVisible="{Binding ShowFriendProfile}" Classes="detail-overlay-surface">

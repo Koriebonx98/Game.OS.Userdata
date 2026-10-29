@@ -163,7 +163,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
-    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii" };
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
@@ -1103,8 +1103,13 @@ public partial class SettingsViewModel : ViewModelBase
         return "Default";
     }
 
-    private static string NormaliseGamesLibTheme(string value) =>
-        string.Equals((value ?? "").Trim(), "Wii", StringComparison.OrdinalIgnoreCase) ? "Wii" : NormaliseGamesTheme(value);
+    private static string NormaliseGamesLibTheme(string value)
+    {
+        var v = (value ?? "").Trim();
+        if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
+        if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        return NormaliseGamesTheme(value);
+    }
 
     private static string NormaliseGamesTheme(string value) =>
         string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";

@@ -62,6 +62,9 @@ public partial class DashboardViewModel
         OnPropertyChanged(nameof(IsAtWiiLeftEdge));
     }
 
+    /// <summary>True on the bottom channel row (Down should reach the nav menu).</summary>
+    public bool IsWiiOnLastRow => WiiChannels.Count == 0 || WiiFocusIndex / WiiColumns >= WiiRows - 1;
+
     /// <summary>D-pad: moves the highlight; Right past the last column opens the Library page.</summary>
     /// <returns>False when Left was pressed on the first column (caller opens the nav menu).</returns>
     public bool MoveWiiFocus(int dCol, int dRow)

@@ -192,6 +192,11 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool   _hasMoreAchievements = false;
     private const int AchievementsPreviewCount = 6;
 
+    /// <summary>First five achievements (unlocked first) shown on the Wii / Switch game card shelf.</summary>
+    public ObservableCollection<Achievement> CardAchievements { get; } = new();
+    [ObservableProperty] private int    _achievementPercent;
+    [ObservableProperty] private string _achievementProgressText = "";
+
     partial void OnShowAllAchievementsChanged(bool value) => RefreshVisibleAchievements();
 
     [RelayCommand]
@@ -4632,6 +4637,12 @@ public partial class GameDetailViewModel : ViewModelBase
         foreach (var a in source)
             VisibleAchievements.Add(a);
         HasMoreAchievements = Achievements.Count > AchievementsPreviewCount;
+        CardAchievements.Clear();
+        foreach (var a in ordered.Take(5))
+            CardAchievements.Add(a);
+        int unlocked = Achievements.Count(a => a.IsUnlocked);
+        AchievementPercent = Achievements.Count == 0 ? 0 : (int)Math.Round(100.0 * unlocked / Achievements.Count);
+        AchievementProgressText = $"{unlocked} / {Achievements.Count}  ·  {AchievementPercent}%";
         if (HasAchievements)
             AchievementsLabel = $"🏆  Achievements  ({Achievements.Count(a => a.IsUnlocked)} / {Achievements.Count})";
     }

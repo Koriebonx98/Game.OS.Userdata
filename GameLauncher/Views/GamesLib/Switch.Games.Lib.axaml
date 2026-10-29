@@ -1,0 +1,164 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GamesLib.SwitchGamesLib"
+             x:DataType="vm:LibraryViewModel"
+             Background="#2b2b2b">
+
+    <!--
+        Switch.Games.Lib — Nintendo Switch style "My Library" (Games) page: dark surface, square game tiles
+        with a cyan focus frame. Edit this file to change the "Switch" Games theme.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.sw-lib-ch">
+            <Setter Property="Width" Value="170"/>
+            <Setter Property="Height" Value="190"/>
+            <Setter Property="Margin" Value="9"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Background" Value="#26292f"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.sw-lib-ch:pointerover, Button.sw-lib-ch.focused">
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
+            <Setter Property="BorderThickness" Value="4"/>
+        </Style>
+        <Style Selector="Border.sw-lib-label">
+            <Setter Property="Background" Value="#26292f"/>
+            <Setter Property="Padding" Value="6,4"/>
+        </Style>
+        <Style Selector="TextBlock.sw-lib-name">
+            <Setter Property="Foreground" Value="#f1f1f1"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        </Style>
+        <Style Selector="Button.sw-lib-arrow">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+            <Setter Property="Foreground" Value="#00c3e3"/>
+            <Setter Property="BorderBrush" Value="#4a4e57"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Button.sw-lib-chip">
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="CornerRadius" Value="16"/>
+            <Setter Property="Foreground" Value="#d8d8d8"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+            <Setter Property="BorderBrush" Value="#4a4e57"/>
+            <Setter Property="BorderThickness" Value="1"/>
+        </Style>
+        <Style Selector="Button.sw-lib-chip.filter-chip-active">
+            <Setter Property="Foreground" Value="#3a3d44"/>
+            <Setter Property="Background" Value="#00c3e3"/>
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
+        </Style>
+        <Style Selector="Button.sw-lib-chip.filter-chip-active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#00c3e3"/>
+        </Style>
+        <Style Selector="Border.sw-lib-dot">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Height" Value="10"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="Background" Value="#4a4e57"/>
+        </Style>
+        <Style Selector="Border.sw-lib-dot.active">
+            <Setter Property="Background" Value="#00c3e3"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="12,18,12,0">
+
+        <!-- Header + search -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="28,0,0,10">
+            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                <TextBlock Text="My Library" FontSize="26" FontWeight="SemiBold" Foreground="#f1f1f1"/>
+                <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games'}"
+                           FontSize="12" Foreground="#9aa0aa"/>
+            </StackPanel>
+            <TextBox Grid.Column="1" Margin="0,0,28,0"
+                     Name="LibrarySearchBox"
+                     Classes="form-input"
+                     IsTabStop="False"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search games…"
+                     Width="240" VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Platform dropdown + install-status chips -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="28,0,0,6">
+            <ComboBox ItemsSource="{Binding Platforms}"
+                      SelectedItem="{Binding FilterPlatform}"
+                      MinWidth="180"
+                      VerticalAlignment="Center"/>
+            <Button Classes="sw-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterAll}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="All">
+                <TextBlock Text="All" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="sw-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Installed">
+                <TextBlock Text="Installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+            <Button Classes="sw-lib-chip"
+                    Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
+                    Command="{Binding SetInstallFilterCommand}"
+                    CommandParameter="Uninstalled">
+                <TextBlock Text="Not installed" FontSize="12" FontWeight="SemiBold"/>
+            </Button>
+        </StackPanel>
+
+        <!-- Channel grid -->
+        <ScrollViewer Grid.Row="2"
+                      HorizontalScrollBarVisibility="Disabled"
+                      VerticalScrollBarVisibility="Auto"
+                      Padding="0,0,0,12">
+            <ItemsControl ItemsSource="{Binding FilteredMyGames}" HorizontalAlignment="Center">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel/>
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:LocalGameCardVm">
+                        <Button Classes="sw-lib-ch"
+                                Classes.focused="{Binding IsFocused}"
+                                Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                                CommandParameter="{Binding}">
+                            <Grid RowDefinitions="*,Auto">
+                                <Border Grid.Row="0" ClipToBounds="True" CornerRadius="2,2,0,0">
+                                    <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                      FallbackText="{Binding EffectiveTitle}"
+                                                      FallbackGradient="{Binding CoverGradient}"
+                                                      SubText="{Binding Platform}"
+                                                      LetterFontSize="36"/>
+                                </Border>
+                                <Border Grid.Row="1" Classes="sw-lib-label">
+                                    <TextBlock Text="{Binding EffectiveTitle}" Classes="sw-lib-name"/>
+                                </Border>
+                            </Grid>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+
+    </Grid>
+</UserControl>

@@ -172,6 +172,87 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [ObservableProperty] private bool _showLogin         = true;
     [ObservableProperty] private bool _showMain          = false;
     [ObservableProperty] private bool _showDetail        = false;
+
+    // Wii / Switch mini game card shown over the current page; DetailVm is loaded behind it.
+    [ObservableProperty] private bool _showGameCard;
+    [ObservableProperty] private bool _gameCardShowAll;
+    /// <summary>0 = Play, 1 = Info, 2 = Show all (achievement shelf).</summary>
+    [ObservableProperty] private int  _gameCardFocus;
+    public bool ShowDetailPage => ShowDetail && !ShowGameCard;
+    public bool IsGameCardSwitch => string.Equals(SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase)
+                                    && !string.Equals(SettingsVm.GamesTheme, "Wii", StringComparison.OrdinalIgnoreCase);
+    public bool GameCardPlayFocused => GameCardFocus == 0;
+    public bool GameCardInfoFocused => GameCardFocus == 1;
+    public bool GameCardAllFocused  => GameCardFocus == 2;
+
+    partial void OnShowDetailChanged(bool value)
+    {
+        if (!value) ShowGameCard = false;
+        OnPropertyChanged(nameof(ShowDetailPage));
+    }
+    partial void OnShowGameCardChanged(bool value)
+    {
+        if (!value) GameCardShowAll = false;
+        GameCardFocus = 0;
+        OnPropertyChanged(nameof(ShowDetailPage));
+    }
+    partial void OnGameCardFocusChanged(int value)
+    {
+        OnPropertyChanged(nameof(GameCardPlayFocused));
+        OnPropertyChanged(nameof(GameCardInfoFocused));
+        OnPropertyChanged(nameof(GameCardAllFocused));
+    }
+
+    private static bool IsCardTheme(string? t) =>
+        string.Equals(t, "Wii", StringComparison.OrdinalIgnoreCase) || string.Equals(t, "Switch", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Opens a game tile: Wii/Switch themes show the centred mini card, others open the full detail page.</summary>
+    private void OpenTileFromDashboard(LocalGameCardVm card) => OpenTile(card, IsCardTheme(SettingsVm.DesignTheme));
+    private void OpenTileFromLibrary(LocalGameCardVm card)   => OpenTile(card, IsCardTheme(SettingsVm.GamesTheme));
+
+    private void OpenTile(LocalGameCardVm card, bool asCard)
+    {
+        OpenDetailFromMyGameCard(card);
+        if (asCard && ShowDetail)
+        {
+            OnPropertyChanged(nameof(IsGameCardSwitch));
+            ShowGameCard = true;
+        }
+    }
+
+    [RelayCommand] private void GameCardPlay()
+    {
+        ShowGameCard = false;
+        ShowDetail = false;
+        DetailVm.LaunchGameCommand.Execute(null);
+    }
+    [RelayCommand] private void GameCardInfo() => ShowGameCard = false;
+    [RelayCommand] private void GameCardClose() { ShowGameCard = false; ShowDetail = false; }
+    [RelayCommand] private void GameCardToggleAll() => GameCardShowAll = !GameCardShowAll;
+
+    public void GameCardActivateFocused()
+    {
+        switch (GameCardFocus)
+        {
+            case 0: GameCardPlay(); break;
+            case 1: GameCardInfo(); break;
+            default: GameCardToggleAll(); break;
+        }
+    }
+
+    public void GameCardMove(int dx, int dy)
+    {
+        if (dy > 0 && DetailVm.HasAchievements) GameCardFocus = 2;
+        else if (dy < 0 && GameCardFocus == 2) GameCardFocus = 0;
+        else if (dx < 0 && GameCardFocus == 1) GameCardFocus = 0;
+        else if (dx > 0 && GameCardFocus == 0) GameCardFocus = 1;
+    }
+
+    /// <summary>B / Escape: collapses the full achievement list first, then closes the card.</summary>
+    public void GameCardBack()
+    {
+        if (GameCardShowAll) GameCardShowAll = false; else GameCardClose();
+    }
     [ObservableProperty] private bool _showFriendProfile = false;
     [ObservableProperty] private string _activePage      = "dashboard";
     /// <summary>True when the left nav sidebar overlay is visible.</summary>
@@ -863,7 +944,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Wire up OpenDetail from child VMs
         DashboardVm.OnOpenDetail        = OpenDetailFromGame;
         DashboardVm.OnOpenStoreDetail   = OpenDetailFromStoreGame;
-        DashboardVm.OnOpenLocalDetail   = OpenDetailFromMyGameCard;
+        DashboardVm.OnOpenLocalDetail   = OpenTileFromDashboard;
         DashboardVm.OnContinuePlaying   = LaunchFromCard;
         DashboardVm.OnNavigateToLibrary = () => Navigate("library");
         DashboardVm.OnNavigateToPage    = Navigate;
@@ -873,7 +954,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Navigate("media");
         };
         DashboardVm.OnPlayFocusedCard   = LaunchFromCard;
-        DashboardVm.OnOpenFocusedCardDetail = OpenDetailFromMyGameCard;
+        DashboardVm.OnOpenFocusedCardDetail = OpenTileFromDashboard;
         DashboardVm.OnViewFriendProfile  = OpenFriendProfile;
         DashboardVm.OnMessageFriend      = friendUsername =>
         {
@@ -930,8 +1011,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         LibraryVm.OnOpenLocalDetail   = OpenDetailFromLocalGame;
         LibraryVm.OnOpenRepackDetail  = OpenDetailFromLocalRepack;
         LibraryVm.OnOpenRomDetail     = OpenDetailFromLocalRom;
-        LibraryVm.OnOpenMyGameDetail  = OpenDetailFromMyGameCard;
-        LibraryVm.OpenFocusedGameRequested = OpenDetailFromMyGameCard;
+        LibraryVm.OnOpenMyGameDetail  = OpenTileFromLibrary;
+        LibraryVm.OpenFocusedGameRequested = OpenTileFromLibrary;
         LibraryVm.OnBackToDashboard = () => Navigate("dashboard");
         LibraryVm.GamesTheme = SettingsVm.GamesTheme;
         LibraryVm.KeyboardTheme = SettingsVm.KeyboardTheme;
