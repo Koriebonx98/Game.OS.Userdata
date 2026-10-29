@@ -364,7 +364,7 @@
                             Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                             CommandParameter="{Binding}">
                         <StackPanel>
-                            <Border Height="120" CornerRadius="10,10,0,0" ClipToBounds="True">
+                            <Border Height="120" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="10,10,0,0" ClipToBounds="True">
                                 <views:CoverImage
                                     ImageUrl="{Binding CoverUrl}"
                                     FallbackText="{Binding Title}"

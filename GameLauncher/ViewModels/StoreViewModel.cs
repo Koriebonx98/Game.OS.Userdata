@@ -71,7 +71,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// The search box can be used to narrow the results below this threshold,
     /// or the "Load More" button appends the next page of results.
     /// </summary>
-    private const int MaxDisplayedGames = 2000;
+    private const int MaxDisplayedGames = 200;
 
     [ObservableProperty] private int    _totalCatalogCount = 0;
     [ObservableProperty] private string _catalogCountLabel = "";

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 
 namespace GameLauncher.Services;
@@ -100,6 +101,17 @@ public static class GameReviewService
             return new Dictionary<string, string>(d ?? new(), StringComparer.OrdinalIgnoreCase);
         }
         catch { return new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase); }
+    }
+
+    /// <summary>Majority compat verdict as a colour (#3fb950 / #f0a030 / #f85149), or "Transparent" with no votes.</summary>
+    public static string GetCompatVerdictColor(string platform, string title)
+    {
+        var votes = LoadCompatVotes(platform, title);
+        if (votes.Count == 0) return "Transparent";
+        int g = votes.Values.Count(v => v == "green"), a = votes.Values.Count(v => v == "amber"), r = votes.Values.Count(v => v == "red");
+        int best = Math.Max(g, Math.Max(a, r));
+        if (best == 0) return "Transparent";
+        return best == g ? "#3fb950" : best == a ? "#f0a030" : "#f85149";
     }
 
     /// <summary>Records a user's vote. Returns false when the user has already voted (one vote per user per game).</summary>

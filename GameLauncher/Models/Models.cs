@@ -397,6 +397,10 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
         public string?       StorePageUrl    { get; set; }
+        private string? _compatBorder;
+        /// <summary>Card border colour from community compat votes: green / amber / red (transparent when no votes).</summary>
+        public string CompatBorderBrush => _compatBorder ??= GameLauncher.Services.GameReviewService.GetCompatVerdictColor(Platform, Title);
+        public double CompatBorderThickness => CompatBorderBrush == "Transparent" ? 0 : 3;
         public string        RatingStars     =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));
