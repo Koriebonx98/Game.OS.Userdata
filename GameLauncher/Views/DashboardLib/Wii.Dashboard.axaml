@@ -6,7 +6,7 @@
              x:DataType="vm:DashboardViewModel">
 
     <!--
-        Wii Menu: 4×3 channel grid of recently played games with a ▶ arrow and the curved "Wii Menu" bar.
+        Wii Menu: 5×3 channel grid of recently played games with a ▶ arrow and the curved "Wii Menu" bar.
         Page 1 = recently played games (this file); the next page is the Library, drawn by the chosen Games design
         (GamesLib/Wii.Games.Lib.axaml when "Wii").
         Controller: D-pad moves, Right past the last column opens the Library, A = game info, X = launch.
@@ -15,10 +15,10 @@
         <Grid RowDefinitions="*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,8,6,0">
                 <Viewbox Grid.Column="0" Stretch="Uniform">
-                <ItemsControl Width="880" Height="540" ItemsSource="{Binding WiiChannels}">
+                <ItemsControl Width="900" Height="440" ItemsSource="{Binding WiiChannels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <UniformGrid Columns="4" Rows="3"/>
+                            <UniformGrid Columns="5" Rows="3"/>
                         </ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
@@ -50,11 +50,12 @@
                     <Border Grid.Column="0" Classes="wii-status-orb-left">
                         <TextBlock Text="Wii" Classes="wii-orb-text"/>
                     </Border>
-                    <Border Grid.Column="1" Width="22" Height="28" Margin="14,0,0,0" CornerRadius="3"
-                            Background="#ffffff" BorderBrush="#a8c8d8" BorderThickness="2"
-                            VerticalAlignment="Center"/>
+                    <Button Grid.Column="1" Classes="wii-status-orb-button" Margin="10,0,0,0"
+                            Command="{Binding NavigateToSettingsCommand}" ToolTip.Tip="Settings">
+                        <TextBlock Text="⚙" Classes="wii-orb-text"/>
+                    </Button>
                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Wii Menu" Classes="wii-clock-time" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding WiiClockTime}" Classes="wii-clock-time" HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding WiiClockDate}" Classes="wii-clock-date" HorizontalAlignment="Center"/>
                     </StackPanel>
                     <Button Grid.Column="3" Classes="wii-status-orb-button" Command="{Binding NavigateToInboxCommand}">
