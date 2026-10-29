@@ -63,15 +63,17 @@
                     Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
                     CornerRadius="14" Padding="14">
                 <DockPanel>
+                    <Button DockPanel.Dock="Top" Content="✕" HorizontalAlignment="Right" Click="OnCloseOverlay"
+                            Background="Transparent" Foreground="White"/>
                     <TextBlock DockPanel.Dock="Top" Text="Filters" FontSize="18" FontWeight="Bold"
                                Foreground="White" Margin="4,0,0,10"/>
                     <TextBlock DockPanel.Dock="Bottom" Text="A Select    B Close" FontSize="11"
                                Foreground="#8b949e" Margin="4,10,0,0"/>
                     <ScrollViewer>
-                        <ItemsControl ItemsSource="{Binding FilterMenuItems}">
+                        <ItemsControl x:Name="FilterList" ItemsSource="{Binding FilterMenuItems}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:StoreViewModel+FilterMenuItem">
-                                    <Border Classes="filter-row" Classes.hl="{Binding IsHighlighted}">
+                                    <Border Classes="filter-row" Classes.hl="{Binding IsHighlighted}" Tapped="OnFilterRowTapped">
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBlock Text="{Binding Label}" FontSize="14"
                                                       />
@@ -107,7 +109,7 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:StoreViewModel+KeyboardKeyVm">
-                                            <Border Classes="osk-key"
+                                            <Border Classes="osk-key" Tapped="OnKeyTapped"
                                                     Classes.wide="{Binding IsWide}"
                                                     Classes.hl="{Binding IsHighlighted}">
                                                 <TextBlock Text="{Binding Label}" FontSize="15"
@@ -120,6 +122,8 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    <Button Content="Done" Click="OnCloseOverlay" HorizontalAlignment="Center"
+                            Background="#21262d" Foreground="White"/>
                     <TextBlock Text="A Type    X Backspace    Y / B Close" FontSize="11"
                                Foreground="#8b949e" HorizontalAlignment="Center" Margin="0,6,0,0"/>
                 </StackPanel>

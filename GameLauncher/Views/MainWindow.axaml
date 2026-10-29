@@ -41,7 +41,8 @@
 
                     <Panel Grid.Row="1">
                     <!-- Main page views -->
-                    <ScrollViewer HorizontalScrollBarVisibility="Disabled"
+                    <ScrollViewer x:Name="PageScroller"
+                                  HorizontalScrollBarVisibility="Disabled"
                                   VerticalScrollBarVisibility="Auto"
                                   IsVisible="{Binding !ShowDetail}">
                         <Panel>
@@ -59,7 +60,8 @@
                                     Height="{Binding $parent[ScrollViewer].Bounds.Height}">
                                 <views:LibraryView DataContext="{Binding LibraryVm}"/>
                             </Border>
-                            <Border IsVisible="{Binding IsStore}">
+                            <Border IsVisible="{Binding IsStore}"
+                                    Height="{Binding $parent[ScrollViewer].Bounds.Height}">
                                 <views:StoreView DataContext="{Binding StoreVm}"/>
                             </Border>
                             <Panel IsVisible="{Binding IsFriendsOrInbox}">

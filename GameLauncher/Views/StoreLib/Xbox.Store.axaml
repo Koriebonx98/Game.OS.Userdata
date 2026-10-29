@@ -89,7 +89,121 @@
 
         <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto" Padding="0,0,0,28">
-            <Panel>
+            <StackPanel>
+                <StackPanel IsVisible="{Binding ShowShelves}">
+                    <StackPanel IsVisible="{Binding HasNewGames}">
+                        <TextBlock Text="🆕  New" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,8,0,10"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,16">
+                            <ItemsControl ItemsSource="{Binding NewGames}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:StoreGame">
+                                        <Button Classes="xbox-store-card" Width="170"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel>
+                                                <Border Height="150" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="12" ClipToBounds="True">
+                                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                                      FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                                      LetterFontSize="48" ImageCornerRadius="12" Height="150"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                                <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                    <StackPanel IsVisible="{Binding HasUpdatedShelf}">
+                        <TextBlock Text="🔄  Updated" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,8,0,10"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,16">
+                            <ItemsControl ItemsSource="{Binding UpdatedShelf}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:StoreGame">
+                                        <Button Classes="xbox-store-card" Width="170"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel>
+                                                <Border Height="150" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="12" ClipToBounds="True">
+                                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                                      FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                                      LetterFontSize="48" ImageCornerRadius="12" Height="150"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                                <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                    <StackPanel IsVisible="{Binding HasExclusivesShelf}">
+                        <TextBlock Text="⭐  Exclusives" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,8,0,10"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,16">
+                            <ItemsControl ItemsSource="{Binding ExclusivesShelf}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:StoreGame">
+                                        <Button Classes="xbox-store-card" Width="170"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel>
+                                                <Border Height="150" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="12" ClipToBounds="True">
+                                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                                      FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                                      LetterFontSize="48" ImageCornerRadius="12" Height="150"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                                <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                    <StackPanel IsVisible="{Binding HasComingSoonShelf}">
+                        <TextBlock Text="⏳  Coming Soon" FontSize="18" FontWeight="Bold" Foreground="#FFFFFF" Margin="0,8,0,10"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,0,16">
+                            <ItemsControl ItemsSource="{Binding ComingSoonShelf}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:StoreGame">
+                                        <Button Classes="xbox-store-card" Width="170"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel>
+                                                <Border Height="150" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="12" ClipToBounds="True">
+                                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
+                                                                      FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                                                      LetterFontSize="48" ImageCornerRadius="12" Height="150"/>
+                                                </Border>
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,8,6,0"/>
+                                                <TextBlock Text="{Binding Platform}" FontSize="11" Foreground="#9E9E9E" Margin="6,2,6,8"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </StackPanel>
                 <ItemsControl Name="GamesGrid" ItemsSource="{Binding FilteredStore}" IsVisible="{Binding IsGamesTab}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
@@ -100,7 +214,7 @@
                                     Command="{Binding $parent[UserControl].DataContext.OpenGameDetailCommand}"
                                     CommandParameter="{Binding}">
                                 <StackPanel>
-                                    <Border Height="180" CornerRadius="12" ClipToBounds="True">
+                                    <Border Height="180" BorderBrush="{Binding CompatBorderBrush}" BorderThickness="{Binding CompatBorderThickness}" CornerRadius="12" ClipToBounds="True">
                                         <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}"
                                                           FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
                                                           LetterFontSize="56" ImageCornerRadius="12" Height="180"/>
@@ -136,7 +250,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </Panel>
+            </StackPanel>
         </ScrollViewer>
     </Grid>
 </UserControl>

@@ -25,6 +25,9 @@ public partial class StoreView : UserControl
         _vm.ScrollFocusedIntoView = () => Dispatcher.UIThread.Post(BringFocusedIntoView, DispatcherPriority.Background);
     }
 
+    private void OnFiltersClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => _vm?.OpenFilterMenu();
+    private void OnKeyboardClick(object? sender, Avalonia.Interactivity.RoutedEventArgs e) => _vm?.OpenKeyboard();
+
     private Control? ActiveRoot() => this.FindControl<Control>(
         _vm is { IsSonyStore: true }     ? "Ps5StoreView" :
         _vm is { IsXboxStore: true }     ? "XboxStoreView" :

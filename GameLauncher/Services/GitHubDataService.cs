@@ -1885,6 +1885,37 @@ namespace GameLauncher.Services
                     }
                 }
 
+                // Categories (Exclusive / Coming Soon / Updated) and last-modified time, as used by the website shelves
+                List<string>? categories = null;
+                var catProp = item.TryGetProperty("categories", out var c1) ? c1 :
+                              item.TryGetProperty("Categories", out var c2) ? c2 : default;
+                if (catProp.ValueKind == JsonValueKind.Array)
+                    categories = catProp.EnumerateArray().Where(e => e.ValueKind == JsonValueKind.String)
+                        .Select(e => e.GetString()!.Trim()).Where(x => x.Length > 0).ToList();
+                else if (catProp.ValueKind == JsonValueKind.String)
+                    categories = catProp.GetString()!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                if (categories is { Count: 0 }) categories = null;
+                List<GameModEntry>? mods = null;
+                if (item.TryGetProperty("mods", out var modsProp) && modsProp.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var m in modsProp.EnumerateArray())
+                    {
+                        if (m.ValueKind != JsonValueKind.Object) continue;
+                        string mName = m.TryGetProperty("name", out var mn) && mn.ValueKind == JsonValueKind.String ? mn.GetString() ?? "" : "";
+                        string mUrl  = m.TryGetProperty("url",  out var mu) && mu.ValueKind == JsonValueKind.String ? mu.GetString() ?? "" : "";
+                        if (mUrl.Length == 0 || !Uri.TryCreate(mUrl, UriKind.Absolute, out var mUri) ||
+                            (mUri.Scheme != Uri.UriSchemeHttp && mUri.Scheme != Uri.UriSchemeHttps)) continue;
+                        var entry = new GameModEntry { Name = mName.Length > 0 ? mName : mUrl, Url = mUrl };
+                        if (m.TryGetProperty("genres", out var mg) && mg.ValueKind == JsonValueKind.Array)
+                            entry.Genres = mg.EnumerateArray().Where(x => x.ValueKind == JsonValueKind.String)
+                                .Select(x => x.GetString()!).Where(x => x.Length > 0).ToList();
+                        (mods ??= new List<GameModEntry>()).Add(entry);
+                    }
+                }
+                string? updatedAt = null;
+                foreach (var key in new[] { "updated_at", "updated", "last_updated", "modified" })
+                    if (item.TryGetProperty(key, out var u) && u.ValueKind == JsonValueKind.String) { updatedAt = u.GetString(); break; }
+
                 if (titleIds.Count == 0)
                 {
                     result.Add(new DatabaseGame
@@ -1902,6 +1933,9 @@ namespace GameLauncher.Services
                         Genre           = genre,
                         ReleaseYear     = releaseYear,
                         AlternateNames  = alternateNames,
+                        Categories      = categories,
+                        Mods            = mods,
+                        UpdatedAt       = updatedAt,
                     });
                 }
                 else
@@ -1923,6 +1957,9 @@ namespace GameLauncher.Services
                             Genre           = genre,
                             ReleaseYear     = releaseYear,
                             AlternateNames  = alternateNames,
+                            Categories      = categories,
+                            Mods            = mods,
+                            UpdatedAt       = updatedAt,
                         });
                     }
                 }

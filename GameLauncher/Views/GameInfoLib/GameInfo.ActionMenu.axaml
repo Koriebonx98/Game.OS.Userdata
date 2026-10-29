@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.GameInfoLib.GameInfoActionMenu"
              x:DataType="vm:GameDetailViewModel">
 
@@ -9,11 +10,12 @@
         All entries are normal buttons, so D-pad / A work through the detail page's controller navigation;
         B (back) closes the menu first.
     -->
-    <Border IsVisible="{Binding IsActionMenuOpen}"
-            Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
-            CornerRadius="10" Padding="8" Margin="0,10,0,0" HorizontalAlignment="Left">
-        <StackPanel Spacing="4" MinWidth="260">
-            <TextBlock Text="{Binding ActionMenuTitle}" FontSize="12" FontWeight="Bold"
+    <Panel>
+    <Border IsVisible="{Binding IsActionMenuOpen}" Background="#CC000000">
+    <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
+            CornerRadius="16" Padding="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+        <StackPanel Spacing="6" MinWidth="360">
+            <TextBlock Text="{Binding ActionMenuTitle}" FontSize="16" FontWeight="Bold"
                        Foreground="#8b949e" Margin="8,2,0,4"/>
 
             <!-- More (···) -->
@@ -21,10 +23,12 @@
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuOpenSettingsCommand}" Content="⚙  Game Settings"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuLaunchViaSteamCommand}" Content="🎮  Launch via Steam"
+                        IsVisible="{Binding HasSteamLaunchOption}"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuOpenControllerCommand}" Content="🎮  Controller Profiles"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                        Command="{Binding MenuOpenModsCommand}" Content="🧩  Manage Mods"
-                        IsVisible="{Binding IsSwitch}"/>
+                        Command="{Binding MenuOpenModsCommand}" Content="🧩  Mods"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuRefreshAchievementsCommand}" Content="↻  Refresh Achievements"
                         IsVisible="{Binding HasExophaseUrl}"/>
@@ -44,4 +48,43 @@
                     Command="{Binding CloseActionMenuCommand}" Content="✕  Close"/>
         </StackPanel>
     </Border>
+    </Border>
+
+    <!-- Mod browser: searchable list of the database's mod links, opens in the browser -->
+    <Border IsVisible="{Binding IsModBrowserOpen}" Background="#CC000000">
+        <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="16" Padding="16"
+                Width="560" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="🧩  MODS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="4,0,0,8"/>
+                <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
+                         Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
+                <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
+                    <Button Classes="btn-secondary" Command="{Binding OpenRyujinxModsCommand}"
+                            Content="Ryujinx mod manager" IsVisible="{Binding IsSwitch}"/>
+                    <Button Classes="btn-secondary" Command="{Binding CloseModBrowserCommand}" Content="✕  Close"/>
+                </StackPanel>
+                <TextBlock Text="No mods listed for this game." Foreground="#8b949e" Margin="4,8"
+                           IsVisible="{Binding NoModsFound}"/>
+                <ScrollViewer VerticalScrollBarVisibility="Hidden">
+                    <ItemsControl ItemsSource="{Binding FilteredMods}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:GameModEntry">
+                                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                        Margin="0,0,0,6" Padding="14,10"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel Spacing="2">
+                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding GenresLabel}" FontSize="11" Foreground="#8b949e"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+    </Border>
+    </Panel>
 </UserControl>

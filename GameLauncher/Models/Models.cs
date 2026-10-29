@@ -397,6 +397,15 @@ namespace GameLauncher.Models
         public string?       AchievementsUrl { get; set; }
         /// <summary>Direct store page URL (e.g. Steam store page, Nintendo eShop).</summary>
         public string?       StorePageUrl    { get; set; }
+        /// <summary>Store categories from the Games.Database (e.g. Exclusive, Coming Soon, Updated).</summary>
+        public List<string>? Categories      { get; set; }
+        /// <summary>Last-modified time from the Games.Database, when present.</summary>
+        public System.DateTime? UpdatedAt    { get; set; }
+        public bool HasCategory(string c) => Categories != null && Categories.Any(x => string.Equals(x, c, System.StringComparison.OrdinalIgnoreCase));
+        private string? _compatBorder;
+        /// <summary>Card border colour from community compat votes: green / amber / red (transparent when no votes).</summary>
+        public string CompatBorderBrush => _compatBorder ??= GameLauncher.Services.GameReviewService.GetCompatVerdictColor(Platform, Title);
+        public double CompatBorderThickness => CompatBorderBrush == "Transparent" ? 0 : 3;
         public string        RatingStars     =>
             new string('★', (int)System.Math.Round(Rating / 2.0))
             + new string('☆', 5 - (int)System.Math.Round(Rating / 2.0));
@@ -897,6 +906,15 @@ namespace GameLauncher.Models
         }
     }
 
+    /// <summary>A community mod link attached to a Games.Database entry ({ name, url, genres }).</summary>
+    public class GameModEntry
+    {
+        public string       Name   { get; set; } = "";
+        public string       Url    { get; set; } = "";
+        public List<string> Genres { get; set; } = new();
+        public string GenresLabel => Genres.Count == 0 ? "" : string.Join(" · ", Genres);
+    }
+
     /// <summary>A game entry from the public Koriebonx98/Games.Database repository.</summary>
     public class DatabaseGame
     {
@@ -922,6 +940,12 @@ namespace GameLauncher.Models
         public string?       ReleaseYear     { get; set; }
         /// <summary>Alternate / known titles for fuzzy matching (e.g. ["GoW", "God of War 2018"]).</summary>
         public List<string>? AlternateNames  { get; set; }
+        /// <summary>Store categories such as "Exclusive", "Coming Soon", "Updated" (same field the website uses).</summary>
+        public List<string>? Categories      { get; set; }
+        /// <summary>Community mods ({ name, url, genres }) shown in the Game Info mod browser.</summary>
+        public List<GameModEntry>? Mods      { get; set; }
+        /// <summary>Last-modified timestamp from updated_at / updated / last_updated / modified.</summary>
+        public string?       UpdatedAt       { get; set; }
     }
 
     /// <summary>

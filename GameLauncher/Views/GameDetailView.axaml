@@ -38,9 +38,9 @@
         </Border>
 
         <!-- ── Content area ── -->
-        <ScrollViewer Grid.Row="1"
+        <ScrollViewer Grid.Row="1" x:Name="DetailScroller"
                       HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto">
+                      VerticalScrollBarVisibility="Hidden">
             <StackPanel Margin="32,24,32,32" Spacing="0">
 
                 <!-- Hero: cover + info side by side -->
@@ -1312,6 +1312,9 @@
         </ScrollViewer>
 
     </Grid>
+
+    <!-- ── Console-style Game Settings / Cloud menu (modal) ── -->
+    <gi:GameInfoActionMenu x:Name="ActionMenuHost"/>
 
     <!-- ── In-app trailer player overlay ──────────────────────────────────── -->
     <!-- Shown when IsTrailerPlayerOpen = true; covers the entire detail view  -->

@@ -71,7 +71,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// The search box can be used to narrow the results below this threshold,
     /// or the "Load More" button appends the next page of results.
     /// </summary>
-    private const int MaxDisplayedGames = 2000;
+    private const int MaxDisplayedGames = 200;
 
     [ObservableProperty] private int    _totalCatalogCount = 0;
     [ObservableProperty] private string _catalogCountLabel = "";
@@ -97,6 +97,98 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// <summary>Recently added games (Steam auto-adds and new/edited platform games).</summary>
     public ObservableCollection<StoreGame> NewGames { get; } = new();
     public bool HasNewGames => NewGames.Count > 0;
+
+    // ── Storefront shelves (same shelves as the website store) ────────────
+    private const int ShelfMax = 20;
+    public ObservableCollection<StoreGame> UpdatedShelf    { get; } = new();
+    public ObservableCollection<StoreGame> ExclusivesShelf { get; } = new();
+    public ObservableCollection<StoreGame> ComingSoonShelf { get; } = new();
+    public bool HasUpdatedShelf    => UpdatedShelf.Count > 0;
+    public bool HasExclusivesShelf => ExclusivesShelf.Count > 0;
+    public bool HasComingSoonShelf => ComingSoonShelf.Count > 0;
+    /// <summary>Shelves are shown on the unfiltered home view only, like a storefront.</summary>
+    public bool ShowShelves => IsGamesTab && string.IsNullOrWhiteSpace(SearchText) && FilterGenre == "All";
+
+    // Shelf candidates gathered from every platform's database (not just the selected one),
+    // like the website which keeps all platform games in memory.
+    private readonly Dictionary<string, List<StoreGame>> _shelfPool = new();
+    private CancellationTokenSource? _shelfCts;
+
+    private static StoreGame ToStoreGame(DatabaseGame g, string platform) => new()
+    {
+        Title           = WebUtility.HtmlDecode(g.Title ?? ""),
+        Platform        = platform,
+        Genre           = g.Genre ?? "Unknown",
+        Price           = "N/A",
+        CoverUrl        = g.CoverUrl,
+        Description     = g.Description ?? "",
+        TrailerUrl      = g.TrailerUrl,
+        AchievementsUrl = g.AchievementsUrl,
+        Screenshots     = g.Screenshots,
+        StorePageUrl    = g.StorePageUrl,
+        Categories      = g.Categories,
+        UpdatedAt       = DateTime.TryParse(g.UpdatedAt, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var upd) ? upd : null,
+    };
+
+    /// <summary>Loads every platform database in the background and keeps only shelf-relevant games.</summary>
+    private async Task LoadShelvesAsync(IReadOnlyList<string> platforms)
+    {
+        _shelfCts?.Cancel();
+        var cts = _shelfCts = new CancellationTokenSource();
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+        foreach (var platform in platforms.Where(p => p != "All"))
+        {
+            if (cts.IsCancellationRequested) return;
+            try
+            {
+                var db = await GameOsClient.FetchGamesDatabaseAsync(platform, cts.Token).ConfigureAwait(false);
+                var picked = db.Select(g => ToStoreGame(g, platform))
+                    .Where(g => g.Categories != null || g.UpdatedAt is { } d && d > cutoff)
+                    .Where(g => g.HasCategory("Updated") || g.HasCategory("Exclusive") || g.HasCategory("Coming Soon")
+                                || (g.UpdatedAt is { } u && u > cutoff))
+                    .ToList();
+                if (cts.IsCancellationRequested) return;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    _shelfPool[platform] = picked;
+                    RebuildShelves();
+                });
+            }
+            catch { /* best-effort: skip platforms that fail to load */ }
+        }
+    }
+
+    private void RebuildShelves()
+    {
+        static void Fill(ObservableCollection<StoreGame> target, IEnumerable<StoreGame> src)
+        {
+            target.Clear();
+            foreach (var g in src.Take(ShelfMax)) target.Add(g);
+        }
+        // Interleave platforms so one big platform (PC) doesn't fill a whole shelf.
+        static IEnumerable<StoreGame> Mix(IEnumerable<IEnumerable<StoreGame>> lists)
+        {
+            var enums = lists.Select(l => l.GetEnumerator()).ToList();
+            bool any = true;
+            while (any)
+            {
+                any = false;
+                foreach (var e in enums)
+                    if (e.MoveNext()) { any = true; yield return e.Current; }
+            }
+        }
+        var cutoff = DateTime.UtcNow.AddDays(-30);
+        var pools = _shelfPool.OrderBy(k => k.Key).Select(k => k.Value).ToList();
+        Fill(UpdatedShelf, Mix(pools.Select(l => l
+            .Where(g => g.HasCategory("Updated") || (g.UpdatedAt is { } d && d > cutoff))
+            .OrderByDescending(g => g.UpdatedAt ?? DateTime.MinValue))));
+        Fill(ExclusivesShelf, Mix(pools.Select(l => l.Where(g => g.HasCategory("Exclusive")))));
+        Fill(ComingSoonShelf, Mix(pools.Select(l => l.Where(g => g.HasCategory("Coming Soon")))));
+        OnPropertyChanged(nameof(HasUpdatedShelf));
+        OnPropertyChanged(nameof(HasExclusivesShelf));
+        OnPropertyChanged(nameof(HasComingSoonShelf));
+        OnPropertyChanged(nameof(ShowShelves));
+    }
 
     private async Task LoadNewGamesAsync()
     {
@@ -165,6 +257,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
         _ = LoadAppStoreAsync();
         _ = LoadNewGamesAsync();
         _ = LoadWishlistAsync();
+        _ = LoadShelvesAsync(Platforms.ToList());
 
         // Discover all platform JSON files from the Games.Database repository so new
         // platforms appear automatically without requiring an app update.
@@ -208,6 +301,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 // Keep the current selection if it still exists.
                 if (!Platforms.Contains(current))
                     SelectedPlatform = "All";
+                _ = LoadShelvesAsync(Platforms.ToList());
             });
         }
         catch { /* best-effort — the built-in list remains usable */ }
@@ -630,7 +724,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     partial void OnIsFilterMenuOpenChanged(bool value) => OnPropertyChanged(nameof(IsOverlayOpen));
     partial void OnIsKeyboardOpenChanged(bool value)   => OnPropertyChanged(nameof(IsOverlayOpen));
 
-    partial void OnIsAppStoreTabChanged(bool value) => ClearFocus();
+    partial void OnIsAppStoreTabChanged(bool value) { ClearFocus(); OnPropertyChanged(nameof(ShowShelves)); }
 
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
@@ -682,6 +776,8 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                     AchievementsUrl = g.AchievementsUrl,
                     Screenshots     = g.Screenshots,
                     StorePageUrl    = g.StorePageUrl,
+                    Categories      = g.Categories,
+                    UpdatedAt       = DateTime.TryParse(g.UpdatedAt, null, System.Globalization.DateTimeStyles.AdjustToUniversal, out var upd) ? upd : null,
                 })
                 .ToList();
 
@@ -720,6 +816,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                         AchievementsUrl = g.AchievementsUrl,
                         Screenshots     = g.Screenshots,
                         StorePageUrl    = g.StorePageUrl,
+                        Categories      = g.Categories,
                     })
                     .ToList();
                 StatusMessage = $"Offline — showing cached {platform} data.";
@@ -753,6 +850,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     private void ApplyFilter()
     {
+        OnPropertyChanged(nameof(ShowShelves));
         FilteredStore.Clear();
         var results = _allStore.AsEnumerable();
 

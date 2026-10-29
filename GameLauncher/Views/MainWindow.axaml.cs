@@ -1044,8 +1044,13 @@ public partial class MainWindow : Window
 
     private void OnMainViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
+        if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ActivePage))
+            this.FindControl<ScrollViewer>("PageScroller")?.ScrollToHome();
+
         if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ShowDetail))
         {
+            if (_boundVm.ShowDetail)
+                DetailHost?.ScrollToTop();
             OnShowDetailChanged(_boundVm.ShowDetail);
             return;
         }
