@@ -127,7 +127,7 @@
         <Setter Property="Background" Value="#dae8f2"/>
         <Setter Property="BorderBrush" Value="#a8c8d8"/>
         <Setter Property="BorderThickness" Value="2,1,2,0"/>
-        <Setter Property="Height" Value="84"/>
+        <Setter Property="Height" Value="64"/>
         <Setter Property="CornerRadius" Value="60,60,0,0"/>
         <Setter Property="VerticalAlignment" Value="Bottom"/>
         <Setter Property="Padding" Value="32,8"/>

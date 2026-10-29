@@ -13,8 +13,9 @@
     -->
     <Border Classes="dashboard-wii-layout" Background="#f3f4f6">
         <Grid RowDefinitions="*,Auto">
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="14,14,6,0">
-                <ItemsControl Grid.Column="0" ItemsSource="{Binding WiiChannels}">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,8,6,0">
+                <Viewbox Grid.Column="0" Stretch="Uniform">
+                <ItemsControl Width="880" Height="540" ItemsSource="{Binding WiiChannels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="4" Rows="3"/>
@@ -38,6 +39,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </Viewbox>
                 <Button Grid.Column="1" Classes="wii-page-arrow" Content="▶" Margin="6,0,0,0"
                         Command="{Binding WiiNextPageCommand}" ToolTip.Tip="My Library"/>
             </Grid>
