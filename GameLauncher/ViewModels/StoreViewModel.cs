@@ -660,7 +660,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     partial void OnIsFilterMenuOpenChanged(bool value) => OnPropertyChanged(nameof(IsOverlayOpen));
     partial void OnIsKeyboardOpenChanged(bool value)   => OnPropertyChanged(nameof(IsOverlayOpen));
 
-    partial void OnIsAppStoreTabChanged(bool value) => ClearFocus();
+    partial void OnIsAppStoreTabChanged(bool value) { ClearFocus(); OnPropertyChanged(nameof(ShowShelves)); }
 
     // Cancellation source for in-flight platform loads
     private CancellationTokenSource _loadCts = new();
