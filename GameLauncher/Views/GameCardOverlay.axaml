@@ -134,18 +134,18 @@
 
                 <!-- Cover -->
                 <Border Width="190" Height="250" HorizontalAlignment="Center" ClipToBounds="True" CornerRadius="8"
-                        IsVisible="{Binding !$parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                        IsVisible="{Binding !$parent[UserControl].DataContext.GameCardShowAll}">
                     <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}" LetterFontSize="48"/>
                 </Border>
 
                 <!-- Play / Info -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                     <Button Classes="gc-btn" Content="{Binding PlayButtonLabel}"
-                            Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardPlayFocused}"
-                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardPlayCommand}"/>
+                            Classes.focused="{Binding $parent[UserControl].DataContext.GameCardPlayFocused}"
+                            Command="{Binding $parent[UserControl].DataContext.GameCardPlayCommand}"/>
                     <Button Classes="gc-btn" Content="Info"
-                            Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardInfoFocused}"
-                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardInfoCommand}"/>
+                            Classes.focused="{Binding $parent[UserControl].DataContext.GameCardInfoFocused}"
+                            Command="{Binding $parent[UserControl].DataContext.GameCardInfoCommand}"/>
                 </StackPanel>
 
                 <!-- Achievement progress -->
@@ -156,7 +156,7 @@
 
                     <!-- Single shelf: 5 achievements + Show all -->
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,4,0,0"
-                                IsVisible="{Binding !$parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                                IsVisible="{Binding !$parent[UserControl].DataContext.GameCardShowAll}">
                         <ItemsControl ItemsSource="{Binding CardAchievements}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8"/></ItemsPanelTemplate>
@@ -171,12 +171,12 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <Button Classes="gc-all" Content="Show all"
-                                Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardAllFocused}"
-                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardToggleAllCommand}"/>
+                                Classes.focused="{Binding $parent[UserControl].DataContext.GameCardAllFocused}"
+                                Command="{Binding $parent[UserControl].DataContext.GameCardToggleAllCommand}"/>
                     </StackPanel>
 
                     <!-- Full list -->
-                    <StackPanel Spacing="6" IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                    <StackPanel Spacing="6" IsVisible="{Binding $parent[UserControl].DataContext.GameCardShowAll}">
                         <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
                             <ItemsControl ItemsSource="{Binding Achievements}">
                                 <ItemsControl.ItemTemplate>
@@ -196,8 +196,8 @@
                             </ItemsControl>
                         </ScrollViewer>
                         <Button Classes="gc-btn" Content="Back" HorizontalAlignment="Center"
-                                Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardAllFocused}"
-                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardToggleAllCommand}"/>
+                                Classes.focused="{Binding $parent[UserControl].DataContext.GameCardAllFocused}"
+                                Command="{Binding $parent[UserControl].DataContext.GameCardToggleAllCommand}"/>
                     </StackPanel>
                 </StackPanel>
             </StackPanel>
