@@ -326,6 +326,13 @@ public partial class MainWindow : Window
             }
         }
 
+        // ── Wii / Switch game card open: it owns the keys ──
+        if (vm.ShowGameCard && !vm.ShowQuickMenu && !IsTextInputFocused() && HandleGameCardKey(vm, e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // ── Nav sidebar open: Up/Down move highlight; Enter navigates to highlighted item ──
         if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
@@ -462,8 +469,8 @@ public partial class MainWindow : Window
                     e.Handled = true;
                     return;
                 case Key.Down:
-                    // Move to next recent game card (same as Right)
-                    vm.DashboardVm.MoveFocus(1);
+                    // Nothing below the tile row → open the nav menu
+                    OpenNavWithCurrentHighlight(vm);
                     e.Handled = true;
                     return;
                 case Key.Up:
@@ -766,7 +773,10 @@ public partial class MainWindow : Window
                 return true;
             case Key.Right:    lib.MoveGameFocus(1);         return true;
             case Key.Up:       lib.MoveGameFocusRow(-1);     return true;
-            case Key.Down:     lib.MoveGameFocusRow(1);      return true;
+            case Key.Down:
+                if (lib.IsOnLastRow) OpenNavWithCurrentHighlight(vm);
+                else lib.MoveGameFocusRow(1);
+                return true;
             case Key.Enter:    lib.ActivateFocusedGame();    return true;
             case Key.PageUp:   lib.CycleInstallFilter(-1);   return true;
             case Key.PageDown: lib.CycleInstallFilter(1);    return true;
@@ -835,6 +845,25 @@ public partial class MainWindow : Window
         return false;
     }
 
+    /// <summary>Wii / Switch game card controller + keyboard handling. Returns true when consumed.</summary>
+    private static bool HandleGameCardKey(MainViewModel vm, Key key)
+    {
+        switch (key)
+        {
+            case Key.Left:  vm.GameCardMove(-1, 0); break;
+            case Key.Right: vm.GameCardMove(1, 0);  break;
+            case Key.Up:    vm.GameCardMove(0, -1); break;
+            case Key.Down:  vm.GameCardMove(0, 1);  break;
+            case Key.Enter: vm.GameCardActivateFocused(); break;
+            case Key.X:     vm.GameCardPlayCommand.Execute(null); break;
+            case Key.Escape:
+            case Key.BrowserBack:
+            case Key.Y:     vm.GameCardBack(); break;
+            default: return false;
+        }
+        return true;
+    }
+
     /// <summary>Wii Menu controller/keyboard handling shared by both input paths. Returns true when consumed.</summary>
     private bool HandleWiiDashboardKey(MainViewModel vm, Key key)
     {
@@ -845,7 +874,10 @@ public partial class MainWindow : Window
                 return true;
             case Key.Right: vm.DashboardVm.MoveWiiFocus(1, 0);  return true;
             case Key.Up:    vm.DashboardVm.MoveWiiFocus(0, -1); return true;
-            case Key.Down:  vm.DashboardVm.MoveWiiFocus(0, 1);  return true;
+            case Key.Down:
+                if (vm.DashboardVm.IsWiiOnLastRow) OpenNavWithCurrentHighlight(vm);
+                else vm.DashboardVm.MoveWiiFocus(0, 1);
+                return true;
             case Key.Enter: vm.DashboardVm.OpenWiiFocused();    return true;
             case Key.X:     vm.DashboardVm.PlayWiiFocused();    return true;
         }
@@ -1088,11 +1120,11 @@ public partial class MainWindow : Window
         if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ActivePage))
             this.FindControl<ScrollViewer>("PageScroller")?.ScrollToHome();
 
-        if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ShowDetail))
+        if (_boundVm != null && e.PropertyName == nameof(MainViewModel.ShowDetailPage))
         {
-            if (_boundVm.ShowDetail)
+            if (_boundVm.ShowDetailPage)
                 DetailHost?.ScrollToTop();
-            OnShowDetailChanged(_boundVm.ShowDetail);
+            OnShowDetailChanged(_boundVm.ShowDetailPage);
             return;
         }
 
@@ -1124,7 +1156,7 @@ public partial class MainWindow : Window
         // so retry until the user moves the highlight themselves.
         void TryFocus()
         {
-            if (token != _detailFocusToken || _boundVm?.ShowDetail != true) return;
+            if (token != _detailFocusToken || _boundVm?.ShowDetailPage != true) return;
             var focused = FocusManager?.GetFocusedElement() as Control;
             if (focused == null || !(DetailHost?.IsVisualAncestorOf(focused) ?? false) || _detailAutoFocused == focused)
             {
@@ -1332,6 +1364,9 @@ public partial class MainWindow : Window
             return;
         }
 
+        // ── Wii / Switch game card open: it owns the buttons ──
+        if (vm.ShowGameCard && !vm.ShowQuickMenu && HandleGameCardKey(vm, key)) return;
+
         // ── Nav sidebar open: Up/Down move highlight; Enter navigates to highlighted item ──
         if (vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
@@ -1471,8 +1506,7 @@ public partial class MainWindow : Window
                     vm.DashboardVm.MoveFocus(-1);
                     return;
                 case Key.Down:
-                    // Move to next recent game card
-                    vm.DashboardVm.MoveFocus(1);
+                    OpenNavWithCurrentHighlight(vm);
                     return;
                 case Key.Up:
                     // Move to previous recent game card

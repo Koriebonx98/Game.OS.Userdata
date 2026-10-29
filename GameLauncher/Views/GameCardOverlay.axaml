@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:models="using:GameLauncher.Models"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GameCardOverlay"
+             x:DataType="vm:MainViewModel">
+
+    <!--
+        Wii / Switch mini game card, centred over the dashboard or library when a game tile is clicked.
+        Title + platform, cover, Play / Info, achievement progress bar and a one-row shelf of 5 achievements
+        plus "Show all". DataContext is MainViewModel; game data comes from DetailVm (loaded behind the card).
+        Wii look by default; the "sw" class switches it to the dark Switch look.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Border.gc-card">
+            <Setter Property="Background" Value="#ffffff"/>
+            <Setter Property="BorderBrush" Value="#a8c8d8"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="Padding" Value="20,16"/>
+            <Setter Property="Width" Value="420"/>
+            <Setter Property="MaxHeight" Value="640"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw">
+            <Setter Property="Background" Value="#2b2d33"/>
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
+            <Setter Property="CornerRadius" Value="8"/>
+        </Style>
+        <Style Selector="Border.gc-card TextBlock.gc-title">
+            <Setter Property="Foreground" Value="#333333"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw TextBlock.gc-title">
+            <Setter Property="Foreground" Value="#f1f1f1"/>
+        </Style>
+        <Style Selector="Border.gc-card TextBlock.gc-sub">
+            <Setter Property="Foreground" Value="#3aa0e8"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw TextBlock.gc-sub">
+            <Setter Property="Foreground" Value="#9aa0aa"/>
+        </Style>
+
+        <Style Selector="Button.gc-btn">
+            <Setter Property="Width" Value="140"/>
+            <Setter Property="Height" Value="44"/>
+            <Setter Property="Margin" Value="6,0"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#3a8fd0"/>
+            <Setter Property="Background" Value="#f2f6fa"/>
+            <Setter Property="BorderBrush" Value="#a8c8d8"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-btn">
+            <Setter Property="Foreground" Value="#f1f1f1"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+            <Setter Property="BorderBrush" Value="#4a4e57"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Button.gc-btn:pointerover, Button.gc-btn.focused">
+            <Setter Property="BorderBrush" Value="#3aa0e8"/>
+            <Setter Property="BorderThickness" Value="4"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-btn:pointerover, Border.gc-card.sw Button.gc-btn.focused">
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
+        </Style>
+        <Style Selector="Button.gc-btn /template/ ContentPresenter">
+            <Setter Property="CornerRadius" Value="22"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-btn /template/ ContentPresenter">
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Button.gc-ach">
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Background" Value="#f2f6fa"/>
+            <Setter Property="BorderThickness" Value="0"/>
+        </Style>
+        <Style Selector="Button.gc-all">
+            <Setter Property="Width" Value="64"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#3a8fd0"/>
+            <Setter Property="Background" Value="#f2f6fa"/>
+            <Setter Property="BorderBrush" Value="#a8c8d8"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-all">
+            <Setter Property="Foreground" Value="#f1f1f1"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+            <Setter Property="BorderBrush" Value="#4a4e57"/>
+        </Style>
+        <Style Selector="Button.gc-all:pointerover, Button.gc-all.focused">
+            <Setter Property="BorderBrush" Value="#3aa0e8"/>
+            <Setter Property="BorderThickness" Value="4"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw Button.gc-all:pointerover, Border.gc-card.sw Button.gc-all.focused">
+            <Setter Property="BorderBrush" Value="#00c3e3"/>
+        </Style>
+        <Style Selector="Border.gc-card ProgressBar">
+            <Setter Property="Height" Value="14"/>
+            <Setter Property="Foreground" Value="#3aa0e8"/>
+            <Setter Property="Background" Value="#dbe6ee"/>
+        </Style>
+        <Style Selector="Border.gc-card.sw ProgressBar">
+            <Setter Property="Foreground" Value="#00c3e3"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border IsVisible="{Binding ShowGameCard}" Background="#99000000">
+        <Border Classes="gc-card" Classes.sw="{Binding IsGameCardSwitch}">
+            <StackPanel Spacing="12" DataContext="{Binding DetailVm}" x:DataType="vm:GameDetailViewModel">
+
+                <!-- Name + platform -->
+                <StackPanel Spacing="2">
+                    <TextBlock Classes="gc-title" Text="{Binding Title}" FontSize="22" FontWeight="Bold"
+                               HorizontalAlignment="Center" TextAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Classes="gc-sub" Text="{Binding Platform}" FontSize="13" FontWeight="SemiBold"
+                               HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- Cover -->
+                <Border Width="190" Height="250" HorizontalAlignment="Center" ClipToBounds="True" CornerRadius="8"
+                        IsVisible="{Binding !$parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding Title}" LetterFontSize="48"/>
+                </Border>
+
+                <!-- Play / Info -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button Classes="gc-btn" Content="{Binding PlayButtonLabel}"
+                            Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardPlayFocused}"
+                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardPlayCommand}"/>
+                    <Button Classes="gc-btn" Content="Info"
+                            Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardInfoFocused}"
+                            Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardInfoCommand}"/>
+                </StackPanel>
+
+                <!-- Achievement progress -->
+                <StackPanel Spacing="4" IsVisible="{Binding HasAchievements}">
+                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding AchievementPercent}"/>
+                    <TextBlock Classes="gc-sub" Text="{Binding AchievementProgressText}" FontSize="12"
+                               HorizontalAlignment="Center"/>
+
+                    <!-- Single shelf: 5 achievements + Show all -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8" Margin="0,4,0,0"
+                                IsVisible="{Binding !$parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                        <ItemsControl ItemsSource="{Binding CardAchievements}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:Achievement">
+                                    <Border Width="52" Height="52" CornerRadius="6" ClipToBounds="True"
+                                            Opacity="{Binding LockedOpacity}" ToolTip.Tip="{Binding Name}">
+                                        <views:CoverImage ImageUrl="{Binding IconUrl}" FallbackText="🏆" LetterFontSize="22"/>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="gc-all" Content="Show all"
+                                Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardAllFocused}"
+                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardToggleAllCommand}"/>
+                    </StackPanel>
+
+                    <!-- Full list -->
+                    <StackPanel Spacing="6" IsVisible="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardShowAll}">
+                        <ScrollViewer MaxHeight="360" VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding Achievements}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:Achievement">
+                                        <Grid ColumnDefinitions="Auto,*" Margin="0,3" Opacity="{Binding LockedOpacity}">
+                                            <Border Width="40" Height="40" CornerRadius="6" ClipToBounds="True" Margin="0,0,10,0">
+                                                <views:CoverImage ImageUrl="{Binding IconUrl}" FallbackText="🏆" LetterFontSize="18"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                <TextBlock Classes="gc-title" Text="{Binding Name}" FontSize="13" FontWeight="SemiBold"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Classes="gc-sub" Text="{Binding StatusLabel}" FontSize="11"/>
+                                            </StackPanel>
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Button Classes="gc-btn" Content="Back" HorizontalAlignment="Center"
+                                Classes.focused="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardAllFocused}"
+                                Command="{Binding $parent[UserControl].((vm:MainViewModel)DataContext).GameCardToggleAllCommand}"/>
+                    </StackPanel>
+                </StackPanel>
+            </StackPanel>
+        </Border>
+    </Border>
+</UserControl>

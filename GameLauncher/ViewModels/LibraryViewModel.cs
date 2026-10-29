@@ -26,7 +26,8 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private string _gamesTheme = "Default";
     public bool IsPs5GamesLib     => string.Equals(GamesTheme, "PS5", System.StringComparison.OrdinalIgnoreCase);
     public bool IsWiiGamesLib     => string.Equals(GamesTheme, "Wii", System.StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGamesLib => !IsPs5GamesLib && !IsWiiGamesLib;
+    public bool IsSwitchGamesLib  => string.Equals(GamesTheme, "Switch", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGamesLib => !IsPs5GamesLib && !IsWiiGamesLib && !IsSwitchGamesLib;
 
     /// <summary>Slides back to the dashboard (the Wii Games page's left arrow); wired by MainViewModel.</summary>
     public Action? OnBackToDashboard { get; set; }
@@ -36,6 +37,7 @@ public partial class LibraryViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsPs5GamesLib));
         OnPropertyChanged(nameof(IsWiiGamesLib));
+        OnPropertyChanged(nameof(IsSwitchGamesLib));
         OnPropertyChanged(nameof(IsDefaultGamesLib));
     }
 
@@ -451,6 +453,17 @@ public partial class LibraryViewModel : ViewModelBase
     public Func<int>? ColumnsProvider { get; set; }
 
     /// <summary>Moves focus one row up (−1) or down (+1), keeping the same column.</summary>
+    /// <summary>True when there is no game row below the focused one (Down should reach the nav menu).</summary>
+    public bool IsOnLastRow
+    {
+        get
+        {
+            if (FilteredMyGames.Count == 0 || FocusedGameIndex < 0) return true;
+            int cols = Math.Max(1, ColumnsProvider?.Invoke() ?? 1);
+            return FocusedGameIndex + cols >= FilteredMyGames.Count;
+        }
+    }
+
     public void MoveGameFocusRow(int direction)
     {
         if (FilteredMyGames.Count == 0 || FocusedGameIndex < 0)

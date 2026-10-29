@@ -12,11 +12,13 @@
           Views/GamesLib/Default.Games.Lib.axaml   ("Default")
           Views/GamesLib/PS5.Games.Lib.axaml       ("PS5")
           Views/GamesLib/Wii.Games.Lib.axaml       ("Wii")
+          Views/GamesLib/Switch.Games.Lib.axaml    ("Switch")
     -->
     <Panel>
         <lib:DefaultGamesLib Name="DefaultLib" IsVisible="{Binding IsDefaultGamesLib}"/>
         <lib:Ps5GamesLib     Name="Ps5Lib"     IsVisible="{Binding IsPs5GamesLib}"/>
         <lib:WiiGamesLib     Name="WiiLib"     IsVisible="{Binding IsWiiGamesLib}"/>
+        <lib:SwitchGamesLib  Name="SwitchLib"  IsVisible="{Binding IsSwitchGamesLib}"/>
         <lib:GamesLibOverlays/>
     </Panel>
 </UserControl>

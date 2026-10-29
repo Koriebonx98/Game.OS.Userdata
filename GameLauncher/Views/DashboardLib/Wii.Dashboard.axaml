@@ -14,8 +14,9 @@
     <Border Classes="dashboard-wii-layout" Background="#f3f4f6">
         <Grid RowDefinitions="*,Auto">
             <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,8,6,0">
-                <Viewbox Grid.Column="0" Stretch="Uniform">
-                <ItemsControl Width="900" Height="440" ItemsSource="{Binding WiiChannels}">
+                <Viewbox Grid.Column="0" Stretch="Uniform" StretchDirection="DownOnly" MaxHeight="400"
+                         HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ItemsControl Width="760" Height="372" ItemsSource="{Binding WiiChannels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <UniformGrid Columns="5" Rows="3"/>

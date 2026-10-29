@@ -83,10 +83,11 @@
     </UserControl.Styles>
 
     <Border Classes="dashboard-switch-layout" Background="#2b2b2b">
-        <Panel>
-        <views:CoverImage IsVisible="{Binding HasSwitchShownCard}" ImageUrl="{Binding SwitchShownCard.CoverUrl}"
+        <Panel ClipToBounds="True">
+        <!-- Hovered game's picture: always behind (ZIndex 0) the tiles and menu (ZIndex 1) -->
+        <views:CoverImage ZIndex="0" IsVisible="{Binding HasSwitchShownCard}" ImageUrl="{Binding SwitchShownCard.CoverUrl}"
                           FallbackText="" Opacity="0.28" IsHitTestVisible="False"/>
-        <Grid RowDefinitions="Auto,*,Auto">
+        <Grid ZIndex="1" RowDefinitions="Auto,*,Auto">
 
             <!-- Profile + clock -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="28,12,28,0">
