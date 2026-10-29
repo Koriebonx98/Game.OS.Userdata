@@ -851,7 +851,46 @@ public partial class GameDetailViewModel : ViewModelBase
     public System.Action? OnClose { get; set; }
 
     [RelayCommand]
-    private void Close() => OnClose?.Invoke();
+    private void Close()
+    {
+        IsModBrowserOpen = false;
+        OnClose?.Invoke();
+    }
+
+    // ── Mod browser (Steam-workshop-style list of the database's mod links) ─────
+    private List<GameModEntry> _dbMods = new();
+    [ObservableProperty] private bool   _isModBrowserOpen;
+    [ObservableProperty] private string _modSearchText = "";
+    public ObservableCollection<GameModEntry> FilteredMods { get; } = new();
+    public bool HasDbMods => _dbMods.Count > 0;
+    public bool NoModsFound => FilteredMods.Count == 0;
+
+    partial void OnModSearchTextChanged(string value) => RefreshModList();
+
+    private void RefreshModList()
+    {
+        var term = (ModSearchText ?? "").Trim();
+        FilteredMods.Clear();
+        foreach (var m in _dbMods.Where(m => term.Length == 0
+                     || m.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                     || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase))))
+            FilteredMods.Add(m);
+        OnPropertyChanged(nameof(HasDbMods));
+        OnPropertyChanged(nameof(NoModsFound));
+    }
+
+    [RelayCommand] private void CloseModBrowser() => IsModBrowserOpen = false;
+
+    [RelayCommand]
+    private void OpenModUrl(GameModEntry? mod)
+    {
+        if (mod == null || !Uri.TryCreate(mod.Url, UriKind.Absolute, out var u) ||
+            (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps)) return;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = u.AbsoluteUri, UseShellExecute = true }); }
+        catch { /* best-effort */ }
+    }
+
+    [RelayCommand] private void OpenRyujinxMods() { IsModBrowserOpen = false; OpenModsPanel(); }
 
     // ── Settings panel ────────────────────────────────────────────────────────
     /// <summary>True when the settings overlay is visible.</summary>
@@ -3279,7 +3318,7 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _actionMenuKind = "";
     public bool   IsMoreMenu  => ActionMenuKind == "more";
     public bool   IsCloudMenu => ActionMenuKind == "cloud";
-    public string ActionMenuTitle => IsCloudMenu ? "CLOUD SAVES" : "GAME OPTIONS";
+    public string ActionMenuTitle => IsCloudMenu ? "CLOUD SAVES" : "GAME SETTINGS";
     partial void OnActionMenuKindChanged(string value)
     {
         OnPropertyChanged(nameof(IsMoreMenu));
@@ -3300,7 +3339,21 @@ public partial class GameDetailViewModel : ViewModelBase
 
     [RelayCommand] private void MenuOpenSettings()   { IsActionMenuOpen = false; OpenSettings(); }
     [RelayCommand] private void MenuOpenController() { IsActionMenuOpen = false; ToggleControllerPanel(); }
-    [RelayCommand] private void MenuOpenMods()       { IsActionMenuOpen = false; OpenModsPanel(); }
+    [RelayCommand] private void MenuOpenMods()       { IsActionMenuOpen = false; ModSearchText = ""; RefreshModList(); IsModBrowserOpen = true; }
+    [RelayCommand] private void MenuLaunchViaSteam()
+    {
+        IsActionMenuOpen = false;
+        if (_steamAppId <= 0) return;
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName        = $"steam://launch/{_steamAppId}",
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception ex) { DevLogService.Log($"[MenuLaunchViaSteam] {ex.Message}"); }
+    }
     [RelayCommand] private async System.Threading.Tasks.Task MenuRefreshAchievements()
     {
         IsActionMenuOpen = false;
@@ -3781,6 +3834,8 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     public void EnrichFromDatabaseGame(DatabaseGame dbGame)
     {
+        _dbMods = dbGame.Mods ?? new List<GameModEntry>();
+        RefreshModList();
         // Use the canonical database title (e.g. "Call of Duty: Black Ops II"
         // instead of the Windows-safe folder name "Call of Duty - Black Ops II")
         if (!string.IsNullOrEmpty(dbGame.Title))

@@ -52,18 +52,28 @@ public partial class GameDetailView : UserControl
     {
         var buttons = this.GetVisualDescendants()
             .OfType<Button>()
-            .Where(b => b.IsEffectivelyVisible && b.IsEffectivelyEnabled && b.Focusable)
+            .Where(b => b.IsEffectivelyVisible && b.IsEffectivelyEnabled && b.Focusable && InActiveScope(b))
             .ToList();
         var target = buttons.FirstOrDefault(b => b.Classes.Contains("btn-primary") || b.Classes.Contains("btn-success"))
                      ?? buttons.FirstOrDefault();
         target?.Focus(NavigationMethod.Directional);
     }
 
+    /// <summary>While the modal action menu is open, only controls inside it are navigable.</summary>
+    private bool InActiveScope(Control c)
+    {
+        if (DataContext is GameDetailViewModel { IsActionMenuOpen: true } or GameDetailViewModel { IsModBrowserOpen: true } &&
+            this.FindControl<Control>("ActionMenuHost") is { } host)
+            return host.IsVisualAncestorOf(c);
+        return true;
+    }
+
     /// <summary>Closes the topmost panel/overlay, or the whole detail page when none is open.</summary>
     public void HandleBack()
     {
         if (DataContext is not GameDetailViewModel vm) return;
-        if (vm.IsActionMenuOpen)         vm.CloseActionMenuCommand.Execute(null);
+        if (vm.IsModBrowserOpen)         vm.CloseModBrowserCommand.Execute(null);
+        else if (vm.IsActionMenuOpen)    vm.CloseActionMenuCommand.Execute(null);
         else if (vm.IsVlcPlayerOpen)     CloseVlcOverlay();
         else if (vm.IsTrailerPlayerOpen) vm.CloseTrailerPlayerCommand.Execute(null);
         else if (vm.ShowModsPanel)       vm.CloseModsPanelCommand.Execute(null);
@@ -128,7 +138,7 @@ public partial class GameDetailView : UserControl
         double bestScore = double.MaxValue;
         foreach (var c in this.GetVisualDescendants().OfType<Control>())
         {
-            if (c == from || !IsNavTarget(c) || !c.Focusable || !c.IsEffectivelyVisible || !c.IsEffectivelyEnabled)
+            if (c == from || !IsNavTarget(c) || !c.Focusable || !c.IsEffectivelyVisible || !c.IsEffectivelyEnabled || !InActiveScope(c))
                 continue;
             if (c.GetVisualAncestors().Any(a => a is ComboBox)) continue;
             var b = BoundsInView(c);
