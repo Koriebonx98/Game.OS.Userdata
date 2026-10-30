@@ -11,7 +11,7 @@
         <Grid RowDefinitions="Auto,180,*,Auto">
 
             <!-- Header -->
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,12">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,12" IsVisible="{Binding Options.ShowHeader}">
                 <TextBlock Text="Games" Classes="ps5-header-title"/>
                 <TextBlock Text="  Media" Classes="ps5-header-media"/>
             </StackPanel>

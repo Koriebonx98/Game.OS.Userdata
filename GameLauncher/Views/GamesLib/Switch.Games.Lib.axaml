@@ -12,13 +12,13 @@
     -->
     <UserControl.Styles>
         <Style Selector="Button.sw-lib-ch">
-            <Setter Property="Width" Value="170"/>
-            <Setter Property="Height" Value="190"/>
-            <Setter Property="Margin" Value="9"/>
+            <Setter Property="Width" Value="150"/>
+            <Setter Property="Height" Value="150"/>
+            <Setter Property="Margin" Value="7"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="#26292f"/>
             <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="BorderThickness" Value="4"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="ClipToBounds" Value="True"/>
@@ -27,7 +27,8 @@
         </Style>
         <Style Selector="Button.sw-lib-ch:pointerover, Button.sw-lib-ch.focused">
             <Setter Property="BorderBrush" Value="#00c3e3"/>
-            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="RenderTransform" Value="scale(1.05)"/>
+            <Setter Property="ZIndex" Value="5"/>
         </Style>
         <Style Selector="Border.sw-lib-label">
             <Setter Property="Background" Value="#26292f"/>
@@ -80,12 +81,17 @@
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="12,18,12,0">
+    <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="12,14,12,0">
 
         <!-- Header + search -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="28,0,0,10">
             <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                <TextBlock Text="My Library" FontSize="26" FontWeight="SemiBold" Foreground="#f1f1f1"/>
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <Border Width="34" Height="34" CornerRadius="17" Background="#e60012">
+                        <TextBlock Text="🎮" FontSize="17" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="All Software" FontSize="24" FontWeight="SemiBold" Foreground="#f1f1f1" VerticalAlignment="Center"/>
+                </StackPanel>
                 <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games'}"
                            FontSize="12" Foreground="#9aa0aa"/>
             </StackPanel>
@@ -141,24 +147,30 @@
                                 Classes.focused="{Binding IsFocused}"
                                 Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
                                 CommandParameter="{Binding}">
-                            <Grid RowDefinitions="*,Auto">
-                                <Border Grid.Row="0" ClipToBounds="True" CornerRadius="2,2,0,0">
-                                    <views:CoverImage ImageUrl="{Binding CoverUrl}"
-                                                      FallbackText="{Binding EffectiveTitle}"
-                                                      FallbackGradient="{Binding CoverGradient}"
-                                                      SubText="{Binding Platform}"
-                                                      LetterFontSize="36"/>
-                                </Border>
-                                <Border Grid.Row="1" Classes="sw-lib-label">
-                                    <TextBlock Text="{Binding EffectiveTitle}" Classes="sw-lib-name"/>
-                                </Border>
-                            </Grid>
+                            <Border ClipToBounds="True" CornerRadius="1"
+                                    ToolTip.Tip="{Binding EffectiveTitle}">
+                                <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                  FallbackText="{Binding EffectiveTitle}"
+                                                  FallbackGradient="{Binding CoverGradient}"
+                                                  SubText="{Binding Platform}"
+                                                  LetterFontSize="36"/>
+                            </Border>
                         </Button>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ScrollViewer>
 
-
+        <!-- Selected game + button hints, like the Switch's All Software screen -->
+        <Border Grid.Row="3" Background="#1d2025" BorderBrush="#3a3d44" BorderThickness="0,1,0,0" Padding="28,8">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding FocusedGame.EffectiveTitle}" FontSize="15" Foreground="#f1f1f1"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="22">
+                    <TextBlock Text="Ⓐ  Open" FontSize="13" Foreground="#d8d8d8"/>
+                    <TextBlock Text="Ⓑ  Back" FontSize="13" Foreground="#d8d8d8"/>
+                </StackPanel>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>

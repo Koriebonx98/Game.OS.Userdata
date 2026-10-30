@@ -3413,10 +3413,12 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Game Info card layout ("Default" or "PS5"); pushed from Settings by MainViewModel.</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
     public bool IsPs5GameInfo     => string.Equals(GameInfoTheme, "PS5", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGameInfo => !IsPs5GameInfo;
+    public bool IsSwitchGameInfo  => string.Equals(GameInfoTheme, "Switch", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGameInfo => !IsPs5GameInfo && !IsSwitchGameInfo;
     partial void OnGameInfoThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5GameInfo));
+        OnPropertyChanged(nameof(IsSwitchGameInfo));
         OnPropertyChanged(nameof(IsDefaultGameInfo));
     }
 

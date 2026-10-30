@@ -470,6 +470,28 @@ namespace GameLauncher.Models
         public bool   GamesExists   { get; set; }
     }
 
+    // ── Per-dashboard customisation ───────────────────────────────────────────
+
+    /// <summary>
+    /// User customisation of one dashboard design (Settings → Design → ⚙ next to Dashboard):
+    /// which assets are shown, accent colour, size and position. Stored per design name.
+    /// </summary>
+    public class DashboardOptions
+    {
+        /// <summary>Asset key → visible. Missing keys use the design's default (visible).</summary>
+        [JsonPropertyName("assets")]  public Dictionary<string, bool> Assets { get; set; } = new();
+        /// <summary>Accent colour as #RRGGBB; empty = the design's own colour.</summary>
+        [JsonPropertyName("accent")]  public string AccentColor { get; set; } = "";
+        /// <summary>Content scale (0.6 – 1.4).</summary>
+        [JsonPropertyName("scale")]   public double Scale   { get; set; } = 1.0;
+        /// <summary>Design variant, e.g. XB360 "OG" or "Kinetic"; empty = the design's first version.</summary>
+        [JsonPropertyName("version")] public string Version { get; set; } = "";
+        /// <summary>Horizontal content offset in pixels.</summary>
+        [JsonPropertyName("offsetX")] public double OffsetX { get; set; }
+        /// <summary>Vertical content offset in pixels.</summary>
+        [JsonPropertyName("offsetY")] public double OffsetY { get; set; }
+    }
+
     // ── Application-wide settings ─────────────────────────────────────────────
 
     /// <summary>
@@ -547,6 +569,10 @@ namespace GameLauncher.Models
         /// Selected launcher design theme. Supported values: <c>Default</c>, <c>XB360</c>, and <c>PS5</c>.
         /// </summary>
         [JsonPropertyName("designTheme")] public string DesignTheme { get; set; } = "Default";
+
+        /// <summary>Per-dashboard customisation keyed by design name ("Default", "Wii", "Switch", …).</summary>
+        [JsonPropertyName("dashboardOptions")]
+        public Dictionary<string, DashboardOptions> DashboardOptions { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>Layout of the Games (library) page: "Default" or "PS5".</summary>
         [JsonPropertyName("gamesTheme")] public string GamesTheme { get; set; } = "Default";

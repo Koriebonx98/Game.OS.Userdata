@@ -13,8 +13,8 @@
     -->
     <UserControl.Styles>
         <Style Selector="Button.sw-tile">
-            <Setter Property="Width" Value="150"/>
-            <Setter Property="Height" Value="150"/>
+            <Setter Property="Width" Value="132"/>
+            <Setter Property="Height" Value="132"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
@@ -40,11 +40,11 @@
             </Setter>
         </Style>
         <Style Selector="Button.sw-tile.focused /template/ ContentPresenter">
-            <Setter Property="BorderBrush" Value="#00c3e3"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource DashAccent}"/>
         </Style>
         <Style Selector="Border.sw-empty">
-            <Setter Property="Width" Value="150"/>
-            <Setter Property="Height" Value="150"/>
+            <Setter Property="Width" Value="132"/>
+            <Setter Property="Height" Value="132"/>
             <Setter Property="Margin" Value="0,0,10,0"/>
             <Setter Property="CornerRadius" Value="4"/>
             <Setter Property="BorderBrush" Value="#f0b323"/>
@@ -58,27 +58,51 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
         </Style>
         <Style Selector="Button.sw-round">
-            <Setter Property="Width" Value="42"/>
-            <Setter Property="Height" Value="42"/>
-            <Setter Property="Margin" Value="7,0"/>
+            <Setter Property="Width" Value="56"/>
+            <Setter Property="Height" Value="56"/>
+            <Setter Property="Margin" Value="0"/>
             <Setter Property="Padding" Value="0"/>
             <Setter Property="Background" Value="#3a3d44"/>
             <Setter Property="Foreground" Value="#f1f1f1"/>
-            <Setter Property="FontSize" Value="22"/>
-            <Setter Property="CornerRadius" Value="21"/>
+            <Setter Property="FontSize" Value="26"/>
+            <Setter Property="CornerRadius" Value="28"/>
             <Setter Property="HorizontalContentAlignment" Value="Center"/>
             <Setter Property="VerticalContentAlignment" Value="Center"/>
             <Setter Property="Cursor" Value="Hand"/>
         </Style>
         <Style Selector="Button.sw-round /template/ ContentPresenter">
-            <Setter Property="CornerRadius" Value="21"/>
+            <Setter Property="CornerRadius" Value="28"/>
         </Style>
         <Style Selector="Button.sw-round.focused">
-            <Setter Property="Background" Value="#00c3e3"/>
+            <Setter Property="Background" Value="{DynamicResource DashAccent}"/>
             <Setter Property="RenderTransform" Value="scale(1.15)"/>
         </Style>
         <Style Selector="Button.sw-round:pointerover">
             <Setter Property="Background" Value="#4a4e57"/>
+        </Style>
+        <Style Selector="Border.sw-info">
+            <Setter Property="Background" Value="#1d2025"/>
+            <Setter Property="BorderBrush" Value="#3a3d44"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="Padding" Value="18,12"/>
+            <Setter Property="Margin" Value="44,0"/>
+        </Style>
+        <Style Selector="Button.sw-info-btn">
+            <Setter Property="Padding" Value="18,8"/>
+            <Setter Property="Background" Value="#3a3d44"/>
+            <Setter Property="Foreground" Value="#f1f1f1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="Button.sw-info-btn:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource DashAccent}"/>
+        </Style>
+        <Style Selector="TextBlock.sw-cap">
+            <Setter Property="Foreground" Value="#9aa0aa"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="0,4,0,0"/>
         </Style>
         <Style Selector="TextBlock.sw-hint">
             <Setter Property="Foreground" Value="#d8d8d8"/>
@@ -102,20 +126,25 @@
             <!-- Profile + clock -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="28,12,28,0">
                 <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20"
-                        Background="#e8e8e8" BorderBrush="#f0b323" BorderThickness="2">
+                        IsVisible="{Binding Options.ShowProfile}"
+                        Background="#e8e8e8" BorderBrush="{DynamicResource DashAccent}" BorderThickness="2">
                     <TextBlock Text="{Binding SteamProfileInitial}" Foreground="#2b2b2b" FontWeight="Bold" FontSize="18"
                                HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding SteamClockTime}" Foreground="#f1f1f1" FontSize="18"/>
-                    <TextBlock Text="📶" Foreground="#f1f1f1" FontSize="14" VerticalAlignment="Center"/>
-                    <TextBlock Text="🔋" Foreground="#9be564" FontSize="14" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding SteamClockTime}" Foreground="#f1f1f1" FontSize="18"
+                               IsVisible="{Binding Options.ShowClock}"/>
+                    <TextBlock Text="📶" Foreground="#f1f1f1" FontSize="14" VerticalAlignment="Center"
+                               IsVisible="{Binding Options.ShowStatus}"/>
+                    <TextBlock Text="🔋" Foreground="#9be564" FontSize="14" VerticalAlignment="Center"
+                               IsVisible="{Binding Options.ShowStatus}"/>
                 </StackPanel>
             </Grid>
 
             <StackPanel Grid.Row="1" VerticalAlignment="Center" Spacing="14">
             <TextBlock Text="{Binding SwitchShownTitle}" Foreground="#f1f1f1" FontSize="22" FontWeight="SemiBold"
-                       Height="30" Margin="44,0" TextTrimming="CharacterEllipsis"/>
+                       Height="30" Margin="44,0" TextTrimming="CharacterEllipsis"
+                       IsVisible="{Binding Options.ShowTitle}"/>
             <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                 <StackPanel Orientation="Horizontal" Margin="40,0">
                     <Button Classes="sw-tile" Classes.focused="{Binding IsStoreFocused}"
@@ -169,25 +198,73 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- Round shortcut bar -->
-            <Border Classes="sw-bar" Margin="0,8,0,0">
-                <StackPanel Orientation="Horizontal">
-                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar0}" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"
-                            ToolTip.Tip="All Games"/>
-                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar1}" Content="🛍" Command="{Binding OpenFeaturedDetailCommand}"
-                            ToolTip.Tip="Store"/>
-                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar2}" Content="👥" Command="{Binding NavigateToFriendsCommand}"
-                            ToolTip.Tip="Friends"/>
-                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar3}" Content="✉" Command="{Binding NavigateToInboxCommand}"
-                            ToolTip.Tip="Inbox"/>
-                    <Button Classes="sw-round" Classes.focused="{Binding SwitchBar4}" Content="⚙" Command="{Binding NavigateToSettingsCommand}"
-                            ToolTip.Tip="Settings"/>
+            <!-- Game info panel for the highlighted / hovered game -->
+            <Border Classes="sw-info" IsVisible="{Binding HasSwitchShownCard}">
+                <Border IsVisible="{Binding Options.ShowInfo}">
+                    <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" VerticalAlignment="Center">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Background="#e60012" CornerRadius="3" Padding="8,2">
+                                    <TextBlock Text="{Binding SwitchShownPlatform}" FontSize="11" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                                <TextBlock Text="{Binding SwitchShownKind}" FontSize="12" Foreground="#9aa0aa" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="⏱" FontSize="13" Foreground="{DynamicResource DashAccent}"/>
+                                <TextBlock Text="{Binding SwitchShownPlaytime}" FontSize="13" Foreground="#d8d8d8"/>
+                            </StackPanel>
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center">
+                            <Button Classes="sw-info-btn" Command="{Binding OpenLocalGameDetailCommand}"
+                                    CommandParameter="{Binding SwitchShownCard}">
+                                <TextBlock Text="Ⓐ  Game Info" FontSize="13"/>
+                            </Button>
+                            <Button Classes="sw-info-btn" Command="{Binding PlaySwitchShownCommand}">
+                                <TextBlock Text="Ⓧ  Play" FontSize="13"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Border>
+
+            <!-- Round shortcut bar: mouse, D-pad (Down from the tiles) and A all work -->
+            <Border Classes="sw-bar" Margin="0,8,0,0" IsVisible="{Binding Options.ShowShortcuts}">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar0}" Content="🎮" Command="{Binding NavigateToAllGamesCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Library"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar1}" Content="🛍" Command="{Binding OpenFeaturedDetailCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Store"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar2}" Content="🏆" Command="{Binding NavigateToAchievementsCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Achievements"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar3}" Content="🎬" Command="{Binding OpenMoviesFolderCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Media"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar4}" Content="👥" Command="{Binding NavigateToFriendsCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Friends"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar5}" Content="✉" Command="{Binding NavigateToInboxCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Inbox"/>
+                    </StackPanel>
+                    <StackPanel>
+                        <Button Classes="sw-round" Classes.focused="{Binding SwitchBar6}" Content="⚙" Command="{Binding NavigateToSettingsCommand}"/>
+                        <TextBlock Classes="sw-cap" Text="Settings"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
             </StackPanel>
 
             <!-- Button hints -->
-            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,2,28,8">
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="22" Margin="28,2,28,8"
+                        IsVisible="{Binding Options.ShowHints}">
                 <TextBlock Text="Ⓧ  Play" Classes="sw-hint"/>
                 <TextBlock Text="Ⓐ  OK" Classes="sw-hint"/>
             </StackPanel>

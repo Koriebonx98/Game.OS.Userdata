@@ -156,10 +156,125 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
-    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii" };
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Switch" };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
     [ObservableProperty] private string _storeTheme = "Default";
     public IReadOnlyList<string> AvailableStoreThemes { get; } = new[] { "Default", "Sony", "Xbox", "Nintendo" };
+
+    // ── Per-dashboard customisation (⚙ next to the Dashboard drop-down) ───────
+    private readonly Dictionary<string, DashboardOptions> _dashboardOptions = new(StringComparer.OrdinalIgnoreCase);
+    private bool _loadingDashboardEditor;
+
+    /// <summary>Which ⚙ options panel is open in Settings → Design ("dashboard", "library", …; empty = none).</summary>
+    [ObservableProperty] private string _openOptionsPanel = "";
+    public bool IsDashboardOptionsOpen => OpenOptionsPanel == "dashboard";
+    public bool IsOtherOptionsOpen => !string.IsNullOrEmpty(OpenOptionsPanel) && OpenOptionsPanel != "dashboard";
+    partial void OnOpenOptionsPanelChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsDashboardOptionsOpen));
+        OnPropertyChanged(nameof(IsOtherOptionsOpen));
+    }
+
+    [RelayCommand]
+    private void ToggleOptionsPanel(string? key) =>
+        OpenOptionsPanel = OpenOptionsPanel == key ? "" : key ?? "";
+
+    /// <summary>Assets (on/off) offered by the dashboard currently selected in the Theme drop-down.</summary>
+    public ObservableCollection<DashboardAssetToggleVm> DashboardAssets { get; } = new();
+    public IReadOnlyList<string> DashboardAccentPresets { get; } =
+        new[] { "Default", "#00c3e3", "#e60012", "#0070D1", "#9bd30b", "#f0b323", "#a371f7", "#ff7d1a", "#3fb950", "#ffffff" };
+    /// <summary>Versions of the selected dashboard (XB360: OG / Kinetic); empty for other designs.</summary>
+    public ObservableCollection<string> DashboardVersions { get; } = new();
+    public bool HasDashboardVersions => DashboardVersions.Count > 0;
+    [ObservableProperty] private string _dashboardVersion = "";
+    [ObservableProperty] private string _dashboardAccent = "";
+    [ObservableProperty] private double _dashboardScale = 1.0;
+    [ObservableProperty] private double _dashboardOffsetX;
+    [ObservableProperty] private double _dashboardOffsetY;
+    public string DashboardOptionsTitle => $"{DesignTheme} dashboard";
+
+    /// <summary>Raised when the open editor changes so the live dashboard can preview (design name, options).</summary>
+    public Action<string, DashboardOptions>? DashboardOptionsChanged { get; set; }
+
+    partial void OnDesignThemeChanged(string value)
+    {
+        OnPropertyChanged(nameof(DashboardOptionsTitle));
+        LoadDashboardEditor();
+    }
+    partial void OnDashboardVersionChanged(string value)
+    {
+        if (_loadingDashboardEditor) return;
+        // The asset list differs per version, so commit the version then rebuild the checkboxes.
+        CommitDashboardEditor();
+        LoadDashboardEditor();
+    }
+    partial void OnDashboardAccentChanged(string value) => CommitDashboardEditor();
+    partial void OnDashboardScaleChanged(double value) => CommitDashboardEditor();
+    partial void OnDashboardOffsetXChanged(double value) => CommitDashboardEditor();
+    partial void OnDashboardOffsetYChanged(double value) => CommitDashboardEditor();
+
+    private static DashboardOptions CopyOptions(DashboardOptions o) => new()
+    {
+        Assets = new Dictionary<string, bool>(o.Assets ?? new()),
+        Version = o.Version ?? "",
+        AccentColor = o.AccentColor ?? "", Scale = o.Scale <= 0 ? 1.0 : o.Scale,
+        OffsetX = o.OffsetX, OffsetY = o.OffsetY,
+    };
+
+    private Dictionary<string, DashboardOptions> CloneDashboardOptions() =>
+        _dashboardOptions.ToDictionary(kv => kv.Key, kv => CopyOptions(kv.Value), StringComparer.OrdinalIgnoreCase);
+
+    private void LoadDashboardEditor()
+    {
+        _loadingDashboardEditor = true;
+        try
+        {
+            string design = DashboardCatalog.Normalise(DesignTheme);
+            var o = _dashboardOptions.TryGetValue(design, out var existing) ? existing : new DashboardOptions();
+            DashboardVersions.Clear();
+            foreach (var v in DashboardCatalog.VersionsFor(design)) DashboardVersions.Add(v);
+            OnPropertyChanged(nameof(HasDashboardVersions));
+            string version = DashboardCatalog.NormaliseVersion(design, o.Version);
+            DashboardVersion = version;
+            DashboardAssets.Clear();
+            foreach (var def in DashboardCatalog.AssetsFor(design, version))
+            {
+                var toggle = new DashboardAssetToggleVm(def.Key, def.Label, !o.Assets.TryGetValue(def.Key, out var on) || on);
+                toggle.PropertyChanged += (_, _) => CommitDashboardEditor();
+                DashboardAssets.Add(toggle);
+            }
+            DashboardAccent = string.IsNullOrWhiteSpace(o.AccentColor) ? "Default" : o.AccentColor;
+            DashboardScale = Math.Clamp(o.Scale <= 0 ? 1.0 : o.Scale, 0.6, 1.4);
+            DashboardOffsetX = o.OffsetX;
+            DashboardOffsetY = o.OffsetY;
+        }
+        finally { _loadingDashboardEditor = false; }
+    }
+
+    private void CommitDashboardEditor()
+    {
+        if (_loadingDashboardEditor) return;
+        string design = DashboardCatalog.Normalise(DesignTheme);
+        var o = new DashboardOptions
+        {
+            Version = DashboardCatalog.NormaliseVersion(design, DashboardVersion),
+            AccentColor = DashboardCatalog.TryParseColor(DashboardAccent, out _) ? DashboardAccent.Trim() : "",
+            Scale = Math.Round(DashboardScale, 2),
+            OffsetX = Math.Round(DashboardOffsetX), OffsetY = Math.Round(DashboardOffsetY),
+        };
+        foreach (var t in DashboardAssets) o.Assets[t.Key] = t.IsOn;
+        _dashboardOptions[design] = o;
+        DashboardOptionsChanged?.Invoke(design, CopyOptions(o));
+    }
+
+    [RelayCommand]
+    private void ResetDashboardOptions()
+    {
+        _dashboardOptions.Remove(DashboardCatalog.Normalise(DesignTheme));
+        LoadDashboardEditor();
+        CommitDashboardEditor();
+        _dashboardOptions.Remove(DashboardCatalog.Normalise(DesignTheme));
+    }
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
@@ -767,8 +882,11 @@ public partial class SettingsViewModel : ViewModelBase
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
-        GameInfoTheme              = NormaliseGamesTheme(appSettings.GameInfoTheme);
+        GameInfoTheme              = NormaliseGameInfoTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
+        foreach (var kv in appSettings.DashboardOptions)
+            _dashboardOptions[DashboardCatalog.Normalise(kv.Key)] = CopyOptions(kv.Value);
+        LoadDashboardEditor();
         LogGamesScanner           = appSettings.LogGamesScanner;
         LogGamesScannerAdvanced   = appSettings.LogGamesScannerAdvanced;
         LogRomsScanner            = appSettings.LogRomsScanner;
@@ -974,7 +1092,8 @@ public partial class SettingsViewModel : ViewModelBase
             GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
-            GameInfoTheme              = NormaliseGamesTheme(GameInfoTheme),
+            GameInfoTheme              = NormaliseGameInfoTheme(GameInfoTheme),
+            DashboardOptions           = CloneDashboardOptions(),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),
             LogGamesScanner           = LogGamesScanner,
             LogGamesScannerAdvanced   = LogGamesScannerAdvanced,
@@ -1110,6 +1229,9 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         return NormaliseGamesTheme(value);
     }
+
+    private static string NormaliseGameInfoTheme(string value) =>
+        string.Equals((value ?? "").Trim(), "Switch", StringComparison.OrdinalIgnoreCase) ? "Switch" : NormaliseGamesTheme(value);
 
     private static string NormaliseGamesTheme(string value) =>
         string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";

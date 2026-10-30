@@ -376,7 +376,14 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
-        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
+            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
+        {
+            var kr = vm.DashboardVm.HandleKineticKey(e.Key.ToString());
+            if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);
+            if (kr != KineticKeyResult.NotHandled) { e.Handled = true; return; }
+        }
+        if (vm.IsHome && isXb360 && !vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {
@@ -1448,7 +1455,14 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = string.Equals(vm.SettingsVm.DesignTheme, "XB360", StringComparison.OrdinalIgnoreCase);
-        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
+            && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
+        {
+            var kr = vm.DashboardVm.HandleKineticKey(key.ToString());
+            if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);
+            if (kr != KineticKeyResult.NotHandled) return;
+        }
+        if (vm.IsHome && isXb360 && !vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
             switch (key)
             {

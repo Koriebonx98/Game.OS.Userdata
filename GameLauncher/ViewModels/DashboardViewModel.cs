@@ -77,6 +77,7 @@ public partial class DashboardViewModel : ViewModelBase
 
     // Recent achievements
     public ObservableCollection<Achievement> RecentAchievements { get; } = new();
+    public bool HasNoRecentAchievements => RecentAchievements.Count == 0;
     public ObservableCollection<SteamDashboardNewsTileVm> SteamNewsTiles { get; } = new();
 
     // ── Friends (online friends shown in the dashboard) ────────────────────
@@ -203,6 +204,7 @@ public partial class DashboardViewModel : ViewModelBase
         RecentAchievements.Clear();
         foreach (var a in achievements.OrderByDescending(a => ParseDate(a.UnlockedAt)).Take(4))
             RecentAchievements.Add(a);
+        OnPropertyChanged(nameof(HasNoRecentAchievements));
 
         // ── Continue Playing ──────────────────────────────────────────────────
         // Built from the cloud activity log as the single source of truth so that
@@ -626,6 +628,9 @@ public partial class DashboardViewModel : ViewModelBase
             Xb360HasFocusedGame = true;
             Xb360FocusedGame.IsFocused = true;
         }
+
+        // ── XB360 "Kinetic" mosaic (keeps the current tab) ────────────────────
+        RebuildKineticTiles();
     }
 
     // Keep the original 3-arg overload for backwards compatibility with existing callers.
@@ -734,6 +739,9 @@ public partial class DashboardViewModel : ViewModelBase
     public bool SwitchBar2 => SwitchBarIndex == 2;
     public bool SwitchBar3 => SwitchBarIndex == 3;
     public bool SwitchBar4 => SwitchBarIndex == 4;
+    public bool SwitchBar5 => SwitchBarIndex == 5;
+    public bool SwitchBar6 => SwitchBarIndex == 6;
+    private const int SwitchBarLast = 6;
     partial void OnSwitchBarIndexChanged(int value)
     {
         OnPropertyChanged(nameof(InSwitchBar));
@@ -742,6 +750,8 @@ public partial class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(SwitchBar2));
         OnPropertyChanged(nameof(SwitchBar3));
         OnPropertyChanged(nameof(SwitchBar4));
+        OnPropertyChanged(nameof(SwitchBar5));
+        OnPropertyChanged(nameof(SwitchBar6));
     }
 
     /// <summary>Handles a D-pad/A press while the Switch shortcut bar is focused or being entered. Returns true when consumed.</summary>
@@ -756,15 +766,17 @@ public partial class DashboardViewModel : ViewModelBase
         switch (key)
         {
             case "Left":  SwitchBarIndex = Math.Max(0, SwitchBarIndex - 1); break;
-            case "Right": SwitchBarIndex = Math.Min(4, SwitchBarIndex + 1); break;
+            case "Right": SwitchBarIndex = Math.Min(SwitchBarLast, SwitchBarIndex + 1); break;
             case "Up":    SwitchBarIndex = -1; break;
             case "Enter":
                 switch (SwitchBarIndex)
                 {
                     case 0: NavigateToAllGames(); break;
                     case 1: OpenFeaturedDetail(); break;
-                    case 2: NavigateToFriends(); break;
-                    case 3: NavigateToInbox(); break;
+                    case 2: NavigateToAchievements(); break;
+                    case 3: OpenMoviesFolder(); break;
+                    case 4: NavigateToFriends(); break;
+                    case 5: NavigateToInbox(); break;
                     default: NavigateToSettings(); break;
                 }
                 break;
@@ -925,6 +937,20 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void NavigateToSettings() => OnNavigateToPage?.Invoke("settings");
 
+    /// <summary>Opens the page that lists the user's achievements (their profile).</summary>
+    [RelayCommand]
+    private void NavigateToAchievements() => OnNavigateToPage?.Invoke("profile");
+
+    /// <summary>Per-design customisation (assets, accent, size, position) of the active dashboard.</summary>
+    public DashboardOptionsVm Options { get; } = new();
+
+    /// <summary>Switch game info panel: launches the game shown there.</summary>
+    [RelayCommand]
+    private void PlaySwitchShown()
+    {
+        if (SwitchShownCard is { } card) OnPlayFocusedCard?.Invoke(card);
+    }
+
     private LocalGameCardVm? _switchHoverCard;
     /// <summary>Game under the mouse on the Switch dashboard (null when none).</summary>
     public LocalGameCardVm? SwitchHoverCard
@@ -935,11 +961,27 @@ public partial class DashboardViewModel : ViewModelBase
     public LocalGameCardVm? SwitchShownCard => _switchHoverCard ?? FocusedCard;
     public bool HasSwitchShownCard => SwitchShownCard != null;
     public string SwitchShownTitle => SwitchShownCard?.EffectiveTitle ?? "";
+    public string SwitchShownPlatform => SwitchShownCard?.Platform ?? "";
+    public string SwitchShownKind => SwitchShownCard?.KindLabel ?? "";
+    public string SwitchShownPlaytime
+    {
+        get
+        {
+            if (SwitchShownCard is not { } c) return "";
+            int minutes = PlaytimeService.GetTotalMinutes(c.Platform, c.EffectiveTitle);
+            return minutes <= 0 ? "No play time yet"
+                 : minutes < 60 ? $"{minutes}m played"
+                 : $"{minutes / 60}h {minutes % 60}m played";
+        }
+    }
     private void NotifySwitchShown()
     {
         OnPropertyChanged(nameof(SwitchShownCard));
         OnPropertyChanged(nameof(HasSwitchShownCard));
         OnPropertyChanged(nameof(SwitchShownTitle));
+        OnPropertyChanged(nameof(SwitchShownPlatform));
+        OnPropertyChanged(nameof(SwitchShownPlaytime));
+        OnPropertyChanged(nameof(SwitchShownKind));
     }
 
     // ── Media blade commands ────────────────────────────────────────────────────

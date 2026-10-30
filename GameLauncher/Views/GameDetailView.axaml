@@ -48,6 +48,7 @@
                 <Panel Margin="0,0,0,28">
                     <gi:DefaultGameInfo IsVisible="{Binding IsDefaultGameInfo}"/>
                     <gi:Ps5GameInfo IsVisible="{Binding IsPs5GameInfo}"/>
+                    <gi:SwitchGameInfo IsVisible="{Binding IsSwitchGameInfo}"/>
                 </Panel>
 
                 <!-- ── Multi-drive switcher ── -->
