@@ -27,6 +27,7 @@ public partial class DashboardViewModel : ViewModelBase
             OnPropertyChanged(nameof(SteamClockTime));
         };
         _wiiClockTimer.Start();
+        Options.PropertyChanged += (_, _) => UpdateFocusedCard();
     }
 
     [ObservableProperty] private UserProfile _profile = new();
@@ -114,7 +115,7 @@ public partial class DashboardViewModel : ViewModelBase
                      IReadOnlyList<LocalGameCardVm>? localCards = null)
     {
         Profile           = profile;
-        GamesCount        = library.Count;
+        _libraryGames     = library;
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
@@ -342,7 +343,7 @@ public partial class DashboardViewModel : ViewModelBase
             Ps5RecentGames.Add(card);
         SwitchEmptySlots.Clear();
         for (int i = Ps5RecentGames.Count; i < 4; i++) SwitchEmptySlots.Add(i);
-        _defaultFocusIndex = int.MinValue; // re-seeded after the hero is resolved
+        _defaultFocusSet = false; // re-seeded after the hero is resolved
 
         LocalLibraryGames.Clear();
         if (localCards != null)
@@ -718,6 +719,117 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Top-rated store title shown as the store brief when the Store tile is highlighted.</summary>
     public StoreGame? StoreBriefGame => GameCatalog.Store.OrderByDescending(g => g.Rating).FirstOrDefault();
 
+    // ── PS5 shelf: recommended games (Store tile) / related games (any game tile) ──
+    /// <summary>One card on the PS5 shelf.</summary>
+    public sealed partial class ShelfCardVm : ObservableObject
+    {
+        public StoreGame Game { get; }
+        public ShelfCardVm(StoreGame game) { Game = game; }
+        [ObservableProperty] private bool _isFocused;
+    }
+
+    private const int Ps5ShelfSize = 10;
+    private List<Game> _libraryGames = new();
+    /// <summary>Supplies the store catalog (curated + loaded platform shelves) used for recommendations.</summary>
+    public Func<IReadOnlyList<StoreGame>>? StoreCatalogProvider { get; set; }
+
+    public ObservableCollection<ShelfCardVm> Ps5Shelf { get; } = new();
+    [ObservableProperty] private string _ps5ShelfTitle = "";
+    [ObservableProperty] private bool _hasPs5Shelf;
+    private int _ps5ShelfIndex = -1;
+    /// <summary>True while the controller highlight is on the shelf rather than the card strip.</summary>
+    public bool IsPs5ShelfActive => _ps5ShelfIndex >= 0;
+
+    private IReadOnlyList<StoreGame> StoreCatalog() =>
+        StoreCatalogProvider?.Invoke() ?? (IReadOnlyList<StoreGame>)GameCatalog.Store;
+
+    private void RefreshPs5Shelf()
+    {
+        ExitPs5Shelf();
+        Ps5Shelf.Clear();
+        string title = "";
+        try
+        {
+            if (SelectedCardIndex >= 0 && SelectedCardIndex < Ps5RecentGames.Count)
+            {
+                if (Options.ShowRelated)
+                {
+                    var card = Ps5RecentGames[SelectedCardIndex];
+                    var genre = _libraryGames.FirstOrDefault(g =>
+                        string.Equals(g.Title, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))?.Genre;
+                    foreach (var g in StoreRecommendations.Related(StoreCatalog(), card.Platform, card.EffectiveTitle, genre, Ps5ShelfSize))
+                        Ps5Shelf.Add(new ShelfCardVm(g));
+                    title = $"More like {card.EffectiveTitle}";
+                }
+            }
+            else if (Options.ShowRecommended)
+            {
+                var owned = _libraryGames.Select(g => (g.Platform, g.Title, g.Genre))
+                    .Concat(RecentLocalGames.Select(c => (c.Platform, c.EffectiveTitle, "")));
+                foreach (var g in StoreRecommendations.ForUser(StoreCatalog(), owned, Ps5ShelfSize))
+                    Ps5Shelf.Add(new ShelfCardVm(g));
+                title = "Recommended for you";
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[Dashboard] PS5 shelf failed: {ex.Message}"); }
+        Ps5ShelfTitle = title;
+        HasPs5Shelf = Ps5Shelf.Count > 0;
+    }
+
+    private void ExitPs5Shelf()
+    {
+        if (_ps5ShelfIndex >= 0 && _ps5ShelfIndex < Ps5Shelf.Count) Ps5Shelf[_ps5ShelfIndex].IsFocused = false;
+        _ps5ShelfIndex = -1;
+        OnPropertyChanged(nameof(IsPs5ShelfActive));
+    }
+
+    /// <summary>Mouse hover over a strip card (-1 = Store, n = All Games): highlights it like the controller does.</summary>
+    public void HoverCard(int index)
+    {
+        if (index == SelectedCardIndex && !IsPs5ShelfActive) return;
+        SelectedCardIndex = Math.Clamp(index, -1, Ps5RecentGames.Count);
+        UpdateFocusedCard();
+    }
+
+    [RelayCommand]
+    private void OpenShelfGame(ShelfCardVm? card)
+    {
+        if (card != null) OnOpenStoreDetail?.Invoke(card.Game);
+    }
+
+    /// <summary>
+    /// PS5 shelf navigation. Down from the card strip enters the shelf; Left/Right move along it; Up returns.
+    /// Returns true when the key was consumed.
+    /// </summary>
+    public bool HandlePs5ShelfKey(Avalonia.Input.Key key)
+    {
+        if (!IsPs5ShelfActive)
+        {
+            if (key != Avalonia.Input.Key.Down || Ps5Shelf.Count == 0) return false;
+            _ps5ShelfIndex = 0;
+            Ps5Shelf[0].IsFocused = true;
+            OnPropertyChanged(nameof(IsPs5ShelfActive));
+            return true;
+        }
+
+        int prev = _ps5ShelfIndex;
+        switch (key)
+        {
+            case Avalonia.Input.Key.Right: _ps5ShelfIndex = Math.Min(prev + 1, Ps5Shelf.Count - 1); break;
+            case Avalonia.Input.Key.Left:  _ps5ShelfIndex = Math.Max(prev - 1, 0); break;
+            case Avalonia.Input.Key.Up:    ExitPs5Shelf(); return true;
+            case Avalonia.Input.Key.Enter:
+            case Avalonia.Input.Key.X:
+                OpenShelfGame(Ps5Shelf[prev]);
+                return true;
+            case Avalonia.Input.Key.Down: return true;
+            default: return false;
+        }
+        Ps5Shelf[prev].IsFocused = false;
+        Ps5Shelf[_ps5ShelfIndex].IsFocused = true;
+        return true;
+    }
+
     /// <summary>Invoked by MainWindow when Play is pressed for the focused card.</summary>
     public Action<LocalGameCardVm>? OnPlayFocusedCard { get; set; }
     /// <summary>Invoked by MainWindow when "..." is pressed for the focused card (open detail page).</summary>
@@ -813,56 +925,132 @@ public partial class DashboardViewModel : ViewModelBase
         else PlayFocusedCard();
     }
 
-    // ── Default dashboard focus: hero "Continue Playing" button, then the Continue Playing cards ──
-    private int _defaultFocusIndex = int.MinValue;
+    // ── Default dashboard focus: hero → Continue Playing cards → Media cards → Recent Achievements ──
+    private enum DefaultRow { Hero, Recent, Media, Achievements }
+    private static readonly DefaultRow[] DefaultRows = { DefaultRow.Hero, DefaultRow.Recent, DefaultRow.Media, DefaultRow.Achievements };
+    private const int DefaultMediaCount = 3;
+    private DefaultRow _defaultRow = DefaultRow.Hero;
+    private int _defaultCol;
+    private bool _defaultFocusSet;
     [ObservableProperty] private bool _isHeroFocused;
+    [ObservableProperty] private bool _isDefaultMoviesFocused;
+    [ObservableProperty] private bool _isDefaultTvFocused;
+    [ObservableProperty] private bool _isDefaultMusicFocused;
+    [ObservableProperty] private bool _isDefaultNoAchievementsFocused;
 
-    private bool HasHero => FeaturedGame != null;
-    private int DefaultFirstIndex => HasHero ? -1 : 0;
+    /// <summary>Raised after the highlight moves so the view can scroll the focused item into view.</summary>
+    public event Action? DefaultFocusChanged;
 
-    /// <summary>True when the first focusable item (hero button, or first card without a hero) is highlighted.</summary>
-    public bool IsAtDefaultFirstItem => _defaultFocusIndex <= DefaultFirstIndex;
-
-    /// <summary>Moves the highlight across hero → Continue Playing cards (clamped).</summary>
-    public void MoveDefaultFocus(int delta)
+    private int DefaultRowCount(DefaultRow row) => row switch
     {
-        if (_defaultFocusIndex == int.MinValue) { SetDefaultFocus(DefaultFirstIndex); return; }
-        SetDefaultFocus(_defaultFocusIndex + delta);
+        DefaultRow.Hero => FeaturedGame != null && Options.ShowFeatured ? 1 : 0,
+        DefaultRow.Recent => Options.ShowRecent ? RecentLocalGames.Count : 0,
+        DefaultRow.Media => Options.ShowMedia ? DefaultMediaCount : 0,
+        // With no achievements the "🏆 Achievements" card is the single focusable item.
+        _ => Options.ShowAchievements ? Math.Max(1, RecentAchievements.Count) : 0,
+    };
+
+    /// <summary>True when the highlight is at the left edge, where Left opens the navigation menu.</summary>
+    public bool IsAtDefaultFirstItem => !_defaultFocusSet || _defaultCol <= 0 || _defaultRow == DefaultRow.Achievements;
+
+    /// <summary>Moves the highlight: dx steps along a row, dy jumps between rows (Achievements is a vertical list).</summary>
+    public void MoveDefaultFocus(int dx, int dy)
+    {
+        if (!_defaultFocusSet) { ResetDefaultFocus(); return; }
+        int idx = Array.IndexOf(DefaultRows, _defaultRow);
+        if (dx != 0 && _defaultRow != DefaultRow.Achievements)
+        {
+            SetDefaultFocus(_defaultRow, Math.Clamp(_defaultCol + dx, 0, Math.Max(0, DefaultRowCount(_defaultRow) - 1)));
+            return;
+        }
+        if (dy == 0) return;
+        if (_defaultRow == DefaultRow.Achievements)
+        {
+            int next = _defaultCol + dy;
+            if (next >= 0 && next < DefaultRowCount(DefaultRow.Achievements)) { SetDefaultFocus(_defaultRow, next); return; }
+        }
+        for (int i = idx + dy; i >= 0 && i < DefaultRows.Length; i += dy)
+        {
+            int count = DefaultRowCount(DefaultRows[i]);
+            if (count == 0) continue;
+            int col = DefaultRows[i] == DefaultRow.Achievements ? 0 : Math.Min(_defaultCol, count - 1);
+            if (dy < 0 && DefaultRows[i] == DefaultRow.Achievements) col = count - 1;
+            SetDefaultFocus(DefaultRows[i], col);
+            return;
+        }
     }
 
-    /// <summary>Highlights the first item so the dashboard never shows without a visible selection.</summary>
-    public void ResetDefaultFocus() => SetDefaultFocus(DefaultFirstIndex);
-
-    private void SetDefaultFocus(int index)
+    /// <summary>Highlights the first available item so the dashboard never shows without a visible selection.</summary>
+    public void ResetDefaultFocus()
     {
-        index = Math.Clamp(index, DefaultFirstIndex, Math.Max(DefaultFirstIndex, RecentLocalGames.Count - 1));
-        _defaultFocusIndex = index;
+        foreach (var row in DefaultRows)
+            if (DefaultRowCount(row) > 0) { SetDefaultFocus(row, 0); return; }
+        _defaultFocusSet = false;
+        ClearDefaultFocusFlags();
+    }
+
+    private void ClearDefaultFocusFlags()
+    {
         foreach (var c in RecentLocalGames) c.IsFocused = false;
-        IsHeroFocused = index < 0 && HasHero;
-        if (index >= 0 && index < RecentLocalGames.Count)
-            RecentLocalGames[index].IsFocused = true;
-        OnPropertyChanged(nameof(IsAtDefaultFirstItem));
+        foreach (var a in RecentAchievements) a.IsCardFocused = false;
+        IsHeroFocused = IsDefaultMoviesFocused = IsDefaultTvFocused = IsDefaultMusicFocused = IsDefaultNoAchievementsFocused = false;
     }
 
-    /// <summary>A button: opens the info page of the highlighted hero / card.</summary>
+    private void SetDefaultFocus(DefaultRow row, int col)
+    {
+        _defaultFocusSet = true;
+        _defaultRow = row;
+        _defaultCol = col;
+        ClearDefaultFocusFlags();
+        switch (row)
+        {
+            case DefaultRow.Hero: IsHeroFocused = true; break;
+            case DefaultRow.Recent: if (col < RecentLocalGames.Count) RecentLocalGames[col].IsFocused = true; break;
+            case DefaultRow.Media:
+                IsDefaultMoviesFocused = col == 0; IsDefaultTvFocused = col == 1; IsDefaultMusicFocused = col == 2; break;
+            case DefaultRow.Achievements:
+                if (RecentAchievements.Count == 0) IsDefaultNoAchievementsFocused = true;
+                else if (col < RecentAchievements.Count) RecentAchievements[col].IsCardFocused = true;
+                break;
+        }
+        OnPropertyChanged(nameof(IsAtDefaultFirstItem));
+        DefaultFocusChanged?.Invoke();
+    }
+
+    /// <summary>A button: opens the highlighted hero / card / media section / achievements page.</summary>
     public void OpenDefaultFocused()
     {
-        if (_defaultFocusIndex == int.MinValue) ResetDefaultFocus();
-        if (_defaultFocusIndex < 0) OpenFeaturedDetail();
-        else if (_defaultFocusIndex < RecentLocalGames.Count)
-            OnOpenFocusedCardDetail?.Invoke(RecentLocalGames[_defaultFocusIndex]);
+        if (!_defaultFocusSet) ResetDefaultFocus();
+        switch (_defaultRow)
+        {
+            case DefaultRow.Hero: OpenFeaturedDetail(); break;
+            case DefaultRow.Recent:
+                if (_defaultCol < RecentLocalGames.Count) OnOpenFocusedCardDetail?.Invoke(RecentLocalGames[_defaultCol]);
+                break;
+            case DefaultRow.Media:
+                OnNavigateToMediaSection?.Invoke(_defaultCol switch { 0 => "movies", 1 => "tvshows", _ => "music" });
+                break;
+            case DefaultRow.Achievements: NavigateToAchievements(); break;
+        }
     }
 
-    /// <summary>X button: launches the highlighted hero / card.</summary>
+    /// <summary>X button: launches the highlighted hero / card; other rows just open.</summary>
     public void PlayDefaultFocused()
     {
-        if (_defaultFocusIndex == int.MinValue) ResetDefaultFocus();
-        if (_defaultFocusIndex < 0) ContinuePlaying();
-        else if (_defaultFocusIndex < RecentLocalGames.Count)
-            OnPlayFocusedCard?.Invoke(RecentLocalGames[_defaultFocusIndex]);
+        if (!_defaultFocusSet) ResetDefaultFocus();
+        if (_defaultRow == DefaultRow.Hero) ContinuePlaying();
+        else if (_defaultRow == DefaultRow.Recent && _defaultCol < RecentLocalGames.Count)
+            OnPlayFocusedCard?.Invoke(RecentLocalGames[_defaultCol]);
+        else OpenDefaultFocused();
     }
 
     private void UpdateFocusedCard()
+    {
+        UpdateFocusedCardCore();
+        RefreshPs5Shelf();
+    }
+
+    private void UpdateFocusedCardCore()
     {
         // Clear old focus
         foreach (var c in Ps5RecentGames)
@@ -882,7 +1070,7 @@ public partial class DashboardViewModel : ViewModelBase
             FocusedCardAchievements.Clear();
             if (SelectedCardIndex >= Ps5RecentGames.Count)
                 foreach (var a in RecentAchievements.Take(5)) FocusedCardAchievements.Add(a);
-            FocusedCardTrophyHeader = SelectedCardIndex < 0 ? "" : "Recent trophies";
+            FocusedCardTrophyHeader = SelectedCardIndex < 0 ? "" : $"Recent {Options.AchievementsWordLower}";
             OnPropertyChanged(nameof(HasFocusedCardAchievements));
             NotifySwitchShown();
             return;
@@ -903,7 +1091,7 @@ public partial class DashboardViewModel : ViewModelBase
             .ToList();
         foreach (var a in related.Take(6))
             FocusedCardAchievements.Add(a);
-        FocusedCardTrophyHeader = $"{card.EffectiveTitle} · Trophies";
+        FocusedCardTrophyHeader = $"{card.EffectiveTitle} · {Options.AchievementsWord}";
         OnPropertyChanged(nameof(HasFocusedCardAchievements));
     }
 

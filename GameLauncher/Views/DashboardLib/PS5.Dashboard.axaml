@@ -13,7 +13,7 @@
             <!-- Header -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="28,18,28,12" IsVisible="{Binding Options.ShowHeader}">
                 <TextBlock Text="Games" Classes="ps5-header-title"/>
-                <TextBlock Text="  Media" Classes="ps5-header-media"/>
+                <TextBlock Text="  Media" Classes="ps5-header-media" IsVisible="{Binding Options.ShowMedia}"/>
             </StackPanel>
 
             <!-- Horizontal card row -->
@@ -23,7 +23,7 @@
                           Padding="20,0">
                 <StackPanel Orientation="Horizontal">
                     <!-- Store card -->
-                    <Button Classes="game-card-btn ps5-game-card-btn"
+                    <Button Classes="game-card-btn ps5-game-card-btn" Tag="store"
                             Classes.focused="{Binding IsStoreFocused}"
                             Command="{Binding OpenFeaturedDetailCommand}">
                         <StackPanel>
@@ -69,7 +69,7 @@
                     </ItemsControl>
 
                     <!-- All games card -->
-                    <Button Classes="game-card-btn ps5-game-card-btn"
+                    <Button Classes="game-card-btn ps5-game-card-btn" Tag="all"
                             Classes.focused="{Binding IsAllGamesFocused}"
                             Command="{Binding NavigateToAllGamesCommand}">
                         <StackPanel>
@@ -83,8 +83,11 @@
                 </StackPanel>
             </ScrollViewer>
 
+            <!-- Content under the strip: store brief / trophies of the highlighted game, then a shelf of play cards -->
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <StackPanel>
             <!-- Store brief (Store tile highlighted) -->
-            <StackPanel Grid.Row="2" Margin="40,14,40,0" Spacing="6" IsVisible="{Binding IsStoreFocused}">
+            <StackPanel Margin="40,14,40,0" Spacing="6" IsVisible="{Binding IsStoreFocused}">
                 <TextBlock Text="Store" Foreground="#00AEEF" FontSize="14" FontWeight="SemiBold"/>
                 <TextBlock Text="{Binding StoreBriefGame.Title}" Foreground="White" FontSize="30" FontWeight="Bold"
                            TextTrimming="CharacterEllipsis"/>
@@ -98,14 +101,15 @@
             </StackPanel>
 
             <!-- Trophies of the highlighted game (live as focus moves) -->
-            <Border Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="28,14,0,0"
+            <StackPanel IsVisible="{Binding Options.ShowAchievements}">
+            <Border HorizontalAlignment="Left" Margin="28,14,0,0"
                     Padding="16,12" Classes="ps5-achievements-panel"
                     IsVisible="{Binding !IsStoreFocused}">
                 <StackPanel Width="420">
                     <TextBlock Text="{Binding FocusedCardTrophyHeader}" Foreground="#E6E6E6" FontSize="13"
                                FontWeight="SemiBold" Margin="0,0,0,6" TextTrimming="CharacterEllipsis"/>
                     <Rectangle Height="1" Fill="#2B2B2B" Margin="0,0,0,6"/>
-                    <TextBlock Text="No trophies yet" Foreground="#9E9E9E" FontSize="12"
+                    <TextBlock Text="{Binding Options.AchievementsWordLower, StringFormat='No {0} yet'}" Foreground="#9E9E9E" FontSize="12"
                                IsVisible="{Binding !HasFocusedCardAchievements}"/>
                     <ItemsControl ItemsSource="{Binding FocusedCardAchievements}">
                         <ItemsControl.ItemTemplate>
@@ -127,17 +131,57 @@
                     </ItemsControl>
                 </StackPanel>
             </Border>
+            </StackPanel>
+
+            <!-- Shelf: recommended games (Store tile) or games related to the highlighted game -->
+            <StackPanel Margin="28,16,0,8" Spacing="8" IsVisible="{Binding HasPs5Shelf}">
+                <TextBlock Text="{Binding Ps5ShelfTitle}" Foreground="#ECECEC" FontSize="15" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                    <ItemsControl ItemsSource="{Binding Ps5Shelf}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal"/>
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:DashboardViewModel+ShelfCardVm">
+                                <Button Classes="game-card-btn ps5-game-card-btn"
+                                        Classes.focused="{Binding IsFocused}"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenShelfGameCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel>
+                                        <Border Height="100" ClipToBounds="True" CornerRadius="10">
+                                            <views:CoverImage
+                                                ImageUrl="{Binding Game.CoverUrl}"
+                                                FallbackText="{Binding Game.Title}"
+                                                FallbackGradient="{Binding Game.CoverGradient}"
+                                                SubText="{Binding Game.Platform}"
+                                                LetterFontSize="32"
+                                                ImageCornerRadius="10"
+                                                Height="100"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Game.Title}" Classes="ps5-card-title" Margin="8,6,8,0"/>
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </StackPanel>
+            </StackPanel>
+            </ScrollViewer>
 
             <!-- Bottom status tiles -->
             <StackPanel Grid.Row="3"
                         Orientation="Horizontal"
                         HorizontalAlignment="Left"
                         VerticalAlignment="Bottom"
-                        Margin="20,0,0,12">
-                <Border Classes="ps5-status-tile" Width="120" Height="52" Padding="10">
+                        Margin="20,0,0,56">
+                <Border Classes="ps5-status-tile" Width="120" Height="52" Padding="10"
+                        IsVisible="{Binding Options.ShowAchievements}">
                     <StackPanel>
                         <TextBlock Text="{Binding AchievementsCount}" Classes="ps5-status-value"/>
-                        <TextBlock Text="Trophies" Classes="ps5-status-label"/>
+                        <TextBlock Text="{Binding Options.AchievementsWord}" Classes="ps5-status-label"/>
                     </StackPanel>
                 </Border>
                 <Border Classes="ps5-status-tile" Width="160" Height="52" Padding="10" Margin="12,0,0,0">

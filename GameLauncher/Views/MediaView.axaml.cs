@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using System.Linq;
 using GameLauncher.Services;
 using GameLauncher.ViewModels;
 using LibVLCSharp.Shared;
@@ -16,25 +18,127 @@ public partial class MediaView : UserControl
     private MediaPlayer? _mediaPlayer;
     private Media?       _media;
 
+    // ── Music player state (audio only, independent of the video overlay) ─────
+    private LibVLC?      _audioVlc;
+    private MediaPlayer? _audioPlayer;
+    private Media?       _audioMedia;
+    private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+
     public MediaView()
     {
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Unloaded           += OnUnloaded;
+        _audioTimer.Tick   += (_, _) => PublishAudioProgress();
     }
+
+    private MediaViewModel? _subscribedVm;
 
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        if (_subscribedVm != null) _subscribedVm.MediaFocusChanged -= ScrollFocusedIntoView;
+        _subscribedVm = DataContext as MediaViewModel;
+        if (_subscribedVm != null) _subscribedVm.MediaFocusChanged += ScrollFocusedIntoView;
+
         if (DataContext is MediaViewModel vm)
         {
             vm.PlayLocalVideoRequested = OnPlayLocalVideoRequested;
             vm.PlayMediaItemRequested = OnPlayMediaItemRequested;
+            vm.PlayAudioRequested = StartAudio;
+            vm.ToggleAudioPauseRequested = ToggleAudioPause;
+            vm.StopAudioRequested = StopAudio;
         }
     }
+
+    // Keeps the controller highlight visible when it moves below the fold.
+    private void ScrollFocusedIntoView() =>
+        Dispatcher.UIThread.Post(() =>
+            this.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.IsVisible && b.IsEffectivelyVisible && b.Classes.Contains("focused"))?.BringIntoView(),
+            DispatcherPriority.Background);
 
     private void OnUnloaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
         DisposeVlc();
+        StopAudio();
+    }
+
+    // ── Music player ─────────────────────────────────────────────────────────
+
+    private static void InitVlcCore()
+    {
+        string? vlcDir = IntroWindow.FindBundledLibVlcDirectoryPublic();
+        if (!string.IsNullOrEmpty(vlcDir)) Core.Initialize(vlcDir);
+        else Core.Initialize();
+    }
+
+    private void StartAudio(string path)
+    {
+        if (DataContext is not MediaViewModel vm) return;
+        if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) return;
+        StopAudio();
+        try
+        {
+            InitVlcCore();
+            _audioVlc    = new LibVLC(enableDebugLogs: false);
+            _audioPlayer = new MediaPlayer(_audioVlc);
+            _audioPlayer.EndReached       += OnAudioEnded;
+            _audioPlayer.EncounteredError += OnAudioError;
+            _audioMedia = new Media(_audioVlc, new Uri(path));
+            _audioPlayer.Play(_audioMedia);
+            vm.IsMusicPlaying = true;
+            _audioTimer.Start();
+        }
+        catch (Exception ex)
+        {
+            DevLogService.Log($"[MediaView] Audio init failed: {ex.GetType().Name}: {ex.Message}");
+            StopAudio();
+            vm.IsMusicPlaying = false;
+        }
+    }
+
+    private void ToggleAudioPause()
+    {
+        if (_audioPlayer == null || DataContext is not MediaViewModel vm) return;
+        _audioPlayer.Pause();
+        vm.IsMusicPlaying = !vm.IsMusicPlaying;
+    }
+
+    private void PublishAudioProgress()
+    {
+        if (_audioPlayer != null && DataContext is MediaViewModel vm)
+            vm.UpdateAudioProgress(_audioPlayer.Time, _audioPlayer.Length);
+    }
+
+    // VLC raises these on its own thread, and the player must not be disposed from inside its callback.
+    private void OnAudioEnded(object? sender, EventArgs e) =>
+        System.Threading.Tasks.Task.Run(() => Dispatcher.UIThread.Post(() =>
+        {
+            if (DataContext is MediaViewModel vm) vm.OnAudioEnded();
+        }));
+
+    private void OnAudioError(object? sender, EventArgs e) =>
+        System.Threading.Tasks.Task.Run(() => Dispatcher.UIThread.Post(() =>
+        {
+            StopAudio();
+            if (DataContext is MediaViewModel vm) vm.IsMusicPlaying = false;
+        }));
+
+    private void StopAudio()
+    {
+        _audioTimer.Stop();
+        if (_audioPlayer != null)
+        {
+            _audioPlayer.EndReached       -= OnAudioEnded;
+            _audioPlayer.EncounteredError -= OnAudioError;
+            try { _audioPlayer.Stop(); } catch (Exception ex) { DevLogService.Log($"[MediaView] Audio stop: {ex.Message}"); }
+            _audioPlayer.Dispose();
+            _audioPlayer = null;
+        }
+        _audioMedia?.Dispose();
+        _audioMedia = null;
+        _audioVlc?.Dispose();
+        _audioVlc = null;
     }
 
     // ── VLC local file player ────────────────────────────────────────────────
@@ -82,6 +186,8 @@ public partial class MediaView : UserControl
 
         // Stop any running playback before starting a new one.
         DisposeVlc();
+        StopAudio();
+        vm.IsMusicPlaying = false;
 
         try
         {

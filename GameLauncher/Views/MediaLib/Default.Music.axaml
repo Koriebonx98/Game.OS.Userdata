@@ -1,0 +1,131 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.DefaultMusic"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Default Music: console-styled browser (folders left, songs right) with a player panel at the bottom. -->
+    <UserControl.Styles>
+        <Style Selector="Button.track-row">
+            <Setter Property="Background" Value="#161b22"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.track-row:pointerover /template/ ContentPresenter, Button.track-row:focus /template/ ContentPresenter">
+            <Setter Property="Background" Value="#21262d"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*,Auto">
+        <Grid Grid.Row="0" ColumnDefinitions="250,*">
+
+            <!-- Folders / artists -->
+            <Border Grid.Column="0" Background="#161b22" Padding="18,24">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Music" Classes="section-header" Margin="0,0,0,8"/>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsAllSongsFocused}" HorizontalAlignment="Stretch"
+                                Command="{Binding SelectMusicGroupCommand}" CommandParameter="">
+                            🎵  All songs
+                        </Button>
+                        <ItemsControl ItemsSource="{Binding MusicGroups}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                                            HorizontalContentAlignment="Left"
+                                            Command="{Binding $parent[UserControl].DataContext.SelectMusicGroupCommand}"
+                                            CommandParameter="{Binding Title}">
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Border Height="1" Background="#30363d" Margin="0,6"/>
+                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                                Command="{Binding RefreshMediaLibraryCommand}">⟳  Refresh Scan</Button>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMusicFocused}" HorizontalAlignment="Stretch"
+                                Command="{Binding SelectMoviesCommand}">‹  Movies &amp; TV</Button>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+
+            <!-- Songs -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="32,24,32,0">
+                <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,16">
+                    <TextBlock Text="{Binding MusicTracksTitle}" Classes="page-title"/>
+                    <TextBlock Text="{Binding ActiveSectionSummary}" FontSize="12" Foreground="#8b949e"/>
+                </StackPanel>
+
+                <Border Grid.Row="1" Classes="empty-state-card" CornerRadius="10" Padding="28,24"
+                        VerticalAlignment="Top" IsVisible="{Binding HasNoMusic}">
+                    <StackPanel Spacing="8" HorizontalAlignment="Center">
+                        <TextBlock Text="🎵" FontSize="36" HorizontalAlignment="Center"/>
+                        <TextBlock Text="No music found" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Add songs to a Media/Music folder on any drive, then Refresh Scan."
+                                   FontSize="12" Foreground="#8b949e" TextWrapping="Wrap" TextAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsVisible="{Binding !HasNoMusic}">
+                    <ItemsControl ItemsSource="{Binding MusicTracks}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Classes="track-row media-nav" Classes.focused="{Binding IsFocused}"
+                                        Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Grid ColumnDefinitions="44,*,Auto" ColumnSpacing="12">
+                                        <Border Width="44" Height="44" CornerRadius="8" ClipToBounds="True">
+                                            <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                              FallbackGradient="{Binding Gradient}" LocalCachePath="{Binding CoverPath}"
+                                                              LetterFontSize="20" ImageCornerRadius="8"
+                                                              Width="44" Height="44"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                            <TextBlock Text="{Binding DisplayTitle}" FontSize="13" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Group}" FontSize="11" Foreground="#8b949e"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" FontSize="11" Foreground="#8b949e">
+                                            <Run Text="{Binding Extension}"/><Run Text="  ·  "/><Run Text="{Binding SizeLabel}"/>
+                                        </TextBlock>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- Player -->
+        <Border Grid.Row="1" Background="#161b22" BorderBrush="#30363d" BorderThickness="0,1,0,0" Padding="24,14">
+            <Grid ColumnDefinitions="260,*,Auto" ColumnSpacing="24">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding NowPlayingTitle}" FontSize="14" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding NowPlayingGroup}" FontSize="11" Foreground="#8b949e"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                        <Button Classes="btn-secondary" Command="{Binding PreviousTrackCommand}" Content="⏮"/>
+                        <Button Classes="btn-primary" MinWidth="64" HorizontalContentAlignment="Center"
+                                Command="{Binding TogglePlayPauseCommand}"
+                                Content="{Binding PlayPauseGlyph}"/>
+                        <Button Classes="btn-secondary" Command="{Binding NextTrackCommand}" Content="⏭"/>
+                        <Button Classes="btn-secondary" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <TextBlock Text="{Binding PositionLabel}" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
+                        <ProgressBar Grid.Column="1" Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="6"/>
+                        <TextBlock Grid.Column="2" Text="{Binding DurationLabel}" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

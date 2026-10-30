@@ -1055,8 +1055,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.StoreTheme = SettingsVm.StoreTheme;
         DetailVm.GameInfoTheme = SettingsVm.GameInfoTheme;
         StoreVm.KeyboardTheme = SettingsVm.KeyboardTheme;
+        MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
+        MediaVm.MusicTheme = SettingsVm.MusicTheme;
         SettingsVm.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(SettingsViewModel.MoviesTvTheme))
+                MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
+            if (e.PropertyName == nameof(SettingsViewModel.MusicTheme))
+                MediaVm.MusicTheme = SettingsVm.MusicTheme;
             if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
                 { LibraryVm.GamesTheme = SettingsVm.GamesTheme; StoreVm.GamesTheme = SettingsVm.GamesTheme; }
             if (e.PropertyName == nameof(SettingsViewModel.StoreTheme))
@@ -1080,6 +1086,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DashboardVm.Options.Load(_appliedDashboardDesign, LoadDashboardOptions(_appliedDashboardDesign));
         };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
+        DashboardVm.StoreCatalogProvider = () => StoreVm.CatalogForRecommendations();
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
         {
@@ -2086,7 +2093,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         IsNavExpanded = false;
         ShowDetail = false;
         ActivePage = page;
-        if (page == "library")
+        // The library is built at startup and refreshed on every change, so only build here if that hasn't happened yet.
+        if (page == "library" && !LibraryVm.HasBuilt)
             LibraryVm.Load(_library);
         if (page == "friends")
             FriendsVm.Load(_client, _profile.Username);
@@ -2095,7 +2103,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
         if (page == "media")
+        {
             MediaVm.EnsureMediaLibraryFresh();
+            MediaVm.ResetMediaFocus();
+        }
     }
 
     /// <summary>

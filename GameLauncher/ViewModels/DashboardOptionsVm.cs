@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Avalonia.Media;
 using CommunityToolkit.Mvvm.ComponentModel;
 using GameLauncher.Models;
@@ -36,7 +37,13 @@ public static class DashboardCatalog
             new("title", "Game title"), new("info", "Game info panel"), new("shortcuts", "Shortcut bar"),
             new("hints", "Button hints"), new("background", "Game background"),
         },
-        "PS5" => new DashboardAssetDef[] { new("header", "Header (Games / Media)") },
+        "PS5" => new DashboardAssetDef[]
+        {
+            new("header", "Header (Games / Media)"), new("media", "Media tab in the header"),
+            new("achievements", "Achievements / trophies (panel & counter)"),
+            new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
+            new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
+        },
         Xb360Og => new DashboardAssetDef[]
         {
             new("profile", "Profile & greeting"), new("achievements", "Recent achievements"),
@@ -76,10 +83,34 @@ public static class DashboardCatalog
         return "Default";
     }
 
-    public static bool TryParseColor(string? hex, out Color color)
+    /// <summary>Friendly accent colour names offered in Settings (name → colour).</summary>
+    private static readonly (string Name, string Hex)[] AccentColors =
+    {
+        ("Blue", "#58a6ff"), ("Cyan", "#00c3e3"), ("Red", "#e60012"), ("Green", "#3fb950"),
+        ("Lime", "#9bd30b"), ("Yellow", "#f0b323"), ("Orange", "#ff7d1a"), ("Purple", "#a371f7"),
+        ("Pink", "#f778ba"), ("White", "#ffffff"),
+    };
+
+    public static IReadOnlyList<string> AccentNames { get; } =
+        new[] { "Default" }.Concat(AccentColors.Select(c => c.Name)).ToArray();
+
+    /// <summary>Turns a saved accent (colour name, or a legacy hex code) into the matching colour name, or "Default".</summary>
+    public static string AccentName(string? value)
+    {
+        var v = value?.Trim() ?? "";
+        foreach (var (name, hex) in AccentColors)
+            if (string.Equals(name, v, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(hex, v, StringComparison.OrdinalIgnoreCase)) return name;
+        return "Default";
+    }
+
+    public static bool TryParseColor(string? value, out Color color)
     {
         color = default;
-        return !string.IsNullOrWhiteSpace(hex) && Color.TryParse(hex.Trim(), out color);
+        var v = value?.Trim() ?? "";
+        foreach (var (name, hex) in AccentColors)
+            if (string.Equals(name, v, StringComparison.OrdinalIgnoreCase)) return Color.TryParse(hex, out color);
+        return v.Length > 0 && Color.TryParse(v, out color);
     }
 }
 
@@ -130,6 +161,11 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowBackground   => Get("background");
     public bool ShowHeader       => Get("header");
     public bool ShowTabs         => Get("tabs");
+    public bool ShowRecommended  => Get("recommended");
+    public bool ShowRelated      => Get("related");
+    /// <summary>PS5 calls achievements "Trophies"; the setting switches the wording back to "Achievements".</summary>
+    public string AchievementsWord      => Get("trophyname") ? "Trophies" : "Achievements";
+    public string AchievementsWordLower => AchievementsWord.ToLowerInvariant();
 
     public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
     public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;

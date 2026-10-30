@@ -78,7 +78,8 @@
                             <Border IsVisible="{Binding IsSettings}">
                                 <views:SettingsView DataContext="{Binding SettingsVm}"/>
                             </Border>
-                            <Border IsVisible="{Binding IsMedia}">
+                            <Border IsVisible="{Binding IsMedia}"
+                                    Height="{Binding $parent[ScrollViewer].Bounds.Height}">
                                 <views:MediaView DataContext="{Binding MediaVm}"/>
                             </Border>
                         </Panel>

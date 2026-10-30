@@ -421,24 +421,27 @@ public partial class MainWindow : Window
             }
         }
 
-        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        // Default dashboard: hero, Continue Playing cards, Media cards and Recent Achievements
         bool isDefaultDash = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isDefaultDash && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {
                 case Key.Right:
+                    vm.DashboardVm.MoveDefaultFocus(1, 0);
+                    e.Handled = true;
+                    return;
                 case Key.Down:
-                    vm.DashboardVm.MoveDefaultFocus(1);
+                    vm.DashboardVm.MoveDefaultFocus(0, 1);
                     e.Handled = true;
                     return;
                 case Key.Left:
                     if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
-                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    else vm.DashboardVm.MoveDefaultFocus(-1, 0);
                     e.Handled = true;
                     return;
                 case Key.Up:
-                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    vm.DashboardVm.MoveDefaultFocus(0, -1);
                     e.Handled = true;
                     return;
                 case Key.Enter:
@@ -467,6 +470,12 @@ public partial class MainWindow : Window
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigation && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
+            if (string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
+                vm.DashboardVm.HandlePs5ShelfKey(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
             switch (e.Key)
             {
                 case Key.Right:
@@ -513,6 +522,16 @@ public partial class MainWindow : Window
         if (vm.IsSettings && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleSettingsKey(vm, e.Key, IsTextInputFocused()))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
+        // Media (Movies & TV / Music) controller navigation
+        if (vm.IsMedia && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.MediaVm.IsVlcPlayerOpen)
+        {
+            if (HandleMediaKey(vm, e.Key))
             {
                 e.Handled = true;
                 return;
@@ -737,6 +756,23 @@ public partial class MainWindow : Window
     /// Returns true when the key was consumed. Up/Down move a row, Left/Right move a card,
     /// X opens the filter box, Y opens the on-screen keyboard, B closes either overlay.
     /// </summary>
+    private bool HandleMediaKey(MainViewModel vm, Key key)
+    {
+        if (IsTextInputFocused()) return false;
+        switch (key)
+        {
+            case Key.Left:
+                if (!vm.MediaVm.MoveMediaFocus(-1, 0)) OpenNavWithCurrentHighlight(vm);
+                return true;
+            case Key.Right: vm.MediaVm.MoveMediaFocus(1, 0); return true;
+            case Key.Up:    vm.MediaVm.MoveMediaFocus(0, -1); return true;
+            case Key.Down:  vm.MediaVm.MoveMediaFocus(0, 1); return true;
+            case Key.Enter: vm.MediaVm.ActivateMediaFocus(); return true;
+            case Key.X:     vm.MediaVm.QuickActionMediaFocus(); return true;
+        }
+        return false;
+    }
+
     private static bool HandleLibraryKey(MainViewModel vm, Key key, bool inSearch)
     {
         var lib = vm.LibraryVm;
@@ -1482,22 +1518,24 @@ public partial class MainWindow : Window
             if (HandleWiiDashboardKey(vm, key)) return;
         }
 
-        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        // Default dashboard: hero, Continue Playing cards, Media cards and Recent Achievements
         bool isDefaultDashController = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isDefaultDashController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
             switch (key)
             {
                 case Key.Right:
+                    vm.DashboardVm.MoveDefaultFocus(1, 0);
+                    return;
                 case Key.Down:
-                    vm.DashboardVm.MoveDefaultFocus(1);
+                    vm.DashboardVm.MoveDefaultFocus(0, 1);
                     return;
                 case Key.Left:
                     if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
-                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    else vm.DashboardVm.MoveDefaultFocus(-1, 0);
                     return;
                 case Key.Up:
-                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    vm.DashboardVm.MoveDefaultFocus(0, -1);
                     return;
                 case Key.Enter:
                     vm.DashboardVm.OpenDefaultFocused();
@@ -1520,6 +1558,9 @@ public partial class MainWindow : Window
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigationController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
+            if (string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
+                vm.DashboardVm.HandlePs5ShelfKey(key))
+                return;
             switch (key)
             {
                 case Key.Right:
@@ -1558,6 +1599,13 @@ public partial class MainWindow : Window
         if (vm.IsSettings && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleSettingsKey(vm, key, false))
+                return;
+        }
+
+        // Media (Movies & TV / Music) controller navigation
+        if (vm.IsMedia && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.MediaVm.IsVlcPlayerOpen)
+        {
+            if (HandleMediaKey(vm, key))
                 return;
         }
 

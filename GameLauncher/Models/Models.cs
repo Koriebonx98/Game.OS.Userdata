@@ -577,6 +577,12 @@ namespace GameLauncher.Models
         /// <summary>Layout of the Games (library) page: "Default" or "PS5".</summary>
         [JsonPropertyName("gamesTheme")] public string GamesTheme { get; set; } = "Default";
 
+        /// <summary>Movies &amp; TV page design: "Default" or "Netflix".</summary>
+        [JsonPropertyName("moviesTvTheme")] public string MoviesTvTheme { get; set; } = "Default";
+
+        /// <summary>Music page design: "Default" or "Spotify".</summary>
+        [JsonPropertyName("musicTheme")] public string MusicTheme { get; set; } = "Default";
+
         /// <summary>Store page design: "Default", "Sony", "Xbox" or "Nintendo".</summary>
         [JsonPropertyName("storeTheme")] public string StoreTheme { get; set; } = "Default";
 

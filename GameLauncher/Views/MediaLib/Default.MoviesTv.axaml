@@ -1,0 +1,127 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.DefaultMoviesTv"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Default Movies & TV: streaming-style browser with Movies / TV Shows on the left. -->
+    <UserControl.Styles>
+        <Style Selector="Button.poster-btn">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,16,18"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.poster-btn:pointerover /template/ ContentPresenter, Button.poster-btn:focus /template/ ContentPresenter">
+            <Setter Property="Background" Value="#21262d"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid ColumnDefinitions="230,*">
+
+        <!-- Left: sections -->
+        <Border Grid.Column="0" Background="#161b22" Padding="18,24">
+            <StackPanel Spacing="8">
+                <TextBlock Text="Movies &amp; TV" Classes="section-header" Margin="0,0,0,8"/>
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
+                        HorizontalAlignment="Stretch" Command="{Binding SelectMoviesCommand}">
+                    🎬  Movies
+                </Button>
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
+                        HorizontalAlignment="Stretch" Command="{Binding SelectTvShowsCommand}">
+                    📺  TV Shows
+                </Button>
+                <Border Height="1" Background="#30363d" Margin="0,10"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                        Command="{Binding PlayLocalVideoCommand}">
+                    📂  Play File…
+                </Button>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                        Command="{Binding RefreshMediaLibraryCommand}">
+                    ⟳  Refresh Scan
+                </Button>
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMusicFocused}" HorizontalAlignment="Stretch"
+                        Command="{Binding SelectMusicCommand}">
+                    🎵  Music  ›
+                </Button>
+            </StackPanel>
+        </Border>
+
+        <!-- Right: library -->
+        <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" Margin="32,24,32,0">
+            <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,16">
+                <TextBlock Text="{Binding ActiveSectionTitle}" Classes="page-title"/>
+                <TextBlock Text="{Binding ActiveSectionSummary}" FontSize="12" Foreground="#8b949e"/>
+            </StackPanel>
+
+            <!-- Empty state -->
+            <Border Grid.Row="1" Classes="empty-state-card" CornerRadius="10" Padding="28,24"
+                    VerticalAlignment="Top" IsVisible="{Binding HasNoActiveItems}">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <TextBlock Text="🎞" FontSize="36" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Nothing here yet" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Add files to a Media/Movies or Media/TV Shows folder on any drive, then Refresh Scan."
+                               FontSize="12" Foreground="#8b949e" TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                          IsVisible="{Binding !HasNoActiveItems}">
+                <ItemsControl ItemsSource="{Binding ActiveGroups}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                                    <TextBlock Text="{Binding Title}" Classes="section-header"/>
+                                    <TextBlock Text="{Binding CountLabel}" FontSize="11" Foreground="#8b949e"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding Items}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Classes="poster-btn media-nav" Classes.focused="{Binding IsFocused}" Width="150"
+                                                    Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <StackPanel Spacing="6">
+                                                    <Border Height="215" CornerRadius="8" ClipToBounds="True">
+                                                        <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                          FallbackGradient="{Binding Gradient}"
+                                                                          SubText="{Binding Extension}" LocalCachePath="{Binding CoverPath}"
+                                                                          LetterFontSize="64" ImageCornerRadius="8"
+                                                                          Height="215"/>
+                                                    </Border>
+                                                    <TextBlock Text="{Binding DisplayTitle}" FontSize="12" FontWeight="SemiBold"
+                                                               TextWrapping="Wrap" MaxHeight="34" Margin="2,0"/>
+                                                </StackPanel>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Selected item -->
+            <Border Grid.Row="2" Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="8" Margin="0,8,0,16"
+                    IsVisible="{Binding HasSelectedItem}">
+                <Grid Margin="14,10" ColumnDefinitions="*,Auto">
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="{Binding SelectedItemTitle}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock FontSize="11" Foreground="#8b949e">
+                            <Run Text="{Binding SelectedItemTypeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItemSizeLabel}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <Button Grid.Column="1" Classes="btn-primary" Command="{Binding PlaySelectedMediaCommand}"
+                            VerticalAlignment="Center">▶  Play</Button>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

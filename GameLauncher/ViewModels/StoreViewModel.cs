@@ -232,6 +232,16 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
     /// <summary>Invoked when the user clicks a store game card.</summary>
     public Action<StoreGame>? OnOpenDetail { get; set; }
 
+    /// <summary>Curated catalog plus every platform shelf loaded so far (de-duplicated), for dashboard recommendations.</summary>
+    public IReadOnlyList<StoreGame> CatalogForRecommendations()
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var result = new List<StoreGame>();
+        foreach (var g in _allStoreBase.Concat(_shelfPool.Values.SelectMany(l => l)))
+            if (seen.Add($"{g.Platform}|{g.Title}")) result.Add(g);
+        return result;
+    }
+
     public void Load(List<StoreGame> store, List<Game> library,
                      UserProfile profile, GameOsClient client, bool isAdmin,
                      int totalCatalogCount = RealDatabaseTotal)
