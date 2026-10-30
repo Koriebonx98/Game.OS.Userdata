@@ -111,6 +111,9 @@ public partial class LibraryViewModel : ViewModelBase
     // accesses are sequentially serialised on the UI thread — no locking needed.
     private bool _rebuildScheduled = false;
 
+    /// <summary>True once the library has been built at least once (startup preload), so opening the page is instant.</summary>
+    public bool HasBuilt { get; private set; }
+
     public void Load(List<Game> games)
     {
         _allGames = games;
@@ -213,6 +216,7 @@ public partial class LibraryViewModel : ViewModelBase
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 _rebuildScheduled = false;
+                HasBuilt = true;
 
                 _allMyGames.Clear();
                 foreach (var c in newMyGames) _allMyGames.Add(c);

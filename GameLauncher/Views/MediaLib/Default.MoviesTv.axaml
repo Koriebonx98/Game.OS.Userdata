@@ -25,11 +25,11 @@
         <Border Grid.Column="0" Background="#161b22" Padding="18,24">
             <StackPanel Spacing="8">
                 <TextBlock Text="Movies &amp; TV" Classes="section-header" Margin="0,0,0,8"/>
-                <Button Classes="btn-secondary" Classes.active="{Binding IsMoviesSelected}"
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
                         HorizontalAlignment="Stretch" Command="{Binding SelectMoviesCommand}">
                     🎬  Movies
                 </Button>
-                <Button Classes="btn-secondary" Classes.active="{Binding IsTvShowsSelected}"
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
                         HorizontalAlignment="Stretch" Command="{Binding SelectTvShowsCommand}">
                     📺  TV Shows
                 </Button>
@@ -42,7 +42,7 @@
                         Command="{Binding RefreshMediaLibraryCommand}">
                     ⟳  Refresh Scan
                 </Button>
-                <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMusicFocused}" HorizontalAlignment="Stretch"
                         Command="{Binding SelectMusicCommand}">
                     🎵  Music  ›
                 </Button>
@@ -84,14 +84,14 @@
                                     </ItemsControl.ItemsPanel>
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate>
-                                            <Button Classes="poster-btn" Width="150"
+                                            <Button Classes="poster-btn media-nav" Classes.focused="{Binding IsFocused}" Width="150"
                                                     Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
                                                     CommandParameter="{Binding}">
                                                 <StackPanel Spacing="6">
                                                     <Border Height="215" CornerRadius="8" ClipToBounds="True">
                                                         <views:CoverImage FallbackText="{Binding DisplayTitle}"
                                                                           FallbackGradient="{Binding Gradient}"
-                                                                          SubText="{Binding Extension}"
+                                                                          SubText="{Binding Extension}" LocalCachePath="{Binding CoverPath}"
                                                                           LetterFontSize="64" ImageCornerRadius="8"
                                                                           Height="215"/>
                                                     </Border>

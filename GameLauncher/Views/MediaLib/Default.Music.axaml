@@ -30,14 +30,14 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="8">
                         <TextBlock Text="Music" Classes="section-header" Margin="0,0,0,8"/>
-                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsAllSongsFocused}" HorizontalAlignment="Stretch"
                                 Command="{Binding SelectMusicGroupCommand}" CommandParameter="">
                             🎵  All songs
                         </Button>
                         <ItemsControl ItemsSource="{Binding MusicGroups}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate>
-                                    <Button Classes="btn-secondary" HorizontalAlignment="Stretch" Margin="0,0,0,8"
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}" HorizontalAlignment="Stretch" Margin="0,0,0,8"
                                             HorizontalContentAlignment="Left"
                                             Command="{Binding $parent[UserControl].DataContext.SelectMusicGroupCommand}"
                                             CommandParameter="{Binding Title}">
@@ -49,7 +49,7 @@
                         <Border Height="1" Background="#30363d" Margin="0,6"/>
                         <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
                                 Command="{Binding RefreshMediaLibraryCommand}">⟳  Refresh Scan</Button>
-                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMusicFocused}" HorizontalAlignment="Stretch"
                                 Command="{Binding SelectMoviesCommand}">‹  Movies &amp; TV</Button>
                     </StackPanel>
                 </ScrollViewer>
@@ -76,13 +76,13 @@
                     <ItemsControl ItemsSource="{Binding MusicTracks}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Classes="track-row"
+                                <Button Classes="track-row media-nav" Classes.focused="{Binding IsFocused}"
                                         Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
                                         CommandParameter="{Binding}">
                                     <Grid ColumnDefinitions="44,*,Auto" ColumnSpacing="12">
                                         <Border Width="44" Height="44" CornerRadius="8" ClipToBounds="True">
                                             <views:CoverImage FallbackText="{Binding DisplayTitle}"
-                                                              FallbackGradient="{Binding Gradient}"
+                                                              FallbackGradient="{Binding Gradient}" LocalCachePath="{Binding CoverPath}"
                                                               LetterFontSize="20" ImageCornerRadius="8"
                                                               Width="44" Height="44"/>
                                         </Border>

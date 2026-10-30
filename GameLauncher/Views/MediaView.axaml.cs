@@ -1,6 +1,8 @@
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
+using System.Linq;
 using GameLauncher.Services;
 using GameLauncher.ViewModels;
 using LibVLCSharp.Shared;
@@ -30,8 +32,14 @@ public partial class MediaView : UserControl
         _audioTimer.Tick   += (_, _) => PublishAudioProgress();
     }
 
+    private MediaViewModel? _subscribedVm;
+
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
+        if (_subscribedVm != null) _subscribedVm.MediaFocusChanged -= ScrollFocusedIntoView;
+        _subscribedVm = DataContext as MediaViewModel;
+        if (_subscribedVm != null) _subscribedVm.MediaFocusChanged += ScrollFocusedIntoView;
+
         if (DataContext is MediaViewModel vm)
         {
             vm.PlayLocalVideoRequested = OnPlayLocalVideoRequested;
@@ -41,6 +49,13 @@ public partial class MediaView : UserControl
             vm.StopAudioRequested = StopAudio;
         }
     }
+
+    // Keeps the controller highlight visible when it moves below the fold.
+    private void ScrollFocusedIntoView() =>
+        Dispatcher.UIThread.Post(() =>
+            this.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.IsVisible && b.IsEffectivelyVisible && b.Classes.Contains("focused"))?.BringIntoView(),
+            DispatcherPriority.Background);
 
     private void OnUnloaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {

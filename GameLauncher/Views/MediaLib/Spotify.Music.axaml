@@ -68,7 +68,7 @@
             <Border Grid.Column="0" Background="#121212" CornerRadius="8" Padding="12,16">
                 <Grid RowDefinitions="Auto,Auto,*,Auto">
                     <TextBlock Grid.Row="0" Text="♫ Music" Foreground="White" FontSize="20" FontWeight="Black" Margin="12,0,0,12"/>
-                    <Button Grid.Row="1" Classes="sp-nav" Command="{Binding SelectMusicGroupCommand}" CommandParameter=""
+                    <Button Grid.Row="1" Classes="sp-nav media-nav" Classes.focused="{Binding IsAllSongsFocused}" Command="{Binding SelectMusicGroupCommand}" CommandParameter=""
                             Content="⌂  All songs"/>
                     <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
                         <StackPanel>
@@ -76,7 +76,7 @@
                             <ItemsControl ItemsSource="{Binding MusicGroups}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Classes="sp-nav"
+                                        <Button Classes="sp-nav media-nav" Classes.focused="{Binding IsFocused}"
                                                 Command="{Binding $parent[UserControl].DataContext.SelectMusicGroupCommand}"
                                                 CommandParameter="{Binding Title}">
                                             <StackPanel Orientation="Horizontal" Spacing="10">
@@ -99,7 +99,7 @@
                     </ScrollViewer>
                     <StackPanel Grid.Row="3" Spacing="2">
                         <Button Classes="sp-nav" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳  Refresh"/>
-                        <Button Classes="sp-nav" Command="{Binding SelectMoviesCommand}" Content="‹  Movies &amp; TV"/>
+                        <Button Classes="sp-nav media-nav" Classes.focused="{Binding IsTabMusicFocused}" Command="{Binding SelectMoviesCommand}" Content="‹  Movies &amp; TV"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -141,7 +141,7 @@
                             <ItemsControl ItemsSource="{Binding MusicTracks}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Classes="sp-row"
+                                        <Button Classes="sp-row media-nav" Classes.focused="{Binding IsFocused}"
                                                 Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
                                                 CommandParameter="{Binding}">
                                             <Grid ColumnDefinitions="40,*,Auto">
@@ -149,7 +149,7 @@
                                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
                                                     <Border Width="40" Height="40" CornerRadius="4" ClipToBounds="True">
                                                         <views:CoverImage FallbackText="{Binding DisplayTitle}"
-                                                                          FallbackGradient="{Binding Gradient}"
+                                                                          FallbackGradient="{Binding Gradient}" LocalCachePath="{Binding CoverPath}"
                                                                           LetterFontSize="18" ImageCornerRadius="4"
                                                                           Width="40" Height="40"/>
                                                     </Border>

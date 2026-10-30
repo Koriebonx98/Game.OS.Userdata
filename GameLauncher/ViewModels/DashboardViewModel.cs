@@ -27,6 +27,7 @@ public partial class DashboardViewModel : ViewModelBase
             OnPropertyChanged(nameof(SteamClockTime));
         };
         _wiiClockTimer.Start();
+        Options.PropertyChanged += (_, _) => UpdateFocusedCard();
     }
 
     [ObservableProperty] private UserProfile _profile = new();
@@ -114,7 +115,7 @@ public partial class DashboardViewModel : ViewModelBase
                      IReadOnlyList<LocalGameCardVm>? localCards = null)
     {
         Profile           = profile;
-        GamesCount        = library.Count;
+        _libraryGames     = library;
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
@@ -718,6 +719,117 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Top-rated store title shown as the store brief when the Store tile is highlighted.</summary>
     public StoreGame? StoreBriefGame => GameCatalog.Store.OrderByDescending(g => g.Rating).FirstOrDefault();
 
+    // ── PS5 shelf: recommended games (Store tile) / related games (any game tile) ──
+    /// <summary>One card on the PS5 shelf.</summary>
+    public sealed partial class ShelfCardVm : ObservableObject
+    {
+        public StoreGame Game { get; }
+        public ShelfCardVm(StoreGame game) { Game = game; }
+        [ObservableProperty] private bool _isFocused;
+    }
+
+    private const int Ps5ShelfSize = 10;
+    private List<Game> _libraryGames = new();
+    /// <summary>Supplies the store catalog (curated + loaded platform shelves) used for recommendations.</summary>
+    public Func<IReadOnlyList<StoreGame>>? StoreCatalogProvider { get; set; }
+
+    public ObservableCollection<ShelfCardVm> Ps5Shelf { get; } = new();
+    [ObservableProperty] private string _ps5ShelfTitle = "";
+    [ObservableProperty] private bool _hasPs5Shelf;
+    private int _ps5ShelfIndex = -1;
+    /// <summary>True while the controller highlight is on the shelf rather than the card strip.</summary>
+    public bool IsPs5ShelfActive => _ps5ShelfIndex >= 0;
+
+    private IReadOnlyList<StoreGame> StoreCatalog() =>
+        StoreCatalogProvider?.Invoke() ?? (IReadOnlyList<StoreGame>)GameCatalog.Store;
+
+    private void RefreshPs5Shelf()
+    {
+        ExitPs5Shelf();
+        Ps5Shelf.Clear();
+        string title = "";
+        try
+        {
+            if (SelectedCardIndex >= 0 && SelectedCardIndex < Ps5RecentGames.Count)
+            {
+                if (Options.ShowRelated)
+                {
+                    var card = Ps5RecentGames[SelectedCardIndex];
+                    var genre = _libraryGames.FirstOrDefault(g =>
+                        string.Equals(g.Title, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))?.Genre;
+                    foreach (var g in StoreRecommendations.Related(StoreCatalog(), card.Platform, card.EffectiveTitle, genre, Ps5ShelfSize))
+                        Ps5Shelf.Add(new ShelfCardVm(g));
+                    title = $"More like {card.EffectiveTitle}";
+                }
+            }
+            else if (Options.ShowRecommended)
+            {
+                var owned = _libraryGames.Select(g => (g.Platform, g.Title, g.Genre))
+                    .Concat(RecentLocalGames.Select(c => (c.Platform, c.EffectiveTitle, "")));
+                foreach (var g in StoreRecommendations.ForUser(StoreCatalog(), owned, Ps5ShelfSize))
+                    Ps5Shelf.Add(new ShelfCardVm(g));
+                title = "Recommended for you";
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[Dashboard] PS5 shelf failed: {ex.Message}"); }
+        Ps5ShelfTitle = title;
+        HasPs5Shelf = Ps5Shelf.Count > 0;
+    }
+
+    private void ExitPs5Shelf()
+    {
+        if (_ps5ShelfIndex >= 0 && _ps5ShelfIndex < Ps5Shelf.Count) Ps5Shelf[_ps5ShelfIndex].IsFocused = false;
+        _ps5ShelfIndex = -1;
+        OnPropertyChanged(nameof(IsPs5ShelfActive));
+    }
+
+    /// <summary>Mouse hover over a strip card (-1 = Store, n = All Games): highlights it like the controller does.</summary>
+    public void HoverCard(int index)
+    {
+        if (index == SelectedCardIndex && !IsPs5ShelfActive) return;
+        SelectedCardIndex = Math.Clamp(index, -1, Ps5RecentGames.Count);
+        UpdateFocusedCard();
+    }
+
+    [RelayCommand]
+    private void OpenShelfGame(ShelfCardVm? card)
+    {
+        if (card != null) OnOpenStoreDetail?.Invoke(card.Game);
+    }
+
+    /// <summary>
+    /// PS5 shelf navigation. Down from the card strip enters the shelf; Left/Right move along it; Up returns.
+    /// Returns true when the key was consumed.
+    /// </summary>
+    public bool HandlePs5ShelfKey(Avalonia.Input.Key key)
+    {
+        if (!IsPs5ShelfActive)
+        {
+            if (key != Avalonia.Input.Key.Down || Ps5Shelf.Count == 0) return false;
+            _ps5ShelfIndex = 0;
+            Ps5Shelf[0].IsFocused = true;
+            OnPropertyChanged(nameof(IsPs5ShelfActive));
+            return true;
+        }
+
+        int prev = _ps5ShelfIndex;
+        switch (key)
+        {
+            case Avalonia.Input.Key.Right: _ps5ShelfIndex = Math.Min(prev + 1, Ps5Shelf.Count - 1); break;
+            case Avalonia.Input.Key.Left:  _ps5ShelfIndex = Math.Max(prev - 1, 0); break;
+            case Avalonia.Input.Key.Up:    ExitPs5Shelf(); return true;
+            case Avalonia.Input.Key.Enter:
+            case Avalonia.Input.Key.X:
+                OpenShelfGame(Ps5Shelf[prev]);
+                return true;
+            case Avalonia.Input.Key.Down: return true;
+            default: return false;
+        }
+        Ps5Shelf[prev].IsFocused = false;
+        Ps5Shelf[_ps5ShelfIndex].IsFocused = true;
+        return true;
+    }
+
     /// <summary>Invoked by MainWindow when Play is pressed for the focused card.</summary>
     public Action<LocalGameCardVm>? OnPlayFocusedCard { get; set; }
     /// <summary>Invoked by MainWindow when "..." is pressed for the focused card (open detail page).</summary>
@@ -934,6 +1046,12 @@ public partial class DashboardViewModel : ViewModelBase
 
     private void UpdateFocusedCard()
     {
+        UpdateFocusedCardCore();
+        RefreshPs5Shelf();
+    }
+
+    private void UpdateFocusedCardCore()
+    {
         // Clear old focus
         foreach (var c in Ps5RecentGames)
             c.IsFocused = false;
@@ -952,7 +1070,7 @@ public partial class DashboardViewModel : ViewModelBase
             FocusedCardAchievements.Clear();
             if (SelectedCardIndex >= Ps5RecentGames.Count)
                 foreach (var a in RecentAchievements.Take(5)) FocusedCardAchievements.Add(a);
-            FocusedCardTrophyHeader = SelectedCardIndex < 0 ? "" : "Recent trophies";
+            FocusedCardTrophyHeader = SelectedCardIndex < 0 ? "" : $"Recent {Options.AchievementsWordLower}";
             OnPropertyChanged(nameof(HasFocusedCardAchievements));
             NotifySwitchShown();
             return;
@@ -973,7 +1091,7 @@ public partial class DashboardViewModel : ViewModelBase
             .ToList();
         foreach (var a in related.Take(6))
             FocusedCardAchievements.Add(a);
-        FocusedCardTrophyHeader = $"{card.EffectiveTitle} · Trophies";
+        FocusedCardTrophyHeader = $"{card.EffectiveTitle} · {Options.AchievementsWord}";
         OnPropertyChanged(nameof(HasFocusedCardAchievements));
     }
 

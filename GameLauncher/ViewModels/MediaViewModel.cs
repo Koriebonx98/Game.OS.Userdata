@@ -11,8 +11,10 @@ namespace GameLauncher.ViewModels;
 
 public partial class MediaViewModel : ObservableObject
 {
-    public sealed class MediaLibraryItem
+    public sealed partial class MediaLibraryItem : ObservableObject
     {
+        /// <summary>True while the controller / keyboard highlight is on this item.</summary>
+        [ObservableProperty] private bool _isFocused;
         public string Title { get; init; } = "";
         public string FullPath { get; init; } = "";
         public string SourceFolder { get; init; } = "";
@@ -25,12 +27,15 @@ public partial class MediaViewModel : ObservableObject
         public string Initial => DisplayTitle.Length > 0 ? DisplayTitle[..1].ToUpperInvariant() : "?";
         /// <summary>"#start,#end" poster gradient used by CoverImage when there is no artwork.</summary>
         public string Gradient { get; init; } = "#1e1b4b,#312e81";
+        /// <summary>Local poster / cover image found next to the file, or empty.</summary>
+        public string CoverPath { get; init; } = "";
         public string SizeLabel => FormatFileSize(FileSizeBytes);
     }
 
     /// <summary>A show / artist / folder and the items inside it.</summary>
-    public sealed class MediaGroup
+    public sealed partial class MediaGroup : ObservableObject
     {
+        [ObservableProperty] private bool _isFocused;
         public string Title { get; init; } = "";
         public IReadOnlyList<MediaLibraryItem> Items { get; init; } = Array.Empty<MediaLibraryItem>();
         public string CountLabel => Items.Count == 1 ? "1 item" : $"{Items.Count} items";
@@ -107,8 +112,11 @@ public partial class MediaViewModel : ObservableObject
     public bool IsVideoSection     => SelectedMediaSection != "music";
 
     /// <summary>Items of the active video section grouped by show / folder (one row each in the Netflix layout).</summary>
-    public IReadOnlyList<MediaGroup> ActiveGroups => BuildGroups(ActiveItems);
-    public IReadOnlyList<MediaGroup> MusicGroups => BuildGroups(Music);
+    // Cached so controller focus flags live on stable group objects.
+    private IReadOnlyList<MediaGroup>? _activeGroups;
+    private IReadOnlyList<MediaGroup>? _musicGroups;
+    public IReadOnlyList<MediaGroup> ActiveGroups => _activeGroups ??= BuildGroups(ActiveItems);
+    public IReadOnlyList<MediaGroup> MusicGroups => _musicGroups ??= BuildGroups(Music);
     public bool HasNoActiveItems => !ActiveItems.Any();
     public bool HasNoMusic => Music.Count == 0;
 
@@ -129,6 +137,8 @@ public partial class MediaViewModel : ObservableObject
 
     private void NotifyLibraryChanged()
     {
+        _activeGroups = null;
+        _musicGroups = null;
         OnPropertyChanged(nameof(ActiveItems));
         OnPropertyChanged(nameof(ActiveGroups));
         OnPropertyChanged(nameof(ActiveSectionSummary));
@@ -195,6 +205,7 @@ public partial class MediaViewModel : ObservableObject
 
     partial void OnSelectedMediaSectionChanged(string value)
     {
+        _activeGroups = null;
         EnsureSelectedItemForActiveSection();
     }
 
@@ -211,6 +222,7 @@ public partial class MediaViewModel : ObservableObject
         SelectedMediaSection = NormalizeSection(section);
         EnsureMediaLibraryFresh();
         EnsureSelectedItemForActiveSection();
+        ResetMediaFocus();
     }
 
     public void EnsureMediaLibraryFresh()
@@ -256,6 +268,162 @@ public partial class MediaViewModel : ObservableObject
 
     [RelayCommand]
     private void SelectMusicGroup(string? group) => SelectedMusicGroup = group ?? "";
+
+    // ── Controller / keyboard navigation ──────────────────────────────────────
+    // Zones: 0 = tab bar (Movies / TV Shows / Music), 1 = content (poster rows or song list),
+    //        2 = music folder list (left column, first entry is "All songs").
+    private int _zone = 1;
+    private int _tabIdx;
+    private int _row, _col, _trackIdx, _folderIdx;
+    private MediaLibraryItem? _focusedItem;
+    private MediaGroup? _focusedGroup;
+
+    /// <summary>Raised after the highlight moved so the view can scroll it into view.</summary>
+    public event Action? MediaFocusChanged;
+
+    public bool IsTabMoviesFocused => _zone == 0 && _tabIdx == 0;
+    public bool IsTabTvFocused     => _zone == 0 && _tabIdx == 1;
+    public bool IsTabMusicFocused  => _zone == 0 && _tabIdx == 2;
+    public bool IsAllSongsFocused  => _zone == 2 && _folderIdx == 0;
+
+    private static readonly string[] TabSections = { "movies", "tvshows", "music" };
+
+    private static int TabIndexOf(string section) => Math.Max(0, Array.IndexOf(TabSections, section));
+
+    /// <summary>Puts the highlight on the first item of the page (called when the page opens).</summary>
+    public void ResetMediaFocus()
+    {
+        _zone = 1;
+        _row = _col = _trackIdx = _folderIdx = 0;
+        _tabIdx = TabIndexOf(SelectedMediaSection);
+        ApplyMediaFocus();
+    }
+
+    /// <summary>
+    /// Moves the highlight. Returns false when Left was pressed at the left edge, so the caller can open the nav menu.
+    /// </summary>
+    public bool MoveMediaFocus(int dx, int dy)
+    {
+        bool music = IsMusicSelected;
+        switch (_zone)
+        {
+            case 0:
+                if (dx != 0)
+                {
+                    int next = _tabIdx + dx;
+                    if (next < 0) return false;
+                    if (next >= TabSections.Length) return true;
+                    _tabIdx = next;
+                    SelectedMediaSection = TabSections[_tabIdx];
+                    _row = _col = _trackIdx = _folderIdx = 0;
+                }
+                else if (dy > 0 && (music ? MusicTracks.Any() : ActiveGroups.Count > 0)) _zone = 1;
+                break;
+
+            case 1 when music:
+            {
+                int count = MusicTracks.Count();
+                if (dy < 0) { if (_trackIdx > 0) _trackIdx--; else { _zone = 0; _tabIdx = 2; } }
+                else if (dy > 0) _trackIdx = Math.Min(_trackIdx + 1, Math.Max(0, count - 1));
+                else if (dx < 0) _zone = 2;
+                break;
+            }
+
+            case 1:
+            {
+                var groups = ActiveGroups;
+                if (dy < 0)
+                {
+                    if (_row > 0) { _row--; _col = Math.Min(_col, groups[_row].Items.Count - 1); }
+                    else { _zone = 0; _tabIdx = TabIndexOf(SelectedMediaSection); }
+                }
+                else if (dy > 0)
+                {
+                    if (_row < groups.Count - 1) { _row++; _col = Math.Min(_col, groups[_row].Items.Count - 1); }
+                }
+                else if (dx < 0) { if (_col > 0) _col--; else return false; }
+                else if (dx > 0 && groups.Count > 0 && _col < groups[_row].Items.Count - 1) _col++;
+                break;
+            }
+
+            case 2:
+            {
+                int max = MusicGroups.Count;
+                if (dy < 0) { if (_folderIdx > 0) _folderIdx--; else { _zone = 0; _tabIdx = 2; } }
+                else if (dy > 0) _folderIdx = Math.Min(_folderIdx + 1, max);
+                else if (dx < 0) return false;
+                else if (dx > 0) _zone = 1;
+                if (_zone == 2)
+                {
+                    SelectedMusicGroup = _folderIdx == 0 ? "" : MusicGroups[_folderIdx - 1].Title;
+                    _trackIdx = 0;
+                }
+                break;
+            }
+        }
+        ApplyMediaFocus();
+        return true;
+    }
+
+    /// <summary>A button: play the highlighted poster / song, or step into the song list from the folder list.</summary>
+    public void ActivateMediaFocus()
+    {
+        if (_zone == 0)
+        {
+            if (_tabIdx == 2 && IsMusicSelected) SelectedMediaSection = "movies";
+            _tabIdx = TabIndexOf(SelectedMediaSection);
+            _zone = 1;
+            ApplyMediaFocus();
+            return;
+        }
+        if (_zone == 2) { _zone = 1; ApplyMediaFocus(); return; }
+        if (_zone == 1 && _focusedItem != null) PlayMediaItem(_focusedItem);
+    }
+
+    /// <summary>X button: play / pause the music player (or play the highlighted video).</summary>
+    public void QuickActionMediaFocus()
+    {
+        if (IsMusicSelected) TogglePlayPause();
+        else if (_focusedItem != null) PlayMediaItem(_focusedItem);
+    }
+
+    private void ApplyMediaFocus()
+    {
+        if (_focusedItem != null) _focusedItem.IsFocused = false;
+        if (_focusedGroup != null) _focusedGroup.IsFocused = false;
+        _focusedItem = null;
+        _focusedGroup = null;
+
+        if (_zone == 1)
+        {
+            if (IsMusicSelected)
+            {
+                var tracks = MusicTracks.ToList();
+                if (tracks.Count > 0) _focusedItem = tracks[Math.Clamp(_trackIdx, 0, tracks.Count - 1)];
+            }
+            else
+            {
+                var groups = ActiveGroups;
+                if (groups.Count > 0)
+                {
+                    var items = groups[Math.Clamp(_row, 0, groups.Count - 1)].Items;
+                    if (items.Count > 0) _focusedItem = items[Math.Clamp(_col, 0, items.Count - 1)];
+                }
+            }
+            if (_focusedItem != null) { _focusedItem.IsFocused = true; SelectedItem = _focusedItem; }
+        }
+        else if (_zone == 2 && _folderIdx > 0 && _folderIdx <= MusicGroups.Count)
+        {
+            _focusedGroup = MusicGroups[_folderIdx - 1];
+            _focusedGroup.IsFocused = true;
+        }
+
+        OnPropertyChanged(nameof(IsTabMoviesFocused));
+        OnPropertyChanged(nameof(IsTabTvFocused));
+        OnPropertyChanged(nameof(IsTabMusicFocused));
+        OnPropertyChanged(nameof(IsAllSongsFocused));
+        MediaFocusChanged?.Invoke();
+    }
 
     // ── Music player (audio is played by MediaView through LibVLC, without the video overlay) ──
     public Action<string>? PlayAudioRequested { get; set; }
@@ -350,9 +518,9 @@ public partial class MediaViewModel : ObservableObject
 
         foreach (var driveRoot in roots)
         {
-            TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies");
-            TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music");
-            TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows");
+            TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies", "Films");
+            TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music", "Songs");
+            TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows", "TV", "Series", "Shows", "TV Series");
         }
 
         _lastScanUtc = DateTime.UtcNow;
@@ -379,21 +547,21 @@ public partial class MediaViewModel : ObservableObject
         HashSet<string> knownPaths,
         params string[] categoryFolderNames)
     {
-        string mediaRoot = Path.Combine(driveRoot, "Media");
-        if (!Directory.Exists(mediaRoot)) return;
-
-        IEnumerable<string> categoryDirs;
-        try
+        // Category folders are accepted under <drive>/Media/ and directly on the drive (<drive>/Movies, ...).
+        var categoryDirs = new List<string>();
+        foreach (var parent in new[] { Path.Combine(driveRoot, "Media"), driveRoot })
         {
-            categoryDirs = Directory
-                .EnumerateDirectories(mediaRoot)
-                .Where(path => categoryFolderNames.Contains(
-                    Path.GetFileName(path),
-                    StringComparer.OrdinalIgnoreCase))
-                .ToList();
+            if (!Directory.Exists(parent)) continue;
+            try
+            {
+                categoryDirs.AddRange(Directory
+                    .EnumerateDirectories(parent)
+                    .Where(path => categoryFolderNames.Contains(
+                        Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)));
+            }
+            catch (UnauthorizedAccessException) { }
+            catch (IOException) { }
         }
-        catch (UnauthorizedAccessException) { return; }
-        catch (IOException) { return; }
 
         foreach (var mediaFolder in categoryDirs)
         {
@@ -413,20 +581,50 @@ public partial class MediaViewModel : ObservableObject
                 string title = CleanTitle(file);
                 destination.Add(new MediaLibraryItem
                 {
+                    CoverPath = FindArtwork(file, mediaFolder),
                     DisplayTitle = title,
                     Gradient = GradientFor(title),
                     Group = segments.Length > 1 ? segments[0] : categoryFolderNames[0],
                     Title = Path.GetFileName(file),
                     FullPath = file,
                     SourceFolder = mediaFolder,
-                    MediaType = string.Equals(Path.GetFileName(mediaFolder), "Music", StringComparison.OrdinalIgnoreCase)
-                        ? "music"
-                        : "video",
+                    MediaType = categoryFolderNames[0] == "Music" ? "music" : "video",
                     Extension = extension,
                     FileSizeBytes = SafeGetFileSize(file)
                 });
             }
         }
+    }
+
+    private static readonly string[] ArtworkNames =
+        { "poster", "folder", "cover", "front", "thumb", "albumart", "fanart" };
+    private static readonly string[] ArtworkExts = { ".jpg", ".jpeg", ".png", ".webp" };
+
+    /// <summary>Local artwork next to the file (name.jpg, poster.jpg, folder.jpg, cover.png ...), or "".</summary>
+    private static string FindArtwork(string file, string categoryRoot)
+    {
+        try
+        {
+            string? dir = Path.GetDirectoryName(file);
+            string stem = Path.GetFileNameWithoutExtension(file);
+            while (!string.IsNullOrEmpty(dir))
+            {
+                foreach (var ext in ArtworkExts)
+                {
+                    var own = Path.Combine(dir, stem + ext);
+                    if (File.Exists(own)) return own;
+                    foreach (var n in ArtworkNames)
+                    {
+                        var candidate = Path.Combine(dir, n + ext);
+                        if (File.Exists(candidate)) return candidate;
+                    }
+                }
+                if (string.Equals(Path.GetFullPath(dir), Path.GetFullPath(categoryRoot), StringComparison.OrdinalIgnoreCase)) break;
+                dir = Path.GetDirectoryName(dir);
+            }
+        }
+        catch { /* artwork is optional */ }
+        return "";
     }
 
     private void EnsureSelectedItemForActiveSection()

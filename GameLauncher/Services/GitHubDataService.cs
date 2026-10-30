@@ -2429,7 +2429,7 @@ namespace GameLauncher.Services
             if (platform == "PC" || PlatformToDbFolder(platform) == null) return false;
             if (rom.SizeBytes < 1_048_576) return false; // too small to be a real game image
             string[] okTypes = { "iso", "bin", "cue", "chd", "img", "mdf", "nrg", "cso", "zso", "pkg",
-                                 "nsp", "xci", "wbfs", "rvz", "gcm", "xex", "god", "7z", "zip", "rar" };
+                                 "nsp", "xci", "wbfs", "rvz", "gcm", "xex", "god", "zar", "7z", "zip", "rar" };
             if (!string.IsNullOrEmpty(rom.FileType) &&
                 !okTypes.Contains(rom.FileType.TrimStart('.').ToLowerInvariant())) return false;
             if (!string.IsNullOrEmpty(rom.TitleId) && !System.Text.RegularExpressions.Regex.IsMatch(

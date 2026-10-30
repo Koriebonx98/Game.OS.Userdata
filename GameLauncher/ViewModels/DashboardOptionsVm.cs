@@ -37,7 +37,13 @@ public static class DashboardCatalog
             new("title", "Game title"), new("info", "Game info panel"), new("shortcuts", "Shortcut bar"),
             new("hints", "Button hints"), new("background", "Game background"),
         },
-        "PS5" => new DashboardAssetDef[] { new("header", "Header (Games / Media)") },
+        "PS5" => new DashboardAssetDef[]
+        {
+            new("header", "Header (Games / Media)"), new("media", "Media tab in the header"),
+            new("achievements", "Achievements / trophies (panel & counter)"),
+            new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
+            new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
+        },
         Xb360Og => new DashboardAssetDef[]
         {
             new("profile", "Profile & greeting"), new("achievements", "Recent achievements"),
@@ -155,6 +161,11 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowBackground   => Get("background");
     public bool ShowHeader       => Get("header");
     public bool ShowTabs         => Get("tabs");
+    public bool ShowRecommended  => Get("recommended");
+    public bool ShowRelated      => Get("related");
+    /// <summary>PS5 calls achievements "Trophies"; the setting switches the wording back to "Achievements".</summary>
+    public string AchievementsWord      => Get("trophyname") ? "Trophies" : "Achievements";
+    public string AchievementsWordLower => AchievementsWord.ToLowerInvariant();
 
     public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
     public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;

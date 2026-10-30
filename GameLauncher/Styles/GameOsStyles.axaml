@@ -354,6 +354,13 @@
         <Setter Property="Background" Value="#2d333b"/>
     </Style>
 
+    <!-- Media pages (Movies & TV / Music): controller highlight ring on any button -->
+    <Style Selector="Button.media-nav.focused /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="3"/>
+        <Setter Property="Background" Value="#2d333b"/>
+    </Style>
+
     <Style Selector="Button.btn-primary.focused /template/ ContentPresenter">
         <Setter Property="BorderBrush" Value="#FFFFFF"/>
         <Setter Property="BorderThickness" Value="3"/>

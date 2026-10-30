@@ -65,11 +65,11 @@
                     <TextBlock Text="NETFLIX" Foreground="#E50914" FontSize="26" FontWeight="Black"
                                VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                        <Button Classes="nflx-tab" Classes.active="{Binding IsMoviesSelected}"
+                        <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
                                 Command="{Binding SelectMoviesCommand}" Content="Movies"/>
-                        <Button Classes="nflx-tab" Classes.active="{Binding IsTvShowsSelected}"
+                        <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
                                 Command="{Binding SelectTvShowsCommand}" Content="TV Shows"/>
-                        <Button Classes="nflx-tab" Command="{Binding SelectMusicCommand}" Content="Music"/>
+                        <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabMusicFocused}" Command="{Binding SelectMusicCommand}" Content="Music"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
@@ -92,7 +92,7 @@
                 <!-- Billboard: the selected title -->
                 <Grid Height="360" IsVisible="{Binding HasSelectedItem}">
                     <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
-                                      FallbackGradient="{Binding SelectedItem.Gradient}"
+                                      FallbackGradient="{Binding SelectedItem.Gradient}" LocalCachePath="{Binding SelectedItem.CoverPath}"
                                       LetterFontSize="200" ImageCornerRadius="0"/>
                     <Border>
                         <Border.Background>
@@ -137,14 +137,14 @@
                                         </ItemsControl.ItemsPanel>
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
-                                                <Button Classes="nflx-tile" Width="240"
+                                                <Button Classes="nflx-tile media-nav" Classes.focused="{Binding IsFocused}" Width="240"
                                                         Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
                                                         CommandParameter="{Binding}">
                                                     <Grid Height="135">
                                                         <Border CornerRadius="4" ClipToBounds="True">
                                                             <views:CoverImage FallbackText="{Binding DisplayTitle}"
                                                                               FallbackGradient="{Binding Gradient}"
-                                                                              LetterFontSize="60" ImageCornerRadius="4"
+                                                                              LocalCachePath="{Binding CoverPath}" LetterFontSize="60" ImageCornerRadius="4"
                                                                               Height="135"/>
                                                         </Border>
                                                         <Border VerticalAlignment="Bottom" CornerRadius="0,0,4,4" Padding="10,18,10,8">
