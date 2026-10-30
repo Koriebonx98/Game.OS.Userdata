@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.NetflixMoviesTv"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Netflix-style Movies & TV: black canvas, red accent, top tabs, billboard and horizontal rows. -->
+    <UserControl.Styles>
+        <Style Selector="Button.nflx-tab">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#b3b3b3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="10,6"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.nflx-tab:pointerover"><Setter Property="Foreground" Value="#e5e5e5"/></Style>
+        <Style Selector="Button.nflx-tab.active"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="Bold"/></Style>
+        <Style Selector="Button.nflx-play">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Padding" Value="26,10"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.nflx-play:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#e6e6e6"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="Button.nflx-more">
+            <Setter Property="Background" Value="#6d6d6eb3"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Padding" Value="22,10"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.nflx-tile">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.15"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.nflx-tile:pointerover, Button.nflx-tile:focus">
+            <Setter Property="RenderTransform" Value="scale(1.08)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="#141414" RowDefinitions="Auto,*">
+
+        <!-- Top bar -->
+        <Border Grid.Row="0" Padding="40,16" Background="#141414">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="22">
+                    <TextBlock Text="NETFLIX" Foreground="#E50914" FontSize="26" FontWeight="Black"
+                               VerticalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                        <Button Classes="nflx-tab" Classes.active="{Binding IsMoviesSelected}"
+                                Command="{Binding SelectMoviesCommand}" Content="Movies"/>
+                        <Button Classes="nflx-tab" Classes.active="{Binding IsTvShowsSelected}"
+                                Command="{Binding SelectTvShowsCommand}" Content="TV Shows"/>
+                        <Button Classes="nflx-tab" Command="{Binding SelectMusicCommand}" Content="Music"/>
+                    </StackPanel>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <Button Classes="nflx-tab" Command="{Binding PlayLocalVideoCommand}" Content="📂 Play File"/>
+                    <Button Classes="nflx-tab" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳ Refresh"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <!-- Empty state -->
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoActiveItems}">
+                    <TextBlock Text="Nothing to watch yet" Foreground="White" FontSize="28" FontWeight="Bold"/>
+                    <TextBlock Text="Add files to a Media/Movies or Media/TV Shows folder on any drive, then press Refresh."
+                               Foreground="#b3b3b3" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+
+                <!-- Billboard: the selected title -->
+                <Grid Height="360" IsVisible="{Binding HasSelectedItem}">
+                    <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
+                                      FallbackGradient="{Binding SelectedItem.Gradient}"
+                                      LetterFontSize="200" ImageCornerRadius="0"/>
+                    <Border>
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                <GradientStop Offset="0" Color="#E6141414"/>
+                                <GradientStop Offset="0.6" Color="#40141414"/>
+                                <GradientStop Offset="1" Color="Transparent"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border VerticalAlignment="Bottom" Height="120">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                <GradientStop Offset="0" Color="Transparent"/>
+                                <GradientStop Offset="1" Color="#141414"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <StackPanel Margin="40,0,0,50" VerticalAlignment="Bottom" HorizontalAlignment="Left" Spacing="12" MaxWidth="560">
+                        <TextBlock Text="{Binding SelectedItem.DisplayTitle}" Foreground="White" FontSize="40"
+                                   FontWeight="Black" TextWrapping="Wrap"/>
+                        <TextBlock Foreground="#b3b3b3" FontSize="13">
+                            <Run Text="{Binding SelectedItemTypeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItemSizeLabel}"/>
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0">
+                            <Button Classes="nflx-play" Command="{Binding PlaySelectedMediaCommand}">▶  Play</Button>
+                            <Button Classes="nflx-more" Command="{Binding PlayLocalVideoCommand}">📂  Play File…</Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Rows -->
+                <ItemsControl ItemsSource="{Binding ActiveGroups}" Margin="0,0,0,40">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="40,8,0,14" Spacing="8">
+                                <TextBlock Text="{Binding Title}" Foreground="#e5e5e5" FontSize="18" FontWeight="SemiBold"/>
+                                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,10,0,10">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Classes="nflx-tile" Width="240"
+                                                        Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Grid Height="135">
+                                                        <Border CornerRadius="4" ClipToBounds="True">
+                                                            <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                              FallbackGradient="{Binding Gradient}"
+                                                                              LetterFontSize="60" ImageCornerRadius="4"
+                                                                              Height="135"/>
+                                                        </Border>
+                                                        <Border VerticalAlignment="Bottom" CornerRadius="0,0,4,4" Padding="10,18,10,8">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                                    <GradientStop Offset="0" Color="Transparent"/>
+                                                                    <GradientStop Offset="1" Color="#E6000000"/>
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                            <TextBlock Text="{Binding DisplayTitle}" Foreground="White" FontSize="12"
+                                                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                        </Border>
+                                                    </Grid>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1055,8 +1055,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.StoreTheme = SettingsVm.StoreTheme;
         DetailVm.GameInfoTheme = SettingsVm.GameInfoTheme;
         StoreVm.KeyboardTheme = SettingsVm.KeyboardTheme;
+        MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
+        MediaVm.MusicTheme = SettingsVm.MusicTheme;
         SettingsVm.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName == nameof(SettingsViewModel.MoviesTvTheme))
+                MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
+            if (e.PropertyName == nameof(SettingsViewModel.MusicTheme))
+                MediaVm.MusicTheme = SettingsVm.MusicTheme;
             if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
                 { LibraryVm.GamesTheme = SettingsVm.GamesTheme; StoreVm.GamesTheme = SettingsVm.GamesTheme; }
             if (e.PropertyName == nameof(SettingsViewModel.StoreTheme))

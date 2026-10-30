@@ -157,6 +157,12 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
     public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Switch" };
+    /// <summary>Movies &amp; TV page design.</summary>
+    [ObservableProperty] private string _moviesTvTheme = "Default";
+    public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Netflix" };
+    /// <summary>Music page design.</summary>
+    [ObservableProperty] private string _musicTheme = "Default";
+    public IReadOnlyList<string> AvailableMusicThemes { get; } = new[] { "Default", "Spotify" };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
     [ObservableProperty] private string _storeTheme = "Default";
     public IReadOnlyList<string> AvailableStoreThemes { get; } = new[] { "Default", "Sony", "Xbox", "Nintendo" };
@@ -181,8 +187,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     /// <summary>Assets (on/off) offered by the dashboard currently selected in the Theme drop-down.</summary>
     public ObservableCollection<DashboardAssetToggleVm> DashboardAssets { get; } = new();
-    public IReadOnlyList<string> DashboardAccentPresets { get; } =
-        new[] { "Default", "#00c3e3", "#e60012", "#0070D1", "#9bd30b", "#f0b323", "#a371f7", "#ff7d1a", "#3fb950", "#ffffff" };
+    public IReadOnlyList<string> DashboardAccentPresets { get; } = DashboardCatalog.AccentNames;
     [ObservableProperty] private string _dashboardAccent = "";
     [ObservableProperty] private double _dashboardScale = 1.0;
     [ObservableProperty] private double _dashboardOffsetX;
@@ -226,7 +231,7 @@ public partial class SettingsViewModel : ViewModelBase
                 toggle.PropertyChanged += (_, _) => CommitDashboardEditor();
                 DashboardAssets.Add(toggle);
             }
-            DashboardAccent = string.IsNullOrWhiteSpace(o.AccentColor) ? "Default" : o.AccentColor;
+            DashboardAccent = DashboardCatalog.AccentName(o.AccentColor);
             DashboardScale = Math.Clamp(o.Scale <= 0 ? 1.0 : o.Scale, 0.6, 1.4);
             DashboardOffsetX = o.OffsetX;
             DashboardOffsetY = o.OffsetY;
@@ -240,7 +245,7 @@ public partial class SettingsViewModel : ViewModelBase
         string design = DashboardCatalog.Normalise(DesignTheme);
         var o = new DashboardOptions
         {
-            AccentColor = DashboardCatalog.TryParseColor(DashboardAccent, out _) ? DashboardAccent.Trim() : "",
+            AccentColor = DashboardCatalog.AccentName(DashboardAccent) is var accent && accent != "Default" ? accent : "",
             Scale = Math.Round(DashboardScale, 2),
             OffsetX = Math.Round(DashboardOffsetX), OffsetY = Math.Round(DashboardOffsetY),
         };
@@ -864,6 +869,8 @@ public partial class SettingsViewModel : ViewModelBase
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
+        MoviesTvTheme              = string.Equals(appSettings.MoviesTvTheme?.Trim(), "Netflix", StringComparison.OrdinalIgnoreCase) ? "Netflix" : "Default";
+        MusicTheme                 = string.Equals(appSettings.MusicTheme?.Trim(), "Spotify", StringComparison.OrdinalIgnoreCase) ? "Spotify" : "Default";
         GameInfoTheme              = NormaliseGameInfoTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         foreach (var kv in appSettings.DashboardOptions)
@@ -1074,6 +1081,8 @@ public partial class SettingsViewModel : ViewModelBase
             GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
+            MoviesTvTheme              = MoviesTvTheme == "Netflix" ? "Netflix" : "Default",
+            MusicTheme                 = MusicTheme == "Spotify" ? "Spotify" : "Default",
             GameInfoTheme              = NormaliseGameInfoTheme(GameInfoTheme),
             DashboardOptions           = CloneDashboardOptions(),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),

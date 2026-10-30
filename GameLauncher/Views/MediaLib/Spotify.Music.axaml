@@ -1,0 +1,201 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.SpotifyMusic"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Spotify-style Music: black sidebar, #121212 canvas, green accent, track table and a bottom player bar. -->
+    <UserControl.Styles>
+        <Style Selector="Button.sp-nav">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#b3b3b3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,9"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.sp-nav:pointerover"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.sp-nav:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="#1a1a1a"/></Style>
+        <Style Selector="Button.sp-row">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.sp-row:pointerover /template/ ContentPresenter, Button.sp-row:focus /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2a2a2a"/>
+        </Style>
+        <Style Selector="Button.sp-play">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="Width" Value="38"/>
+            <Setter Property="Height" Value="38"/>
+            <Setter Property="CornerRadius" Value="19"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.sp-play:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1ed760"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="Button.sp-ctl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#b3b3b3"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.sp-ctl:pointerover"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.sp-ctl:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+        <Style Selector="ProgressBar.sp-progress">
+            <Setter Property="Foreground" Value="#1DB954"/>
+            <Setter Property="Background" Value="#535353"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*,Auto" Background="#000000">
+        <Grid Grid.Row="0" ColumnDefinitions="260,*" ColumnSpacing="8" Margin="8,8,8,0">
+
+            <!-- Sidebar: Your Library -->
+            <Border Grid.Column="0" Background="#121212" CornerRadius="8" Padding="12,16">
+                <Grid RowDefinitions="Auto,Auto,*,Auto">
+                    <TextBlock Grid.Row="0" Text="♫ Music" Foreground="White" FontSize="20" FontWeight="Black" Margin="12,0,0,12"/>
+                    <Button Grid.Row="1" Classes="sp-nav" Command="{Binding SelectMusicGroupCommand}" CommandParameter=""
+                            Content="⌂  All songs"/>
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" Margin="0,14,0,0">
+                        <StackPanel>
+                            <TextBlock Text="Your Library" Foreground="#b3b3b3" FontSize="13" FontWeight="SemiBold" Margin="12,0,0,6"/>
+                            <ItemsControl ItemsSource="{Binding MusicGroups}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Classes="sp-nav"
+                                                Command="{Binding $parent[UserControl].DataContext.SelectMusicGroupCommand}"
+                                                CommandParameter="{Binding Title}">
+                                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                                <Border Width="36" Height="36" CornerRadius="4" ClipToBounds="True">
+                                                    <views:CoverImage FallbackText="{Binding Title}" LetterFontSize="16"
+                                                                      FallbackGradient="#1e3a2f,#1DB954" ImageCornerRadius="4"
+                                                                      Width="36" Height="36"/>
+                                                </Border>
+                                                <StackPanel VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Title}" Foreground="White" FontSize="13"
+                                                               TextTrimming="CharacterEllipsis" MaxWidth="150"/>
+                                                    <TextBlock Text="{Binding CountLabel}" Foreground="#b3b3b3" FontSize="11"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="3" Spacing="2">
+                        <Button Classes="sp-nav" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳  Refresh"/>
+                        <Button Classes="sp-nav" Command="{Binding SelectMoviesCommand}" Content="‹  Movies &amp; TV"/>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Main: header + track table -->
+            <Border Grid.Column="1" CornerRadius="8" ClipToBounds="True">
+                <Border.Background>
+                    <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,45%">
+                        <GradientStop Offset="0" Color="#1b5e3a"/>
+                        <GradientStop Offset="1" Color="#121212"/>
+                    </LinearGradientBrush>
+                </Border.Background>
+                <Grid RowDefinitions="Auto,Auto,*">
+                    <StackPanel Grid.Row="0" Margin="28,36,28,20" Spacing="6">
+                        <TextBlock Text="PLAYLIST" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                        <TextBlock Text="{Binding MusicTracksTitle}" Foreground="White" FontSize="44" FontWeight="Black"
+                                   TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding ActiveSectionSummary}" Foreground="#b3b3b3" FontSize="13"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="18" Margin="28,0,28,12">
+                        <Button Classes="sp-play" Width="56" Height="56" CornerRadius="28" Background="#1DB954"
+                                FontSize="22" Command="{Binding TogglePlayPauseCommand}" Content="{Binding PlayPauseGlyph}"/>
+                    </StackPanel>
+
+                    <StackPanel Grid.Row="2" Margin="16,0">
+                        <Grid ColumnDefinitions="40,*,Auto" Margin="12,0,12,6">
+                            <TextBlock Text="#" Foreground="#b3b3b3" FontSize="12"/>
+                            <TextBlock Grid.Column="1" Text="TITLE" Foreground="#b3b3b3" FontSize="12"/>
+                            <TextBlock Grid.Column="2" Text="TYPE · SIZE" Foreground="#b3b3b3" FontSize="12"/>
+                        </Grid>
+                        <Border Height="1" Background="#2a2a2a" Margin="0,0,0,6"/>
+
+                        <TextBlock Text="No music found — add songs to a Media/Music folder, then Refresh."
+                                   Foreground="#b3b3b3" FontSize="13" Margin="12,16" TextWrapping="Wrap"
+                                   IsVisible="{Binding HasNoMusic}"/>
+
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" IsVisible="{Binding !HasNoMusic}">
+                            <ItemsControl ItemsSource="{Binding MusicTracks}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Classes="sp-row"
+                                                Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Grid ColumnDefinitions="40,*,Auto">
+                                                <TextBlock Text="♪" Foreground="#b3b3b3" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                                    <Border Width="40" Height="40" CornerRadius="4" ClipToBounds="True">
+                                                        <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                          FallbackGradient="{Binding Gradient}"
+                                                                          LetterFontSize="18" ImageCornerRadius="4"
+                                                                          Width="40" Height="40"/>
+                                                    </Border>
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding DisplayTitle}" Foreground="White" FontSize="14"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Text="{Binding Group}" Foreground="#b3b3b3" FontSize="12"/>
+                                                    </StackPanel>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" VerticalAlignment="Center" Foreground="#b3b3b3" FontSize="12">
+                                                    <Run Text="{Binding Extension}"/><Run Text="  ·  "/><Run Text="{Binding SizeLabel}"/>
+                                                </TextBlock>
+                                            </Grid>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Grid>
+            </Border>
+        </Grid>
+
+        <!-- Bottom player bar -->
+        <Border Grid.Row="1" Background="#000000" Padding="16,10">
+            <Grid ColumnDefinitions="*,2*,*">
+                <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="2">
+                    <TextBlock Text="{Binding NowPlayingTitle}" Foreground="White" FontSize="13" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding NowPlayingGroup}" Foreground="#b3b3b3" FontSize="11"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6" MaxWidth="620">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="14">
+                        <Button Classes="sp-ctl" Command="{Binding PreviousTrackCommand}" Content="⏮"/>
+                        <Button Classes="sp-play" Command="{Binding TogglePlayPauseCommand}" Content="{Binding PlayPauseGlyph}"/>
+                        <Button Classes="sp-ctl" Command="{Binding NextTrackCommand}" Content="⏭"/>
+                        <Button Classes="sp-ctl" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                    </StackPanel>
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
+                        <TextBlock Text="{Binding PositionLabel}" Foreground="#b3b3b3" FontSize="11" VerticalAlignment="Center"/>
+                        <ProgressBar Grid.Column="1" Classes="sp-progress" Minimum="0" Maximum="100"
+                                     Value="{Binding ProgressPercent}" Height="4"/>
+                        <TextBlock Grid.Column="2" Text="{Binding DurationLabel}" Foreground="#b3b3b3" FontSize="11" VerticalAlignment="Center"/>
+                    </Grid>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

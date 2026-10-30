@@ -421,24 +421,27 @@ public partial class MainWindow : Window
             }
         }
 
-        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        // Default dashboard: hero, Continue Playing cards, Media cards and Recent Achievements
         bool isDefaultDash = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isDefaultDash && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {
                 case Key.Right:
+                    vm.DashboardVm.MoveDefaultFocus(1, 0);
+                    e.Handled = true;
+                    return;
                 case Key.Down:
-                    vm.DashboardVm.MoveDefaultFocus(1);
+                    vm.DashboardVm.MoveDefaultFocus(0, 1);
                     e.Handled = true;
                     return;
                 case Key.Left:
                     if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
-                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    else vm.DashboardVm.MoveDefaultFocus(-1, 0);
                     e.Handled = true;
                     return;
                 case Key.Up:
-                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    vm.DashboardVm.MoveDefaultFocus(0, -1);
                     e.Handled = true;
                     return;
                 case Key.Enter:
@@ -1482,22 +1485,24 @@ public partial class MainWindow : Window
             if (HandleWiiDashboardKey(vm, key)) return;
         }
 
-        // Default dashboard: hero "Continue Playing" button + Continue Playing cards
+        // Default dashboard: hero, Continue Playing cards, Media cards and Recent Achievements
         bool isDefaultDashController = string.Equals(vm.SettingsVm.DesignTheme, "Default", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && isDefaultDashController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
             switch (key)
             {
                 case Key.Right:
+                    vm.DashboardVm.MoveDefaultFocus(1, 0);
+                    return;
                 case Key.Down:
-                    vm.DashboardVm.MoveDefaultFocus(1);
+                    vm.DashboardVm.MoveDefaultFocus(0, 1);
                     return;
                 case Key.Left:
                     if (vm.DashboardVm.IsAtDefaultFirstItem) OpenNavWithCurrentHighlight(vm);
-                    else vm.DashboardVm.MoveDefaultFocus(-1);
+                    else vm.DashboardVm.MoveDefaultFocus(-1, 0);
                     return;
                 case Key.Up:
-                    vm.DashboardVm.MoveDefaultFocus(-1);
+                    vm.DashboardVm.MoveDefaultFocus(0, -1);
                     return;
                 case Key.Enter:
                     vm.DashboardVm.OpenDefaultFocused();

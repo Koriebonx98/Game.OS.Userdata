@@ -2,131 +2,26 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:vlc="using:LibVLCSharp.Avalonia"
+             xmlns:lib="using:GameLauncher.Views.MediaLib"
              x:Class="GameLauncher.Views.MediaView"
              x:DataType="vm:MediaViewModel">
 
     <Panel>
-        <!-- Main scrollable content -->
-        <ScrollViewer HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      IsVisible="{Binding !IsVlcPlayerOpen}">
-            <StackPanel Margin="32,28,32,28" Spacing="24">
-
-                <!-- Page title -->
-                <TextBlock Text="Media" Classes="page-title"/>
-                <TextBlock Text="Browse media from all drives under each drive's Media folder."
-                           Classes="page-subtitle" Margin="0,-20,0,0"/>
-
-                <!-- Play File button -->
-                <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
-                    <Button Classes="btn-primary"
-                            Command="{Binding PlayLocalVideoCommand}"
-                            Padding="16,8">
-                        🎬  Play File…
-                    </Button>
-                </StackPanel>
-
-                <Border Classes="xb360-metro-tile xb360-metro-stat" CornerRadius="10">
-                    <Grid Margin="16" ColumnDefinitions="220,*" ColumnSpacing="16">
-                        <StackPanel Grid.Column="0" Spacing="8">
-                            <TextBlock Text="Media" Classes="section-header"/>
-                            <Button Classes="btn-secondary"
-                                    Classes.active="{Binding IsMoviesSelected}"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding SelectMoviesCommand}">
-                                🎬  Movies
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    Classes.active="{Binding IsTvShowsSelected}"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding SelectTvShowsCommand}">
-                                📺  TV Shows
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    Classes.active="{Binding IsMusicSelected}"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding SelectMusicCommand}">
-                                🎵  Music
-                            </Button>
-                            <Button Classes="btn-secondary"
-                                    HorizontalAlignment="Stretch"
-                                    Command="{Binding RefreshMediaLibraryCommand}">
-                                Refresh Scan
-                            </Button>
-                        </StackPanel>
-
-                        <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*,Auto" RowSpacing="8">
-                            <TextBlock Text="{Binding ActiveSectionTitle}" Classes="section-header"/>
-                            <TextBlock Text="{Binding ActiveSectionSummary}"
-                                       Grid.Row="1"
-                                       FontSize="12"
-                                       Foreground="#8b949e"/>
-                            <ScrollViewer Grid.Row="2" MaxHeight="300"
-                                          HorizontalScrollBarVisibility="Disabled"
-                                          VerticalScrollBarVisibility="Auto">
-                                <ItemsControl ItemsSource="{Binding ActiveItems}">
-                                    <ItemsControl.ItemsPanel>
-                                        <ItemsPanelTemplate>
-                                            <WrapPanel Orientation="Horizontal" ItemWidth="180" ItemHeight="96"/>
-                                        </ItemsPanelTemplate>
-                                    </ItemsControl.ItemsPanel>
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate>
-                                            <Button Classes="btn-secondary"
-                                                    Margin="0,0,8,8"
-                                                    HorizontalContentAlignment="Stretch"
-                                                    VerticalContentAlignment="Stretch"
-                                                    Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
-                                                    CommandParameter="{Binding}">
-                                                <StackPanel Margin="8,6" Spacing="3">
-                                                    <TextBlock Text="{Binding Title}"
-                                                               FontSize="12"
-                                                               FontWeight="SemiBold"
-                                                               MaxHeight="34"
-                                                               TextWrapping="Wrap"/>
-                                                    <TextBlock Text="{Binding Extension}"
-                                                               FontSize="10"
-                                                               Foreground="#8b949e"/>
-                                                </StackPanel>
-                                            </Button>
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </ScrollViewer>
-                            <Border Grid.Row="3"
-                                    Classes="xb360-metro-tile xb360-metro-stat"
-                                    CornerRadius="8"
-                                    IsVisible="{Binding HasSelectedItem}">
-                                <StackPanel Margin="12,10" Spacing="6">
-                                    <TextBlock Text="Info" Classes="section-header" FontSize="14"/>
-                                    <TextBlock Text="{Binding SelectedItemTitle}"
-                                               FontSize="13"
-                                               FontWeight="SemiBold"
-                                               TextWrapping="Wrap"/>
-                                    <TextBlock Text="{Binding SelectedItemTypeLabel}"
-                                               FontSize="11"
-                                               Foreground="#8b949e"/>
-                                    <TextBlock Text="{Binding SelectedItemSizeLabel}"
-                                               FontSize="11"
-                                               Foreground="#8b949e"/>
-                                    <TextBlock Text="{Binding SelectedItemPath}"
-                                               FontSize="10"
-                                               Foreground="#8b949e"
-                                               TextWrapping="Wrap"
-                                               MaxHeight="36"/>
-                                    <Button Classes="btn-primary"
-                                            HorizontalAlignment="Left"
-                                            Command="{Binding PlaySelectedMediaCommand}">
-                                        <TextBlock Text="{Binding SelectedItemActionLabel}"/>
-                                    </Button>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-                    </Grid>
-                </Border>
-
-            </StackPanel>
-        </ScrollViewer>
+        <!--
+            Media page. The layouts live in separate files chosen by Settings -> Design:
+              Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Netflix.MoviesTv.axaml ("Netflix")
+              Views/MediaLib/Default.Music.axaml     ("Default")   Views/MediaLib/Spotify.Music.axaml    ("Spotify")
+        -->
+        <Panel IsVisible="{Binding !IsVlcPlayerOpen}">
+            <Panel IsVisible="{Binding IsVideoSection}">
+                <lib:DefaultMoviesTv IsVisible="{Binding IsDefaultMoviesTv}"/>
+                <lib:NetflixMoviesTv IsVisible="{Binding IsNetflixMoviesTv}"/>
+            </Panel>
+            <Panel IsVisible="{Binding IsMusicSelected}">
+                <lib:DefaultMusic IsVisible="{Binding IsDefaultMusic}"/>
+                <lib:SpotifyMusic IsVisible="{Binding IsSpotifyMusic}"/>
+            </Panel>
+        </Panel>
 
         <!-- VLC player overlay (shown when IsVlcPlayerOpen) -->
         <Border Background="#0d1117"

@@ -1121,8 +1121,6 @@
                                             <ComboBox Classes="form-input" Width="140"
                                                       ItemsSource="{Binding DashboardAccentPresets}"
                                                       SelectedItem="{Binding DashboardAccent}"/>
-                                            <TextBox Classes="form-input" Width="110" Watermark="#RRGGBB"
-                                                     Text="{Binding DashboardAccent}"/>
                                         </StackPanel>
 
                                         <TextBlock Text="{Binding DashboardScale, StringFormat='Size: {0:P0}'}" FontSize="12" Foreground="#e6edf3"/>
@@ -1163,6 +1161,28 @@
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="library"/>
                                 </StackPanel>
                                 <TextBlock Text="Layout of the Library (My Games) page. Default is the standard grid; PS5 shows PlayStation-style tiles."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Movies &amp; TV"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableMoviesTvThemes}"
+                                          SelectedItem="{Binding MoviesTvTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="Movies &amp; TV page design. Default is a console-style browser; Netflix mimics the Netflix look."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Music"
+                                           FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input"
+                                          ItemsSource="{Binding AvailableMusicThemes}"
+                                          SelectedItem="{Binding MusicTheme}"
+                                          Width="220"/>
+                                <TextBlock Text="Music page design. Default is a console-style player; Spotify mimics the Spotify look."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 
