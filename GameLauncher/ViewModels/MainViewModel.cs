@@ -1066,6 +1066,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (e.PropertyName == nameof(SettingsViewModel.GameInfoTheme))
                 DetailVm.GameInfoTheme = SettingsVm.GameInfoTheme;
         };
+        // Dashboard customisation (Settings → Design → ⚙): the options belong to the applied dashboard design.
+        _appliedDashboardDesign = DashboardCatalog.Normalise(SettingsVm.DesignTheme);
+        DashboardVm.Options.Load(_appliedDashboardDesign, LoadDashboardOptions(_appliedDashboardDesign));
+        SettingsVm.DashboardOptionsChanged = (design, options) =>
+        {
+            if (string.Equals(design, _appliedDashboardDesign, StringComparison.OrdinalIgnoreCase))
+                DashboardVm.Options.Load(design, options);
+        };
+        SettingsVm.SettingsApplied += () =>
+        {
+            _appliedDashboardDesign = DashboardCatalog.Normalise(SettingsVm.DesignTheme);
+            DashboardVm.Options.Load(_appliedDashboardDesign, LoadDashboardOptions(_appliedDashboardDesign));
+        };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
@@ -2059,6 +2072,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.DispatcherPriority.Background);
         });
     }
+
+    private string _appliedDashboardDesign = "Default";
+
+    private static Models.DashboardOptions? LoadDashboardOptions(string design) =>
+        Services.AppSettingsService.Load().DashboardOptions.TryGetValue(design, out var o) ? o : null;
 
     [RelayCommand]
     private void Navigate(string page)

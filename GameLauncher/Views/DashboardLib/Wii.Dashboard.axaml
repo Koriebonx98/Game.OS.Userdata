@@ -14,7 +14,7 @@
     <Border Classes="dashboard-wii-layout" Background="#f3f4f6"
             Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Grid RowDefinitions="*,Auto">
-            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,8,6,0">
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="10,2,6,0">
                 <ItemsControl Grid.Column="0" ItemsSource="{Binding WiiChannels}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
@@ -23,7 +23,7 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:WiiChannelVm">
-                            <Panel Margin="5">
+                            <Panel Margin="3">
                                 <Border Classes="wii-channel-empty" IsVisible="{Binding IsEmpty}"/>
                                 <Button Classes="wii-ch" Classes.focused="{Binding IsFocused}" IsVisible="{Binding HasCard}"
                                         HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
@@ -40,25 +40,34 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Button Grid.Column="1" Classes="wii-page-arrow" Content="▶" Margin="6,0,0,0"
+                        IsVisible="{Binding Options.ShowArrow}"
                         Command="{Binding WiiNextPageCommand}" ToolTip.Tip="My Library"/>
             </Grid>
 
             <!-- Curved Wii Menu bar: Wii button, SD card, title + date, envelope -->
-            <Border Grid.Row="1" Classes="wii-bottom-bar">
+            <Border Grid.Row="1" Classes="wii-bottom-bar" Height="48" Padding="28,4"
+                    Background="{DynamicResource DashAccent}" BorderBrush="{DynamicResource DashAccent}">
                 <Grid ColumnDefinitions="Auto,Auto,*,Auto" VerticalAlignment="Center">
-                    <Border Grid.Column="0" Classes="wii-status-orb-left">
-                        <TextBlock Text="Wii" Classes="wii-orb-text"/>
+                    <Border Grid.Column="0" Classes="wii-status-orb-left" Width="38" Height="38" CornerRadius="19"
+                            Margin="12,0,0,0" IsVisible="{Binding Options.ShowWiiButton}">
+                        <TextBlock Text="Wii" Classes="wii-orb-text" FontSize="14"/>
                     </Border>
                     <Button Grid.Column="1" Classes="wii-status-orb-button" Margin="10,0,0,0"
+                            Width="38" Height="38" CornerRadius="19"
+                            IsVisible="{Binding Options.ShowSettings}"
                             Command="{Binding NavigateToSettingsCommand}" ToolTip.Tip="Settings">
-                        <TextBlock Text="⚙" Classes="wii-orb-text"/>
+                        <TextBlock Text="⚙" Classes="wii-orb-text" FontSize="15"/>
                     </Button>
                     <StackPanel Grid.Column="2" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="{Binding WiiClockTime}" Classes="wii-clock-time" HorizontalAlignment="Center"/>
-                        <TextBlock Text="{Binding WiiClockDate}" Classes="wii-clock-date" HorizontalAlignment="Center"/>
+                        <TextBlock Text="{Binding WiiClockTime}" Classes="wii-clock-time" FontSize="19"
+                                   HorizontalAlignment="Center" IsVisible="{Binding Options.ShowClock}"/>
+                        <TextBlock Text="{Binding WiiClockDate}" Classes="wii-clock-date" FontSize="11"
+                                   HorizontalAlignment="Center" IsVisible="{Binding Options.ShowDate}"/>
                     </StackPanel>
-                    <Button Grid.Column="3" Classes="wii-status-orb-button" Command="{Binding NavigateToInboxCommand}">
-                        <TextBlock Text="✉" Classes="wii-orb-text"/>
+                    <Button Grid.Column="3" Classes="wii-status-orb-button" Width="38" Height="38" CornerRadius="19"
+                            Margin="0,0,12,0" IsVisible="{Binding Options.ShowInbox}"
+                            Command="{Binding NavigateToInboxCommand}" ToolTip.Tip="Inbox">
+                        <TextBlock Text="✉" Classes="wii-orb-text" FontSize="15"/>
                     </Button>
                 </Grid>
             </Border>

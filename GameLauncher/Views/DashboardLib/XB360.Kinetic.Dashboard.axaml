@@ -1,0 +1,132 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.DashboardLib.Xb360KineticDashboard"
+             x:DataType="vm:DashboardViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.kx-tab">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#c8c8c8"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.kx-tab /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.kx-tab.active">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="30"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="Button.kx-tile">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.kx-tile /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4a4a4a"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <Style Selector="Button.kx-tile.solid /template/ ContentPresenter">
+            <Setter Property="Background" Value="{DynamicResource DashAccent}"/>
+        </Style>
+        <Style Selector="Button.kx-tile:pointerover /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+        <Style Selector="Button.kx-tile.focused /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+        <Style Selector="ItemsControl.kx-grid > ContentPresenter" x:DataType="vm:KineticTileVm">
+            <Setter Property="Grid.Column" Value="{Binding Col}"/>
+            <Setter Property="Grid.Row" Value="{Binding Row}"/>
+            <Setter Property="Grid.ColumnSpan" Value="{Binding ColSpan}"/>
+            <Setter Property="Grid.RowSpan" Value="{Binding RowSpan}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border>
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                <GradientStop Color="#5c5c5c" Offset="0"/>
+                <GradientStop Color="#9a9a9a" Offset="0.6"/>
+                <GradientStop Color="#d0d0d0" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <Grid RowDefinitions="Auto,*,Auto" Margin="40,20,40,16">
+
+            <!-- Tab header + profile / clock -->
+            <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <ItemsControl ItemsSource="{Binding KineticTabs}" IsVisible="{Binding Options.ShowTabs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="10"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KineticTabVm">
+                            <Button Classes="kx-tab" Classes.active="{Binding IsActive}" Content="{Binding Title}"
+                                    VerticalAlignment="Bottom"
+                                    Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).SelectKineticTabCommand}"
+                                    CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Top">
+                    <TextBlock Text="{Binding SteamClockTime}" Foreground="White" FontSize="18" VerticalAlignment="Center"
+                               IsVisible="{Binding Options.ShowClock}"/>
+                    <Border Width="44" Height="44" Background="{DynamicResource DashAccent}" BorderBrush="White" BorderThickness="2"
+                            IsVisible="{Binding Options.ShowProfile}">
+                        <TextBlock Text="{Binding SteamProfileInitial}" Foreground="White" FontSize="20" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                </StackPanel>
+            </Grid>
+
+            <!-- Tile mosaic -->
+            <Viewbox Grid.Row="1" Stretch="Uniform" StretchDirection="Both" Margin="0,16" HorizontalAlignment="Left" VerticalAlignment="Top">
+                <ItemsControl Classes="kx-grid" ItemsSource="{Binding KineticTiles}" Width="1000" Height="400">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Grid ColumnDefinitions="*,*,*,*,*,*,*,*" RowDefinitions="*,*,*"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KineticTileVm">
+                            <Button Classes="kx-tile" Classes.solid="{Binding IsSolid}" Classes.focused="{Binding IsFocused}"
+                                    Command="{Binding ActivateCommand}">
+                                <Grid>
+                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackGradient="{Binding CoverGradient}"
+                                                      FallbackText="" IsVisible="{Binding HasCover}"/>
+                                    <TextBlock Text="{Binding Glyph}" FontSize="40" Foreground="White" Opacity="0.9"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                                               IsVisible="{Binding IsSolid}"/>
+                                    <Border VerticalAlignment="Bottom" Background="#99000000" Padding="8,4">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Foreground="White" FontSize="15" FontWeight="SemiBold"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="#dddddd" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle.Length}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Viewbox>
+
+            <!-- Hints -->
+            <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="24" IsVisible="{Binding Options.ShowHints}">
+                <TextBlock Text="Ⓐ Select" Foreground="White" FontSize="16"/>
+                <TextBlock Text="◀ ▶ Tabs / Tiles" Foreground="White" FontSize="16"/>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

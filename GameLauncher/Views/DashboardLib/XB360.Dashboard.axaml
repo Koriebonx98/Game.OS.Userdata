@@ -1,4 +1,4 @@
-<UserControl xmlns="https://github.com/avaloniaui"
+<UserControl xmlns:local="clr-namespace:GameLauncher.Views.DashboardLib" xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:models="using:GameLauncher.Models"
@@ -8,9 +8,11 @@
 
     <Border Classes="dashboard-xb360-layout"
             Height="{Binding $parent[ScrollViewer].Bounds.Height}">
-        <Grid RowDefinitions="Auto,Auto,*">
+        <Panel>
+        <local:Xb360KineticDashboard IsVisible="{Binding Options.IsXb360Kinetic}"/>
+        <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding Options.IsXb360Og}">
             <!-- Top header bar with user info -->
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="32,16,32,0">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="32,16,32,0" IsVisible="{Binding Options.ShowProfile}">
                 <Border Width="50" Height="50" Classes="xb360-avatar-tile">
                     <TextBlock Text="🙂" HorizontalAlignment="Center" VerticalAlignment="Center" FontSize="20"/>
                 </Border>
@@ -132,7 +134,7 @@
                     </StackPanel>
 
                     <!-- Right panel: achievements -->
-                    <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="10">
+                    <StackPanel Grid.Column="1" Margin="16,0,0,0" Spacing="10" IsVisible="{Binding Options.ShowAchievements}">
                         <TextBlock Text="Recent Achievements" Classes="xb360-strip-header"/>
                         <ItemsControl ItemsSource="{Binding RecentAchievements}">
                             <ItemsControl.ItemTemplate>
@@ -381,5 +383,6 @@
 
             </Grid>
         </Grid>
+        </Panel>
     </Border>
 </UserControl>

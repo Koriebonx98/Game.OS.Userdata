@@ -10,6 +10,7 @@
         <Grid RowDefinitions="Auto,Auto,*">
             <Grid Grid.Row="0" Margin="54,24,54,0" ColumnDefinitions="*,Auto,Auto,Auto,Auto">
                 <TextBlock Text="Recent Games"
+                           IsVisible="{Binding Options.ShowTitle}"
                            Classes="steam-shell-title"
                            VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1"
@@ -22,10 +23,12 @@
                            Margin="0,0,24,0"/>
                 <TextBlock Grid.Column="3"
                            Text="{Binding SteamClockTime}"
+                           IsVisible="{Binding Options.ShowClock}"
                            Classes="steam-shell-time"
                            Margin="0,0,22,0"
                            VerticalAlignment="Center"/>
                 <Border Grid.Column="4"
+                        IsVisible="{Binding Options.ShowProfile}"
                         Classes="steam-shell-avatar"
                         VerticalAlignment="Center">
                     <TextBlock Text="{Binding SteamProfileInitial}"

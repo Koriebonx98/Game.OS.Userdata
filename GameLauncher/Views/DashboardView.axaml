@@ -18,7 +18,11 @@
           Views/DashboardLib/SteamBPM.Dashboard.axaml  (Steam Big Picture)
           Views/DashboardLib/Default.Dashboard.axaml   (Default / GameOS)
     -->
-    <Grid>
+    <UserControl.Resources>
+        <SolidColorBrush x:Key="DashAccent" Color="#58a6ff"/>
+    </UserControl.Resources>
+    <!-- Stage: carries the per-design size / position / accent chosen in Settings → Design → ⚙ (see DashboardView.axaml.cs) -->
+    <Grid x:Name="Stage">
         <dash:Xb360Dashboard/>
         <dash:Ps5Dashboard/>
         <dash:SwitchDashboard/>

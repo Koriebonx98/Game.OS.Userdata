@@ -6,18 +6,32 @@
              x:Class="GameLauncher.Views.DashboardLib.DefaultDashboard"
              x:DataType="vm:DashboardViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="Button.achievements-link">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.achievements-link:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1f6feb22"/>
+        </Style>
+    </UserControl.Styles>
+
     <StackPanel Margin="32,28,32,28" Spacing="0" Classes="dashboard-default-layout">
 
         <!-- Greeting -->
-        <TextBlock Text="{Binding Greeting}"
-                   Classes="page-title"
-                   Margin="0,0,0,4"/>
-        <TextBlock Text="Welcome back to Game.OS"
-                   Classes="page-subtitle"
-                   Margin="0,0,0,24"/>
+        <StackPanel IsVisible="{Binding Options.ShowGreeting}">
+            <TextBlock Text="{Binding Greeting}"
+                       Classes="page-title"
+                       Margin="0,0,0,4"/>
+            <TextBlock Text="Welcome back to Game.OS"
+                       Classes="page-subtitle"
+                       Margin="0,0,0,24"/>
+        </StackPanel>
 
         <!-- Stats row -->
-        <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0">
+        <StackPanel Orientation="Horizontal" Margin="0,0,0,28" Spacing="0" IsVisible="{Binding Options.ShowStats}">
             <Border Classes="stat-tile">
                 <StackPanel Spacing="2">
                     <TextBlock Text="{Binding GamesCount}" Classes="stat-number"/>
@@ -48,6 +62,7 @@
         </StackPanel>
 
         <!-- Hero Featured Game / Last Played -->
+        <Panel IsVisible="{Binding Options.ShowFeatured}">
         <Border Classes="hero-banner featured-hero-banner" Margin="0,0,0,24" Cursor="Hand"
                 IsVisible="{Binding FeaturedGame, Converter={x:Static ObjectConverters.IsNotNull}}">
             <Grid ColumnDefinitions="*,Auto" Margin="32,28,32,28">
@@ -109,9 +124,10 @@
                 </Border>
             </Grid>
         </Border>
+        </Panel>
 
         <!-- Continue Playing (locally detected ROMs + installed games that have been played) -->
-        <StackPanel Margin="0,0,0,24">
+        <StackPanel Margin="0,0,0,24" IsVisible="{Binding Options.ShowRecent}">
             <TextBlock Text="Continue Playing" Classes="section-header"/>
             <StackPanel IsVisible="{Binding HasRecentLocalGames}">
                 <ItemsControl ItemsSource="{Binding RecentLocalGames}">
@@ -187,15 +203,10 @@
             </Border>
         </StackPanel>
 
-        <!-- Media -->
-        <StackPanel Margin="0,0,0,24">
+        <!-- Media: each card opens that Media section -->
+        <StackPanel Margin="0,0,0,24" IsVisible="{Binding Options.ShowMedia}">
             <TextBlock Text="Media" Classes="section-header"/>
-            <ItemsControl>
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
+            <WrapPanel>
                 <Button Classes="game-card-btn"
                         Command="{Binding OpenMoviesFolderCommand}">
                     <StackPanel Margin="12,10" Spacing="6">
@@ -220,44 +231,61 @@
                                    Classes="achievement-desc"/>
                     </StackPanel>
                 </Button>
-            </ItemsControl>
+            </WrapPanel>
         </StackPanel>
 
-        <!-- Recent Achievements -->
-        <TextBlock Text="Recent Achievements" Classes="section-header"
-                   IsVisible="{Binding RecentAchievements.Count}"/>
+        <!-- Recent Achievements: the header, empty card and every row open the achievements page -->
+        <StackPanel IsVisible="{Binding Options.ShowAchievements}">
+            <Button Classes="achievements-link" HorizontalAlignment="Left"
+                    Command="{Binding NavigateToAchievementsCommand}">
+                <TextBlock Text="Recent Achievements  ›" Classes="section-header"/>
+            </Button>
 
-        <ItemsControl ItemsSource="{Binding RecentAchievements}"
-                      IsVisible="{Binding RecentAchievements.Count}">
-            <ItemsControl.ItemTemplate>
-                <DataTemplate x:DataType="models:Achievement">
-                    <Border Classes="achievement-card">
-                        <Grid ColumnDefinitions="40,*">
-                            <Border Grid.Column="0" Width="36" Height="36"
-                                    Classes="achievement-icon-card" CornerRadius="8">
-                                <TextBlock Text="🏆" FontSize="18"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"/>
+            <Button Classes="game-card-btn" Width="260" HorizontalAlignment="Left"
+                    IsVisible="{Binding HasNoRecentAchievements}"
+                    Command="{Binding NavigateToAchievementsCommand}">
+                <StackPanel Margin="12,10" Spacing="6">
+                    <TextBlock Text="🏆 Achievements" Classes="game-card-title"/>
+                    <TextBlock Text="No achievements yet — view your profile."
+                               Classes="achievement-desc"/>
+                </StackPanel>
+            </Button>
+
+            <ItemsControl ItemsSource="{Binding RecentAchievements}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="models:Achievement">
+                        <Button Classes="achievements-link" HorizontalAlignment="Stretch"
+                                HorizontalContentAlignment="Stretch"
+                                Command="{Binding $parent[UserControl].DataContext.NavigateToAchievementsCommand}">
+                            <Border Classes="achievement-card">
+                                <Grid ColumnDefinitions="40,*">
+                                    <Border Grid.Column="0" Width="36" Height="36"
+                                            Classes="achievement-icon-card" CornerRadius="8">
+                                        <TextBlock Text="🏆" FontSize="18"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" Margin="12,0,0,0"
+                                                VerticalAlignment="Center" Spacing="2">
+                                        <TextBlock Text="{Binding Name}"
+                                                   Classes="achievement-title"/>
+                                        <TextBlock Text="{Binding Description}"
+                                                   Classes="achievement-desc"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding GameTitle}"
+                                                       Classes="achievement-meta"/>
+                                            <TextBlock Text="|" Classes="achievement-divider"/>
+                                            <TextBlock Text="{Binding Platform}"
+                                                       Classes="achievement-meta"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
                             </Border>
-                            <StackPanel Grid.Column="1" Margin="12,0,0,0"
-                                        VerticalAlignment="Center" Spacing="2">
-                                <TextBlock Text="{Binding Name}"
-                                           Classes="achievement-title"/>
-                                <TextBlock Text="{Binding Description}"
-                                           Classes="achievement-desc"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="{Binding GameTitle}"
-                                               Classes="achievement-meta"/>
-                                    <TextBlock Text="|" Classes="achievement-divider"/>
-                                    <TextBlock Text="{Binding Platform}"
-                                               Classes="achievement-meta"/>
-                                </StackPanel>
-                            </StackPanel>
-                        </Grid>
-                    </Border>
-                </DataTemplate>
-            </ItemsControl.ItemTemplate>
-        </ItemsControl>
+                        </Button>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
 
     </StackPanel>
 </UserControl>
