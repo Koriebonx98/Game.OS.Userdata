@@ -188,7 +188,8 @@ public partial class App : Application
     {
         var trimmed = (designTheme ?? "").Trim();
         string normalised;
-        if (string.Equals(trimmed, Xb360DesignTheme, StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(trimmed, Xb360DesignTheme, StringComparison.OrdinalIgnoreCase) ||
+            ViewModels.DashboardCatalog.IsXb360(trimmed))
             normalised = Xb360DesignTheme;
         else if (string.Equals(trimmed, Ps5DesignTheme, StringComparison.OrdinalIgnoreCase))
             normalised = Ps5DesignTheme;

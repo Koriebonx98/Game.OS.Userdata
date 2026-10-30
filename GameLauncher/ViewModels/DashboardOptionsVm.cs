@@ -12,27 +12,16 @@ public sealed record DashboardAssetDef(string Key, string Label);
 /// <summary>Which assets each dashboard design offers in Settings → Design → ⚙, plus default accents.</summary>
 public static class DashboardCatalog
 {
-    public static readonly IReadOnlyList<string> Designs = new[] { "Default", "XB360", "PS5", "Wii", "Switch", "SteamBPM" };
+    public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", "Wii", "Switch", "SteamBPM" };
 
-    /// <summary>Selectable versions of a design (only XB360 has more than one).</summary>
-    public static IReadOnlyList<string> VersionsFor(string design) =>
-        design == "XB360" ? new[] { "OG", "Kinetic" } : Array.Empty<string>();
+    public const string Xb360Og = "XB360 OG";
+    public const string Xb360Kinetic = "XB360 Kinetic";
 
-    public static string NormaliseVersion(string design, string? version)
-    {
-        foreach (var v in VersionsFor(design))
-            if (string.Equals(v, version?.Trim(), StringComparison.OrdinalIgnoreCase)) return v;
-        return VersionsFor(design).Count > 0 ? VersionsFor(design)[0] : "";
-    }
+    public static bool IsXb360(string? design) =>
+        string.Equals(design, Xb360Og, StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(design, Xb360Kinetic, StringComparison.OrdinalIgnoreCase);
 
-    public static IReadOnlyList<DashboardAssetDef> AssetsFor(string design, string? version = null) =>
-        design == "XB360" && NormaliseVersion(design, version) == "Kinetic"
-            ? new DashboardAssetDef[]
-            {
-                new("tabs", "Tab header (home / social / …)"), new("profile", "Profile picture"),
-                new("clock", "Clock"), new("hints", "Button hints"),
-            }
-            : AssetsForDesign(design);
+    public static IReadOnlyList<DashboardAssetDef> AssetsFor(string design) => AssetsForDesign(design);
 
     private static IReadOnlyList<DashboardAssetDef> AssetsForDesign(string design) => design switch
     {
@@ -48,9 +37,14 @@ public static class DashboardCatalog
             new("hints", "Button hints"), new("background", "Game background"),
         },
         "PS5" => new DashboardAssetDef[] { new("header", "Header (Games / Media)") },
-        "XB360" => new DashboardAssetDef[]
+        Xb360Og => new DashboardAssetDef[]
         {
             new("profile", "Profile & greeting"), new("achievements", "Recent achievements"),
+        },
+        Xb360Kinetic => new DashboardAssetDef[]
+        {
+            new("tabs", "Tab header (home / social / …)"), new("profile", "Profile picture"),
+            new("clock", "Clock"), new("hints", "Button hints"),
         },
         "SteamBPM" => new DashboardAssetDef[]
         {
@@ -68,13 +62,15 @@ public static class DashboardCatalog
         "Wii" => "#7cb7d6",
         "Switch" => "#00c3e3",
         "PS5" => "#0070D1",
-        "XB360" => "#1f9d1f",
+        Xb360Og or Xb360Kinetic => "#1f9d1f",
         "SteamBPM" => "#1a9fff",
         _ => "#58a6ff",
     };
 
     public static string Normalise(string? design)
     {
+        // Legacy single "XB360" design maps to the original dashboard.
+        if (string.Equals(design?.Trim(), "XB360", StringComparison.OrdinalIgnoreCase)) return Xb360Og;
         foreach (var d in Designs)
             if (string.Equals(d, design?.Trim(), StringComparison.OrdinalIgnoreCase)) return d;
         return "Default";
@@ -135,9 +131,8 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowHeader       => Get("header");
     public bool ShowTabs         => Get("tabs");
 
-    public string Version => DashboardCatalog.NormaliseVersion(Design, _o.Version);
-    public bool IsXb360Kinetic => Design == "XB360" && Version == "Kinetic";
-    public bool IsXb360Og      => !IsXb360Kinetic;
+    public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
+    public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;
 }
 
 /// <summary>One asset checkbox in the Settings editor.</summary>

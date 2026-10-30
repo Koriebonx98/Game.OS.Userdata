@@ -149,7 +149,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Selected launcher design theme.</summary>
     [ObservableProperty] private string _designTheme = "Default";
     /// <summary>Available launcher design themes for Settings → Design.</summary>
-    public IReadOnlyList<string> AvailableDesignThemes { get; } = new[] { "Default", "XB360", "PS5", "Wii", "Switch", "SteamBPM" };
+    public IReadOnlyList<string> AvailableDesignThemes { get; } = DashboardCatalog.Designs;
 
     /// <summary>Selected Games (library) page layout.</summary>
     [ObservableProperty] private string _gamesTheme = "Default";
@@ -183,10 +183,6 @@ public partial class SettingsViewModel : ViewModelBase
     public ObservableCollection<DashboardAssetToggleVm> DashboardAssets { get; } = new();
     public IReadOnlyList<string> DashboardAccentPresets { get; } =
         new[] { "Default", "#00c3e3", "#e60012", "#0070D1", "#9bd30b", "#f0b323", "#a371f7", "#ff7d1a", "#3fb950", "#ffffff" };
-    /// <summary>Versions of the selected dashboard (XB360: OG / Kinetic); empty for other designs.</summary>
-    public ObservableCollection<string> DashboardVersions { get; } = new();
-    public bool HasDashboardVersions => DashboardVersions.Count > 0;
-    [ObservableProperty] private string _dashboardVersion = "";
     [ObservableProperty] private string _dashboardAccent = "";
     [ObservableProperty] private double _dashboardScale = 1.0;
     [ObservableProperty] private double _dashboardOffsetX;
@@ -201,13 +197,6 @@ public partial class SettingsViewModel : ViewModelBase
         OnPropertyChanged(nameof(DashboardOptionsTitle));
         LoadDashboardEditor();
     }
-    partial void OnDashboardVersionChanged(string value)
-    {
-        if (_loadingDashboardEditor) return;
-        // The asset list differs per version, so commit the version then rebuild the checkboxes.
-        CommitDashboardEditor();
-        LoadDashboardEditor();
-    }
     partial void OnDashboardAccentChanged(string value) => CommitDashboardEditor();
     partial void OnDashboardScaleChanged(double value) => CommitDashboardEditor();
     partial void OnDashboardOffsetXChanged(double value) => CommitDashboardEditor();
@@ -216,7 +205,6 @@ public partial class SettingsViewModel : ViewModelBase
     private static DashboardOptions CopyOptions(DashboardOptions o) => new()
     {
         Assets = new Dictionary<string, bool>(o.Assets ?? new()),
-        Version = o.Version ?? "",
         AccentColor = o.AccentColor ?? "", Scale = o.Scale <= 0 ? 1.0 : o.Scale,
         OffsetX = o.OffsetX, OffsetY = o.OffsetY,
     };
@@ -231,13 +219,8 @@ public partial class SettingsViewModel : ViewModelBase
         {
             string design = DashboardCatalog.Normalise(DesignTheme);
             var o = _dashboardOptions.TryGetValue(design, out var existing) ? existing : new DashboardOptions();
-            DashboardVersions.Clear();
-            foreach (var v in DashboardCatalog.VersionsFor(design)) DashboardVersions.Add(v);
-            OnPropertyChanged(nameof(HasDashboardVersions));
-            string version = DashboardCatalog.NormaliseVersion(design, o.Version);
-            DashboardVersion = version;
             DashboardAssets.Clear();
-            foreach (var def in DashboardCatalog.AssetsFor(design, version))
+            foreach (var def in DashboardCatalog.AssetsFor(design))
             {
                 var toggle = new DashboardAssetToggleVm(def.Key, def.Label, !o.Assets.TryGetValue(def.Key, out var on) || on);
                 toggle.PropertyChanged += (_, _) => CommitDashboardEditor();
@@ -257,7 +240,6 @@ public partial class SettingsViewModel : ViewModelBase
         string design = DashboardCatalog.Normalise(DesignTheme);
         var o = new DashboardOptions
         {
-            Version = DashboardCatalog.NormaliseVersion(design, DashboardVersion),
             AccentColor = DashboardCatalog.TryParseColor(DashboardAccent, out _) ? DashboardAccent.Trim() : "",
             Scale = Math.Round(DashboardScale, 2),
             OffsetX = Math.Round(DashboardOffsetX), OffsetY = Math.Round(DashboardOffsetY),
@@ -1203,16 +1185,7 @@ public partial class SettingsViewModel : ViewModelBase
         return trimmed.StartsWith("#", StringComparison.Ordinal) ? trimmed : $"#{trimmed}";
     }
 
-    private static string NormaliseDesignTheme(string value)
-    {
-        var trimmed = (value ?? "").Trim();
-        if (string.Equals(trimmed, "XB360", StringComparison.OrdinalIgnoreCase)) return "XB360";
-        if (string.Equals(trimmed, "PS5",   StringComparison.OrdinalIgnoreCase)) return "PS5";
-        if (string.Equals(trimmed, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
-        if (string.Equals(trimmed, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
-        if (string.Equals(trimmed, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
-        return "Default";
-    }
+    private static string NormaliseDesignTheme(string value) => DashboardCatalog.Normalise(value);
 
     private static string NormaliseStoreTheme(string value)
     {

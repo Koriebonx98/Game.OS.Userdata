@@ -1092,7 +1092,7 @@
                                             ToolTip.Tip="Customise this design" Content="⚙" FontSize="16"
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="dashboard"/>
                                 </StackPanel>
-                                <TextBlock Text="Default uses the standard Game.OS dashboard style. XB360 applies an Xbox 360 inspired dashboard look."
+                                <TextBlock Text="Default uses the standard Game.OS dashboard style. XB360 OG is the original Xbox 360 blades dashboard; XB360 Kinetic is the Kinect-era tile mosaic."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
 
                                 <!-- ⚙ Dashboard options: assets, accent, size and position of the selected dashboard -->
@@ -1103,15 +1103,6 @@
                                         <TextBlock Text="{Binding DashboardOptionsTitle}" FontSize="14" FontWeight="Bold" Foreground="White"/>
                                         <TextBlock Text="Choose what appears on this dashboard. Changes preview live; press Save Settings to keep them."
                                                    FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
-
-                                        <StackPanel Spacing="6" IsVisible="{Binding HasDashboardVersions}">
-                                            <TextBlock Text="Version" FontSize="12" Foreground="#e6edf3"/>
-                                            <ComboBox Classes="form-input" Width="200"
-                                                      ItemsSource="{Binding DashboardVersions}"
-                                                      SelectedItem="{Binding DashboardVersion}"/>
-                                            <TextBlock Text="OG is the original XB360 blades design. Kinetic is the Kinect-era tile mosaic with a tab header."
-                                                       FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
-                                        </StackPanel>
 
                                         <TextBlock Text="Show on screen" FontSize="12" Foreground="#e6edf3"/>
                                         <ItemsControl ItemsSource="{Binding DashboardAssets}">

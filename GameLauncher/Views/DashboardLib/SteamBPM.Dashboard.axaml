@@ -6,7 +6,7 @@
              x:Class="GameLauncher.Views.DashboardLib.SteamBpmDashboard"
              x:DataType="vm:DashboardViewModel">
 
-    <Border Classes="dashboard-steambpm-layout" IsVisible="False">
+    <Border Classes="dashboard-steambpm-layout">
         <Grid RowDefinitions="Auto,Auto,*">
             <Grid Grid.Row="0" Margin="54,24,54,0" ColumnDefinitions="*,Auto,Auto,Auto,Auto">
                 <TextBlock Text="Recent Games"
