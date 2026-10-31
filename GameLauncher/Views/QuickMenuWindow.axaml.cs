@@ -86,11 +86,11 @@ public partial class QuickMenuWindow : Window
         switch (e.Key)
         {
             case Key.Left:
-                if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+                if (vm.IsXb360Theme) vm.MoveXb360Horizontal(-1);
                 else vm.MoveHubSelection(-1);
                 return;
             case Key.Right:
-                if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+                if (vm.IsXb360Theme) vm.MoveXb360Horizontal(1);
                 else vm.MoveHubSelection(1);
                 return;
             // LB / RB blade navigation in XB360 guide.

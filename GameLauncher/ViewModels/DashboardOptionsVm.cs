@@ -16,11 +16,11 @@ public static class DashboardCatalog
     public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", "Wii", "Switch", "SteamBPM" };
 
     public const string Xb360Og = "XB360 OG";
+    /// <summary>Temporary: the Default dashboard/theme in Xbox green, until the Kinetic look is rebuilt on top of it.</summary>
     public const string Xb360Kinetic = "XB360 Kinetic";
 
     public static bool IsXb360(string? design) =>
-        string.Equals(design, Xb360Og, StringComparison.OrdinalIgnoreCase) ||
-        string.Equals(design, Xb360Kinetic, StringComparison.OrdinalIgnoreCase);
+        string.Equals(design, Xb360Og, StringComparison.OrdinalIgnoreCase);
 
     public static IReadOnlyList<DashboardAssetDef> AssetsFor(string design) => AssetsForDesign(design);
 
@@ -47,11 +47,6 @@ public static class DashboardCatalog
         Xb360Og => new DashboardAssetDef[]
         {
             new("profile", "Profile & greeting"), new("achievements", "Recent achievements"),
-        },
-        Xb360Kinetic => new DashboardAssetDef[]
-        {
-            new("tabs", "Tab header (home / social / …)"), new("profile", "Profile picture"),
-            new("clock", "Clock"), new("hints", "Button hints"),
         },
         "SteamBPM" => new DashboardAssetDef[]
         {
@@ -174,7 +169,6 @@ public partial class DashboardOptionsVm : ObservableObject
     public string AchievementsWord      => Get("trophyname") ? "Trophies" : "Achievements";
     public string AchievementsWordLower => AchievementsWord.ToLowerInvariant();
 
-    public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
     public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;
 }
 

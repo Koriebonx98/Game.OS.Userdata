@@ -637,9 +637,6 @@ public partial class DashboardViewModel : ViewModelBase
             Xb360HasFocusedGame = true;
             Xb360FocusedGame.IsFocused = true;
         }
-
-        // ── XB360 "Kinetic" mosaic (keeps the current tab) ────────────────────
-        RebuildKineticTiles();
     }
 
     // Keep the original 3-arg overload for backwards compatibility with existing callers.

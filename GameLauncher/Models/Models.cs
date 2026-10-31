@@ -484,7 +484,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("accent")]  public string AccentColor { get; set; } = "";
         /// <summary>Content scale (0.6 – 1.4).</summary>
         [JsonPropertyName("scale")]   public double Scale   { get; set; } = 1.0;
-        /// <summary>Design variant, e.g. XB360 "OG" or "Kinetic"; empty = the design's first version.</summary>
+        /// <summary>Design variant, e.g. XB360 "OG"; empty = the design's first version.</summary>
         [JsonPropertyName("version")] public string Version { get; set; } = "";
         /// <summary>Horizontal content offset in pixels.</summary>
         [JsonPropertyName("offsetX")] public double OffsetX { get; set; }
