@@ -102,9 +102,11 @@ public partial class QuickMenuWindow : Window
                 return;
             case Key.Up:
                 if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);
+                else vm.MoveHubItem(-1);
                 return;
             case Key.Down:
                 if (vm.IsXb360Theme) vm.MoveXb360CenterItem(1);
+                else vm.MoveHubItem(1);
                 return;
             case Key.Enter:
             case Key.Space:

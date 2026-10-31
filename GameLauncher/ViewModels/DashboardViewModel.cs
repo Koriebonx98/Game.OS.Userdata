@@ -27,7 +27,7 @@ public partial class DashboardViewModel : ViewModelBase
             OnPropertyChanged(nameof(SteamClockTime));
         };
         _wiiClockTimer.Start();
-        Options.PropertyChanged += (_, _) => UpdateFocusedCard();
+        Options.PropertyChanged += (_, _) => { UpdateFocusedCard(); ClampSteamFocus(); };
     }
 
     [ObservableProperty] private UserProfile _profile = new();
@@ -98,6 +98,7 @@ public partial class DashboardViewModel : ViewModelBase
             OnlineFriends.Add(f);
         OnlineFriendsCount   = OnlineFriends.Count;
         HasDashboardFriends  = OnlineFriends.Count > 0;
+        if (SteamTab == 1) RebuildSteamShelf();
     }
 
     /// <summary>Invoked when the user clicks a game card to open the detail overlay.</summary>
@@ -520,7 +521,7 @@ public partial class DashboardViewModel : ViewModelBase
                 continue;
 
             SteamRecentSideGames.Add(card);
-            if (SteamRecentSideGames.Count >= 4)
+            if (SteamRecentSideGames.Count >= 6)
                 break;
         }
 
@@ -547,6 +548,7 @@ public partial class DashboardViewModel : ViewModelBase
             {
                 Category = "NEWS",
                 Title = achievement.Name,
+                Action = "profile",
                 Subtitle = achievement.GameTitle,
                 Meta = achievement.Platform,
                 CoverUrl = coverUrl,
@@ -559,6 +561,7 @@ public partial class DashboardViewModel : ViewModelBase
             SteamNewsTiles.Add(new SteamDashboardNewsTileVm
             {
                 Category = "FRIENDS",
+                Action = "friends",
                 Title = HasDashboardFriends ? $"{OnlineFriendsCount} friends online" : "Friends are offline",
                 Subtitle = HasDashboardFriends ? "Jump into your social hub." : "Invite someone to play.",
                 Meta = "SOCIAL",
@@ -571,6 +574,7 @@ public partial class DashboardViewModel : ViewModelBase
             SteamNewsTiles.Add(new SteamDashboardNewsTileVm
             {
                 Category = "REGULAR UPDATE",
+                Action = "library",
                 Title = "Continue your library tour",
                 Subtitle = $"{GamesCount} games · {TotalPlaytimeLabel} tracked",
                 Meta = "GAME.OS",
@@ -583,6 +587,7 @@ public partial class DashboardViewModel : ViewModelBase
             SteamNewsTiles.Add(new SteamDashboardNewsTileVm
             {
                 Category = "RECOMMENDED",
+                Action = "media",
                 Title = "Open Movies, TV, or Music",
                 Subtitle = "Your media shortcuts live right here.",
                 Meta = "MEDIA",
@@ -596,6 +601,7 @@ public partial class DashboardViewModel : ViewModelBase
             {
                 Category = "NEWS",
                 Title = "Open your friends inbox",
+                Action = "inbox",
                 Subtitle = "Messages, invites, and presence are ready.",
                 Meta = "COMMUNITY",
                 CoverGradient = "#3A264D,#121E31",
@@ -613,6 +619,8 @@ public partial class DashboardViewModel : ViewModelBase
                 CoverGradient = "#3A4B26,#121E31",
             });
         }
+
+        ResetSteamFocus();
 
         // ── Initialize PS5 focused card ──────────────────────────────────────
         SelectedCardIndex = -1; // Store card is highlighted first
@@ -776,6 +784,9 @@ public partial class DashboardViewModel : ViewModelBase
         HasPs5Shelf = Ps5Shelf.Count > 0;
     }
 
+    /// <summary>Raised after the PS5 shelf highlight moves so the view can scroll it into view.</summary>
+    public event Action? Ps5ShelfFocusChanged;
+
     private void ExitPs5Shelf()
     {
         if (_ps5ShelfIndex >= 0 && _ps5ShelfIndex < Ps5Shelf.Count) Ps5Shelf[_ps5ShelfIndex].IsFocused = false;
@@ -809,6 +820,7 @@ public partial class DashboardViewModel : ViewModelBase
             _ps5ShelfIndex = 0;
             Ps5Shelf[0].IsFocused = true;
             OnPropertyChanged(nameof(IsPs5ShelfActive));
+            Ps5ShelfFocusChanged?.Invoke();
             return true;
         }
 
@@ -827,6 +839,7 @@ public partial class DashboardViewModel : ViewModelBase
         }
         Ps5Shelf[prev].IsFocused = false;
         Ps5Shelf[_ps5ShelfIndex].IsFocused = true;
+        Ps5ShelfFocusChanged?.Invoke();
         return true;
     }
 
@@ -1308,7 +1321,7 @@ public partial class DashboardViewModel : ViewModelBase
     }
 }
 
-public class SteamDashboardNewsTileVm
+public partial class SteamDashboardNewsTileVm : ObservableObject
 {
     public string Category { get; init; } = "";
     public string Title { get; init; } = "";
@@ -1316,4 +1329,9 @@ public class SteamDashboardNewsTileVm
     public string Meta { get; init; } = "";
     public string? CoverUrl { get; init; }
     public string CoverGradient { get; init; } = "#0d2137,#163d5e";
+    /// <summary>What activating the tile does: "profile", "friends", "inbox", "media", "library", "store" or "" (nothing).</summary>
+    public string Action { get; init; } = "";
+    /// <summary>Store game opened by an Action of "store".</summary>
+    public StoreGame? Store { get; init; }
+    [ObservableProperty] private bool _isFocused;
 }

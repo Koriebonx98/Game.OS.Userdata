@@ -22,14 +22,18 @@
                     </StackPanel>
                     <Button Grid.Column="2" Classes="qm-wii-bubble" Command="{Binding DismissCommand}" Width="86">Close</Button>
                 </Grid>
-                <Grid Grid.Row="1" ColumnDefinitions="*,*,*,*,*,*" ColumnSpacing="10">
-                    <Button Grid.Column="0" Classes="qm-wii-bubble" Command="{Binding GoToGameOsHomeCommand}">Home</Button>
-                    <Button Grid.Column="1" Classes="qm-wii-bubble" Command="{Binding OpenLibraryPageCommand}">Recent</Button>
-                    <Button Grid.Column="2" Classes="qm-wii-bubble" Command="{Binding OpenFriendsPageCommand}">Friends</Button>
-                    <Button Grid.Column="3" Classes="qm-wii-bubble" Command="{Binding OpenInboxPageCommand}">Inbox</Button>
-                    <Button Grid.Column="4" Classes="qm-wii-bubble" Command="{Binding OpenBrowserCommand}">Browser</Button>
-                    <Button Grid.Column="5" Classes="qm-wii-bubble" Command="{Binding ExitGameCommand}" IsVisible="{Binding IsPlayingGame}">Exit Game</Button>
-                </Grid>
+                <ItemsControl Grid.Row="1" ItemsSource="{Binding HubActions}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                            <Button Classes="qm-wii-bubble" Classes.cursor="{Binding IsCursor}" Margin="5,0"
+                                    HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
+                                    Focusable="False" Command="{Binding ActivateCommand}" Content="{Binding Title}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
             </Grid>
         </Border>
 </UserControl>

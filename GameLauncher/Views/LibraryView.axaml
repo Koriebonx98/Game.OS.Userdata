@@ -13,12 +13,14 @@
           Views/GamesLib/PS5.Games.Lib.axaml       ("PS5")
           Views/GamesLib/Wii.Games.Lib.axaml       ("Wii")
           Views/GamesLib/Switch.Games.Lib.axaml    ("Switch")
+          Views/GamesLib/SteamBPM.Games.Lib.axaml  ("SteamBPM" - Steam "My Library")
     -->
     <Panel>
         <lib:DefaultGamesLib Name="DefaultLib" IsVisible="{Binding IsDefaultGamesLib}"/>
         <lib:Ps5GamesLib     Name="Ps5Lib"     IsVisible="{Binding IsPs5GamesLib}"/>
         <lib:WiiGamesLib     Name="WiiLib"     IsVisible="{Binding IsWiiGamesLib}"/>
         <lib:SwitchGamesLib  Name="SwitchLib"  IsVisible="{Binding IsSwitchGamesLib}"/>
+        <lib:SteamGamesLib   Name="SteamLib"   IsVisible="{Binding IsSteamGamesLib}"/>
         <lib:GamesLibOverlays/>
     </Panel>
 </UserControl>

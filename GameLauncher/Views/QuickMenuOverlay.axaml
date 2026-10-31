@@ -88,6 +88,11 @@
             <Setter Property="CornerRadius" Value="30"/>
             <Setter Property="Padding" Value="18,14"/>
         </Style>
+        <Style Selector="Button.qm-wii-bubble.cursor">
+            <Setter Property="BorderBrush" Value="#1d9bd6"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="Background" Value="#d9f1fb"/>
+        </Style>
         <Style Selector="Button.qm-wii-bubble">
             <Setter Property="Background" Value="#ffffff"/>
             <Setter Property="Foreground" Value="#1d6b8f"/>
@@ -301,7 +306,9 @@
           Views/QuickMenuLib/GameOS.QuickMenu.axaml   ("GameOS")
           Views/QuickMenuLib/Wii.QuickMenu.axaml      ("Wii")
           Views/QuickMenuLib/XB360.QuickMenu.axaml    ("XB360" guide)
-          Views/QuickMenuLib/Hub.QuickMenu.axaml      ("PS5" / "Switch" / "SteamBPM" hub bar)
+          Views/QuickMenuLib/Hub.QuickMenu.axaml      ("PS5" hub bar)
+          Views/QuickMenuLib/Switch.QuickMenu.axaml   ("Switch" Quick Guide)
+          Views/QuickMenuLib/Steam.QuickMenu.axaml    ("SteamBPM" Quick Guide)
           Views/QuickMenuLib/QuickMenu.Chat.axaml     (chat mini-window, all themes)
         Shared theme styles stay in this file.
     -->
@@ -311,6 +318,8 @@
         <qm:WiiQuickMenu/>
         <qm:Xb360QuickMenu/>
         <qm:HubQuickMenu/>
+        <qm:SwitchQuickMenu/>
+        <qm:SteamQuickMenu/>
         <qm:QuickMenuChat/>
     </Grid>
 

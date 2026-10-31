@@ -206,10 +206,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(GameCardAllFocused));
     }
 
-    private static bool IsCardTheme(string? t) =>
-        string.Equals(t, "Wii", StringComparison.OrdinalIgnoreCase) || string.Equals(t, "Switch", StringComparison.OrdinalIgnoreCase);
+    /// <summary>The Wii mini card only appears when Game Info is set to "Wii"; any other choice opens the user's chosen Game Info page.</summary>
+    private bool IsCardTheme(string? t) =>
+        string.Equals(t, "Switch", StringComparison.OrdinalIgnoreCase) ||
+        (string.Equals(t, "Wii", StringComparison.OrdinalIgnoreCase) &&
+         string.Equals(SettingsVm.GameInfoTheme, "Wii", StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Opens a game tile: Wii/Switch themes show the centred mini card, others open the full detail page.</summary>
+    /// <summary>Opens a game tile: Switch (and Wii with the Wii Game Info) show the centred mini card, others open the full detail page.</summary>
     private void OpenTileFromDashboard(LocalGameCardVm card) => OpenTile(card, IsCardTheme(SettingsVm.DesignTheme));
     private void OpenTileFromLibrary(LocalGameCardVm card)   => OpenTile(card, IsCardTheme(SettingsVm.GamesTheme));
 

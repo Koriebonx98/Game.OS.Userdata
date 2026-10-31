@@ -156,7 +156,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
-    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Switch" };
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM" };
     /// <summary>Movies &amp; TV page design.</summary>
     [ObservableProperty] private string _moviesTvTheme = "Default";
     public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Netflix" };
@@ -265,7 +265,7 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
-    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch" };
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
@@ -1209,11 +1209,18 @@ public partial class SettingsViewModel : ViewModelBase
         var v = (value ?? "").Trim();
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return NormaliseGamesTheme(value);
     }
 
-    private static string NormaliseGameInfoTheme(string value) =>
-        string.Equals((value ?? "").Trim(), "Switch", StringComparison.OrdinalIgnoreCase) ? "Switch" : NormaliseGamesTheme(value);
+    private static string NormaliseGameInfoTheme(string value)
+    {
+        var v = (value ?? "").Trim();
+        if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
+        if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
+        if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
+        return NormaliseGamesTheme(value);
+    }
 
     private static string NormaliseGamesTheme(string value) =>
         string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";

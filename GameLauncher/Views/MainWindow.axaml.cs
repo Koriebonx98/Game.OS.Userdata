@@ -293,6 +293,7 @@ public partial class MainWindow : Window
                     if (!textInputFocused)
                     {
                         if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(-1);
+                        else vm.QuickMenuVm.MoveHubItem(-1);
                     }
                     e.Handled = true;
                     return;
@@ -300,6 +301,7 @@ public partial class MainWindow : Window
                     if (!textInputFocused)
                     {
                         if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(1);
+                        else vm.QuickMenuVm.MoveHubItem(1);
                     }
                     e.Handled = true;
                     return;
@@ -459,6 +461,13 @@ public partial class MainWindow : Window
             && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
             && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter
             && vm.DashboardVm.HandleSwitchBarKey(e.Key.ToString()))
+        {
+            e.Handled = true;
+            return;
+        }
+
+        if (vm.IsHome && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
+            && TrySteamDashboardKey(vm, e.Key))
         {
             e.Handled = true;
             return;
@@ -642,6 +651,11 @@ public partial class MainWindow : Window
     /// Opens the nav sidebar and initialises the highlight to the currently active page,
     /// so the user sees their current position when navigating with Up/Down.
     /// </summary>
+    /// <summary>Steam Big Picture dashboard: D-pad / A / X / Y / bumpers move the highlight across games, tabs and shelf.</summary>
+    private static bool TrySteamDashboardKey(MainViewModel vm, Key key) =>
+        string.Equals(vm.SettingsVm.DesignTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase)
+        && vm.DashboardVm.HandleSteamKey(key, () => OpenNavWithCurrentHighlight(vm));
+
     private static void OpenNavWithCurrentHighlight(MainViewModel vm)
     {
         int pageIdx = System.Array.IndexOf(_navPages, vm.ActivePage);
@@ -1018,10 +1032,12 @@ public partial class MainWindow : Window
         HandleOverlayKeyState(Services.NativeMethods.VK_UP, ref _overlayUpLatched, () =>
         {
             if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);
+            else vm.MoveHubItem(-1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_DOWN, ref _overlayDownLatched, () =>
         {
             if (vm.IsXb360Theme) vm.MoveXb360CenterItem(1);
+            else vm.MoveHubItem(1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_RETURN, ref _overlayEnterLatched, vm.ActivateSelectedHub);
         HandleOverlayKeyState(Services.NativeMethods.VK_SPACE, ref _overlaySpaceLatched, vm.ActivateSelectedHub);
@@ -1340,10 +1356,10 @@ public partial class MainWindow : Window
                     if (isXb360Overlay) qvm.MoveXb360Blade(1); else qvm.MoveHubSelection(1);
                     return;
                 case Key.Up:
-                    if (isXb360Overlay) qvm.MoveXb360CenterItem(-1);
+                    if (isXb360Overlay) qvm.MoveXb360CenterItem(-1); else qvm.MoveHubItem(-1);
                     return;
                 case Key.Down:
-                    if (isXb360Overlay) qvm.MoveXb360CenterItem(1);
+                    if (isXb360Overlay) qvm.MoveXb360CenterItem(1); else qvm.MoveHubItem(1);
                     return;
                 case Key.Enter:
                     qvm.ActivateSelectedHub();
@@ -1374,9 +1390,11 @@ public partial class MainWindow : Window
                     return;
                 case Key.Up:
                     if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(-1);
+                    else vm.QuickMenuVm.MoveHubItem(-1);
                     return;
                 case Key.Down:
                     if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360CenterItem(1);
+                    else vm.QuickMenuVm.MoveHubItem(1);
                     return;
                 case Key.Enter:
                     vm.QuickMenuVm.ActivateSelectedHub();
@@ -1550,6 +1568,9 @@ public partial class MainWindow : Window
             && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
             && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter
             && vm.DashboardVm.HandleSwitchBarKey(key.ToString()))
+            return;
+
+        if (vm.IsHome && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && TrySteamDashboardKey(vm, key))
             return;
 
         // PS5 / Switch dashboard navigation

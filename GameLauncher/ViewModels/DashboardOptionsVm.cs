@@ -55,7 +55,12 @@ public static class DashboardCatalog
         },
         "SteamBPM" => new DashboardAssetDef[]
         {
+            new("navbar", "Top navigation bar (Library / Store / Friends)"),
             new("title", "Title"), new("clock", "Clock"), new("profile", "Profile picture"),
+            new("status", "Controller / battery icons"), new("featured", "Large last-played hero"),
+            new("recent", "Recent games row"), new("tabs", "Tabs (What's new / Friends / Recommended)"),
+            new("shelf", "Shelf under the tabs"), new("background", "Game artwork background"),
+            new("hints", "Controller button hints"),
         },
         _ => new DashboardAssetDef[]
         {
@@ -163,6 +168,8 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowTabs         => Get("tabs");
     public bool ShowRecommended  => Get("recommended");
     public bool ShowRelated      => Get("related");
+    public bool ShowNavBar       => Get("navbar");
+    public bool ShowShelf        => Get("shelf");
     /// <summary>PS5 calls achievements "Trophies"; the setting switches the wording back to "Achievements".</summary>
     public string AchievementsWord      => Get("trophyname") ? "Trophies" : "Achievements";
     public string AchievementsWordLower => AchievementsWord.ToLowerInvariant();

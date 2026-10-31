@@ -55,7 +55,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsWiiTheme => string.Equals(QuickMenuTheme, "Wii", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchTheme => string.Equals(QuickMenuTheme, "Switch", StringComparison.OrdinalIgnoreCase);
     public bool IsSteamBpmTheme => string.Equals(QuickMenuTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
-    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme && !IsXb360Theme;
+    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme && !IsXb360Theme && !IsSwitchTheme && !IsSteamBpmTheme;
     public bool UsesXb360GuideLayout => IsXb360Theme;
 
     // ── Hub page state ──────────────────────────────────────────────────────
@@ -217,6 +217,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(Xb360OnlineFriendsCount));
         OnPropertyChanged(nameof(Xb360FriendsCount));
         OnPropertyChanged(nameof(QuickFriends));
+        RebuildHubActions();
     }
 
     partial void OnPendingDownloadCountChanged(int value)
@@ -237,6 +238,9 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSteamBpmTheme));
         OnPropertyChanged(nameof(UsesHubLayout));
         OnPropertyChanged(nameof(UsesXb360GuideLayout));
+        OnPropertyChanged(nameof(UsesSwitchGuideLayout));
+        OnPropertyChanged(nameof(UsesSteamGuideLayout));
+        RebuildHubActions();
         NotifyXb360BladeProps();
         NotifyXb360CursorProps();
     }
@@ -284,6 +288,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsPowerPage));
         OnPropertyChanged(nameof(IsAchievementsPage));
         UpdateMenuHeader(value);
+        RebuildHubActions();
 
         // XB360 uses Xb360CenterIndex/BladeId for navigation — do not sync ActivePage ↔ SelectedHubIndex.
         if (IsXb360Theme) return;
@@ -363,6 +368,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     {
         // XB360 uses MoveXb360Blade / MoveXb360CenterItem instead.
         if (IsXb360Theme) return;
+        if (IsWiiTheme) { MoveHubItem(delta); return; }
 
         var navigationOrder = GetCurrentNavigationOrder();
         if (navigationOrder.Length == 0) return;
@@ -550,6 +556,8 @@ public partial class QuickMenuViewModel : ViewModelBase
             ActivateXb360Current();
             return;
         }
+
+        if (ActivateHubAction()) return;
 
         var navigationOrder = GetCurrentNavigationOrder();
         if (SelectedHubIndex < 0 || SelectedHubIndex >= navigationOrder.Length) return;
@@ -1118,6 +1126,7 @@ public partial class QuickMenuViewModel : ViewModelBase
 
         UpdateAchievements(achievements);
         MediaStatusLabel = "Media controls are ready.";
+        RebuildHubActions();
     }
 
     private string[] GetCurrentNavigationOrder() => HubOrder;
