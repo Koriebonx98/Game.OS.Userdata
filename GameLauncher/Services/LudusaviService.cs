@@ -131,6 +131,28 @@ namespace GameLauncher.Services
             if (!approval.Approved)
                 return LudusaviResult.Cancelled(approval.Message);
 
+            // Back up to every configured "Game Saves" location (first one is primary).
+            LudusaviResult? first = null;
+            LudusaviResult? anySuccess = null;
+            foreach (var root in UserDataService.GetGameSavesRoots(username, platform))
+            {
+                var r = await SyncCoreAsync(platform, gameTitle, username, root, sourceOverridePath, titleId);
+                first ??= r;
+                if (r.Kind == ResultKind.Synced) anySuccess ??= r;
+                else DevLogService.Log($"[Saves] backup to \"{root}\" returned {r.Kind}");
+            }
+            return anySuccess ?? first ?? LudusaviResult.NoSaveFound;
+        }
+
+        private static async Task<LudusaviResult> SyncCoreAsync(
+            string  platform,
+            string  gameTitle,
+            string  username,
+            string  platformSavesRoot,
+            string? sourceOverridePath,
+            string? titleId)
+        {
+
             // Build the per-user per-game save path and ensure the directory exists.
             // When a TitleID is supplied the saves are stored in a TitleID sub-folder so
             // that multiple games with the same title (or the same game on different
@@ -142,7 +164,6 @@ namespace GameLauncher.Services
             // extract the TitleID from that path so the backup is always placed in a
             // per-TitleID sub-folder.  This prevents collisions when multiple games share
             // the same title but use different TitleIDs.
-            string platformSavesRoot = UserDataService.GetGameSavesPath(username, platform);
             string safeGameTitle     = StorageHelpers.SanitiseName(gameTitle);
 
             if (string.IsNullOrWhiteSpace(titleId) &&
@@ -321,6 +342,24 @@ namespace GameLauncher.Services
             if (!approval.Approved)
                 return LudusaviResult.Cancelled(approval.Message);
 
+            // Restore from the first configured "Game Saves" location that holds this game's saves.
+            LudusaviResult? last = null;
+            foreach (var root in UserDataService.GetGameSavesRoots(username, platform))
+            {
+                last = await RestoreCoreAsync(platform, gameTitle, root, targetOverridePath, titleId);
+                if (last.Kind != ResultKind.NoSaveFound) return last;
+            }
+            return last ?? LudusaviResult.NoSaveFound;
+        }
+
+        private static async Task<LudusaviResult> RestoreCoreAsync(
+            string  platform,
+            string  gameTitle,
+            string  platformSavesRoot,
+            string? targetOverridePath,
+            string? titleId)
+        {
+
             // Locate the Game.OS backup folder for this game.
             // Prefer the TitleID-scoped sub-folder; fall back to the legacy flat folder
             // for saves that were backed up before this layout was introduced.
@@ -329,7 +368,6 @@ namespace GameLauncher.Services
             // targetOverridePath was resolved (e.g. Content/{profile}/{titleId}/00000001/),
             // extract the TitleID from that path so the correct per-TitleID backup folder
             // is located during restore.
-            string platformSavesRoot = UserDataService.GetGameSavesPath(username, platform);
             string safeGameTitle     = StorageHelpers.SanitiseName(gameTitle);
 
             if (string.IsNullOrWhiteSpace(titleId) &&

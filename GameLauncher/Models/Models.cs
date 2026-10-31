@@ -557,6 +557,12 @@ namespace GameLauncher.Models
         /// <see cref="ShowIntroVideo"/> is <see langword="true"/>, this file is used
         /// instead of the built-in intro animation.
         /// </summary>
+        /// <summary>Folders/drives that game saves are backed up to (all are written; restore uses the first holding saves).</summary>
+        [JsonPropertyName("gameSavesLocations")] public List<string> GameSavesLocations { get; set; } = new();
+
+        /// <summary>Root folder for captured screenshots/recordings ("Media/Games/{Platform}/{Game}"). Blank = Data/Media.</summary>
+        [JsonPropertyName("mediaLocation")] public string MediaLocation { get; set; } = "";
+
         [JsonPropertyName("introVideoPath")] public string IntroVideoPath { get; set; } = "";
 
         /// <summary>

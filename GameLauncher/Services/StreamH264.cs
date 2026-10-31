@@ -48,7 +48,7 @@ namespace GameLauncher.Services
             });
         }
 
-        private static string? FindFfmpeg()
+        internal static string? FindFfmpeg()
         {
             if (_ffmpegPath != null) return _ffmpegPath.Length == 0 ? null : _ffmpegPath;
             string exe = OperatingSystem.IsWindows() ? "ffmpeg.exe" : "ffmpeg";

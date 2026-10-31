@@ -2212,7 +2212,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// Tries the main window handle first; falls back to opening the game folder.
     /// This is a best-effort operation — it may not work on all platforms.
     /// </summary>
-    private void ResumeGameWindow()
+    public void ResumeGameWindow()
     {
         var proc = _runningProcess;
         if (proc == null) return;
@@ -4419,8 +4419,38 @@ public partial class GameDetailViewModel : ViewModelBase
         HasDisplayTitleId = !string.IsNullOrEmpty(id);
     }
 
+    public sealed record CaptureItem(string Path, bool IsVideo)
+    {
+        public bool IsImage => !IsVideo;
+        public string Name => System.IO.Path.GetFileNameWithoutExtension(Path);
+    }
+    public ObservableCollection<CaptureItem> Captures { get; } = new();
+    [ObservableProperty] private bool _hasCaptures;
+
+    [RelayCommand] private void OpenCapture(CaptureItem? item) { if (item != null) OpenWithSystem(item.Path); }
+
+    /// <summary>Loads this game's own screenshots / recordings from the Media location.</summary>
+    private void LoadCaptures()
+    {
+        Captures.Clear();
+        try
+        {
+            string dir = Services.CaptureService.GameFolder(Platform, Title);
+            if (Directory.Exists(dir))
+                foreach (var f in Directory.EnumerateFiles(dir).OrderByDescending(f => f))
+                {
+                    string ext = System.IO.Path.GetExtension(f).ToLowerInvariant();
+                    if (ext is ".png" or ".jpg" or ".jpeg") Captures.Add(new CaptureItem(f, false));
+                    else if (ext is ".mp4" or ".mkv" or ".webm") Captures.Add(new CaptureItem(f, true));
+                }
+        }
+        catch { /* best-effort */ }
+        HasCaptures = Captures.Count > 0;
+    }
+
     private void PopulateScreenshots(List<string>? shots)
     {
+        LoadCaptures();
         Screenshots.Clear();
         if (shots != null)
             foreach (var s in shots) Screenshots.Add(s);

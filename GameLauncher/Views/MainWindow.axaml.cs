@@ -282,11 +282,19 @@ public partial class MainWindow : Window
                     return;
                 // LB / RB → blade navigation (PageUp = LB, PageDown = RB).
                 case Key.PageUp:
-                    if (!textInputFocused && isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                        else vm.QuickMenuVm.MoveHubSelection(-1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.PageDown:
-                    if (!textInputFocused && isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                    if (!textInputFocused)
+                    {
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                        else vm.QuickMenuVm.MoveHubSelection(1);
+                    }
                     e.Handled = true;
                     return;
                 case Key.Up:

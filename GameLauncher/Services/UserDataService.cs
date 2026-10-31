@@ -1,5 +1,7 @@
 using System;
+using System;
 using System.IO;
+using System.Linq;
 
 namespace GameLauncher.Services
 {
@@ -62,6 +64,28 @@ namespace GameLauncher.Services
             string safeUser     = SanitiseFolderName(username);
             string safePlatform = SanitiseFolderName(platform);
             return Path.Combine(DataRoot, safeUser, "GameSaves", safePlatform);
+        }
+
+        /// <summary>
+        /// Every GameSaves root to back up to / restore from for a platform. Each folder or drive chosen in
+        /// Settings → Game Saves gets <c>GameOS/GameSaves/{user}/{platform}</c> (portable across PCs, e.g. on a USB drive).
+        /// Falls back to the default Data folder when none are configured.
+        /// </summary>
+        public static System.Collections.Generic.IReadOnlyList<string> GetGameSavesRoots(string username, string platform)
+        {
+            var roots = new System.Collections.Generic.List<string>();
+            try
+            {
+                foreach (var loc in AppSettingsService.Load().GameSavesLocations ?? new())
+                {
+                    if (string.IsNullOrWhiteSpace(loc)) continue;
+                    string p = Path.Combine(loc.Trim(), "GameOS", "GameSaves", SanitiseFolderName(username), SanitiseFolderName(platform));
+                    if (!roots.Contains(p, StringComparer.OrdinalIgnoreCase)) roots.Add(p);
+                }
+            }
+            catch { }
+            if (roots.Count == 0) roots.Add(GetGameSavesPath(username, platform));
+            return roots;
         }
 
         /// <summary>Returns the ScreenShots path for a user.</summary>

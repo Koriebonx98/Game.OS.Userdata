@@ -96,9 +96,11 @@ public partial class QuickMenuWindow : Window
             // LB / RB blade navigation in XB360 guide.
             case Key.PageUp:
                 if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+                else vm.MoveHubSelection(-1);
                 return;
             case Key.PageDown:
                 if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+                else vm.MoveHubSelection(1);
                 return;
             case Key.Up:
                 if (vm.IsXb360Theme) vm.MoveXb360CenterItem(-1);

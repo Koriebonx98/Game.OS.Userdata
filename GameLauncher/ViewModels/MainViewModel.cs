@@ -466,6 +466,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DownloadsVm    = new DownloadsViewModel();
         BrowserVm.Downloads = DownloadsVm;
         BrowserVm.ExitRequested += () => Navigate("dashboard");
+        BrowserVm.ReturnToGameRequested += () =>
+        {
+            Navigate("dashboard");
+            DetailVm.ResumeGameWindow();
+            MinimizeWindowRequested?.Invoke();
+        };
         BrowserVm.OpenDownloadsRequested += () => Navigate("downloads");
         DownloadsVm.ResolveGame = (url, referer) =>
         {
@@ -524,8 +530,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             LaunchFromCard(card);
         };
         QuickMenuVm.SettingsVm = SettingsVm;
-        QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle);
-        QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url);
+        QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle, null, QuickMenuVm.IsPlayingGame);
+        QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url, QuickMenuVm.IsPlayingGame);
         DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
         QuickMenuVm.OnSignOut = () => SignOutCommand.Execute(null);
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
@@ -2142,13 +2148,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private bool _browserContextKept;
 
     /// <summary>Opens the browser tied to a game so saved links, walkthroughs and downloads use its name and platform.</summary>
-    private void OpenBrowserForGame(string? platform, string? game, string? url = null)
+    private void OpenBrowserForGame(string? platform, string? game, string? url = null, bool peek = false)
     {
+        BrowserVm.IsPeek = peek;
         BrowserVm.SetContext(platform, game);
         _browserContextKept = true;
         Navigate("browser");
         _browserContextKept = false;
         if (!string.IsNullOrWhiteSpace(url)) BrowserVm.NewTab(url);
+        // No page requested: start on the saved links / favourites list.
+        else if (BrowserVm.HasContext && (GameLinksService.ForGame(BrowserVm.ContextPlatform, BrowserVm.ContextGame).Count > 0 || BrowserVm.Settings.Favourites.Count > 0))
+            BrowserVm.OpenMenu();
     }
 
     [RelayCommand]
