@@ -165,6 +165,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public InboxViewModel     InboxVm          { get; }
     public SettingsViewModel  SettingsVm       { get; }
     public MediaViewModel     MediaVm          { get; }
+    public BrowserViewModel   BrowserVm        { get; }
+    public DownloadsViewModel DownloadsVm      { get; }
     public GameDetailViewModel DetailVm        { get; }
     public QuickMenuViewModel  QuickMenuVm     { get; }
 
@@ -321,6 +323,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(IsNavHighlightSettings))]
     [NotifyPropertyChangedFor(nameof(IsNavHighlightMedia))]
     [NotifyPropertyChangedFor(nameof(IsNavHighlightMusic))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightBrowser))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightDownloads))]
     private int _navHighlightIndex = 0;
 
     public bool IsNavHighlightDashboard => IsNavExpanded && NavHighlightIndex == 0;
@@ -332,6 +336,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public bool IsNavHighlightSettings  => IsNavExpanded && NavHighlightIndex == 6;
     public bool IsNavHighlightMedia     => IsNavExpanded && NavHighlightIndex == 7;
     public bool IsNavHighlightMusic     => IsNavExpanded && NavHighlightIndex == 8;
+    public bool IsNavHighlightBrowser   => IsNavExpanded && NavHighlightIndex == 9;
+    public bool IsNavHighlightDownloads => IsNavExpanded && NavHighlightIndex == 10;
 
     partial void OnIsNavExpandedChanged(bool value)
     {
@@ -345,6 +351,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsNavHighlightSettings));
         OnPropertyChanged(nameof(IsNavHighlightMedia));
         OnPropertyChanged(nameof(IsNavHighlightMusic));
+        OnPropertyChanged(nameof(IsNavHighlightBrowser));
+        OnPropertyChanged(nameof(IsNavHighlightDownloads));
+        RefreshBrowserSuspend();
     }
 
     public bool IsHome        => ActivePage == "dashboard";
@@ -360,6 +369,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// <summary>True when the Music page is active (a separate page from Movies &amp; TV that shares the media player).</summary>
     public bool IsMusic       => ActivePage == "music";
     public bool IsMediaOrMusic => IsMedia || IsMusic;
+    public bool IsBrowser     => ActivePage == "browser";
+    public bool IsDownloads   => ActivePage == "downloads";
+
+    /// <summary>The native web view paints above every Avalonia control, so it is hidden whenever an overlay is open.</summary>
+    private void RefreshBrowserSuspend()
+    {
+        if (BrowserVm == null) return;
+        BrowserVm.IsActive = ActivePage == "browser" && !ShowDetail && !ShowQuickMenu && !IsNavExpanded;
+        BrowserVm.SuspendWebView = IsNavExpanded || ShowQuickMenu || ShowDetail || (DownloadsVm?.IsPromptOpen ?? false);
+    }
     /// <summary>True when the Friends or Inbox page is active (both show FriendsView).</summary>
     public bool IsFriendsOrInbox => ActivePage == "friends" || ActivePage == "inbox";
 
@@ -376,6 +395,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsMusic));
         OnPropertyChanged(nameof(IsMediaOrMusic));
         OnPropertyChanged(nameof(IsFriendsOrInbox));
+        OnPropertyChanged(nameof(IsBrowser));
+        OnPropertyChanged(nameof(IsDownloads));
+        RefreshBrowserSuspend();
     }
 
     private void TryLaunchAcceptedInvite(GameInvite invite)
@@ -446,6 +468,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         InboxVm        = new InboxViewModel();
         SettingsVm     = new SettingsViewModel();
         MediaVm        = new MediaViewModel();
+        BrowserVm      = new BrowserViewModel();
+        DownloadsVm    = new DownloadsViewModel();
+        BrowserVm.Downloads = DownloadsVm;
+        BrowserVm.ExitRequested += () => Navigate("dashboard");
+        BrowserVm.OpenDownloadsRequested += () => Navigate("downloads");
+        BrowserVm.DownloadRequested += url => DownloadsVm.BeginDownload(url);
+        DownloadsVm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(DownloadsViewModel.IsPromptOpen)) RefreshBrowserSuspend(); };
+        PropertyChanged += (_, e) => { if (e.PropertyName is nameof(ShowQuickMenu) or nameof(ShowDetail)) RefreshBrowserSuspend(); };
         DetailVm       = new GameDetailViewModel();
         QuickMenuVm    = new QuickMenuViewModel();
 
@@ -2147,6 +2177,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             InboxVm.Load(_client, _profile.Username);
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
+        if (page == "browser")
+        {
+            BrowserVm.ApplySettings(Services.AppSettingsService.Load().Browser);
+            BrowserVm.EnsureTab();
+        }
         if (page == "media" || page == "music")
         {
             // Movies & TV and Music are separate pages over one shared player.

@@ -536,6 +536,8 @@ public partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsNotificationsSection))]
     [NotifyPropertyChangedFor(nameof(IsDeveloperSection))]
     [NotifyPropertyChangedFor(nameof(IsControllerSection))]
+    [NotifyPropertyChangedFor(nameof(IsBrowserSection))]
+    [NotifyPropertyChangedFor(nameof(IsDownloadsSection))]
     private string _selectedSection = "app";
 
     public bool IsAppSection           => SelectedSection == "app";
@@ -550,6 +552,29 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsNotificationsSection => SelectedSection == "notifications";
     public bool IsDeveloperSection     => SelectedSection == "developer";
     public bool IsControllerSection    => SelectedSection == "controller";
+    public bool IsBrowserSection       => SelectedSection == "browser";
+    public bool IsDownloadsSection     => SelectedSection == "downloads";
+
+    public Models.BrowserSettings  Browser   { get; private set; } = new();
+    public Models.DownloadSettings Downloads { get; private set; } = new();
+
+    [ObservableProperty] private string _adBlockStatus = $"{Services.AdBlockService.RuleCount} filter rules loaded";
+    [ObservableProperty] private bool _isUpdatingFilters;
+
+    [RelayCommand]
+    private async Task UpdateFilterListsAsync()
+    {
+        if (IsUpdatingFilters) return;
+        IsUpdatingFilters = true;
+        AdBlockStatus = "Downloading filter lists…";
+        try
+        {
+            int n = await Services.AdBlockService.UpdateListsAsync();
+            AdBlockStatus = $"{n} filter rules loaded";
+        }
+        catch (Exception ex) { AdBlockStatus = "Update failed: " + ex.Message; }
+        finally { IsUpdatingFilters = false; }
+    }
 
     [RelayCommand]
     private void SelectSection(string section)
@@ -846,6 +871,8 @@ public partial class SettingsViewModel : ViewModelBase
         }
 
         var appSettings = AppSettingsService.Load();
+        Browser   = appSettings.Browser   ?? new();
+        Downloads = appSettings.Downloads ?? new();
         AutoUpdate             = appSettings.AutoUpdate;
         AppAutoUpdate          = appSettings.AppAutoUpdate;
         ShowIntroVideo         = appSettings.ShowIntroVideo;
@@ -1062,8 +1089,12 @@ public partial class SettingsViewModel : ViewModelBase
             EmulatorSettingsService.SaveAll(group.Platform, list);
         }
 
+        // Favourites are edited from the browser itself, so always keep the stored list.
+        Browser.Favourites = AppSettingsService.Load().Browser?.Favourites ?? Browser.Favourites;
         AppSettingsService.Save(new Models.AppSettings
         {
+            Browser               = Browser,
+            Downloads             = Downloads,
             AutoUpdate            = AutoUpdate,
             AppAutoUpdate         = AppAutoUpdate,
             UpdateOnExit          = UpdateOnExit,

@@ -666,7 +666,7 @@ public partial class MainWindow : Window
     // ── Settings page navigation ──────────────────────────────────────────
     private static readonly string[] _settingsSections =
         ["app", "emulator", "playtime", "sync", "account", "customise", "design", "media",
-         "system", "notifications", "developer", "controller"];
+         "system", "notifications", "developer", "controller", "browser", "downloads"];
 
     /// <summary>True while the D-pad cursor is in the right-hand settings content.</summary>
     private bool _settingsInContent;
@@ -971,7 +971,7 @@ public partial class MainWindow : Window
     }
 
     private static readonly string[] _navPages =
-        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media", "music"];
+        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media", "music", "browser", "downloads"];
 
     private static void NavigatePrev(MainViewModel vm)
     {
@@ -1299,6 +1299,7 @@ public partial class MainWindow : Window
             if (_boundVm == null) return false;
             if (_boundVm.DetailVm.IsGameRunning) return false; // game input is handled by the profile injector
             if (_quickMenuWindow?.IsVisible == true || _boundVm.ShowQuickMenu) return false;
+            if (_boundVm.BrowserVm.IsActive) return true; // the browser reads the pad itself
             return WindowState == WindowState.Minimized || !IsActive;
         };
 
