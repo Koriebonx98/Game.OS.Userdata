@@ -126,6 +126,25 @@ public partial class QuickMenuViewModel
                 yield return Act("⛶", "Full Screen Player", () => MediaFullScreenCommand.Execute(null));
                 yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
                 break;
+            case "guides":
+                if (!IsPlayingGame)
+                {
+                    yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = "No game running.", Subtitle = "Start a game to see its saved walkthroughs." };
+                    yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null));
+                    break;
+                }
+                string gp = string.IsNullOrWhiteSpace(CurrentGamePlatform) ? "PC" : CurrentGamePlatform;
+                string gt = CurrentGameTitle;
+                var links = Services.GameLinksService.ForGame(gp, gt);
+                foreach (var l in links)
+                {
+                    var capturedLink = l;
+                    yield return Act(capturedLink.Icon, capturedLink.Name, () => { OnOpenUrl?.Invoke(gp, gt, capturedLink.Url); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); }, capturedLink.Kind);
+                }
+                if (links.Count == 0)
+                    yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = $"No saved links for {gt}.", Subtitle = "Open the browser from the game page to save walkthroughs." };
+                yield return Act("🔍", "Search walkthrough", () => { OnOpenUrl?.Invoke(gp, gt, "https://duckduckgo.com/?q=" + Uri.EscapeDataString($"{gt} {gp} walkthrough")); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); });
+                break;
             case "browser":
                 yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open the built-in web browser.");
                 break;

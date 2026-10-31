@@ -46,13 +46,30 @@ namespace GameLauncher.Services
         private long _bucketTokens;
         private DateTime _bucketStamp = DateTime.UtcNow;
 
-        private DownloadSettings Settings => AppSettingsService.Load().Downloads;
+        private DownloadSettings _settingsCache = new();
+        private long _settingsStamp;
+
+        // Settings are read from disk; cache briefly so the per-chunk hot path never touches the file system.
+        private DownloadSettings Settings
+        {
+            get
+            {
+                long now = Environment.TickCount64;
+                if (now - Interlocked.Read(ref _settingsStamp) > 1500 || _settingsStamp == 0)
+                {
+                    _settingsCache = AppSettingsService.Load().Downloads;
+                    Interlocked.Exchange(ref _settingsStamp, now == 0 ? 1 : now);
+                }
+                return _settingsCache;
+            }
+        }
 
         private static HttpClient CreateHttp()
         {
-            var h = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 10,
+            var h = new HttpClient(new SocketsHttpHandler { AllowAutoRedirect = true, MaxAutomaticRedirections = 10, EnableMultipleHttp2Connections = true,
+                MaxConnectionsPerServer = 64, ConnectTimeout = TimeSpan.FromSeconds(30), PooledConnectionLifetime = TimeSpan.FromMinutes(10),
                 AutomaticDecompression = DecompressionMethods.None }) { Timeout = Timeout.InfiniteTimeSpan };
-            h.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (GameOS Downloader)");
+            h.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
             return h;
         }
 
@@ -77,6 +94,81 @@ namespace GameLauncher.Services
                 or ".nsp" or ".xci" or ".pkg" or ".rvz" or ".wbfs" or ".gcm" or ".img" or ".tar" or ".gz" or ".tgz"
                 or ".001" or ".z01";
         }
+
+        private static HttpRequestMessage NewRequest(DownloadItem item, bool range = false)
+        {
+            var req = new HttpRequestMessage(HttpMethod.Get, item.Url);
+            if (!string.IsNullOrEmpty(item.Referer)) { try { req.Headers.Referrer = new Uri(item.Referer); } catch { } }
+            if (!string.IsNullOrEmpty(item.Cookie)) req.Headers.TryAddWithoutValidation("Cookie", item.Cookie);
+            return req;
+        }
+
+        /// <summary>
+        /// Asks the server what <paramref name="url"/> is. True when it is a file (attachment or non-web content type),
+        /// so the built-in browser can hand extension-less links (gofile, buzzheavier, ...) to the downloader.
+        /// </summary>
+        public static async Task<bool> ProbeIsDownloadAsync(string url, string referer, string cookie, CancellationToken ct = default)
+        {
+            try
+            {
+                using var req = NewRequest(new DownloadItem { Url = url, Referer = referer, Cookie = cookie });
+                using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
+                if (!resp.IsSuccessStatusCode) return false;
+                if (resp.Content.Headers.ContentDisposition?.DispositionType?.Equals("attachment", StringComparison.OrdinalIgnoreCase) == true) return true;
+                string? mt = resp.Content.Headers.ContentType?.MediaType?.ToLowerInvariant();
+                if (mt == null) return false;
+                if (mt.StartsWith("text/") || mt is "application/json" or "application/xhtml+xml" or "application/javascript"
+                    || mt.StartsWith("image/") || mt.StartsWith("video/") || mt.StartsWith("audio/") || mt.StartsWith("font/")) return false;
+                return true;
+            }
+            catch { return false; }
+        }
+
+        /// <summary>True for links that usually serve a file without a file extension in the URL.</summary>
+        public static bool LooksLikeDownloadEndpoint(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || (u.Scheme != "http" && u.Scheme != "https")) return false;
+            string p = u.AbsolutePath.ToLowerInvariant();
+            string q = u.Query.ToLowerInvariant();
+            return p.Contains("/download") || p.EndsWith("/dl") || p.Contains("/dl/") || p.Contains("/getfile") || p.Contains("/get_file")
+                   || q.Contains("download=") || q.Contains("attachment") || q.Contains("dl=1");
+        }
+
+        private static string NameFromHeaders(HttpResponseMessage resp, DownloadItem item)
+        {
+            var cd = resp.Content.Headers.ContentDisposition;
+            string? fn = cd?.FileNameStar;
+            if (string.IsNullOrWhiteSpace(fn) && !string.IsNullOrWhiteSpace(cd?.FileName))
+            {
+                fn = cd!.FileName!.Trim('"');
+                try
+                {
+                    if (fn.Contains('%')) fn = Uri.UnescapeDataString(fn);
+                    else if (fn.Any(c => c > 127 && c < 256)) // UTF-8 bytes read as Latin-1
+                    {
+                        var decoded = System.Text.Encoding.UTF8.GetString(System.Text.Encoding.Latin1.GetBytes(fn));
+                        if (!decoded.Contains('\uFFFD')) fn = decoded;
+                    }
+                }
+                catch { }
+            }
+            if (string.IsNullOrWhiteSpace(fn))
+                fn = GuessName(resp.RequestMessage?.RequestUri?.ToString() ?? item.Url);
+            return fn!;
+        }
+
+        private static string? ExtensionForContentType(string? mt) => mt?.ToLowerInvariant() switch
+        {
+            "application/zip" or "application/x-zip-compressed" => ".zip",
+            "application/x-rar-compressed" or "application/vnd.rar" or "application/x-rar" => ".rar",
+            "application/x-7z-compressed" => ".7z",
+            "application/x-bittorrent" => ".torrent",
+            "application/x-iso9660-image" => ".iso",
+            "application/x-msdownload" or "application/vnd.microsoft.portable-executable" => ".exe",
+            "application/gzip" or "application/x-gzip" => ".gz",
+            "application/x-tar" => ".tar",
+            _ => null,
+        };
 
         public static string GuessName(string url)
         {
@@ -125,7 +217,7 @@ namespace GameLauncher.Services
         }
 
         /// <summary>Queues a new download into <c>&lt;Root&gt;/...</c> per category/platform and starts it when a slot is free.</summary>
-        public DownloadItem Add(string url, string name, string category, string platform)
+        public DownloadItem Add(string url, string name, string category, string platform, string referer = "", string cookie = "", string game = "")
         {
             Load();
             var s = Settings;
@@ -135,6 +227,10 @@ namespace GameLauncher.Services
                 Url = url.Trim(),
                 Kind = IsTorrentUrl(url) ? DownloadKind.Torrent : DownloadKind.Direct,
                 Name = string.IsNullOrWhiteSpace(name) ? GuessName(url) : name,
+                CustomName = !string.IsNullOrWhiteSpace(name) && name != GuessName(url),
+                GameTitle = game ?? "",
+                Referer = referer ?? "",
+                Cookie = cookie ?? "",
                 Category = category,
                 Platform = platform,
                 Folder = DownloadPathResolver.Resolve(root, platform, category),
@@ -361,10 +457,24 @@ namespace GameLauncher.Services
         {
             Directory.CreateDirectory(item.Folder);
 
-            using var probe = new HttpRequestMessage(HttpMethod.Get, item.Url);
+            using var probe = NewRequest(item);
             probe.Headers.Range = new RangeHeaderValue(0, 0);
-            using var head = await Http.SendAsync(probe, HttpCompletionOption.ResponseHeadersRead, ct);
-            head.EnsureSuccessStatusCode();
+            var head = await Http.SendAsync(probe, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!head.IsSuccessStatusCode && head.StatusCode != HttpStatusCode.PartialContent)
+            {
+                // Some hosts reject Range probes; retry as a plain request.
+                head.Dispose();
+                using var plain = NewRequest(item);
+                head = await Http.SendAsync(plain, HttpCompletionOption.ResponseHeadersRead, ct);
+            }
+            using var _ = head;
+            if (!head.IsSuccessStatusCode)
+                throw new HttpRequestException($"Server answered {(int)head.StatusCode} {head.ReasonPhrase}. The link may have expired or need you to be signed in.");
+
+            string? mediaType = head.Content.Headers.ContentType?.MediaType;
+            if (string.Equals(mediaType, "text/html", StringComparison.OrdinalIgnoreCase)
+                && head.Content.Headers.ContentDisposition?.DispositionType?.Equals("attachment", StringComparison.OrdinalIgnoreCase) != true)
+                throw new IOException("The link opened a web page instead of a file. Open it in the browser and start the download from the page.");
 
             bool ranges = head.StatusCode == HttpStatusCode.PartialContent;
             long total = ranges ? (head.Content.Headers.ContentRange?.Length ?? 0) : (head.Content.Headers.ContentLength ?? 0);
@@ -372,17 +482,16 @@ namespace GameLauncher.Services
 
             if (string.IsNullOrEmpty(item.FilePath))
             {
-                string fn = head.Content.Headers.ContentDisposition?.FileNameStar
-                            ?? head.Content.Headers.ContentDisposition?.FileName?.Trim('"')
-                            ?? GuessName(head.RequestMessage?.RequestUri?.ToString() ?? item.Url);
+                string fn = item.CustomName ? item.Name : NameFromHeaders(head, item);
                 fn = DownloadPathResolver.SanitizeFileName(fn);
+                if (string.IsNullOrEmpty(Path.GetExtension(fn)) && ExtensionForContentType(mediaType) is { } ext) fn += ext;
                 string path = Path.Combine(item.Folder, fn);
                 Ui(() => { item.Name = fn; item.FilePath = path; });
             }
             Ui(() => item.TotalBytes = total);
 
             string part = item.FilePath + ".part";
-            int connections = ranges && total > 4 * 1024 * 1024 ? Math.Clamp(Settings.ConnectionsPerDownload, 1, 16) : 1;
+            int connections = ranges && total > 1024 * 1024 ? Math.Clamp(Settings.ConnectionsPerDownload == 4 ? 8 : Settings.ConnectionsPerDownload, 1, 32) : 1;
 
             if (connections > 1 && item.SegmentProgress.Count != connections)
                 item.SegmentProgress = new List<long>(Enumerable.Repeat(0L, connections));
@@ -425,7 +534,7 @@ namespace GameLauncher.Services
             long segLen = end >= start ? end - start + 1 : -1;
             if (segLen > 0 && done >= segLen) return;
 
-            using var req = new HttpRequestMessage(HttpMethod.Get, item.Url);
+            using var req = NewRequest(item);
             if (ranges) req.Headers.Range = new RangeHeaderValue(start + done, end >= start ? end : null);
             using var resp = await Http.SendAsync(req, HttpCompletionOption.ResponseHeadersRead, ct);
             resp.EnsureSuccessStatusCode();
@@ -433,10 +542,10 @@ namespace GameLauncher.Services
                 throw new IOException("Server stopped honouring range requests; restart the download.");
 
             await using var src = await resp.Content.ReadAsStreamAsync(ct);
-            await using var dst = new FileStream(partPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
+            await using var dst = new FileStream(partPath, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite, 1024 * 1024, FileOptions.Asynchronous);
             dst.Seek(start + done, SeekOrigin.Begin);
 
-            var buf = new byte[64 * 1024];
+            var buf = new byte[256 * 1024];
             int n;
             while ((n = await src.ReadAsync(buf, ct)) > 0)
             {
@@ -512,7 +621,7 @@ namespace GameLauncher.Services
             else
             {
                 string tmp = Path.Combine(Path.GetTempPath(), $"gameos-{item.Id}.torrent");
-                using (var resp = await Http.GetAsync(item.Url, ct))
+                using (var resp = await Http.SendAsync(NewRequest(item), ct))
                 {
                     resp.EnsureSuccessStatusCode();
                     await File.WriteAllBytesAsync(tmp, await resp.Content.ReadAsByteArrayAsync(ct), ct);

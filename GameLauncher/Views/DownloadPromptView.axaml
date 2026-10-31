@@ -9,6 +9,8 @@
             <StackPanel Spacing="12">
                 <TextBlock Text="New download" FontSize="20" FontWeight="Bold" Foreground="White"/>
                 <TextBlock Text="{Binding PromptName}" Foreground="#8b949e" TextTrimming="CharacterEllipsis"/>
+                <TextBlock Text="{Binding PromptGame, StringFormat='🎮  For: {0}'}" Foreground="#3fb950" FontWeight="SemiBold"
+                           IsVisible="{Binding HasPromptGame}"/>
                 <TextBlock Text="TYPE" FontSize="11" Foreground="#8b949e"/>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="Game" Command="{Binding SetCategoryCommand}" CommandParameter="Game" Classes.on="{Binding IsGameCategory}"/>

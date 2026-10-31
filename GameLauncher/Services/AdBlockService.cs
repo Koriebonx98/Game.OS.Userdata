@@ -43,6 +43,15 @@ namespace GameLauncher.Services
             "ad.doubleclick.net","stats.g.doubleclick.net","2mdn.net","serving-sys.com","turn.com","bluekai.com","krxd.net",
             "demdex.net","everesttech.net","omtrdc.net","adition.com","contextweb.com","lijit.com","sovrn.com","gumgum.com",
             "33across.com","tapad.com","liveramp.com","rlcdn.com","adroll.com","perfectaudience.com","bidswitch.net",
+            "monetag.com","pushails.com","onclickperformance.com","richads.com","adcash.com","adsco.re","exdynsrv.com","exosrv.com",
+            "tsyndicate.com","realsrv.com","magsrv.com","ero-advertising.com","adspyglass.com","galaksion.com","clickaine.com",
+            "adskeeper.com","jads.co","hilltopads.com","coinzillatag.com","bitmedia.io","cointraffic.io","highperformanceformat.com",
+            "effectivegatecpm.com","profitablecpmrate.com","profitabledisplaynetwork.com","displayvertising.com","cpmstar.com",
+            "ad-maven.com","admaven.com","pubfuture-ad.com","pubfuture.com","kueezrtb.com","adk2x.com","adxpansion.com","trafficstars.com",
+            "adtng.com","tsyndicate.com","ezmob.com","ads.exoclick.com","syndication.exoclick.com","pemsrv.com","a.magsrv.com","ymzgtbk.com",
+            "alwingulla.com","nap5k.com","tzegilo.com","dolohen.com","wpadmngr.com","acscdn.com","clksite.com","vfghtyvf.com","bebi.com",
+            "adexchangeclear.com","adexchangeprediction.com","brightadnetwork.com","betteradsystem.com","ads.pubmatic.com","onetag-sys.com",
+            "ay.delivery","ayads.co","pubadx.one","pixfuture.net","adsninja.ca","mediavine.com","adthrive.com","ezoic.net","ezoic.com",
             "ads.yahoo.com","advertising.yahoo.com","adtech.com","adtechus.com","yandex.ru/ads","an.yandex.ru","mc.yandex.ru",
         };
 
@@ -201,12 +210,20 @@ namespace GameLauncher.Services
             sb.Append("var of=window.fetch;if(of)window.fetch=function(r){var u=(r&&r.url)||r;if(bad(u))return Promise.reject(new TypeError('blocked'));return of.apply(this,arguments);};");
             sb.Append("var ox=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){if(bad(u)){this.send=function(){};return;}return ox.apply(this,arguments);};");
             sb.Append("if(navigator.sendBeacon){var ob=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){return bad(u)?true:ob(u,d);};}");
-            sb.Append("function sweep(n){var l=(n||document).querySelectorAll?(n||document).querySelectorAll('script[src],iframe[src],img[src],link[href],embed[src]'):[];for(var i=0;i<l.length;i++){var e=l[i];if(bad(e.src||e.href))e.remove();}}");
-            sb.Append("sweep();new MutationObserver(function(ms){for(var i=0;i<ms.length;i++)for(var j=0;j<ms[i].addedNodes.length;j++){var n=ms[i].addedNodes[j];if(n.nodeType===1){if((n.src||n.href)&&bad(n.src||n.href))n.remove();else sweep(n);}}}).observe(document.documentElement,{childList:true,subtree:true});");
+            sb.Append("var BP=/(\\/|\\.|_|-)(pop(under|up|ads?)|adserver|adsbygoogle|ads?\\.js|banner[_-]?ads?|advert(s|ising)?)(\\/|\\.|_|-|$)/i;function badTag(e){var u=e.src||e.href||'';if(!u)return false;if(bad(u))return true;return(e.tagName=='SCRIPT'||e.tagName=='IFRAME')&&BP.test(u.split('?')[0]);}");
+            sb.Append("function sweep(n){var l=(n||document).querySelectorAll?(n||document).querySelectorAll('script[src],iframe[src],img[src],link[href],embed[src]'):[];for(var i=0;i<l.length;i++){var e=l[i];if(badTag(e))e.remove();}}");
+            sb.Append("sweep();new MutationObserver(function(ms){for(var i=0;i<ms.length;i++)for(var j=0;j<ms[i].addedNodes.length;j++){var n=ms[i].addedNodes[j];if(n.nodeType===1){if(badTag(n))n.remove();else sweep(n);}}}).observe(document.documentElement,{childList:true,subtree:true});");
             if (cosmetic)
                 sb.Append("var st=document.createElement('style');st.textContent=").Append(cssJson).Append(";(document.head||document.documentElement).appendChild(st);");
             if (blockPopups)
-                sb.Append("var ow=window.open;window.open=function(u){if(window.__gosUserGesture&&Date.now()-window.__gosUserGesture<1000)return ow.apply(this,arguments);return null;};document.addEventListener('click',function(){window.__gosUserGesture=Date.now();},true);");
+            {
+                // window.open / synthetic target=_blank clicks only pass when the user really clicked a matching link; full-page click-hijack overlays are removed.
+                sb.Append("var ow=window.open;window.__gosLink=null;document.addEventListener('click',function(ev){if(ev.isTrusted){window.__gosUserGesture=Date.now();var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;window.__gosLink=a?a.href:null;return;}");
+                sb.Append("var t=ev.target;if(t&&t.tagName=='A'&&(t.target=='_blank'||t.target=='_top')&&!(window.__gosLink&&window.__gosLink===t.href)){ev.preventDefault();ev.stopImmediatePropagation();}},true);");
+                sb.Append("window.open=function(u){if(window.__gosUserGesture&&Date.now()-window.__gosUserGesture<1000&&window.__gosLink&&u&&window.__gosLink===new URL(u,location.href).href)return ow.apply(this,arguments);return null;};");
+                sb.Append("function kill(){try{var b=document.body;if(!b)return;var c=[].slice.call(b.children).concat([].slice.call(document.documentElement.children));for(var i=0;i<c.length;i++){var e=c[i];if(e===document.head||e===b)continue;var s=getComputedStyle(e);if(s.position!='fixed'&&s.position!='absolute')continue;var z=parseInt(s.zIndex)||0;if(z<1000)continue;var r=e.getBoundingClientRect();if(r.width<innerWidth*0.8||r.height<innerHeight*0.8)continue;var tx=(e.innerText||'').trim();if(parseFloat(s.opacity)<0.1||e.tagName=='IFRAME'||e.tagName=='A'||tx.length==0)e.remove();}}catch(x){}}");
+                sb.Append("setInterval(kill,1000);");
+            }
             sb.Append("})();");
             return sb.ToString();
         }

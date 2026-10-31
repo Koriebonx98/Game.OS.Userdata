@@ -22,7 +22,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     private static readonly string[] HubOrder =
     {
         "home", "switcher", "recent", "notifications", "downloads",
-        "friends", "inbox", "achievements", "media", "browser", "power"
+        "friends", "inbox", "achievements", "guides", "media", "browser", "power"
     };
     // XB360 two-axis navigation arrays
     // Up/Down navigates the center list; Left/Right navigates between blade tabs.
@@ -72,6 +72,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsMediaPage         => ActivePage == "media";
     public bool IsSettingsPage      => ActivePage == "settings";
     public bool IsBrowserPage       => ActivePage == "browser";
+    public bool IsGuidesPage        => ActivePage == "guides";
     public bool IsPowerPage         => ActivePage == "power";
     public bool IsAchievementsPage  => ActivePage == "achievements";
 
@@ -182,6 +183,8 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Action<string>? OnNavigatePage { get; set; }
     public Action<LocalGameCardVm>? OnLaunchRecentGame { get; set; }
     public Action? OnOpenBrowser { get; set; }
+    /// <summary>Opens the browser for (platform, game) on a saved link.</summary>
+    public Action<string, string, string>? OnOpenUrl { get; set; }
     public Action? OnSignOut { get; set; }
     public Action? OnSwitchAccount { get; set; }
     public Action? OnExitApplication { get; set; }
@@ -225,6 +228,21 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(QuickFriends));
         RebuildHubActions();
     }
+
+    /// <summary>Live summary of the built-in downloader for the Downloads page of the quick menu.</summary>
+    public string DownloadsSummary
+    {
+        get
+        {
+            var items = Services.DownloadManagerService.Instance.Items;
+            int active = items.Count(i => i.State == Models.DownloadState.Downloading);
+            int queued = items.Count(i => i.State == Models.DownloadState.Queued);
+            int paused = items.Count(i => i.State is Models.DownloadState.Paused or Models.DownloadState.Failed);
+            return items.Count == 0 ? "No downloads yet." : $"{active} downloading · {queued} queued · {paused} paused/failed";
+        }
+    }
+
+    public void RefreshDownloadsSummary() => OnPropertyChanged(nameof(DownloadsSummary));
 
     partial void OnPendingDownloadCountChanged(int value)
     {
@@ -291,6 +309,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsMediaPage));
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsBrowserPage));
+        OnPropertyChanged(nameof(IsGuidesPage));
         OnPropertyChanged(nameof(IsPowerPage));
         OnPropertyChanged(nameof(IsAchievementsPage));
         UpdateMenuHeader(value);
@@ -665,7 +684,12 @@ public partial class QuickMenuViewModel : ViewModelBase
                 break;
             case "downloads":
                 MenuTitle = "Downloads";
-                MenuSubtitle = "Manage queued installs and updates.";
+                MenuSubtitle = "Manage downloads, pause, resume and add links.";
+                RefreshDownloadsSummary();
+                break;
+            case "guides":
+                MenuTitle = "Guides";
+                MenuSubtitle = IsPlayingGame ? $"Walkthroughs and links saved for {CurrentGameTitle}." : "Start a game to see its walkthroughs and links.";
                 break;
             case "friends":
                 MenuTitle = "Friends";
@@ -720,6 +744,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     [RelayCommand] private void SelectFriends() => ActivePage = "friends";
     [RelayCommand] private void SelectInbox() => ActivePage = "inbox";
     [RelayCommand] private void SelectBrowser() => ActivePage = "browser";
+    [RelayCommand] private void SelectGuides() => ActivePage = "guides";
     [RelayCommand] private void SelectMedia() => ActivePage = "media";
     [RelayCommand] private void SelectPower() => ActivePage = "power";
     [RelayCommand] private void OpenAchievements() => ActivePage = "achievements";
@@ -765,7 +790,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     [RelayCommand]
     private void OpenDownloadsPage()
     {
-        OnNavigatePage?.Invoke("library");
+        OnNavigatePage?.Invoke("downloads");
         OnRequestLauncherForeground?.Invoke();
         OnDismiss?.Invoke();
     }

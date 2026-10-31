@@ -467,7 +467,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         BrowserVm.Downloads = DownloadsVm;
         BrowserVm.ExitRequested += () => Navigate("dashboard");
         BrowserVm.OpenDownloadsRequested += () => Navigate("downloads");
-        BrowserVm.DownloadRequested += url => DownloadsVm.BeginDownload(url);
+        DownloadsVm.ResolveGame = (url, referer) =>
+        {
+            var link = Services.GameLinksService.FindByUrl(referer) ?? Services.GameLinksService.FindByUrl(url);
+            if (link != null) return (link.Platform, link.Game);
+            return BrowserVm.HasContext ? (BrowserVm.ContextPlatform, BrowserVm.ContextGame) : null;
+        };
+        BrowserVm.DownloadRequested += (url, referer, cookie) => DownloadsVm.BeginDownload(url, referer, cookie);
         DownloadsVm.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(DownloadsViewModel.IsPromptOpen)) RefreshBrowserSuspend(); };
         PropertyChanged += (_, e) => { if (e.PropertyName is nameof(ShowQuickMenu) or nameof(ShowDetail)) RefreshBrowserSuspend(); };
         DetailVm       = new GameDetailViewModel();
@@ -518,7 +524,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             LaunchFromCard(card);
         };
         QuickMenuVm.SettingsVm = SettingsVm;
-        QuickMenuVm.OnOpenBrowser = () => Navigate("browser");
+        QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle);
+        QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url);
+        DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
         QuickMenuVm.OnSignOut = () => SignOutCommand.Execute(null);
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
         QuickMenuVm.OnExitApplication = () => ExitAppCommand.Execute(null);
@@ -2131,6 +2139,18 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private static Models.DashboardOptions? LoadDashboardOptions(string design) =>
         Services.AppSettingsService.Load().DashboardOptions.TryGetValue(design, out var o) ? o : null;
 
+    private bool _browserContextKept;
+
+    /// <summary>Opens the browser tied to a game so saved links, walkthroughs and downloads use its name and platform.</summary>
+    private void OpenBrowserForGame(string? platform, string? game, string? url = null)
+    {
+        BrowserVm.SetContext(platform, game);
+        _browserContextKept = true;
+        Navigate("browser");
+        _browserContextKept = false;
+        if (!string.IsNullOrWhiteSpace(url)) BrowserVm.NewTab(url);
+    }
+
     [RelayCommand]
     private void Navigate(string page)
     {
@@ -2138,6 +2158,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Auto-collapse the nav sidebar after a page is selected (console-like)
         IsNavExpanded = false;
         ShowDetail = false;
+        bool wasBrowser = ActivePage == "browser";
         ActivePage = page;
         // The library is built at startup and refreshed on every change, so only build here if that hasn't happened yet.
         if (page == "library" && !LibraryVm.HasBuilt)
@@ -2150,6 +2171,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
         if (page == "browser")
         {
+            if (!_browserContextKept && !wasBrowser) BrowserVm.SetContext(null, null);
             BrowserVm.ApplySettings(Services.AppSettingsService.Load().Browser);
             BrowserVm.EnsureTab();
         }

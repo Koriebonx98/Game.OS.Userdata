@@ -557,6 +557,16 @@ public partial class MainWindow : Window
             }
         }
 
+        // Downloads controller navigation
+        if (vm.IsDownloads && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !IsTextInputFocused())
+        {
+            if (HandleDownloadsKey(vm, e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
@@ -798,6 +808,21 @@ public partial class MainWindow : Window
             case Key.Y when !media.IsMusicPage: vm.MediaVm.FavouriteMediaFocus(); return true;
         }
         return false;
+    }
+
+    private static bool HandleDownloadsKey(MainViewModel vm, Key key)
+    {
+        string name = key switch
+        {
+            Key.Left => "Left", Key.Right => "Right", Key.Up => "Up", Key.Down => "Down",
+            Key.Enter => "A", Key.X => "X", Key.Y => "Y", Key.Escape or Key.BrowserBack => "B",
+            _ => "",
+        };
+        var dl = vm.DownloadsVm;
+        if (name.Length == 0) return dl.Keyboard.IsOpen || dl.IsPromptOpen;
+        // Left on the list opens the nav menu (handled globally), everything else is consumed by the page.
+        if (!dl.Keyboard.IsOpen && !dl.IsPromptOpen && name is "Left" or "Right" or "B") return false;
+        return dl.HandleKey(name);
     }
 
     private static bool HandleLibraryKey(MainViewModel vm, Key key, bool inSearch)
@@ -1657,6 +1682,13 @@ public partial class MainWindow : Window
         if (vm.IsLibrary && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleLibraryKey(vm, key, false))
+                return;
+        }
+
+        // Downloads controller navigation
+        if (vm.IsDownloads && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (HandleDownloadsKey(vm, key))
                 return;
         }
 

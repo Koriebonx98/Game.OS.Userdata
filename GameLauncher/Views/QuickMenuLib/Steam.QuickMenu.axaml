@@ -70,6 +70,7 @@
                 <Button Classes="stg-tab" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}">📬</Button>
                 <Button Classes="stg-tab" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}">🏆</Button>
                 <Button Classes="stg-tab" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}">🎵</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsGuidesPage}" Command="{Binding SelectGuidesCommand}">📖</Button>
                 <Button Classes="stg-tab" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}">🌐</Button>
                 <Button Classes="stg-tab" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}">⏻</Button>
             </StackPanel>

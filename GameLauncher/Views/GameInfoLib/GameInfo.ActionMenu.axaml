@@ -30,6 +30,8 @@
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuOpenModsCommand}" Content="🧩  Mods"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuOpenBrowserCommand}" Content="🌐  Browser: links, downloads &amp; walkthroughs"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuRefreshAchievementsCommand}" Content="↻  Refresh Achievements"
                         IsVisible="{Binding HasExophaseUrl}"/>
             </StackPanel>

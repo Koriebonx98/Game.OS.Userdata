@@ -22,9 +22,19 @@ public partial class DownloadsViewModel : ViewModelBase
     [ObservableProperty] private string _promptCategory = DownloadPathResolver.CategoryGame;
     [ObservableProperty] private string _promptPlatform = "PC";
     [ObservableProperty] private string _promptFolder = "";
+    [ObservableProperty] private string _promptGame = "";
+    public bool HasPromptGame => !string.IsNullOrEmpty(PromptGame);
+    partial void OnPromptGameChanged(string value) => OnPropertyChanged(nameof(HasPromptGame));
+    /// <summary>Resolves the game (platform + title) for a download: a saved link for the source page/URL, else the browser's game context.</summary>
+    public Func<string, string, (string Platform, string Game)?>? ResolveGame { get; set; }
+    private string _promptReferer = "";
+    private string _promptCookie = "";
     /// <summary>Controller focus row inside the prompt: 0 = category, 1 = platform, 2 = start.</summary>
     [ObservableProperty] private int _promptRow;
     [ObservableProperty] private string _statusText = "";
+
+    public OnScreenKeyboardViewModel Keyboard { get; } = new();
+    private int _selectedIndex = -1;
 
     public bool HasItems => Items.Count > 0;
     public bool IsPromptCategoryRow => PromptRow == 0;
@@ -67,13 +77,24 @@ public partial class DownloadsViewModel : ViewModelBase
     }
 
     /// <summary>Starts the Game / Mod / Other + platform prompt for a URL, magnet link or .torrent.</summary>
-    public void BeginDownload(string url)
+    public void BeginDownload(string url, string referer = "", string cookie = "")
     {
         url = (url ?? "").Trim();
         if (url.Length == 0) return;
+        _promptReferer = referer ?? "";
+        _promptCookie = cookie ?? "";
         PromptUrl = url;
         PromptName = DownloadManagerService.GuessName(url);
         PromptCategory = DownloadPathResolver.CategoryGame;
+        PromptGame = "";
+        PromptPlatform = "PC";
+        if (ResolveGame?.Invoke(url, _promptReferer) is { } g && !string.IsNullOrWhiteSpace(g.Game))
+        {
+            PromptGame = g.Game;
+            var match = PlatformNames.FirstOrDefault(n => string.Equals(n, g.Platform, StringComparison.OrdinalIgnoreCase))
+                        ?? PlatformNames.FirstOrDefault(n => g.Platform.Contains(n, StringComparison.OrdinalIgnoreCase) && n.Length > 2);
+            if (match != null) PromptPlatform = match;
+        }
         PromptRow = 0;
         RefreshFolder();
         IsPromptOpen = true;
@@ -90,7 +111,7 @@ public partial class DownloadsViewModel : ViewModelBase
     {
         if (!IsPromptOpen) return;
         IsPromptOpen = false;
-        var item = DownloadManagerService.Instance.Add(PromptUrl, PromptName, PromptCategory, PromptPlatform);
+        var item = DownloadManagerService.Instance.Add(PromptUrl, PromptName, PromptCategory, PromptPlatform, _promptReferer, _promptCookie, PromptGame);
         NewUrl = "";
         StatusText = $"Queued: {item.Name} → {item.Folder}";
         DownloadQueued?.Invoke(item);
@@ -120,6 +141,65 @@ public partial class DownloadsViewModel : ViewModelBase
         if (PromptRow == 2) ConfirmPrompt();
         else PromptRow++;
     }
+
+    /// <summary>Controller handling for the Downloads page. Returns true when the key was consumed.</summary>
+    public bool HandleKey(string name)
+    {
+        if (Keyboard.IsOpen) return Keyboard.HandleKey(name);
+        if (IsPromptOpen)
+        {
+            switch (name)
+            {
+                case "Up": PromptMove(0, -1); break;
+                case "Down": PromptMove(0, 1); break;
+                case "Left": PromptMove(-1, 0); break;
+                case "Right": PromptMove(1, 0); break;
+                case "A": PromptActivate(); break;
+                case "B": case "Y": CancelPrompt(); break;
+            }
+            return true;
+        }
+        switch (name)
+        {
+            case "Up": MoveSelection(-1); return true;
+            case "Down": MoveSelection(1); return true;
+            case "A": ActivateSelected(); return true;
+            case "X": RemoveSelected(); return true;
+            case "Y": OpenLinkKeyboard(); return true;
+            case "Start": ClearFinished(); return true;
+        }
+        return false;
+    }
+
+    private DownloadItem? Selected => _selectedIndex >= 0 && _selectedIndex < Items.Count ? Items[_selectedIndex] : null;
+
+    public void MoveSelection(int d)
+    {
+        if (Items.Count == 0) return;
+        _selectedIndex = Math.Clamp((_selectedIndex < 0 ? (d > 0 ? -1 : Items.Count) : _selectedIndex) + d, 0, Items.Count - 1);
+        for (int i = 0; i < Items.Count; i++) Items[i].IsSelected = i == _selectedIndex;
+    }
+
+    private void ActivateSelected()
+    {
+        var i = Selected ?? (Items.Count > 0 ? Items[0] : null);
+        if (i == null) { OpenLinkKeyboard(); return; }
+        if (i.CanPause) DownloadManagerService.Instance.Pause(i);
+        else if (i.CanResume) DownloadManagerService.Instance.Resume(i);
+        else DownloadManagerService.Instance.OpenFolder(i);
+    }
+
+    private void RemoveSelected()
+    {
+        var i = Selected;
+        if (i == null) return;
+        DownloadManagerService.Instance.Remove(i, false);
+        if (_selectedIndex >= Items.Count) _selectedIndex = Items.Count - 1;
+        for (int k = 0; k < Items.Count; k++) Items[k].IsSelected = k == _selectedIndex;
+    }
+
+    [RelayCommand] public void OpenLinkKeyboard() =>
+        Keyboard.Open(NewUrl, "Paste or type a link / magnet", t => NewUrl = t, t => { NewUrl = t; BeginDownload(t); });
 
     [RelayCommand] private void Pause(DownloadItem? i) { if (i != null) DownloadManagerService.Instance.Pause(i); }
     [RelayCommand] private void Resume(DownloadItem? i) { if (i != null) DownloadManagerService.Instance.Resume(i); }
