@@ -230,7 +230,7 @@
                         Padding="18">
                     <StackPanel Spacing="10">
                         <TextBlock Text="Browser" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="Open your default web browser." Foreground="#9E9E9E"/>
+                        <TextBlock Text="Open the built-in web browser." Foreground="#9E9E9E"/>
                         <Button Classes="btn-secondary" Command="{Binding OpenBrowserCommand}">Open Browser</Button>
                     </StackPanel>
                 </Border>

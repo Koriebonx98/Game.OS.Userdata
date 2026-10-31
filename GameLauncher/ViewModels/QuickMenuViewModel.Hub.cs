@@ -127,7 +127,7 @@ public partial class QuickMenuViewModel
                 yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
                 break;
             case "browser":
-                yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open your default web browser.");
+                yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open the built-in web browser.");
                 break;
             case "power":
                 yield return Act("↩", "Sign Out", () => PowerSignOutCommand.Execute(null));
