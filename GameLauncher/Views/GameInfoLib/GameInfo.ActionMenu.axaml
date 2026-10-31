@@ -42,6 +42,16 @@
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuRestoreCommand}" Content="↙  Restore saves"
                         IsEnabled="{Binding !IsLudusaviRestoring}"/>
+                <TextBlock Text="Other — choose where this game's save is" FontSize="12" Foreground="#8b949e" Margin="8,8,0,0"/>
+                <TextBlock Text="{Binding CustomSavePath}" FontSize="11" Foreground="#58a6ff" Margin="8,0,0,0"
+                           TextTrimming="CharacterEllipsis" IsVisible="{Binding HasCustomSavePath}"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuChooseSaveFolderCommand}" Content="📁  Other: choose save folder…"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuChooseSaveFileCommand}" Content="📄  Other: choose save file…"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding MenuClearCustomSaveCommand}" Content="✕  Clear custom save location"
+                        IsVisible="{Binding HasCustomSavePath}"/>
             </StackPanel>
 
             <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
