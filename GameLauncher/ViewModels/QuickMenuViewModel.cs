@@ -685,7 +685,7 @@ public partial class QuickMenuViewModel : ViewModelBase
                 break;
             case "browser":
                 MenuTitle = "Browser";
-                MenuSubtitle = "Open your default web browser.";
+                MenuSubtitle = "Open the built-in web browser.";
                 break;
             case "power":
                 MenuTitle = "Power";
