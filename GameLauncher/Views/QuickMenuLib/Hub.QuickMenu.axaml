@@ -131,8 +131,8 @@
                         Padding="18">
                     <StackPanel Spacing="10">
                         <TextBlock Text="Downloads" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                        <TextBlock Text="{Binding PendingDownloadCount, StringFormat='Ready installs / updates: {0}'}" Foreground="#ECECEC"/>
-                        <Button Classes="btn-secondary" Command="{Binding OpenDownloadsPageCommand}">Open Library</Button>
+                        <TextBlock Text="{Binding DownloadsSummary}" Foreground="#ECECEC"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenDownloadsPageCommand}">Open Downloads</Button>
                     </StackPanel>
                 </Border>
 
@@ -223,6 +223,29 @@
                 </Border>
 
                 <Border Classes="qm-center-panel"
+                        IsVisible="{Binding IsGuidesPage}"
+                        Width="520"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Padding="18">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Guides" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
+                        <TextBlock Text="{Binding MenuSubtitle}" Foreground="#9E9E9E" TextWrapping="Wrap"/>
+                        <ItemsControl ItemsSource="{Binding HubActions}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                                    <Button Classes="btn-secondary" Classes.active="{Binding IsCursor}" HorizontalAlignment="Stretch"
+                                            HorizontalContentAlignment="Left" Margin="0,0,0,4" Command="{Binding ActivateCommand}"
+                                            IsEnabled="{Binding IsActionable}">
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+
+                <Border Classes="qm-center-panel"
                         IsVisible="{Binding IsBrowserPage}"
                         Width="520"
                         HorizontalAlignment="Center"
@@ -306,6 +329,7 @@
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" Width="72" Height="56">👥</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" Width="72" Height="56">📬</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" Width="72" Height="56">🏆</Button>
+                        <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsGuidesPage}" Command="{Binding SelectGuidesCommand}" Width="72" Height="56">📖</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}" Width="72" Height="56">🎵</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}" Width="72" Height="56">🌐</Button>
                         <Button Classes="btn-secondary qm-hub-btn" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}" Width="72" Height="56">⏻</Button>

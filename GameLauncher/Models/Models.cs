@@ -934,7 +934,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("deleteArchiveAfterExtract")] public bool DeleteArchiveAfterExtract { get; set; } = false;
         [JsonPropertyName("maxConcurrent")]     public int    MaxConcurrent { get; set; } = 3;
         /// <summary>Parallel connections used for one direct download when the server supports ranges.</summary>
-        [JsonPropertyName("connections")]       public int    ConnectionsPerDownload { get; set; } = 4;
+        [JsonPropertyName("connections")]       public int    ConnectionsPerDownload { get; set; } = 8;
         /// <summary>Global direct-download speed limit in KB/s (0 = unlimited).</summary>
         [JsonPropertyName("speedLimitKBps")]    public int    SpeedLimitKBps { get; set; } = 0;
 

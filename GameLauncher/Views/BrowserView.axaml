@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              x:Class="GameLauncher.Views.BrowserView"
              x:DataType="vm:BrowserViewModel"
              Background="#0d1117">
@@ -91,6 +92,7 @@
                     </DockPanel>
                 </Border>
             </Border>
+            <views:OnScreenKeyboardView DataContext="{Binding Keyboard}" ZIndex="20"/>
         </Panel>
 
         <!-- Controller hints -->
@@ -98,7 +100,10 @@
             <Grid ColumnDefinitions="*,Auto">
                 <TextBlock Grid.Column="0" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"
                            Text="L-stick: mouse · R-stick: scroll · A: click · X: right-click · Y: search · B: back · Start: menu · LB/RB: tabs"/>
-                <TextBlock Grid.Column="1" FontSize="11" Foreground="#58a6ff" Text="{Binding StatusText}" Margin="12,0,0,0"/>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12" Margin="12,0,0,0">
+                    <TextBlock FontSize="11" Foreground="#3fb950" Text="{Binding ContextLabel}" IsVisible="{Binding HasContext}"/>
+                    <TextBlock FontSize="11" Foreground="#58a6ff" Text="{Binding StatusText}"/>
+                </StackPanel>
             </Grid>
         </Border>
     </Grid>

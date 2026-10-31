@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.OnScreenKeyboardView"
+             x:DataType="vm:OnScreenKeyboardViewModel">
+    <UserControl.Styles>
+        <Style Selector="Border.osk-key">
+            <Setter Property="Background" Value="#21262d"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Margin" Value="3"/>
+            <Setter Property="Padding" Value="0,12"/>
+            <Setter Property="MinWidth" Value="44"/>
+        </Style>
+        <Style Selector="Border.osk-key.wide"><Setter Property="MinWidth" Value="90"/></Style>
+        <Style Selector="Border.osk-key TextBlock"><Setter Property="Foreground" Value="#E6EDF3"/></Style>
+        <Style Selector="Border.osk-key.hl > TextBlock"><Setter Property="Foreground" Value="#0d1117"/></Style>
+        <Style Selector="Border.osk-key.hl"><Setter Property="Background" Value="#FFFFFF"/></Style>
+    </UserControl.Styles>
+    <Border IsVisible="{Binding IsOpen}" Background="#CC000000">
+        <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40"
+                Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="14" Padding="16">
+            <StackPanel Spacing="4">
+                <Border Background="#0d1117" CornerRadius="8" Padding="12,10" Margin="3,0,3,8" MinWidth="560">
+                    <StackPanel>
+                        <TextBlock Text="{Binding Title}" FontSize="11" Foreground="#8b949e"/>
+                        <TextBlock Text="{Binding Text}" FontSize="18" Foreground="White" TextTrimming="CharacterEllipsis" MinHeight="26"/>
+                    </StackPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding Rows}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:OsKeyRowVm">
+                            <ItemsControl ItemsSource="{Binding Keys}" HorizontalAlignment="Center">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:OsKeyVm">
+                                        <Border Classes="osk-key" Tapped="OnKeyTapped"
+                                                Classes.wide="{Binding IsWide}" Classes.hl="{Binding IsHighlighted}">
+                                            <TextBlock Text="{Binding Display}" FontSize="15" HorizontalAlignment="Center"/>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="D-pad: move · A: type · X: backspace · Y: go / submit · B: close" FontSize="11"
+                           Foreground="#8b949e" HorizontalAlignment="Center" Margin="0,6,0,0"/>
+            </StackPanel>
+        </Border>
+    </Border>
+</UserControl>

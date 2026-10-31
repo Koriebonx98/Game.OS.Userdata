@@ -3301,6 +3301,9 @@ public partial class GameDetailViewModel : ViewModelBase
 
     [RelayCommand] private void MenuOpenSettings()   { IsActionMenuOpen = false; OpenSettings(); }
     [RelayCommand] private void MenuOpenController() { IsActionMenuOpen = false; ToggleControllerPanel(); }
+    /// <summary>Opens the built-in browser for this game (platform, title).</summary>
+    public Action<string, string>? OnOpenBrowserForGame { get; set; }
+    [RelayCommand] private void MenuOpenBrowser() { IsActionMenuOpen = false; OnOpenBrowserForGame?.Invoke(Platform, Title); }
     [RelayCommand] private void MenuOpenMods()       { IsActionMenuOpen = false; ModSearchText = ""; RefreshModList(); IsModBrowserOpen = true; }
     [RelayCommand] private void MenuLaunchViaSteam()
     {

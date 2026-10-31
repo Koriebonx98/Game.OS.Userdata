@@ -105,6 +105,7 @@
                 <Button Classes="swg-icon" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}">📬</Button>
                 <Button Classes="swg-icon" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}">🏆</Button>
                 <Button Classes="swg-icon" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}">🎵</Button>
+                <Button Classes="swg-icon" Classes.active="{Binding IsGuidesPage}" Command="{Binding SelectGuidesCommand}">📖</Button>
                 <Button Classes="swg-icon" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}">🌐</Button>
                 <Button Classes="swg-icon" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}">⏻</Button>
             </StackPanel>
