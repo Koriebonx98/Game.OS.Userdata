@@ -40,11 +40,15 @@ jobs:
           python3 << 'PYEOF'
           import json, base64, os, re, sys
           import urllib.request, urllib.error
+          from urllib.parse import quote
 
           REPO = 'Koriebonx98/Game.OS.Private.Data'
           API = f'https://api.github.com/repos/{REPO}'
           HEAD = {'Authorization': 'Bearer ' + os.environ['DATA_REPO_TOKEN'],
                   'Accept': 'application/vnd.github+json', 'User-Agent': 'gameos-stats'}
+
+          def contents_url(path):
+              return f'{API}/contents/{quote(path, safe="/")}'
 
           def call(url, method='GET', body=None):
               req = urllib.request.Request(url, method=method, headers=HEAD,
@@ -54,7 +58,7 @@ jobs:
 
           def read(path):
               try:
-                  f = call(f'{API}/contents/{path}')
+                  f = call(contents_url(path))
                   return json.loads(base64.b64decode(f['content'])), f['sha']
               except urllib.error.HTTPError as e:
                   if e.code == 404: return None, None
@@ -93,6 +97,6 @@ jobs:
               body = {'message': f'Aggregate stats: {plat}',
                       'content': base64.b64encode(json.dumps(data, indent=2, sort_keys=True).encode()).decode()}
               if sha: body['sha'] = sha
-              call(f'{API}/contents/{path}', 'PUT', body)
+              call(contents_url(path), 'PUT', body)
               print(f'✅ wrote {path} ({len(data)} games)')
           PYEOF
