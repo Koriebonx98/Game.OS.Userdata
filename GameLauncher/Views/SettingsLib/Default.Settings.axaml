@@ -153,6 +153,28 @@
                     </StackPanel>
                 </Button>
 
+                <Button Classes="settings-nav-item"
+                        Classes.active="{Binding IsBrowserSection}"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="browser">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🌐" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Browser" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="settings-nav-item"
+                        Classes.active="{Binding IsDownloadsSection}"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="downloads">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Downloads" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
             </StackPanel>
         </Border>
 
@@ -1495,6 +1517,299 @@
                                    IsVisible="{Binding IsSaveSuccess}"/>
                     </StackPanel>
 
+                </StackPanel>
+
+
+                <!-- ── Browser ── -->
+                <StackPanel IsVisible="{Binding IsBrowserSection}" Spacing="0">
+                    <TextBlock Text="Browser" Classes="page-title" Margin="0,0,0,4"/>
+                    <TextBlock Text="Built-in controller-friendly web browser." Classes="page-subtitle" Margin="0,0,0,24"/>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🌐  General" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Home page" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Opened in new tabs." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="300" Text="{Binding Browser.HomePage, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Search engine" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="DuckDuckGo, Google, Bing, Brave, Startpage or Ecosia." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Browser.SearchEngine, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Intercept downloads" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Send downloads and magnet links to the Game.OS Downloader." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Browser.InterceptDownloads}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="On-screen keyboard" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Open the Windows keyboard when a text field is selected." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Browser.ShowOnScreenKeyboard}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🖱  Virtual mouse" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Cursor speed" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Left stick speed (1–20)." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Browser.CursorSpeed, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Scroll speed" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Right stick speed (1–20)." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Browser.ScrollSpeed, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🛡  Ad blocker" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Enable ad blocker" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Blocks ad and tracker domains, in-page requests and popups." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Browser.AdBlockEnabled}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Hide ad elements" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Cosmetic filtering of ad containers." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Browser.AdBlockCosmetic}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Block popups" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Stop pages opening unwanted tabs." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Browser.BlockPopups}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Allow list" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Sites where blocking is disabled (comma or newline separated)." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="300" Text="{Binding Browser.AllowList, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Custom filters" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Extra hosts / EasyList rules (e.g. ||ads.example.com^)." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="300" Text="{Binding Browser.CustomFilters, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <Button Content="Update filter lists" Classes="btn-secondary" Command="{Binding UpdateFilterListsCommand}" IsEnabled="{Binding !IsUpdatingFilters}"/>
+                                <TextBlock Text="{Binding AdBlockStatus}" Foreground="#8b949e" VerticalAlignment="Center" FontSize="12"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <!-- ── Downloads ── -->
+                <StackPanel IsVisible="{Binding IsDownloadsSection}" Spacing="0">
+                    <TextBlock Text="Downloads" Classes="page-title" Margin="0,0,0,4"/>
+                    <TextBlock Text="Downloader settings (direct links and torrents). The list is stored in Downloads.json." Classes="page-subtitle" Margin="0,0,0,24"/>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="⬇  General" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Root folder" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Roms go to &lt;Root&gt;/Roms/&lt;Platform&gt;/, PC games to &lt;Root&gt;/Repacks. Blank = auto-detect." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="300" Text="{Binding Downloads.RootFolder, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Simultaneous downloads" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Max running at once." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.MaxConcurrent, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Connections per download" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Segments per direct download." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.ConnectionsPerDownload, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Speed limit (KB/s)" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="0 = unlimited." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.SpeedLimitKBps, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="📦  Extraction" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Auto extract" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Extract zip / rar / 7z / tar when a download finishes." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.AutoExtract}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Delete archive after extracting" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Remove the archive once extraction succeeds." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.DeleteArchiveAfterExtract}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🧲  Torrents" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Enable torrents" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Magnet links and .torrent files." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.EnableTorrents}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Listen port" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Incoming connection port." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.TorrentPort, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="DHT" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Find peers without a tracker." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.TorrentDht}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Port forwarding (UPnP/NAT-PMP)" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Try to open the port automatically." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.TorrentPortForwarding}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Max connections" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Total peer connections." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.TorrentMaxConnections, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Max download (KB/s)" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="0 = unlimited." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.TorrentMaxDownloadKBps, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Max upload (KB/s)" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="0 = unlimited." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.TorrentMaxUploadKBps, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Seed after completion" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Keep sharing finished torrents." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.TorrentSeedAfterComplete}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Seed ratio limit" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Stop seeding at this ratio." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.TorrentSeedRatioLimit, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🔔  Download notifications" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Download started" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Notify when a download begins." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.NotifyOnStart}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Download finished" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Notify when a download completes." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.NotifyOnComplete}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Download failed" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Notify when a download fails." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.NotifyOnFail}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Download paused" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Notify when a download is paused." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.NotifyOnPause}" OffContent="" OnContent="" VerticalAlignment="Center" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
                 </StackPanel>
 
                 <!-- ── Notifications ── -->

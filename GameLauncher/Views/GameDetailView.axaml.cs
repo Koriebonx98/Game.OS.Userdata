@@ -38,6 +38,7 @@ public partial class GameDetailView : UserControl
         {
             vm.BrowseLaunchPathRequested  = OnBrowseLaunchPathRequested;
             vm.PlayLocalVideoRequested    = OnPlayLocalVideoRequested;
+            vm.BrowseCustomSaveRequested  = OnBrowseCustomSaveRequested;
             vm.OpenControllerEditorRequested = OnOpenControllerEditorRequested;
         }
     }
@@ -200,6 +201,25 @@ public partial class GameDetailView : UserControl
 
         if (files.Count > 0)
             onPicked(files[0].Path.LocalPath);
+    }
+
+    private async void OnBrowseCustomSaveRequested(bool folder, Action<string> onPicked)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+
+        if (folder)
+        {
+            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(
+                new FolderPickerOpenOptions { Title = "Select the folder containing this game's save", AllowMultiple = false });
+            if (folders.Count > 0) onPicked(folders[0].Path.LocalPath);
+        }
+        else
+        {
+            var files = await topLevel.StorageProvider.OpenFilePickerAsync(
+                new FilePickerOpenOptions { Title = "Select this game's save file", AllowMultiple = false });
+            if (files.Count > 0) onPicked(files[0].Path.LocalPath);
+        }
     }
 
     // ── VLC local file player ────────────────────────────────────────────────

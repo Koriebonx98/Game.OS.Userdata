@@ -623,6 +623,11 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("startupApps")] public List<StartupAppEntry> StartupApps { get; set; } = new();
 
+        /// <summary>Built-in browser settings (Settings → Browser).</summary>
+        [JsonPropertyName("browser")]   public BrowserSettings  Browser   { get; set; } = new();
+        /// <summary>Download manager / torrent / notification settings (Settings → Downloads).</summary>
+        [JsonPropertyName("downloads")] public DownloadSettings Downloads { get; set; } = new();
+
         // ── Notifications ────────────────────────────────────────────────────
 
         /// <summary>Show a toast notification when a friend comes online.</summary>
@@ -808,6 +813,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("exePath")]     public string? ExePath     { get; set; }
         /// <summary>Command-line arguments passed to the executable on launch.</summary>
         [JsonPropertyName("exeArgs")]     public string? ExeArgs     { get; set; }
+        /// <summary>User-chosen save file or folder ("Other" in the cloud menu); overrides auto-detected save locations.</summary>
+        [JsonPropertyName("customSavePath")] public string? CustomSavePath { get; set; }
         /// <summary>Full path to the ROM file used when launching via an emulator.</summary>
         [JsonPropertyName("romPath")]     public string? RomPath     { get; set; }
         /// <summary>
@@ -888,6 +895,66 @@ namespace GameLauncher.Models
     /// One startup-app entry in Settings &gt; System.
     /// These apps are launched automatically after the user logs in.
     /// </summary>
+    public class BrowserFavourite
+    {
+        [JsonPropertyName("title")] public string Title { get; set; } = "";
+        [JsonPropertyName("url")]   public string Url   { get; set; } = "";
+    }
+
+    /// <summary>Settings for the built-in controller-friendly browser and its ad blocker.</summary>
+    public class BrowserSettings
+    {
+        [JsonPropertyName("homePage")]        public string HomePage        { get; set; } = "https://duckduckgo.com";
+        /// <summary>DuckDuckGo, Google, Bing or Brave.</summary>
+        [JsonPropertyName("searchEngine")]    public string SearchEngine    { get; set; } = "DuckDuckGo";
+        [JsonPropertyName("adBlock")]         public bool   AdBlockEnabled { get; set; } = true;
+        /// <summary>Also hide ad containers (cosmetic filtering) and strip ad frames/scripts in the page.</summary>
+        [JsonPropertyName("adBlockCosmetic")] public bool   AdBlockCosmetic { get; set; } = true;
+        [JsonPropertyName("blockPopups")]     public bool   BlockPopups     { get; set; } = true;
+        /// <summary>Hand file/torrent/magnet links to the Downloader instead of the page.</summary>
+        [JsonPropertyName("interceptDownloads")] public bool InterceptDownloads { get; set; } = true;
+        /// <summary>Virtual mouse speed (1–10).</summary>
+        [JsonPropertyName("cursorSpeed")]     public int    CursorSpeed     { get; set; } = 6;
+        /// <summary>Right-stick / edge scroll speed (1–10).</summary>
+        [JsonPropertyName("scrollSpeed")]     public int    ScrollSpeed     { get; set; } = 6;
+        [JsonPropertyName("showOnScreenKeyboard")] public bool ShowOnScreenKeyboard { get; set; } = true;
+        /// <summary>Extra ad-block rules, one per line: a hostname (ads.example.com) or a CSS selector prefixed with "##".</summary>
+        [JsonPropertyName("customFilters")]   public string CustomFilters   { get; set; } = "";
+        /// <summary>Sites where the ad blocker is disabled, one hostname per line.</summary>
+        [JsonPropertyName("allowList")]       public string AllowList       { get; set; } = "";
+        [JsonPropertyName("favourites")]      public List<BrowserFavourite> Favourites { get; set; } = new();
+    }
+
+    /// <summary>Settings for the Downloader (direct + torrent), auto-extract and download notifications.</summary>
+    public class DownloadSettings
+    {
+        /// <summary>Library root (contains Roms/ and Repacks/). Empty = auto-detect.</summary>
+        [JsonPropertyName("rootFolder")]        public string RootFolder { get; set; } = "";
+        [JsonPropertyName("autoExtract")]       public bool   AutoExtract { get; set; } = true;
+        [JsonPropertyName("deleteArchiveAfterExtract")] public bool DeleteArchiveAfterExtract { get; set; } = false;
+        [JsonPropertyName("maxConcurrent")]     public int    MaxConcurrent { get; set; } = 3;
+        /// <summary>Parallel connections used for one direct download when the server supports ranges.</summary>
+        [JsonPropertyName("connections")]       public int    ConnectionsPerDownload { get; set; } = 4;
+        /// <summary>Global direct-download speed limit in KB/s (0 = unlimited).</summary>
+        [JsonPropertyName("speedLimitKBps")]    public int    SpeedLimitKBps { get; set; } = 0;
+
+        [JsonPropertyName("enableTorrents")]    public bool   EnableTorrents { get; set; } = true;
+        [JsonPropertyName("torrentPort")]       public int    TorrentPort { get; set; } = 55123;
+        [JsonPropertyName("torrentDht")]        public bool   TorrentDht { get; set; } = true;
+        [JsonPropertyName("torrentPortForwarding")] public bool TorrentPortForwarding { get; set; } = true;
+        [JsonPropertyName("torrentMaxConnections")] public int TorrentMaxConnections { get; set; } = 150;
+        [JsonPropertyName("torrentMaxDownKBps")] public int   TorrentMaxDownloadKBps { get; set; } = 0;
+        [JsonPropertyName("torrentMaxUpKBps")]  public int    TorrentMaxUploadKBps { get; set; } = 0;
+        [JsonPropertyName("torrentSeed")]       public bool   TorrentSeedAfterComplete { get; set; } = false;
+        /// <summary>Stop seeding once this share ratio is reached (0 = seed until removed).</summary>
+        [JsonPropertyName("torrentSeedRatio")]  public double TorrentSeedRatioLimit { get; set; } = 1.0;
+
+        [JsonPropertyName("notifyStart")]       public bool   NotifyOnStart { get; set; } = true;
+        [JsonPropertyName("notifyComplete")]    public bool   NotifyOnComplete { get; set; } = true;
+        [JsonPropertyName("notifyFail")]        public bool   NotifyOnFail { get; set; } = true;
+        [JsonPropertyName("notifyPause")]       public bool   NotifyOnPause { get; set; } = false;
+    }
+
     public class StartupAppEntry
     {
         [JsonPropertyName("label")]        public string  Label        { get; set; } = "";

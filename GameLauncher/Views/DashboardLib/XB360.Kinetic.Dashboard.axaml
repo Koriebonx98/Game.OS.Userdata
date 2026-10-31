@@ -73,7 +73,7 @@
                         <DataTemplate x:DataType="vm:KineticTabVm">
                             <Button Classes="kx-tab" Classes.active="{Binding IsActive}" Content="{Binding Title}"
                                     VerticalAlignment="Bottom"
-                                    Command="{Binding $parent[UserControl].((vm:DashboardViewModel)DataContext).SelectKineticTabCommand}"
+                                    Command="{ReflectionBinding $parent[UserControl].DataContext.SelectKineticTabCommand}"
                                     CommandParameter="{Binding}"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>

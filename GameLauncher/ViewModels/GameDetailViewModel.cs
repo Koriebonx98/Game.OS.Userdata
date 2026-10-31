@@ -335,10 +335,6 @@ public partial class GameDetailViewModel : ViewModelBase
     public ObservableCollection<InstallDriveOption> InstallDrives { get; } = new();
 
     // ── Static compiled regex ─────────────────────────────────────────────────
-    /// <summary>Matches 7-Zip progress output like "  42% - filename".</summary>
-    private static readonly Regex _sevenZipProgressRegex =
-        new(@"(\d+)%", RegexOptions.Compiled);
-
     /// <summary>Switch TitleID pattern: exactly 16 hexadecimal characters (e.g. "0100152000022000").</summary>
     private static readonly Regex _switchTitleIdValidationRegex =
         new(@"^[0-9A-Fa-f]{16}$", RegexOptions.Compiled);
@@ -3066,8 +3062,7 @@ public partial class GameDetailViewModel : ViewModelBase
         }
 
         // Archive repack — show drive picker so user can choose install location
-        string ext = Path.GetExtension(RepackPath).ToLowerInvariant();
-        bool isArchive = ext is ".zip" or ".rar" or ".7z";
+        bool isArchive = Services.ArchiveExtractor.IsArchive(RepackPath);
         if (isArchive)
         {
             PopulateInstallDrives();
@@ -3129,22 +3124,10 @@ public partial class GameDetailViewModel : ViewModelBase
         // "LHPCR" installed as "LEGO® Harry Potter™ Collection").
         WriteGameOsTitle(destFolder, Title);
 
-        string ext = Path.GetExtension(RepackPath).ToLowerInvariant();
-        if (ext == ".zip")
-        {
-            // Use built-in .NET extraction for ZIP archives
-            _ = ExtractZipAsync(RepackPath, destFolder);
-        }
-        else if (ext is ".rar" or ".7z")
-        {
-            // Try 7-Zip CLI; fall back to opening with the system handler
-            if (!TryExtractWith7Zip(RepackPath, destFolder))
-                OpenWithSystem(RepackPath);
-        }
+        if (Services.ArchiveExtractor.IsArchive(RepackPath))
+            _ = ExtractArchiveAsync(RepackPath, destFolder);
         else
-        {
             OpenWithSystem(RepackPath);
-        }
     }
 
     /// <summary>
@@ -3167,14 +3150,14 @@ public partial class GameDetailViewModel : ViewModelBase
     private void CancelInstall() => ShowDrivePicker = false;
 
     /// <summary>
-    /// Extracts a ZIP archive to <paramref name="destFolder"/> in a background thread,
-    /// reporting per-entry progress via <see cref="ExtractionProgress"/>.
+    /// Extracts a .zip/.rar/.7z/.tar archive to <paramref name="destFolder"/> using the managed
+    /// extractor (no 7-Zip needed), reporting progress via <see cref="ExtractionProgress"/>.
     /// </summary>
-    private async System.Threading.Tasks.Task ExtractZipAsync(string archivePath, string destFolder)
+    private async System.Threading.Tasks.Task ExtractArchiveAsync(string archivePath, string destFolder)
     {
         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
-            SettingsStatus          = "Extracting ZIP…";
+            SettingsStatus          = "Extracting archive…";
             InstallStatusMessage    = "⏳  Extracting archive…";
             InstallStatusIsError    = false;
             ExtractionProgress      = 0;
@@ -3182,31 +3165,8 @@ public partial class GameDetailViewModel : ViewModelBase
         });
         try
         {
-            await System.Threading.Tasks.Task.Run(() =>
-            {
-                using var archive = System.IO.Compression.ZipFile.OpenRead(archivePath);
-                int total = archive.Entries.Count;
-                int done  = 0;
-                foreach (var entry in archive.Entries)
-                {
-                    string destPath = System.IO.Path.Combine(destFolder, entry.FullName);
-                    // Directory entries end with a separator
-                    if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
-                    {
-                        System.IO.Directory.CreateDirectory(destPath);
-                    }
-                    else
-                    {
-                        string? dir = System.IO.Path.GetDirectoryName(destPath);
-                        if (!string.IsNullOrEmpty(dir))
-                            System.IO.Directory.CreateDirectory(dir);
-                        entry.ExtractToFile(destPath, overwrite: true);
-                    }
-                    done++;
-                    double pct = total > 0 ? (double)done / total * 100.0 : 0;
-                    Avalonia.Threading.Dispatcher.UIThread.Post(() => ExtractionProgress = pct);
-                }
-            });
+            var progress = new Progress<double>(pct => ExtractionProgress = pct);
+            await Services.ArchiveExtractor.ExtractAsync(archivePath, destFolder, progress);
 
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
@@ -3219,6 +3179,7 @@ public partial class GameDetailViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
+            Services.DevLogService.Log($"[ExtractArchive] {archivePath}: {ex}");
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 SettingsStatus          = $"Extraction failed: {ex.Message}";
@@ -3227,117 +3188,6 @@ public partial class GameDetailViewModel : ViewModelBase
                 IsExtracting            = false;
             });
         }
-    }
-
-    /// <summary>
-    /// Tries to extract <paramref name="archivePath"/> to <paramref name="destFolder"/>
-    /// using the 7-Zip command-line tool.  Reports progress via <see cref="ExtractionProgress"/>.
-    /// Returns false if 7-Zip is not found so the caller can fall back to the system handler.
-    /// </summary>
-    private bool TryExtractWith7Zip(string archivePath, string destFolder)
-    {
-        // Locate 7-Zip: common Windows install paths, then fall back to system PATH
-        string? sevenZip = null;
-
-        if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                System.Runtime.InteropServices.OSPlatform.Windows))
-        {
-            string[] windowsCandidates =
-            [
-                @"C:\Program Files\7-Zip\7z.exe",
-                @"C:\Program Files (x86)\7-Zip\7z.exe",
-            ];
-            sevenZip = windowsCandidates.FirstOrDefault(System.IO.File.Exists);
-        }
-
-        if (sevenZip == null)
-        {
-            // Verify "7z" actually exists on PATH before using it as a fallback,
-            // so we can return false (and let the caller open with the system handler)
-            // instead of showing a confusing "system cannot find the file" error.
-            bool isWindows = System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(
-                System.Runtime.InteropServices.OSPlatform.Windows);
-            string exeName = isWindows ? "7z.exe" : "7z";
-            bool foundOnPath = (Environment.GetEnvironmentVariable("PATH") ?? "")
-                .Split(System.IO.Path.PathSeparator)
-                .Where(dir => !string.IsNullOrWhiteSpace(dir))
-                .Any(dir => System.IO.File.Exists(System.IO.Path.Combine(dir.Trim(), exeName)));
-
-            if (!foundOnPath)
-                return false;
-
-            sevenZip = "7z";
-        }
-
-        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-        {
-            SettingsStatus          = "Extracting archive with 7-Zip…";
-            InstallStatusMessage    = "⏳  Extracting archive with 7-Zip…";
-            InstallStatusIsError    = false;
-            ExtractionProgress      = 0;
-            IsExtracting            = true;
-        });
-
-        // Safely escape paths to avoid issues with special characters
-        string safeArchive = archivePath.Replace("\"", "\\\"");
-        string safeDest    = destFolder.Replace("\"", "\\\"");
-
-        _ = System.Threading.Tasks.Task.Run(async () =>
-        {
-            try
-            {
-                var psi = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName               = sevenZip,
-                    // -bsp1 makes 7z write progress percentages to stdout
-                    Arguments              = $"x \"{safeArchive}\" -o\"{safeDest}\" -y -bsp1",
-                    UseShellExecute        = false,
-                    CreateNoWindow         = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                };
-                using var proc = System.Diagnostics.Process.Start(psi);
-                if (proc != null)
-                {
-                    // Parse 7z progress output asynchronously
-                    var outputTask = System.Threading.Tasks.Task.Run(async () =>
-                    {
-                        while (!proc.StandardOutput.EndOfStream)
-                        {
-                            var line = await proc.StandardOutput.ReadLineAsync();
-                            if (line == null) break;
-                            // 7z progress format: "  XX% - filename"
-                            var match = _sevenZipProgressRegex.Match(line);
-                            if (match.Success && int.TryParse(match.Groups[1].Value, out int pct))
-                                Avalonia.Threading.Dispatcher.UIThread.Post(() => ExtractionProgress = pct);
-                        }
-                    });
-                    await proc.WaitForExitAsync();
-                    await outputTask;
-                }
-
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    SettingsStatus          = $"✓  Extracted to {destFolder}";
-                    InstallStatusMessage    = $"✓  Installed to {destFolder}";
-                    InstallStatusIsError    = false;
-                    ExtractionProgress      = 100;
-                    IsExtracting            = false;
-                });
-            }
-            catch (Exception ex)
-            {
-                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                {
-                    SettingsStatus          = $"Extraction failed: {ex.Message}";
-                    InstallStatusMessage    = $"⛔  Extraction failed: {ex.Message}";
-                    InstallStatusIsError    = true;
-                    IsExtracting            = false;
-                });
-            }
-        });
-
-        return true;
     }
 
     private static void OpenWithSystem(string path)
@@ -3440,6 +3290,8 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         if (IsActionMenuOpen && ActionMenuKind == kind) { IsActionMenuOpen = false; return; }
         ActionMenuKind = kind;
+        if (kind == "cloud")
+            CustomSavePath = Services.GameSettingsService.Load(Title).CustomSavePath ?? "";
         IsActionMenuOpen = true;
     }
 
@@ -3469,6 +3321,26 @@ public partial class GameDetailViewModel : ViewModelBase
         IsActionMenuOpen = false;
         await SyncExophaseNowAsync();
     }
+    /// <summary>Raised to let the view show a file/folder picker (true = folder) for the "Other" save location.</summary>
+    public System.Action<bool, System.Action<string>>? BrowseCustomSaveRequested { get; set; }
+
+    [ObservableProperty] private string _customSavePath = "";
+    public bool HasCustomSavePath => !string.IsNullOrWhiteSpace(CustomSavePath);
+    partial void OnCustomSavePathChanged(string value) => OnPropertyChanged(nameof(HasCustomSavePath));
+
+    private void SaveCustomSavePath(string? path)
+    {
+        var gs = Services.GameSettingsService.Load(Title);
+        gs.CustomSavePath = string.IsNullOrWhiteSpace(path) ? null : path;
+        Services.GameSettingsService.Save(gs);
+        CustomSavePath = gs.CustomSavePath ?? "";
+        LudusaviSyncStatus = HasCustomSavePath ? $"Custom save location set: {CustomSavePath}" : "Custom save location cleared.";
+    }
+
+    [RelayCommand] private void MenuChooseSaveFolder() => BrowseCustomSaveRequested?.Invoke(true,  p => SaveCustomSavePath(p));
+    [RelayCommand] private void MenuChooseSaveFile()   => BrowseCustomSaveRequested?.Invoke(false, p => SaveCustomSavePath(p));
+    [RelayCommand] private void MenuClearCustomSave()  => SaveCustomSavePath(null);
+
     [RelayCommand] private async System.Threading.Tasks.Task MenuBackup()
     {
         IsActionMenuOpen = false;
@@ -4823,6 +4695,10 @@ public partial class GameDetailViewModel : ViewModelBase
 
     private string? ResolveBestEmulatorSavePathOverrideForBackup(IReadOnlyList<string> preferredTitleIds)
     {
+        string? custom = Services.GameSettingsService.Load(Title).CustomSavePath;
+        if (!string.IsNullOrWhiteSpace(custom) && (Directory.Exists(custom) || File.Exists(custom)))
+            return custom;
+
         if (preferredTitleIds.Count == 0)
             return ResolveEmulatorSavePathOverride(CurrentTitleId);
 
