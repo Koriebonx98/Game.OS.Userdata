@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.MediaLib.MediaFilterBar"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Search, sort, show (filter) and genre controls shared by both Movies & TV layouts. -->
+    <StackPanel Orientation="Horizontal" Spacing="8">
+        <TextBox Width="220" Watermark="🔍  Search titles" Text="{Binding SearchText, Mode=TwoWay}" VerticalAlignment="Center"/>
+        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFilterSortFocused}"
+                Command="{Binding CycleSortCommand}" Content="{Binding SortLabel}"/>
+        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFilterModeFocused}"
+                Command="{Binding CycleFilterCommand}" Content="{Binding FilterLabel}"/>
+        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFilterGenreFocused}"
+                Command="{Binding CycleGenreCommand}" Content="{Binding GenreLabel}"/>
+        <Button Classes="btn-secondary" Command="{Binding ClearFiltersCommand}" Content="✕ Clear"
+                IsVisible="{Binding IsFiltering}"/>
+    </StackPanel>
+</UserControl>

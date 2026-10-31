@@ -49,8 +49,6 @@
                         <Border Height="1" Background="#30363d" Margin="0,6"/>
                         <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
                                 Command="{Binding RefreshMediaLibraryCommand}">⟳  Refresh Scan</Button>
-                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMusicFocused}" HorizontalAlignment="Stretch"
-                                Command="{Binding SelectMoviesCommand}">‹  Movies &amp; TV</Button>
                     </StackPanel>
                 </ScrollViewer>
             </Border>
@@ -118,6 +116,8 @@
                                 Content="{Binding PlayPauseGlyph}"/>
                         <Button Classes="btn-secondary" Command="{Binding NextTrackCommand}" Content="⏭"/>
                         <Button Classes="btn-secondary" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                        <Button Classes="btn-secondary" Command="{Binding ToggleShuffleCommand}" Content="🔀" ToolTip.Tip="Shuffle"/>
+                        <Button Classes="btn-secondary" Command="{Binding OpenNowPlayingFullScreenCommand}" Content="⛶" ToolTip.Tip="Full screen (Y)"/>
                     </StackPanel>
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <TextBlock Text="{Binding PositionLabel}" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>

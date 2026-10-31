@@ -189,6 +189,12 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Action? OnMediaPrevious { get; set; }
     public Action? OnMediaPlayPause { get; set; }
     public Action? OnMediaNext { get; set; }
+    public Action? OnMediaSeekBack { get; set; }
+    public Action? OnMediaSeekForward { get; set; }
+    public Action? OnMediaFullScreen { get; set; }
+    public Action? OnOpenMusicPage { get; set; }
+    /// <summary>Now-playing text for the Media hub (null when nothing is playing in the launcher).</summary>
+    public Func<string?>? MediaStatusProvider { get; set; }
 
     public QuickMenuViewModel()
     {
@@ -857,21 +863,51 @@ public partial class QuickMenuViewModel : ViewModelBase
     private void MediaPrevious()
     {
         OnMediaPrevious?.Invoke();
-        MediaStatusLabel = "Previous track";
+        MediaStatusLabel = MediaStatusProvider?.Invoke() ?? "Previous track";
     }
 
     [RelayCommand]
     private void MediaPlayPause()
     {
         OnMediaPlayPause?.Invoke();
-        MediaStatusLabel = "Play / Pause";
+        MediaStatusLabel = MediaStatusProvider?.Invoke() ?? "Play / Pause";
     }
 
     [RelayCommand]
     private void MediaNext()
     {
         OnMediaNext?.Invoke();
-        MediaStatusLabel = "Next track";
+        MediaStatusLabel = MediaStatusProvider?.Invoke() ?? "Next track";
+    }
+
+    [RelayCommand]
+    private void MediaSeekBack()
+    {
+        OnMediaSeekBack?.Invoke();
+        MediaStatusLabel = MediaStatusProvider?.Invoke() ?? "Skipped back";
+    }
+
+    [RelayCommand]
+    private void MediaSeekForward()
+    {
+        OnMediaSeekForward?.Invoke();
+        MediaStatusLabel = MediaStatusProvider?.Invoke() ?? "Skipped forward";
+    }
+
+    [RelayCommand]
+    private void MediaFullScreen()
+    {
+        OnMediaFullScreen?.Invoke();
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void OpenMusicPage()
+    {
+        OnOpenMusicPage?.Invoke();
+        OnRequestLauncherForeground?.Invoke();
+        OnDismiss?.Invoke();
     }
 
     [RelayCommand]

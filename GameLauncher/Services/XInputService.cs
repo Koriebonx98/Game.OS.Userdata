@@ -71,6 +71,13 @@ internal sealed class XInputService
     /// Falls back to no-op if the DLL is unavailable.
     /// </summary>
     public Action? OnGuide { get; set; }
+    /// <summary>Start + Select (Back) pressed together — the only input accepted while Game OS is blocked.</summary>
+    public Action? OnStartSelect { get; set; }
+    /// <summary>
+    /// When this returns true another app has the screen: every input except Start + Select is ignored
+    /// so Game OS never reacts to a controller that belongs to the app on top.
+    /// </summary>
+    public Func<bool>? IsBlocked { get; set; }
     /// <summary>
     /// Share button (Xbox Series X/S).  Triggers a Win+Alt+PrintScreen screenshot.
     /// Mapped from the Back+Start combo on older controllers where a dedicated Share
@@ -92,6 +99,8 @@ internal sealed class XInputService
     private bool   _ltLatched;
     private bool   _rtLatched;
     private bool   _guideLatched;
+    private bool   _comboLatched;
+
     private int    _connectedIndex  = -1;   // cached slot of the connected controller
     private bool   _xinputAvailable = true; // set false if xinput1_4.dll is missing
     private bool   _xinputExAvailable = true; // set false if xinput9_1_0.dll ordinal 100 is missing
@@ -171,6 +180,23 @@ internal sealed class XInputService
     {
         ushort b = gp.wButtons;
 
+        bool comboDown = (b & StartMask) != 0 && (b & BackMask) != 0;
+        FireStick(comboDown, ref _comboLatched, OnStartSelect);
+
+        if (comboDown || _comboLatched)
+        {
+            // Keep the latches in sync so releasing the combo does not fire a stray Back / button press.
+            _latchedButtons = (ushort)(b & (BackMask | StartMask | _latchedButtons));
+            return;
+        }
+
+        if (IsBlocked?.Invoke() == true)
+        {
+            // Latch whatever is held so nothing fires the moment Game OS becomes active again.
+            _latchedButtons = b;
+            return;
+        }
+
         // Digital buttons (bitmask-based)
         Fire(b, DpadUpMask,    ref _latchedButtons, OnUp);
         Fire(b, DpadDownMask,  ref _latchedButtons, OnDown);
@@ -245,5 +271,6 @@ internal sealed class XInputService
         _ltLatched         = false;
         _rtLatched         = false;
         _guideLatched      = false;
+        _comboLatched      = false;
     }
 }

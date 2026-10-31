@@ -99,6 +99,17 @@
                 </Button>
 
                 <Button Classes="settings-nav-item"
+                        Classes.active="{Binding IsMediaSection}"
+                        HorizontalAlignment="Stretch"
+                        Command="{Binding SelectSectionCommand}"
+                        CommandParameter="media">
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <TextBlock Text="🎬" FontSize="16" VerticalAlignment="Center"/>
+                        <TextBlock Text="Media" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+
+                <Button Classes="settings-nav-item"
                         Classes.active="{Binding IsSystemSection}"
                         HorizontalAlignment="Stretch"
                         Command="{Binding SelectSectionCommand}"
@@ -1070,6 +1081,57 @@
 
                 </StackPanel>
 
+                <!-- ── Media ── -->
+                <StackPanel IsVisible="{Binding IsMediaSection}" Spacing="0">
+                    <TextBlock Text="Media" Classes="page-title" Margin="0,0,0,4"/>
+                    <TextBlock Text="Music, movies and TV show playback."
+                               Classes="page-subtitle" Margin="0,0,0,24"/>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="18">
+                            <TextBlock Text="Player" FontSize="15" FontWeight="SemiBold"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Skip length (seconds)" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableSkipSeconds}"
+                                          SelectedItem="{Binding MediaSkipSeconds}" Width="220"/>
+                                <TextBlock Text="How far ◀ / ▶ and the skip buttons jump in the video and music players."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Movies" FontSize="15" FontWeight="SemiBold"/>
+                            <CheckBox IsChecked="{Binding ShowMovieDetails}" Content="Show the info page before playing a movie"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="TV Shows" FontSize="15" FontWeight="SemiBold"/>
+                            <CheckBox IsChecked="{Binding ShowTvDetails}" Content="Show the info page before playing an episode"/>
+                            <CheckBox IsChecked="{Binding AutoPlayNextEpisode}" Content="Play the next episode automatically"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Music" FontSize="15" FontWeight="SemiBold"/>
+                            <CheckBox IsChecked="{Binding MusicShuffle}" Content="Shuffle"/>
+                            <CheckBox IsChecked="{Binding MusicRepeat}" Content="Repeat (start over after the last song)"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="Info &amp; history" FontSize="15" FontWeight="SemiBold"/>
+                            <CheckBox IsChecked="{Binding OnlineMediaInfo}" Content="Look up posters, summaries and ratings online (kept for offline use)"/>
+                            <TextBlock Text="{Binding MediaStatsSummary}" Opacity="0.7" TextWrapping="Wrap"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
                 <!-- ── Design ── -->
                 <StackPanel IsVisible="{Binding IsDesignSection}" Spacing="0">
 
@@ -1171,7 +1233,7 @@
                                           ItemsSource="{Binding AvailableMoviesTvThemes}"
                                           SelectedItem="{Binding MoviesTvTheme}"
                                           Width="220"/>
-                                <TextBlock Text="Movies &amp; TV page design. Default is a console-style browser; Netflix mimics the Netflix look."
+                                <TextBlock Text="Movies &amp; TV page design. Default is a console-style browser; Cinema is a dark streaming-style layout with a hero banner and rows."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 

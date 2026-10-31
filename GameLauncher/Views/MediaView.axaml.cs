@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Platform.Storage;
 using Avalonia.Threading;
@@ -24,8 +25,16 @@ public partial class MediaView : UserControl
     private Media?       _audioMedia;
     private readonly DispatcherTimer _audioTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
 
+    private readonly DispatcherTimer _videoTimer = new() { Interval = TimeSpan.FromMilliseconds(500) };
+    private bool _seekDragging;
+
     public MediaView()
     {
+        _videoTimer.Tick += (_, _) =>
+        {
+            if (_mediaPlayer != null && DataContext is MediaViewModel v)
+                v.UpdateVideoProgress(_mediaPlayer.Time, _mediaPlayer.Length);
+        };
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         Unloaded           += OnUnloaded;
@@ -47,18 +56,102 @@ public partial class MediaView : UserControl
             vm.PlayAudioRequested = StartAudio;
             vm.ToggleAudioPauseRequested = ToggleAudioPause;
             vm.StopAudioRequested = StopAudio;
+            vm.StopVideoRequested = DisposeVlc;
+            vm.ToggleVideoPauseRequested = ToggleVideoPause;
+            vm.SeekByRequested = SeekBy;
+            vm.SeekToRequested = SeekTo;
         }
     }
 
-    // Keeps the controller highlight visible when it moves below the fold.
+    // Keeps the controller highlight visible: scrolls every ScrollViewer around it (list and shelf) just enough.
     private void ScrollFocusedIntoView() =>
         Dispatcher.UIThread.Post(() =>
-            this.GetVisualDescendants().OfType<Button>()
-                .FirstOrDefault(b => b.IsVisible && b.IsEffectivelyVisible && b.Classes.Contains("focused"))?.BringIntoView(),
-            DispatcherPriority.Background);
+        {
+            var btn = this.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.IsVisible && b.IsEffectivelyVisible && b.Classes.Contains("focused"));
+            if (btn == null) return;
+            foreach (var sv in btn.GetVisualAncestors().OfType<ScrollViewer>())
+            {
+                if (sv.Content is not Visual content) continue;
+                var origin = btn.TranslatePoint(new Avalonia.Point(0, 0), content);
+                if (origin == null) continue;
+                var view = sv.Viewport;
+                double x = sv.Offset.X, y = sv.Offset.Y;
+                if (origin.Value.Y < y) y = origin.Value.Y - 8;
+                else if (origin.Value.Y + btn.Bounds.Height > y + view.Height) y = origin.Value.Y + btn.Bounds.Height - view.Height + 8;
+                if (origin.Value.X < x) x = origin.Value.X - 8;
+                else if (origin.Value.X + btn.Bounds.Width > x + view.Width) x = origin.Value.X + btn.Bounds.Width - view.Width + 8;
+                x = Math.Max(0, x); y = Math.Max(0, y);
+                if (Math.Abs(x - sv.Offset.X) > 0.5 || Math.Abs(y - sv.Offset.Y) > 0.5)
+                    sv.Offset = new Avalonia.Vector(x, y);
+            }
+            btn.BringIntoView();
+        }, DispatcherPriority.Background);
+
+    // ── Transport (video overlay and music) ──────────────────────────────────
+
+    private void ToggleVideoPause()
+    {
+        if (_mediaPlayer == null || DataContext is not MediaViewModel vm) return;
+        _mediaPlayer.Pause();
+        vm.IsVideoPlaying = !vm.IsVideoPlaying;
+    }
+
+    private void SeekBy(bool video, long deltaMs)
+    {
+        var p = video ? _mediaPlayer : _audioPlayer;
+        if (p == null || p.Length <= 0) return;
+        p.Time = Math.Clamp(p.Time + deltaMs, 0, Math.Max(0, p.Length - 500));
+        Publish(video);
+    }
+
+    private void SeekTo(bool video, double fraction)
+    {
+        var p = video ? _mediaPlayer : _audioPlayer;
+        if (p == null || p.Length <= 0) return;
+        p.Time = (long)(Math.Clamp(fraction, 0, 1) * p.Length);
+        Publish(video);
+    }
+
+    private void Publish(bool video)
+    {
+        if (DataContext is not MediaViewModel vm) return;
+        if (video && _mediaPlayer != null) vm.UpdateVideoProgress(_mediaPlayer.Time, _mediaPlayer.Length);
+        else if (!video && _audioPlayer != null) vm.UpdateAudioProgress(_audioPlayer.Time, _audioPlayer.Length);
+    }
+
+    // Progress bars: click or drag to seek. Tag = "video" | "audio".
+    private void OnSeekPressed(object? sender, Avalonia.Input.PointerPressedEventArgs e)
+    {
+        _seekDragging = true;
+        e.Pointer.Capture(sender as Avalonia.Input.IInputElement);
+        SeekFromPointer(sender, e);
+    }
+
+    private void OnSeekMoved(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        if (_seekDragging) SeekFromPointer(sender, e);
+    }
+
+    private void OnSeekReleased(object? sender, Avalonia.Input.PointerReleasedEventArgs e)
+    {
+        if (!_seekDragging) return;
+        SeekFromPointer(sender, e);
+        _seekDragging = false;
+        e.Pointer.Capture(null);
+    }
+
+    private void SeekFromPointer(object? sender, Avalonia.Input.PointerEventArgs e)
+    {
+        if (sender is not Control c || c.Bounds.Width <= 0 || DataContext is not MediaViewModel vm) return;
+        double f = e.GetPosition(c).X / c.Bounds.Width;
+        vm.SeekToRequested?.Invoke(string.Equals(c.Tag as string, "video"), f);
+    }
 
     private void OnUnloaded(object? sender, Avalonia.Interactivity.RoutedEventArgs e)
     {
+        _videoTimer.Stop();
+        (DataContext as MediaViewModel)?.EndAllSessions();
         DisposeVlc();
         StopAudio();
     }
@@ -204,7 +297,10 @@ public partial class MediaView : UserControl
             _media = new Media(_libVlc, new Uri(path));
 
             vm.VlcMediaPath    = Path.GetFileName(path);
+            vm.IsVideoPlaying  = true;
+            vm.VideoProgressPercent = 0;
             vm.IsVlcPlayerOpen = true;
+            _videoTimer.Start();
 
             // Attach to the VideoView AFTER the overlay is shown (next layout pass).
             Dispatcher.UIThread.Post(() =>
@@ -212,6 +308,8 @@ public partial class MediaView : UserControl
                 if (VlcOverlayVideoView != null)
                     VlcOverlayVideoView.MediaPlayer = _mediaPlayer;
                 _mediaPlayer?.Play(_media);
+                long resume = vm.TakeResumeMs();
+                if (resume > 0) ResumeWhenReady(resume);
             }, DispatcherPriority.Background);
         }
         catch (Exception ex)
@@ -221,10 +319,31 @@ public partial class MediaView : UserControl
         }
     }
 
+    // VLC only accepts a seek once playback has actually started, so retry for a couple of seconds.
+    private void ResumeWhenReady(long resumeMs)
+    {
+        int tries = 0;
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        t.Tick += (_, _) =>
+        {
+            var p = _mediaPlayer;
+            if (p == null || ++tries > 12) { t.Stop(); return; }
+            if (p.IsPlaying && p.Length > resumeMs) { p.Time = resumeMs; t.Stop(); }
+        };
+        t.Start();
+    }
+
     private void OnVlcEndReached(object? sender, EventArgs e)
     {
-        System.Threading.Tasks.Task.Run(() =>
-            Dispatcher.UIThread.Post(CloseVlcOverlay));
+        // The player cannot be disposed from inside its own callback, so hop threads first.
+        System.Threading.Tasks.Task.Run(() => Dispatcher.UIThread.Post(() =>
+        {
+            (DataContext as MediaViewModel)?.MarkVideoCompleted();
+            if (DataContext is MediaViewModel vm && vm.NextEpisodePath() is { } next && File.Exists(next))
+                StartPlayback(next);
+            else
+                CloseVlcOverlay();
+        }));
     }
 
     private void OnVlcError(object? sender, EventArgs e)
@@ -242,6 +361,7 @@ public partial class MediaView : UserControl
 
     private void DisposeVlc()
     {
+        _videoTimer.Stop();
         if (_mediaPlayer != null)
         {
             _mediaPlayer.EndReached       -= OnVlcEndReached;
