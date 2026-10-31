@@ -225,6 +225,7 @@ public partial class BrowserViewModel : ViewModelBase
                 MenuEntries.Add(new() { Label = $"⬇  Save page as download link for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindDownload });
                 MenuEntries.Add(new() { Label = $"📖  Save page as walkthrough for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindWalkthrough });
                 MenuEntries.Add(new() { Label = $"📘  Save page as guide for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindGuide });
+                MenuEntries.Add(new() { Label = $"🧩  Save page as mod for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindMod });
             }
             MenuEntries.Add(new() { Label = $"🔍  Search walkthrough: {ContextGame}", Kind = BrowserMenuKind.SearchWeb, Kind2 = "walkthrough" });
             MenuEntries.Add(new() { Label = $"🔍  Search download: {ContextGame} {ContextPlatform}", Kind = BrowserMenuKind.SearchWeb, Kind2 = "download" });

@@ -13,8 +13,9 @@ namespace GameLauncher.Services
         public const string KindDownload = "Download";
         public const string KindWalkthrough = "Walkthrough";
         public const string KindGuide = "Guide";
+        public const string KindMod = "Mod";
         public const string KindOther = "Other";
-        public static readonly string[] Kinds = { KindDownload, KindWalkthrough, KindGuide, KindOther };
+        public static readonly string[] Kinds = { KindDownload, KindWalkthrough, KindGuide, KindMod, KindOther };
 
         [JsonPropertyName("id")]       public string Id { get; set; } = Guid.NewGuid().ToString("N");
         [JsonPropertyName("platform")] public string Platform { get; set; } = "";
@@ -25,7 +26,7 @@ namespace GameLauncher.Services
         [JsonPropertyName("created")]  public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
         [JsonIgnore] public bool IsGuideLike => Kind is KindWalkthrough or KindGuide;
-        [JsonIgnore] public string Icon => Kind switch { KindDownload => "⬇", KindWalkthrough => "📖", KindGuide => "📘", _ => "🔗" };
+        [JsonIgnore] public string Icon => Kind switch { KindDownload => "⬇", KindWalkthrough => "📖", KindGuide => "📘", KindMod => "🧩", _ => "🔗" };
     }
 
     /// <summary>

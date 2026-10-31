@@ -54,7 +54,9 @@ namespace GameLauncher.Services
         public static string CleanQuery(string title, out int year)
         {
             year = 0;
-            var m = Regex.Match(title, @"[\(\[\. _-]((?:19|20)\d{2})(?!\d)");
+            // An explicit "(Year)" / "[Year]" wins, so "Blade Runner 2049 (2017)" resolves to 2017.
+            var m = Regex.Match(title, @"[\(\[]\s*((?:19|20)\d{2})\s*[\)\]]");
+            if (!m.Success) m = Regex.Match(title, @"[\(\[\. _-]((?:19|20)\d{2})(?!\d)");
             if (m.Success) { year = int.Parse(m.Groups[1].Value); title = title[..m.Index]; }
             title = Regex.Replace(title, @"\b(2160p|1080p|720p|480p|4k|uhd|hdr|bluray|brrip|bdrip|web-?dl|webrip|dvdrip|x26[45]|h\.?26[45]|hevc|aac|ac3|dts|remux|extended|unrated|proper)\b.*$",
                 "", RegexOptions.IgnoreCase);
@@ -136,7 +138,7 @@ namespace GameLauncher.Services
         private static async Task<MediaMetadata> FetchItunesAsync(string query, int year, string media, string entity, string keyBase)
         {
             var meta = new MediaMetadata { Source = "iTunes" };
-            string url = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(query)}&media={media}&entity={entity}&limit=5";
+            string url = $"https://itunes.apple.com/search?term={Uri.EscapeDataString(query)}&media={media}&entity={entity}&limit={(year > 0 ? 15 : 5)}";
             using var doc = JsonDocument.Parse(await Http.GetStringAsync(url));
             if (!doc.RootElement.TryGetProperty("results", out var results) || results.GetArrayLength() == 0) return meta;
 
