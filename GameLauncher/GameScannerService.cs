@@ -1431,7 +1431,7 @@ public sealed class GameScannerService : IDisposable
                         string? setupExe = FindSetupExe(sub);
                         results.Add(new LocalRepack
                         {
-                            Title     = _fileSizeAnnotationRegex.Replace(StripRepackMarkers(Path.GetFileName(sub)), "").Trim(),
+                            Title     = CleanRepackFolderName(Path.GetFileName(sub)),
                             FilePath  = setupExe ?? sub,
                             FileType  = setupExe != null ? "setup" : "folder",
                             SizeBytes = GetDirectorySize(sub),
@@ -1600,7 +1600,7 @@ public sealed class GameScannerService : IDisposable
 
         return new LocalRepack
         {
-            Title     = _fileSizeAnnotationRegex.Replace(StripRepackMarkers(Path.GetFileName(folderPath)), "").Trim(),
+            Title     = CleanRepackFolderName(Path.GetFileName(folderPath)),
             FilePath  = preferredFile,
             FileType  = Path.GetExtension(preferredFile).TrimStart('.').ToLowerInvariant(),
             SizeBytes = size,
@@ -1729,6 +1729,21 @@ public sealed class GameScannerService : IDisposable
         // Collapse multiple spaces
         result = Regex.Replace(result, @"\s{2,}", " ").Trim();
         return result;
+    }
+
+    /// <summary>
+    /// Display title for a Repacks sub-folder: "Bloons-TD-6-SteamRIP.com" → "Bloons TD 6".
+    /// Slug-style names (no spaces) get hyphens/underscores replaced; names with spaces keep
+    /// their punctuation and only lose trailing site/scene tags and size annotations.
+    /// </summary>
+    internal static string CleanRepackFolderName(string folderName)
+    {
+        string name = StripRepackMarkers(folderName);
+        if (!name.Contains(' ') && (name.Contains('-') || name.Contains('_')))
+            return NormalizeArchiveTitle(name);
+        name = _domainSuffixRegex.Replace(name, "").TrimEnd();
+        name = _archiveSuffixRegex.Replace(name, "").TrimEnd();
+        return _fileSizeAnnotationRegex.Replace(name, "").Trim();
     }
 
     // ── Game title normalisation (mirrors MainViewModel.NormalizeGameTitle) ──

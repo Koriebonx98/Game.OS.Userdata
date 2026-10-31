@@ -127,6 +127,7 @@ public partial class QuickMenuViewModel
                 yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
                 break;
             case "guides":
+                yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "Dashboard");
                 if (!IsPlayingGame)
                 {
                     yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = "No game running.", Subtitle = "Start a game to see its saved walkthroughs." };
@@ -136,10 +137,23 @@ public partial class QuickMenuViewModel
                 string gp = string.IsNullOrWhiteSpace(CurrentGamePlatform) ? "PC" : CurrentGamePlatform;
                 string gt = CurrentGameTitle;
                 var links = Services.GameLinksService.ForGame(gp, gt);
-                foreach (var l in links)
+                var sections = new (string Title, Func<Services.GameLink, bool> Match)[]
                 {
-                    var capturedLink = l;
-                    yield return Act(capturedLink.Icon, capturedLink.Name, () => { OnOpenUrl?.Invoke(gp, gt, capturedLink.Url); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); }, capturedLink.Kind);
+                    ("Walk Throughs", l => l.IsGuideLike),
+                    ("Mods", l => l.Kind == Services.GameLink.KindMod),
+                    ("Downloads", l => l.Kind == Services.GameLink.KindDownload),
+                    ("Other", l => !l.IsGuideLike && l.Kind != Services.GameLink.KindMod && l.Kind != Services.GameLink.KindDownload),
+                };
+                foreach (var (sectionTitle, match) in sections)
+                {
+                    var inSection = links.Where(match).ToList();
+                    if (inSection.Count == 0) continue;
+                    yield return new QuickMenuHubActionVm { Glyph = "▾", Title = sectionTitle.ToUpperInvariant() };
+                    foreach (var l in inSection)
+                    {
+                        var capturedLink = l;
+                        yield return Act(capturedLink.Icon, capturedLink.Name, () => { OnOpenUrl?.Invoke(gp, gt, capturedLink.Url); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); }, capturedLink.Kind);
+                    }
                 }
                 if (links.Count == 0)
                     yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = $"No saved links for {gt}.", Subtitle = "Open the browser from the game page to save walkthroughs." };
