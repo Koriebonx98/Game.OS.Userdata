@@ -1,7 +1,9 @@
+using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Avalonia.VisualTree;
 using GameLauncher.ViewModels;
 
@@ -14,7 +16,23 @@ public partial class Ps5Dashboard : UserControl
         InitializeComponent();
         // PointerEntered does not bubble, so watch pointer movement and resolve the card under the mouse.
         AddHandler(PointerMovedEvent, OnPointerMoved, RoutingStrategies.Bubble, handledEventsToo: true);
+        DataContextChanged += (_, _) =>
+        {
+            if (_vm != null) _vm.Ps5ShelfFocusChanged -= ScrollShelfFocusIntoView;
+            _vm = DataContext as DashboardViewModel;
+            if (_vm != null) _vm.Ps5ShelfFocusChanged += ScrollShelfFocusIntoView;
+        };
     }
+
+    private DashboardViewModel? _vm;
+
+    // The shelf is wider than the window: keep the highlighted card on screen as the D-pad moves along it.
+    private void ScrollShelfFocusIntoView() =>
+        Dispatcher.UIThread.Post(() =>
+            this.GetVisualDescendants().OfType<Button>()
+                .FirstOrDefault(b => b.IsVisible && b.Classes.Contains("focused")
+                                     && b.DataContext is DashboardViewModel.ShelfCardVm)?.BringIntoView(),
+            DispatcherPriority.Background);
 
     private void OnPointerMoved(object? sender, PointerEventArgs e)
     {

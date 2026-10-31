@@ -90,8 +90,9 @@
             </Grid>
 
             <!-- Tile mosaic -->
-            <Viewbox Grid.Row="1" Stretch="Uniform" StretchDirection="Both" Margin="0,16" HorizontalAlignment="Left" VerticalAlignment="Top">
-                <ItemsControl Classes="kx-grid" ItemsSource="{Binding KineticTiles}" Width="1000" Height="400">
+            <Grid Grid.Row="1" Margin="0,16" MinHeight="150">
+                <ItemsControl Classes="kx-grid" ItemsSource="{Binding KineticTiles}"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate>
                             <Grid ColumnDefinitions="*,*,*,*,*,*,*,*" RowDefinitions="*,*,*"/>
@@ -112,7 +113,7 @@
                                             <TextBlock Text="{Binding Title}" Foreground="White" FontSize="15" FontWeight="SemiBold"
                                                        TextTrimming="CharacterEllipsis"/>
                                             <TextBlock Text="{Binding Subtitle}" Foreground="#dddddd" FontSize="11"
-                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding Subtitle.Length}"/>
+                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding HasSubtitle}"/>
                                         </StackPanel>
                                     </Border>
                                 </Grid>
@@ -120,7 +121,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
-            </Viewbox>
+            </Grid>
 
             <!-- Hints -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="24" IsVisible="{Binding Options.ShowHints}">

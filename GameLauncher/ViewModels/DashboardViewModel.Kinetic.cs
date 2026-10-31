@@ -23,6 +23,7 @@ public partial class KineticTileVm : ObservableObject
     public Action? Action { get; init; }
     public bool HasCover => !string.IsNullOrEmpty(CoverUrl) || !string.IsNullOrEmpty(CoverGradient);
     public bool IsSolid => !HasCover;
+    public bool HasSubtitle => !string.IsNullOrEmpty(Subtitle);
     [ObservableProperty] private bool _isFocused;
     public ICommand ActivateCommand => new RelayCommand(() => Action?.Invoke());
 }

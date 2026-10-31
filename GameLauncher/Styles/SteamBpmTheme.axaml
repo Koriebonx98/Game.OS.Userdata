@@ -134,12 +134,12 @@
     </Style>
 
     <!-- ── Tab pills ──────────────────────────────────────────────────── -->
-    <Style Selector="Border.steam-tab-pill">
+    <Style Selector="Button.steam-tab-pill">
         <Setter Property="Padding" Value="20,9"/>
         <Setter Property="CornerRadius" Value="20"/>
         <Setter Property="Background" Value="#22303E"/>
     </Style>
-    <Style Selector="Border.steam-tab-pill-active">
+    <Style Selector="Button.steam-tab-pill.steam-tab-active">
         <Setter Property="Background" Value="#3D4E5C"/>
     </Style>
     <Style Selector="TextBlock.steam-tab-pill-text">
@@ -167,9 +167,17 @@
         <Setter Property="Foreground" Value="#5BB6FF"/>
     </Style>
     <!-- Card container -->
-    <Style Selector="Border.steam-news-card">
+    <Style Selector="Button.steam-news-card">
         <Setter Property="Width" Value="248"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="BorderThickness" Value="0"/>
         <Setter Property="Background" Value="#16202D"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.steam-news-card /template/ ContentPresenter">
+        <Setter Property="Background" Value="#16202D"/>
+        <Setter Property="CornerRadius" Value="0"/>
     </Style>
     <!-- Dark footer -->
     <Style Selector="Border.steam-news-footer">
@@ -186,5 +194,128 @@
         <Setter Property="FontSize" Value="14"/>
         <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+
+    <!-- ── Focus ring (controller / keyboard highlight) ───────────────── -->
+    <Style Selector="Button.steam-hero-recent-button.steam-focused, Button.steam-side-recent-button.steam-focused, Button.steam-news-card.steam-focused">
+        <Setter Property="RenderTransform" Value="scale(1.04)"/>
+        <Setter Property="ZIndex" Value="5"/>
+        <Setter Property="Transitions">
+            <Transitions>
+                <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+            </Transitions>
+        </Setter>
+    </Style>
+    <Style Selector="Button.steam-hero-recent-button.steam-focused /template/ ContentPresenter, Button.steam-side-recent-button.steam-focused /template/ ContentPresenter, Button.steam-news-card.steam-focused /template/ ContentPresenter, Button.steam-tab-pill.steam-tab-active.steam-focused /template/ ContentPresenter, Button.steam-nav-pill:focus /template/ ContentPresenter">
+        <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        <Setter Property="BorderThickness" Value="3"/>
+    </Style>
+    <Style Selector="Button.steam-tab-pill">
+        <Setter Property="Background" Value="#22303E"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.steam-tab-pill /template/ ContentPresenter">
+        <Setter Property="Background" Value="#22303E"/>
+        <Setter Property="CornerRadius" Value="20"/>
+    </Style>
+    <Style Selector="Button.steam-tab-pill.steam-tab-active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#3D4E5C"/>
+    </Style>
+    <Style Selector="Button.steam-tab-pill:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#33485A"/>
+    </Style>
+
+    <!-- ── Hero / card overlays ───────────────────────────────────────── -->
+    <Style Selector="Border.steam-hero-image-tint">
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,40%" EndPoint="0%,100%">
+                    <GradientStop Color="#00000000" Offset="0"/>
+                    <GradientStop Color="#CC0B1118" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="Border.steam-hero-info-panel">
+        <Setter Property="Padding" Value="20,14"/>
+    </Style>
+    <Style Selector="Border.steam-side-image-tint">
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,50%" EndPoint="0%,100%">
+                    <GradientStop Color="#00000000" Offset="0"/>
+                    <GradientStop Color="#D90B1118" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="Border.steam-side-card-footer">
+        <Setter Property="Padding" Value="12,10"/>
+    </Style>
+    <Style Selector="TextBlock.steam-side-card-title">
+        <Setter Property="FontSize" Value="14"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="White"/>
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+    </Style>
+    <Style Selector="TextBlock.steam-side-card-meta">
+        <Setter Property="FontSize" Value="11"/>
+        <Setter Property="Foreground" Value="#4BAD4E"/>
+    </Style>
+    <Style Selector="Border.steam-news-image-tint">
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Background">
+            <Setter.Value>
+                <LinearGradientBrush StartPoint="0%,60%" EndPoint="0%,100%">
+                    <GradientStop Color="#00000000" Offset="0"/>
+                    <GradientStop Color="#99000000" Offset="1"/>
+                </LinearGradientBrush>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <Style Selector="TextBlock.steam-news-subtitle">
+        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="Foreground" Value="#C6D4DF"/>
+    </Style>
+
+    <!-- ── Top navigation pills, shelf title, hint bar ────────────────── -->
+    <Style Selector="Button.steam-nav-pill">
+        <Setter Property="Padding" Value="16,7"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.steam-nav-pill /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="CornerRadius" Value="18"/>
+    </Style>
+    <Style Selector="Button.steam-nav-pill:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#26384A"/>
+    </Style>
+    <Style Selector="Border.steam-nav-pill">
+        <Setter Property="Padding" Value="16,7"/>
+    </Style>
+    <Style Selector="Border.steam-nav-pill-active">
+        <Setter Property="Background" Value="#3D4E5C"/>
+        <Setter Property="CornerRadius" Value="18"/>
+    </Style>
+    <Style Selector="TextBlock.steam-nav-text">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#DCE6EE"/>
+    </Style>
+    <Style Selector="TextBlock.steam-shelf-title">
+        <Setter Property="FontSize" Value="18"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Border.steam-hint-bar">
+        <Setter Property="Background" Value="#CC10161E"/>
+        <Setter Property="Padding" Value="0,10"/>
+    </Style>
+    <Style Selector="TextBlock.steam-hint-text">
+        <Setter Property="FontSize" Value="13"/>
+        <Setter Property="Foreground" Value="#C6D4DF"/>
     </Style>
 </Styles>

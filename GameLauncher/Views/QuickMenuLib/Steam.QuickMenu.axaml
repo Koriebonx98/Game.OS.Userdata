@@ -1,0 +1,113 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.QuickMenuLib.SteamQuickMenu"
+             x:DataType="vm:QuickMenuViewModel">
+
+    <UserControl.Styles>
+        <Style Selector="Button.stg-tab">
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="20"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.stg-tab /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1b2838"/>
+            <Setter Property="Foreground" Value="#c6d4df"/>
+            <Setter Property="CornerRadius" Value="6"/>
+        </Style>
+        <Style Selector="Button.stg-tab:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2a475e"/>
+        </Style>
+        <Style Selector="Button.stg-tab.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1a9fff"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+
+        <Style Selector="Button.stg-row">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.stg-row /template/ ContentPresenter">
+            <Setter Property="Background" Value="#16202d"/>
+            <Setter Property="Foreground" Value="#c6d4df"/>
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="2"/>
+        </Style>
+        <Style Selector="Button.stg-row:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2a475e"/>
+        </Style>
+        <Style Selector="Button.stg-row.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2a475e"/>
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+        <Style Selector="Button.stg-row.info /template/ ContentPresenter">
+            <Setter Property="Background" Value="#101822"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border HorizontalAlignment="Right" Width="470" Background="#F20e141b"
+            BorderBrush="#2a475e" BorderThickness="1,0,0,0"
+            IsVisible="{Binding UsesSteamGuideLayout}">
+        <Grid RowDefinitions="Auto,Auto,*,Auto" Margin="22">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
+                <Button Classes="stg-tab" Classes.active="{Binding IsHomePage}" Command="{Binding SelectHomeCommand}">🏠</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsSwitcherPage}" Command="{Binding SelectSwitcherCommand}">🗂</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsRecentGamesPage}" Command="{Binding SelectRecentGamesCommand}">🎮</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsNotificationsPage}" Command="{Binding SelectNotificationsCommand}">🔔</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}">⬇</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}">👥</Button>
+            </StackPanel>
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="0,54,0,0">
+                <Button Classes="stg-tab" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}">📬</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}">🏆</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}">🎵</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsBrowserPage}" Command="{Binding SelectBrowserCommand}">🌐</Button>
+                <Button Classes="stg-tab" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}">⏻</Button>
+            </StackPanel>
+
+            <StackPanel Grid.Row="1" Margin="0,112,0,12" Spacing="2">
+                <TextBlock Text="QUICK GUIDE" FontSize="11" FontWeight="Bold" Foreground="#1a9fff"/>
+                <TextBlock Text="{Binding MenuTitle}" FontSize="26" FontWeight="SemiBold" Foreground="White"/>
+                <TextBlock Text="{Binding MenuSubtitle}" FontSize="13" Foreground="#8f98a0" TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding HubActions}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="6"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                            <Button Classes="stg-row" Classes.cursor="{Binding IsCursor}"
+                                    Classes.info="{Binding !IsActionable}"
+                                    IsHitTestVisible="{Binding IsActionable}"
+                                    Command="{Binding ActivateCommand}">
+                                <Grid ColumnDefinitions="40,*">
+                                    <TextBlock Text="{Binding Glyph}" FontSize="20" VerticalAlignment="Center"/>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="12" Foreground="#8f98a0"
+                                                   TextTrimming="CharacterEllipsis" IsVisible="{Binding HasSubtitle}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="3" Margin="0,14,0,0" Foreground="#8f98a0" FontSize="13" TextWrapping="Wrap"
+                       Text="◀ ▶ Tab     ▲ ▼ Select     Ⓐ Select     Ⓑ Back"/>
+        </Grid>
+    </Border>
+</UserControl>

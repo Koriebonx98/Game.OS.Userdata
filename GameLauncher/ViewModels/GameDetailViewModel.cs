@@ -3414,11 +3414,13 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _gameInfoTheme = "Default";
     public bool IsPs5GameInfo     => string.Equals(GameInfoTheme, "PS5", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchGameInfo  => string.Equals(GameInfoTheme, "Switch", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGameInfo => !IsPs5GameInfo && !IsSwitchGameInfo;
+    public bool IsSteamGameInfo   => string.Equals(GameInfoTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultGameInfo => !IsPs5GameInfo && !IsSwitchGameInfo && !IsSteamGameInfo;
     partial void OnGameInfoThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5GameInfo));
         OnPropertyChanged(nameof(IsSwitchGameInfo));
+        OnPropertyChanged(nameof(IsSteamGameInfo));
         OnPropertyChanged(nameof(IsDefaultGameInfo));
     }
 

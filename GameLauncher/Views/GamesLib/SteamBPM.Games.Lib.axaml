@@ -1,0 +1,163 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.GamesLib.SteamGamesLib"
+             x:DataType="vm:LibraryViewModel"
+             Background="#171D25">
+
+    <!--
+        SteamBPM.Games.Lib - Steam Big Picture "My Library": collections on the left, portrait cover grid with a
+        white focus ring, and the highlighted game's name + controller hints at the bottom.
+        Edit this file to change the "SteamBPM" Games theme.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.st-lib-card">
+            <Setter Property="Width" Value="160"/>
+            <Setter Property="Height" Value="226"/>
+            <Setter Property="Margin" Value="9"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="#16202D"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        </Style>
+        <Style Selector="Button.st-lib-card /template/ ContentPresenter">
+            <Setter Property="Background" Value="#16202D"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+        </Style>
+        <Style Selector="Button.st-lib-card:pointerover, Button.st-lib-card.focused">
+            <Setter Property="RenderTransform" Value="scale(1.05)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+        <Style Selector="Button.st-lib-card:pointerover /template/ ContentPresenter, Button.st-lib-card.focused /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.st-lib-side">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Padding" Value="16,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#C6D4DF"/>
+        </Style>
+        <Style Selector="Button.st-lib-side /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="4"/>
+        </Style>
+        <Style Selector="Button.st-lib-side:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#26384A"/>
+        </Style>
+        <Style Selector="Button.st-lib-side.filter-chip-active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3D4E5C"/>
+        </Style>
+        <Style Selector="Border.st-lib-badge">
+            <Setter Property="Background" Value="#2A6496"/>
+            <Setter Property="CornerRadius" Value="2"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Margin" Value="6"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="0,18,0,0">
+
+        <!-- Header + search -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="54,0,54,12">
+            <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="My Library" FontSize="28" FontWeight="SemiBold" Foreground="White"/>
+                <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games'}"
+                           FontSize="12" Foreground="#8BA3B8"/>
+            </StackPanel>
+            <TextBox Grid.Column="1"
+                     Name="LibrarySearchBox"
+                     Classes="form-input"
+                     IsTabStop="False"
+                     Text="{Binding SearchText}"
+                     Watermark="🔍  Search your library…"
+                     Width="260" VerticalAlignment="Center"/>
+        </Grid>
+
+        <Grid Grid.Row="1" ColumnDefinitions="230,*">
+            <!-- Collections -->
+            <StackPanel Grid.Column="0" Margin="40,0,10,0" Spacing="4">
+                <TextBlock Text="COLLECTIONS" FontSize="11" FontWeight="Bold" Foreground="#5BB6FF" Margin="16,0,0,6"/>
+                <Button Classes="st-lib-side"
+                        Classes.filter-chip-active="{Binding IsInstallFilterAll}"
+                        Command="{Binding SetInstallFilterCommand}" CommandParameter="All">
+                    <TextBlock Text="All games" FontSize="14" FontWeight="SemiBold"/>
+                </Button>
+                <Button Classes="st-lib-side"
+                        Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
+                        Command="{Binding SetInstallFilterCommand}" CommandParameter="Installed">
+                    <TextBlock Text="Installed" FontSize="14" FontWeight="SemiBold"/>
+                </Button>
+                <Button Classes="st-lib-side"
+                        Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
+                        Command="{Binding SetInstallFilterCommand}" CommandParameter="Uninstalled">
+                    <TextBlock Text="Not installed" FontSize="14" FontWeight="SemiBold"/>
+                </Button>
+                <TextBlock Text="PLATFORM" FontSize="11" FontWeight="Bold" Foreground="#5BB6FF" Margin="16,16,0,6"/>
+                <ComboBox ItemsSource="{Binding Platforms}"
+                          SelectedItem="{Binding FilterPlatform}"
+                          HorizontalAlignment="Stretch" Margin="8,0,0,0"/>
+            </StackPanel>
+
+            <!-- Cover grid -->
+            <ScrollViewer Grid.Column="1"
+                          HorizontalScrollBarVisibility="Disabled"
+                          VerticalScrollBarVisibility="Auto"
+                          Padding="0,6,0,12">
+                <ItemsControl ItemsSource="{Binding FilteredMyGames}" Margin="0,0,40,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:LocalGameCardVm">
+                            <Button Classes="st-lib-card"
+                                    Classes.focused="{Binding IsFocused}"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                                    CommandParameter="{Binding}">
+                                <Grid ToolTip.Tip="{Binding EffectiveTitle}">
+                                    <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                      FallbackText="{Binding EffectiveTitle}"
+                                                      FallbackGradient="{Binding CoverGradient}"
+                                                      SubText="{Binding Platform}"
+                                                      LetterFontSize="40"
+                                                      ImageCornerRadius="0"/>
+                                    <Border Classes="st-lib-badge"
+                                            IsVisible="{Binding KindLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                        <TextBlock Text="{Binding KindLabel}" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Highlighted game + controller hints -->
+        <Border Grid.Row="2" Background="#CC10161E" Padding="54,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding FocusedGame.EffectiveTitle}" FontSize="16" FontWeight="SemiBold"
+                               Foreground="White" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding FocusedGame.PlaytimeLabel}" FontSize="12" Foreground="#4BAD4E"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="24">
+                    <TextBlock Text="Ⓐ  Game info" FontSize="13" Foreground="#C6D4DF"/>
+                    <TextBlock Text="Ⓑ  Back" FontSize="13" Foreground="#C6D4DF"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+    </Grid>
+</UserControl>

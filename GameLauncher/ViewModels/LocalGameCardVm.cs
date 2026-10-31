@@ -104,4 +104,7 @@ public partial class LocalGameCardVm : ViewModelBase
 
     /// <summary>True when this card is the keyboard-focused card on the dashboard.</summary>
     [ObservableProperty] private bool _isFocused;
+
+    /// <summary>True when this card is highlighted on the Steam Big Picture dashboard.</summary>
+    [ObservableProperty] private bool _isSteamFocused;
 }
