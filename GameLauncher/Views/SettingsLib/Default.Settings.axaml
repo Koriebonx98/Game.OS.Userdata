@@ -1176,7 +1176,7 @@
                                             ToolTip.Tip="Customise this design" Content="⚙" FontSize="16"
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="dashboard"/>
                                 </StackPanel>
-                                <TextBlock Text="Default uses the standard Game.OS dashboard style. XB360 OG is the original Xbox 360 blades dashboard; XB360 Kinetic is the Kinect-era tile mosaic."
+                                <TextBlock Text="Default uses the standard Game.OS dashboard style. XB360 OG is the original Xbox 360 blades dashboard; XB360 Kinetic is the Default dashboard in Xbox green."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
 
                                 <!-- ⚙ Dashboard options: assets, accent, size and position of the selected dashboard -->

@@ -91,6 +91,16 @@ public partial class QuickMenuViewModel : ViewModelBase
     [ObservableProperty] private bool _xb360FriendContextMenuOpen;
     [ObservableProperty] private int  _xb360FriendContextIndex;
 
+    // ── XB360 Achievements sub-navigation + Media blade cursor ─────────────
+    // Media cursor: 0=Prev, 1=Play/Pause, 2=Next, 3=Open Media.
+    [ObservableProperty] private bool _xb360AchievementsSubMode;
+    [ObservableProperty] private int  _xb360AchievementIndex;
+    [ObservableProperty] private int  _xb360MediaIndex = 1;
+    public bool Xb360MediaCursorPrev      => Xb360MediaIndex == 0;
+    public bool Xb360MediaCursorPlayPause => Xb360MediaIndex == 1;
+    public bool Xb360MediaCursorNext      => Xb360MediaIndex == 2;
+    public bool Xb360MediaCursorOpen      => Xb360MediaIndex == 3;
+
     // Cursor booleans — used by XAML to highlight the Up/Down position.
     public bool Xb360CursorHome          => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 0;
     public bool Xb360CursorFriends       => IsXb360Theme && Xb360BladeId == "main" && Xb360CenterIndex == 1;
@@ -252,8 +262,30 @@ public partial class QuickMenuViewModel : ViewModelBase
     }
 
     partial void OnXb360CenterIndexChanged(int value) => NotifyXb360CursorProps();
+    partial void OnXb360MediaIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(Xb360MediaCursorPrev));
+        OnPropertyChanged(nameof(Xb360MediaCursorPlayPause));
+        OnPropertyChanged(nameof(Xb360MediaCursorNext));
+        OnPropertyChanged(nameof(Xb360MediaCursorOpen));
+    }
+
+    partial void OnXb360AchievementsSubModeChanged(bool value) => RefreshXb360AchievementHighlight();
+    partial void OnXb360AchievementIndexChanged(int value)     => RefreshXb360AchievementHighlight();
+
+    private void RefreshXb360AchievementHighlight()
+    {
+        for (int i = 0; i < Achievements.Count; i++)
+            Achievements[i].IsHighlighted = Xb360AchievementsSubMode && i == Xb360AchievementIndex;
+    }
+
     partial void OnXb360BladeIdChanged(string value)
     {
+        // Leaving the main blade drops any sub-panel focus.
+        Xb360AchievementsSubMode = false;
+        Xb360FriendsSubMode = false;
+        Xb360FriendContextMenuOpen = false;
+        Xb360RecentSubMode = false;
         NotifyXb360BladeProps();
         NotifyXb360CursorProps();
     }
@@ -336,6 +368,12 @@ public partial class QuickMenuViewModel : ViewModelBase
         if (IsXb360Theme && Xb360RecentSubMode)
         {
             Xb360RecentSubMode = false;
+            return true;
+        }
+
+        if (IsXb360Theme && Xb360AchievementsSubMode)
+        {
+            Xb360AchievementsSubMode = false;
             return true;
         }
 
@@ -448,12 +486,29 @@ public partial class QuickMenuViewModel : ViewModelBase
     /// <summary>Moves the Up/Down cursor within the XB360 center item list.</summary>
     public void MoveXb360CenterItem(int delta)
     {
-        if (!IsXb360Theme || Xb360BladeId != "main") return;
+        if (!IsXb360Theme) return;
+
+        if (Xb360BladeId == "media")
+        {
+            // Down → "Open Media" button, Up → back to the transport row.
+            if (delta > 0) Xb360MediaIndex = 3;
+            else if (Xb360MediaIndex == 3) Xb360MediaIndex = 1;
+            return;
+        }
+
+        if (Xb360BladeId != "main") return;
 
         if (Xb360RecentSubMode)
         {
             Xb360RecentIndex = Math.Clamp(Xb360RecentIndex + delta, 0, Xb360RecentRows.Count - 1);
             RefreshXb360RecentRows();
+            return;
+        }
+
+        if (Xb360AchievementsSubMode)
+        {
+            if (Achievements.Count > 0)
+                Xb360AchievementIndex = Math.Clamp(Xb360AchievementIndex + delta, 0, Achievements.Count - 1);
             return;
         }
 
@@ -555,6 +610,33 @@ public partial class QuickMenuViewModel : ViewModelBase
         Xb360BladeId = Xb360BladeOrder[Math.Clamp(idx + delta, 0, Xb360BladeOrder.Length - 1)];
     }
 
+    /// <summary>Left/Right: steps within the focused sub-panel (media buttons), leaves a sub-list, or switches blade.</summary>
+    public void MoveXb360Horizontal(int delta)
+    {
+        if (!IsXb360Theme) return;
+
+        if (Xb360BladeId == "media")
+        {
+            if (Xb360MediaIndex == 3) return;
+            int next = Xb360MediaIndex + delta;
+            if (next >= 0 && next <= 2) { Xb360MediaIndex = next; return; }
+            MoveXb360Blade(delta);
+            return;
+        }
+
+        if (Xb360BladeId == "main")
+        {
+            // Left steps back out of a sub-list; Right is ignored while inside one.
+            if (Xb360FriendsSubMode || Xb360AchievementsSubMode || Xb360RecentSubMode)
+            {
+                if (delta < 0) HandleBackNavigation();
+                return;
+            }
+        }
+
+        MoveXb360Blade(delta);
+    }
+
     public void ActivateSelectedHub()
     {
         if (IsXb360Theme)
@@ -577,7 +659,13 @@ public partial class QuickMenuViewModel : ViewModelBase
         switch (Xb360BladeId)
         {
             case "media":
-                OpenMediaPageCommand.Execute(null);
+                switch (Xb360MediaIndex)
+                {
+                    case 0: MediaPreviousCommand.Execute(null); break;
+                    case 1: MediaPlayPauseCommand.Execute(null); break;
+                    case 2: MediaNextCommand.Execute(null); break;
+                    default: OpenMediaPageCommand.Execute(null); break;
+                }
                 return;
             case "settings":
                 OpenSettingsPageCommand.Execute(null);
@@ -595,6 +683,9 @@ public partial class QuickMenuViewModel : ViewModelBase
             ActivateXb360RecentRow();
             return;
         }
+
+        // Achievements are browse-only: A keeps the highlight, B / Left leaves the list.
+        if (Xb360AchievementsSubMode) return;
 
         // If already in friends sub-navigation, delegate to that handler.
         if (Xb360FriendsSubMode)
@@ -623,7 +714,12 @@ public partial class QuickMenuViewModel : ViewModelBase
                 }
                 break;
             case "achievements":
-                ActivePage = "achievements";
+                if (Achievements.Count > 0)
+                {
+                    Xb360AchievementIndex = 0;
+                    Xb360AchievementsSubMode = true;
+                    RefreshXb360AchievementHighlight();
+                }
                 break;
             case "inbox":
                 OpenInboxPageCommand.Execute(null);
@@ -1072,6 +1168,8 @@ public partial class QuickMenuViewModel : ViewModelBase
             });
         }
         HasAchievements = Achievements.Count > 0;
+        Xb360AchievementsSubMode = false;
+        Xb360AchievementIndex = 0;
     }
 
     public void Refresh(
@@ -1104,6 +1202,9 @@ public partial class QuickMenuViewModel : ViewModelBase
         // Reset friends sub-navigation state.
         Xb360FriendsSubMode = false;
         Xb360RecentSubMode = false;
+        Xb360AchievementsSubMode = false;
+        Xb360AchievementIndex = 0;
+        Xb360MediaIndex = 1;
         Xb360SelectedFriendIndex = 0;
         Xb360FriendContextMenuOpen = false;
         Xb360FriendContextIndex = 0;
@@ -1214,8 +1315,22 @@ public class FriendPresenceVm : System.ComponentModel.INotifyPropertyChanged
     public string StatusLabel => IsPlaying ? $"Playing {CurrentGame}" : Status;
 }
 
-public class QuickMenuAchievementVm
+public class QuickMenuAchievementVm : System.ComponentModel.INotifyPropertyChanged
 {
+    public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+    private bool _isHighlighted;
+    /// <summary>True while the XB360 guide cursor is on this achievement row.</summary>
+    public bool IsHighlighted
+    {
+        get => _isHighlighted;
+        set
+        {
+            if (_isHighlighted == value) return;
+            _isHighlighted = value;
+            PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(IsHighlighted)));
+        }
+    }
+
     public string Name { get; set; } = "";
     public string Description { get; set; } = "";
     public bool IsUnlocked { get; set; }

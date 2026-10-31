@@ -267,7 +267,7 @@ public partial class MainWindow : Window
                 case Key.Left:
                     if (!textInputFocused)
                     {
-                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Horizontal(-1);
                         else vm.QuickMenuVm.MoveHubSelection(-1);
                     }
                     e.Handled = true;
@@ -275,7 +275,7 @@ public partial class MainWindow : Window
                 case Key.Right:
                     if (!textInputFocused)
                     {
-                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Horizontal(1);
                         else vm.QuickMenuVm.MoveHubSelection(1);
                     }
                     e.Handled = true;
@@ -378,14 +378,7 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
-        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
-            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
-        {
-            var kr = vm.DashboardVm.HandleKineticKey(e.Key.ToString());
-            if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);
-            if (kr != KineticKeyResult.NotHandled) { e.Handled = true; return; }
-        }
-        if (vm.IsHome && isXb360 && !vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
+        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
             switch (e.Key)
             {
@@ -1034,12 +1027,12 @@ public partial class MainWindow : Window
         var vm = _boundVm.QuickMenuVm;
         HandleOverlayKeyState(Services.NativeMethods.VK_LEFT, ref _overlayLeftLatched, () =>
         {
-            if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+            if (vm.IsXb360Theme) vm.MoveXb360Horizontal(-1);
             else vm.MoveHubSelection(-1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_RIGHT, ref _overlayRightLatched, () =>
         {
-            if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+            if (vm.IsXb360Theme) vm.MoveXb360Horizontal(1);
             else vm.MoveHubSelection(1);
         });
         HandleOverlayKeyState(Services.NativeMethods.VK_UP, ref _overlayUpLatched, () =>
@@ -1373,10 +1366,10 @@ public partial class MainWindow : Window
             switch (key)
             {
                 case Key.Left:
-                    if (isXb360Overlay) qvm.MoveXb360Blade(-1); else qvm.MoveHubSelection(-1);
+                    if (isXb360Overlay) qvm.MoveXb360Horizontal(-1); else qvm.MoveHubSelection(-1);
                     return;
                 case Key.Right:
-                    if (isXb360Overlay) qvm.MoveXb360Blade(1); else qvm.MoveHubSelection(1);
+                    if (isXb360Overlay) qvm.MoveXb360Horizontal(1); else qvm.MoveHubSelection(1);
                     return;
                 case Key.Up:
                     if (isXb360Overlay) qvm.MoveXb360CenterItem(-1); else qvm.MoveHubItem(-1);
@@ -1404,11 +1397,11 @@ public partial class MainWindow : Window
             switch (key)
             {
                 case Key.Left:
-                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Horizontal(-1);
                     else vm.QuickMenuVm.MoveHubSelection(-1);
                     return;
                 case Key.Right:
-                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Horizontal(1);
                     else vm.QuickMenuVm.MoveHubSelection(1);
                     return;
                 case Key.Up:
@@ -1532,14 +1525,7 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
-        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
-            && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
-        {
-            var kr = vm.DashboardVm.HandleKineticKey(key.ToString());
-            if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);
-            if (kr != KineticKeyResult.NotHandled) return;
-        }
-        if (vm.IsHome && isXb360 && !vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
+        if (vm.IsHome && isXb360 && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
             switch (key)
             {

@@ -291,6 +291,13 @@
         <Style Selector="Button.xb360-sub-action-btn.cursor TextBlock">
             <Setter Property="FontWeight" Value="Bold"/>
         </Style>
+        <Style Selector="Border.xb360-friend-row">
+            <Setter Property="Background" Value="#e8e8e8"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.xb360-friend-row TextBlock">
+            <Setter Property="Foreground" Value="#1a1a1a"/>
+        </Style>
         <Style Selector="Border.xb360-friend-row.cursor">
             <Setter Property="Background" Value="#0e9a12"/>
             <Setter Property="BorderBrush" Value="#ffd44d"/>

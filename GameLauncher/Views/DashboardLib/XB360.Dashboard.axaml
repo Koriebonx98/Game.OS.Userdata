@@ -9,8 +9,6 @@
     <Border Classes="dashboard-xb360-layout"
             Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Panel>
-        <ContentControl x:Name="KineticHost" IsVisible="{Binding Options.IsXb360Kinetic}"
-                        HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
         <Grid RowDefinitions="Auto,Auto,*" IsVisible="{Binding Options.IsXb360Og}">
             <!-- Top header bar with user info -->
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="32,16,32,0" IsVisible="{Binding Options.ShowProfile}">
