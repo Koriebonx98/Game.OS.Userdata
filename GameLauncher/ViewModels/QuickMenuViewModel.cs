@@ -397,8 +397,10 @@ public partial class QuickMenuViewModel : ViewModelBase
 
         var navigationOrder = GetCurrentNavigationOrder();
         if (navigationOrder.Length == 0) return;
-        // Wrap in both directions so negative deltas cycle from first -> last.
-        int next = ((SelectedHubIndex + delta) % navigationOrder.Length + navigationOrder.Length) % navigationOrder.Length;
+        // Steam clamps at the ends (no jarring jump across all tabs); other themes wrap in both directions.
+        int next = IsSteamBpmTheme
+            ? Math.Clamp(SelectedHubIndex + delta, 0, navigationOrder.Length - 1)
+            : ((SelectedHubIndex + delta) % navigationOrder.Length + navigationOrder.Length) % navigationOrder.Length;
         SelectedHubIndex = next;
     }
 

@@ -8,7 +8,7 @@ using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
-public enum BrowserMenuKind { Resume, NewTab, CloseTab, Downloads, AddFavourite, Favourite, Exit, SaveLink, SearchWeb, GameLink }
+public enum BrowserMenuKind { ReturnToGame, Resume, NewTab, CloseTab, Downloads, AddFavourite, Favourite, Exit, SaveLink, SearchWeb, GameLink }
 
 public sealed class BrowserMenuEntry
 {
@@ -52,6 +52,13 @@ public partial class BrowserViewModel : ViewModelBase
     /// <summary>Game / ROM the browser was opened for (null = plain browsing). Drives saved links, walkthroughs and download naming.</summary>
     [ObservableProperty] private string _contextGame = "";
     [ObservableProperty] private string _contextPlatform = "";
+    /// <summary>True when opened from the in-game quick menu: compact page view, and exiting returns to the running game.</summary>
+    [ObservableProperty] private bool _isPeek;
+    public event Action? ReturnToGameRequested;
+    [RelayCommand] public void ReturnToGame() { IsMenuOpen = false; IsPeek = false; ReturnToGameRequested?.Invoke(); }
+
+    /// <summary>Opens the start menu (saved links / favourites) if it isn't open yet.</summary>
+    public void OpenMenu() { if (!IsMenuOpen) ToggleMenu(); }
     public bool HasContext => !string.IsNullOrWhiteSpace(ContextGame);
     public string ContextLabel => HasContext ? $"🎮 {ContextGame} ({ContextPlatform})" : "";
     partial void OnContextGameChanged(string value) { OnPropertyChanged(nameof(HasContext)); OnPropertyChanged(nameof(ContextLabel)); }
@@ -173,7 +180,7 @@ public partial class BrowserViewModel : ViewModelBase
     [RelayCommand] public void GoHome() => Go(Settings.HomePage);
     [RelayCommand] public void FocusAddress() => FocusAddressRequested?.Invoke();
     [RelayCommand] public void OpenDownloads() { IsMenuOpen = false; OpenDownloadsRequested?.Invoke(); }
-    [RelayCommand] public void ExitBrowser() { IsMenuOpen = false; ExitRequested?.Invoke(); }
+    [RelayCommand] public void ExitBrowser() { IsMenuOpen = false; if (IsPeek) { ReturnToGame(); return; } ExitRequested?.Invoke(); }
 
     [RelayCommand]
     public void ToggleFavourite()
@@ -209,6 +216,7 @@ public partial class BrowserViewModel : ViewModelBase
     private void RebuildMenu()
     {
         MenuEntries.Clear();
+        if (IsPeek) MenuEntries.Add(new() { Label = "🎮  Return to game", Kind = BrowserMenuKind.ReturnToGame });
         MenuEntries.Add(new() { Label = "▶  Resume browsing", Kind = BrowserMenuKind.Resume });
         MenuEntries.Add(new() { Label = "➕  New tab", Kind = BrowserMenuKind.NewTab });
         MenuEntries.Add(new() { Label = "✕  Close this tab", Kind = BrowserMenuKind.CloseTab });
@@ -250,6 +258,7 @@ public partial class BrowserViewModel : ViewModelBase
         if (entry == null) return;
         switch (entry.Kind)
         {
+            case BrowserMenuKind.ReturnToGame: ReturnToGame(); break;
             case BrowserMenuKind.Resume: IsMenuOpen = false; break;
             case BrowserMenuKind.NewTab: IsMenuOpen = false; NewTab(null); break;
             case BrowserMenuKind.CloseTab: IsMenuOpen = false; CloseTab(ActiveTab); break;

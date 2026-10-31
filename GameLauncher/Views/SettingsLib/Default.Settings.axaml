@@ -439,6 +439,29 @@
                                               Margin="16,0,0,0"/>
                             </Grid>
 
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Media location (screenshots &amp; recordings)" FontSize="13" Foreground="#e6edf3"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#8b949e">
+                                    Captures are saved to  Media\Games\Platform\Game  inside this folder. Leave blank for  Data\Media.
+                                </TextBlock>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                    <TextBox Classes="form-input" Text="{Binding MediaLocation}" FontSize="11"/>
+                                    <Button Grid.Column="1" Classes="btn-secondary" Content="Browse…" FontSize="11" Padding="8,6" Margin="8,0,0,0"
+                                            Command="{Binding BrowseMediaLocationCommand}"/>
+                                </Grid>
+                            </StackPanel>
+
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Game Saves locations" FontSize="13" Foreground="#e6edf3"/>
+                                <TextBlock TextWrapping="Wrap" FontSize="11" Foreground="#8b949e">
+                                    Pick drives or folders (e.g. a USB stick) to back game saves up to - one per line, all are written on Back Up.
+                                    Saves go to  GameOS\GameSaves\User\Platform  so you can restore them on another PC. Leave empty for the default Data folder.
+                                </TextBlock>
+                                <TextBox Classes="form-input" Text="{Binding GameSavesLocationsText}" AcceptsReturn="True" MinHeight="60" FontSize="11" Margin="0,4,0,0"/>
+                                <Button Classes="btn-secondary" Content="Add folder / drive…" FontSize="11" Padding="8,6" HorizontalAlignment="Left"
+                                        Command="{Binding AddGameSavesLocationCommand}"/>
+                            </StackPanel>
+
                             <!-- Custom intro video override (shown when toggle is on) -->
                             <Grid ColumnDefinitions="*,Auto,Auto" VerticalAlignment="Center"
                                   IsVisible="{Binding ShowIntroVideo}">

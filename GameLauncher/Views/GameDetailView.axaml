@@ -730,6 +730,38 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Own captures taken from the quick menu (Media/Games/Platform/Game) -->
+                    <Border IsVisible="{Binding HasCaptures}"
+                            Background="#161b22" CornerRadius="10"
+                            Padding="20,16" Margin="0,0,0,16">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="🎞  My Captures" Classes="section-header" Margin="0"/>
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                                <ItemsControl ItemsSource="{Binding Captures}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="12"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:GameDetailViewModel+CaptureItem">
+                                            <Button Padding="0" Background="#0d1117" Width="300" Height="169" ClipToBounds="True"
+                                                    Command="{ReflectionBinding $parent[UserControl].DataContext.OpenCaptureCommand}"
+                                                    CommandParameter="{Binding}">
+                                                <Grid>
+                                                    <views:CoverImage LocalCachePath="{Binding Path}" IsVisible="{Binding IsImage}"
+                                                                      LetterFontSize="1" ImageCornerRadius="8" Width="300" Height="169"/>
+                                                    <StackPanel IsVisible="{Binding IsVideo}" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="4">
+                                                        <TextBlock Text="▶" FontSize="40" Foreground="White" HorizontalAlignment="Center"/>
+                                                        <TextBlock Text="{Binding Name}" FontSize="11" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Screenshots (same row as trailer when trailer is present) -->
                     <Border IsVisible="{Binding HasScreenshots}"
                             Background="#161b22" CornerRadius="10"

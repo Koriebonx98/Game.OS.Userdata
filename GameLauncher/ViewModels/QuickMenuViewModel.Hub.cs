@@ -77,6 +77,20 @@ public partial class QuickMenuViewModel
             case "home":
                 yield return Act("▶", "Resume", () => DismissCommand.Execute(null));
                 if (IsPlayingGame) yield return Act("⏹", "Exit Game", () => ExitGameCommand.Execute(null), CurrentGameTitle);
+                if (IsPlayingGame)
+                {
+                    yield return Act("📖", "Guides & Walkthroughs", () => SelectGuidesCommand.Execute(null), $"Saved links for {CurrentGameTitle}");
+                    yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null), "Saved links & favourites - returns to your game");
+                }
+                if (IsPlayingGame)
+                {
+                    string cp = CurrentGamePlatform, ct = CurrentGameTitle;
+                    yield return Act("📷", "Screenshot", () => CaptureAfterDismiss(() => Services.CaptureService.TakeScreenshot(cp, ct)), "Saved to your Media folder");
+                    if (Services.CaptureService.IsRecording)
+                        yield return Act("⏺", "Stop Recording", () => CaptureAfterDismiss(() => { Services.CaptureService.StopRecording(); return null; }));
+                    else
+                        yield return Act("🎥", "Record Screen", () => CaptureAfterDismiss(() => { Services.CaptureService.StartRecording(cp, ct); return null; }), "Saved to your Media folder");
+                }
                 if (HasAchievementsProgress) yield return Act("🏆", "Achievements", () => OpenAchievementsCommand.Execute(null), AchievementsLabel);
                 yield return Act("⚙", "Settings", () => OpenSettingsPageCommand.Execute(null));
                 break;
@@ -173,6 +187,17 @@ public partial class QuickMenuViewModel
                 yield return Act("↩", "Back", () => SelectHomeCommand.Execute(null));
                 break;
         }
+    }
+
+    /// <summary>Closes the overlay first so it isn't part of the capture.</summary>
+    private void CaptureAfterDismiss(Func<string?> capture)
+    {
+        OnDismiss?.Invoke();
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            await System.Threading.Tasks.Task.Delay(500);
+            capture();
+        });
     }
 
     /// <summary>Up / Down cursor inside the current page's action list (all four D-pad directions in the Wii bubble row).</summary>

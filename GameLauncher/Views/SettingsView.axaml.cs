@@ -20,6 +20,7 @@ public partial class SettingsView : UserControl
             vm.BrowseRequested                    = OnBrowseRequested;
             vm.BrowseSaveDataRequested            = OnBrowseSaveDataRequested;
             vm.BrowseIntroVideoRequested          = OnBrowseIntroVideoRequested;
+            vm.BrowseFolderRequested              = OnBrowseFolderRequested;
             vm.PickIntroVideoFromGalleryRequested = OnPickIntroVideoFromGalleryRequested;
             vm.BrowseStartupAppRequested          = OnBrowseStartupAppRequested;
             vm.BrowseNewStartupAppRequested       = OnBrowseNewStartupAppRequested;
@@ -64,6 +65,14 @@ public partial class SettingsView : UserControl
 
         if (folders.Count > 0)
             row.SaveDataPath = folders[0].Path.LocalPath;
+    }
+
+    private async void OnBrowseFolderRequested(Action<string> apply)
+    {
+        var topLevel = TopLevel.GetTopLevel(this);
+        if (topLevel == null) return;
+        var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions { Title = "Select folder or drive", AllowMultiple = false });
+        if (folders.Count > 0) apply(folders[0].Path.LocalPath);
     }
 
     private async void OnBrowseIntroVideoRequested()

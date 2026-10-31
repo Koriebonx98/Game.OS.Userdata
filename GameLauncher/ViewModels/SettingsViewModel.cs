@@ -65,6 +65,18 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _showIntroVideo = true;
     /// <summary>Path to a custom intro video file (empty = use built-in animation).</summary>
     [ObservableProperty] private string _introVideoPath = "";
+    [ObservableProperty] private string _mediaLocation = "";
+    /// <summary>One backup location per line.</summary>
+    [ObservableProperty] private string _gameSavesLocationsText = "";
+
+    [RelayCommand] private void BrowseMediaLocation() => BrowseFolderRequested?.Invoke(p => MediaLocation = p);
+    [RelayCommand] private void AddGameSavesLocation() => BrowseFolderRequested?.Invoke(p =>
+    {
+        var lines = GameSavesLocationsText.Split('\n', System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries).ToList();
+        if (!lines.Contains(p, System.StringComparer.OrdinalIgnoreCase)) lines.Add(p);
+        GameSavesLocationsText = string.Join("\n", lines);
+    });
+    public System.Action<System.Action<string>>? BrowseFolderRequested { get; set; }
     /// <summary>Read the Ryujinx log after each Switch game session.</summary>
     [ObservableProperty] private bool _readSwitchLog = false;
     /// <summary>Write all debug output and exceptions to Dev.log next to the exe.</summary>
@@ -877,6 +889,8 @@ public partial class SettingsViewModel : ViewModelBase
         AppAutoUpdate          = appSettings.AppAutoUpdate;
         ShowIntroVideo         = appSettings.ShowIntroVideo;
         IntroVideoPath         = appSettings.IntroVideoPath;
+        MediaLocation          = appSettings.MediaLocation;
+        GameSavesLocationsText = string.Join("\n", appSettings.GameSavesLocations ?? new());
         ReadSwitchLog          = appSettings.ReadSwitchLog;
         DevLogs                = appSettings.DevLogs;
         MinimizeOnGameLaunch   = appSettings.MinimizeOnGameLaunch;
@@ -1106,6 +1120,8 @@ public partial class SettingsViewModel : ViewModelBase
             StreamAudioEnabled   = StreamAudioEnabled,
             ShowIntroVideo        = ShowIntroVideo,
             IntroVideoPath        = IntroVideoPath,
+            MediaLocation         = MediaLocation,
+            GameSavesLocations    = GameSavesLocationsText.Split(new[] { '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries).ToList(),
             HasCompletedFirstRunSetup = true,
             ReadSwitchLog         = ReadSwitchLog,
             DevLogs               = DevLogs,
