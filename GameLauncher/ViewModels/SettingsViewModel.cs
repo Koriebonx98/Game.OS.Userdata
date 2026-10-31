@@ -159,10 +159,20 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM" };
     /// <summary>Movies &amp; TV page design.</summary>
     [ObservableProperty] private string _moviesTvTheme = "Default";
-    public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Netflix" };
+    public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Cinema" };
     /// <summary>Music page design.</summary>
     [ObservableProperty] private string _musicTheme = "Default";
     public IReadOnlyList<string> AvailableMusicThemes { get; } = new[] { "Default", "Spotify" };
+    // ── Settings → Media ──
+    [ObservableProperty] private int  _mediaSkipSeconds = 10;
+    [ObservableProperty] private bool _showMovieDetails = true;
+    [ObservableProperty] private bool _showTvDetails = true;
+    [ObservableProperty] private bool _autoPlayNextEpisode = true;
+    [ObservableProperty] private bool _musicShuffle;
+    [ObservableProperty] private bool _musicRepeat = true;
+    [ObservableProperty] private bool _onlineMediaInfo = true;
+    public string MediaStatsSummary => Services.MediaStatsService.Summary();
+    public IReadOnlyList<int> AvailableSkipSeconds { get; } = new[] { 5, 10, 15, 30, 60 };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
     [ObservableProperty] private string _storeTheme = "Default";
     public IReadOnlyList<string> AvailableStoreThemes { get; } = new[] { "Default", "Sony", "Xbox", "Nintendo" };
@@ -521,6 +531,7 @@ public partial class SettingsViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(IsAccountSection))]
     [NotifyPropertyChangedFor(nameof(IsCustomiseSection))]
     [NotifyPropertyChangedFor(nameof(IsDesignSection))]
+    [NotifyPropertyChangedFor(nameof(IsMediaSection))]
     [NotifyPropertyChangedFor(nameof(IsSystemSection))]
     [NotifyPropertyChangedFor(nameof(IsNotificationsSection))]
     [NotifyPropertyChangedFor(nameof(IsDeveloperSection))]
@@ -534,6 +545,7 @@ public partial class SettingsViewModel : ViewModelBase
     public bool IsAccountSection       => SelectedSection == "account";
     public bool IsCustomiseSection     => SelectedSection == "customise";
     public bool IsDesignSection        => SelectedSection == "design";
+    public bool IsMediaSection         => SelectedSection == "media";
     public bool IsSystemSection        => SelectedSection == "system";
     public bool IsNotificationsSection => SelectedSection == "notifications";
     public bool IsDeveloperSection     => SelectedSection == "developer";
@@ -869,8 +881,15 @@ public partial class SettingsViewModel : ViewModelBase
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
-        MoviesTvTheme              = string.Equals(appSettings.MoviesTvTheme?.Trim(), "Netflix", StringComparison.OrdinalIgnoreCase) ? "Netflix" : "Default";
+        MoviesTvTheme              = appSettings.MoviesTvTheme?.Trim() is { } t && (t.Equals("Cinema", StringComparison.OrdinalIgnoreCase) || t.Equals("Netflix", StringComparison.OrdinalIgnoreCase)) ? "Cinema" : "Default";
         MusicTheme                 = string.Equals(appSettings.MusicTheme?.Trim(), "Spotify", StringComparison.OrdinalIgnoreCase) ? "Spotify" : "Default";
+        MediaSkipSeconds           = appSettings.MediaSkipSeconds > 0 ? appSettings.MediaSkipSeconds : 10;
+        ShowMovieDetails           = appSettings.ShowMovieDetails;
+        ShowTvDetails              = appSettings.ShowTvDetails;
+        AutoPlayNextEpisode        = appSettings.AutoPlayNextEpisode;
+        MusicShuffle               = appSettings.MusicShuffle;
+        MusicRepeat                = appSettings.MusicRepeat;
+        OnlineMediaInfo            = appSettings.OnlineMediaInfo;
         GameInfoTheme              = NormaliseGameInfoTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         foreach (var kv in appSettings.DashboardOptions)
@@ -1081,8 +1100,15 @@ public partial class SettingsViewModel : ViewModelBase
             GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
             KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
-            MoviesTvTheme              = MoviesTvTheme == "Netflix" ? "Netflix" : "Default",
+            MoviesTvTheme              = MoviesTvTheme == "Cinema" ? "Cinema" : "Default",
             MusicTheme                 = MusicTheme == "Spotify" ? "Spotify" : "Default",
+            MediaSkipSeconds           = MediaSkipSeconds > 0 ? MediaSkipSeconds : 10,
+            ShowMovieDetails           = ShowMovieDetails,
+            ShowTvDetails              = ShowTvDetails,
+            AutoPlayNextEpisode        = AutoPlayNextEpisode,
+            MusicShuffle               = MusicShuffle,
+            MusicRepeat                = MusicRepeat,
+            OnlineMediaInfo            = OnlineMediaInfo,
             GameInfoTheme              = NormaliseGameInfoTheme(GameInfoTheme),
             DashboardOptions           = CloneDashboardOptions(),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),

@@ -538,7 +538,7 @@ public partial class MainWindow : Window
         }
 
         // Media (Movies & TV / Music) controller navigation
-        if (vm.IsMedia && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.MediaVm.IsVlcPlayerOpen)
+        if (vm.IsMediaOrMusic && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleMediaKey(vm, e.Key))
             {
@@ -665,7 +665,7 @@ public partial class MainWindow : Window
 
     // ── Settings page navigation ──────────────────────────────────────────
     private static readonly string[] _settingsSections =
-        ["app", "emulator", "playtime", "sync", "account", "customise", "design",
+        ["app", "emulator", "playtime", "sync", "account", "customise", "design", "media",
          "system", "notifications", "developer", "controller"];
 
     /// <summary>True while the D-pad cursor is in the right-hand settings content.</summary>
@@ -773,6 +773,18 @@ public partial class MainWindow : Window
     private bool HandleMediaKey(MainViewModel vm, Key key)
     {
         if (IsTextInputFocused()) return false;
+        var media = vm.MediaVm;
+        string name = key switch
+        {
+            Key.Left => "Left", Key.Right => "Right", Key.Up => "Up", Key.Down => "Down",
+            Key.Enter => "Enter", Key.X => "X", Key.Y => "Y", Key.Escape or Key.BrowserBack => "Escape",
+            Key.PageUp => "LB", Key.PageDown => "RB",
+            _ => "",
+        };
+        // Video player, full-screen music player and the info page take every key while open.
+        if (media.IsVlcPlayerOpen || media.IsNowPlayingFullScreen) { media.HandlePlayerKey(name); return true; }
+        if (media.IsDetailOpen) { media.HandleDetailKey(name); return true; }
+        if (key == Key.Y && media.IsMusicPage && media.HasNowPlaying) { media.OpenNowPlayingFullScreenCommand.Execute(null); return true; }
         switch (key)
         {
             case Key.Left:
@@ -783,6 +795,7 @@ public partial class MainWindow : Window
             case Key.Down:  vm.MediaVm.MoveMediaFocus(0, 1); return true;
             case Key.Enter: vm.MediaVm.ActivateMediaFocus(); return true;
             case Key.X:     vm.MediaVm.QuickActionMediaFocus(); return true;
+            case Key.Y when !media.IsMusicPage: vm.MediaVm.FavouriteMediaFocus(); return true;
         }
         return false;
     }
@@ -958,7 +971,7 @@ public partial class MainWindow : Window
     }
 
     private static readonly string[] _navPages =
-        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media"];
+        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media", "music"];
 
     private static void NavigatePrev(MainViewModel vm)
     {
@@ -1279,18 +1292,27 @@ public partial class MainWindow : Window
         // Start does not open the Quick Menu; only Guide / Home / Xbox does.
         _xinput.OnStart = null;
 
-        // Guide / Home / Xbox button → open/toggle the Quick Menu
-        _xinput.OnGuide = () =>
+        // While another app is on top, Game OS ignores the controller entirely except Start + Select,
+        // which brings up the quick guide menu. Once the guide menu is showing, input works as normal.
+        _xinput.IsBlocked = () =>
+        {
+            if (_boundVm == null) return false;
+            if (_boundVm.DetailVm.IsGameRunning) return false; // game input is handled by the profile injector
+            if (_quickMenuWindow?.IsVisible == true || _boundVm.ShowQuickMenu) return false;
+            return WindowState == WindowState.Minimized || !IsActive;
+        };
+
+        _xinput.OnStartSelect = () =>
         {
             if (_boundVm == null) return;
-            bool gameRunning       = _boundVm.DetailVm.IsGameRunning;
-            bool launcherMinimized = WindowState == WindowState.Minimized;
-            bool launcherUnfocused = !IsActive;
-            if (gameRunning || launcherMinimized || launcherUnfocused)
-                OpenGlobalQuickMenu();
-            else
-                _boundVm.ToggleQuickMenu();
+            if (_quickMenuWindow?.IsVisible == true) { _quickMenuWindow.Hide(); return; }
+            bool otherAppOnTop = _boundVm.DetailVm.IsGameRunning || WindowState == WindowState.Minimized || !IsActive;
+            if (otherAppOnTop) OpenGlobalQuickMenu();
+            else _boundVm.ToggleQuickMenu();
         };
+
+        // The Guide button no longer opens the menu: Start + Select is the single shortcut.
+        _xinput.OnGuide = null;
 
         // Share button → Win+Alt+PrintScreen screenshot (Xbox app / Game Bar)
         _xinput.OnShare = () =>
@@ -1624,7 +1646,7 @@ public partial class MainWindow : Window
         }
 
         // Media (Movies & TV / Music) controller navigation
-        if (vm.IsMedia && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !vm.MediaVm.IsVlcPlayerOpen)
+        if (vm.IsMediaOrMusic && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleMediaKey(vm, key))
                 return;

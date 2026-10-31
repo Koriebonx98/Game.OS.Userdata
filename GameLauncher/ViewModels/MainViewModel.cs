@@ -320,6 +320,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [NotifyPropertyChangedFor(nameof(IsNavHighlightProfile))]
     [NotifyPropertyChangedFor(nameof(IsNavHighlightSettings))]
     [NotifyPropertyChangedFor(nameof(IsNavHighlightMedia))]
+    [NotifyPropertyChangedFor(nameof(IsNavHighlightMusic))]
     private int _navHighlightIndex = 0;
 
     public bool IsNavHighlightDashboard => IsNavExpanded && NavHighlightIndex == 0;
@@ -330,6 +331,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public bool IsNavHighlightProfile   => IsNavExpanded && NavHighlightIndex == 5;
     public bool IsNavHighlightSettings  => IsNavExpanded && NavHighlightIndex == 6;
     public bool IsNavHighlightMedia     => IsNavExpanded && NavHighlightIndex == 7;
+    public bool IsNavHighlightMusic     => IsNavExpanded && NavHighlightIndex == 8;
 
     partial void OnIsNavExpandedChanged(bool value)
     {
@@ -342,6 +344,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsNavHighlightProfile));
         OnPropertyChanged(nameof(IsNavHighlightSettings));
         OnPropertyChanged(nameof(IsNavHighlightMedia));
+        OnPropertyChanged(nameof(IsNavHighlightMusic));
     }
 
     public bool IsHome        => ActivePage == "dashboard";
@@ -354,6 +357,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public bool IsInbox       => ActivePage == "inbox";
     /// <summary>True when the Media page is active.</summary>
     public bool IsMedia       => ActivePage == "media";
+    /// <summary>True when the Music page is active (a separate page from Movies &amp; TV that shares the media player).</summary>
+    public bool IsMusic       => ActivePage == "music";
+    public bool IsMediaOrMusic => IsMedia || IsMusic;
     /// <summary>True when the Friends or Inbox page is active (both show FriendsView).</summary>
     public bool IsFriendsOrInbox => ActivePage == "friends" || ActivePage == "inbox";
 
@@ -367,6 +373,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         OnPropertyChanged(nameof(IsSettings));
         OnPropertyChanged(nameof(IsInbox));
         OnPropertyChanged(nameof(IsMedia));
+        OnPropertyChanged(nameof(IsMusic));
+        OnPropertyChanged(nameof(IsMediaOrMusic));
         OnPropertyChanged(nameof(IsFriendsOrInbox));
     }
 
@@ -514,9 +522,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
         QuickMenuVm.OnExitApplication = () => ExitAppCommand.Execute(null);
         QuickMenuVm.OnRequestLauncherForeground = () => BringToForegroundRequested?.Invoke();
-        QuickMenuVm.OnMediaPrevious = SendMediaPrevious;
-        QuickMenuVm.OnMediaPlayPause = SendMediaPlayPause;
-        QuickMenuVm.OnMediaNext = SendMediaNext;
+        // Controls the launcher's own player when something is playing there, otherwise falls back to the OS media keys.
+        QuickMenuVm.OnMediaPrevious = () => { if (MediaVm.HasActivePlayback) MediaVm.TransportStep(-1); else SendMediaPrevious(); };
+        QuickMenuVm.OnMediaPlayPause = () => { if (MediaVm.HasActivePlayback) MediaVm.TransportPlayPause(); else SendMediaPlayPause(); };
+        QuickMenuVm.OnMediaNext = () => { if (MediaVm.HasActivePlayback) MediaVm.TransportStep(1); else SendMediaNext(); };
+        QuickMenuVm.OnMediaSeekBack = () => MediaVm.TransportSeek(-1);
+        QuickMenuVm.OnMediaSeekForward = () => MediaVm.TransportSeek(1);
+        QuickMenuVm.OnMediaFullScreen = () =>
+        {
+            Navigate(MediaVm.IsVlcPlayerOpen ? "media" : "music");
+            if (!MediaVm.IsVlcPlayerOpen) MediaVm.OpenNowPlayingFullScreenCommand.Execute(null);
+        };
+        QuickMenuVm.OnOpenMusicPage = () => Navigate("music");
+        QuickMenuVm.MediaStatusProvider = () =>
+            MediaVm.IsVlcPlayerOpen ? $"{(MediaVm.IsVideoPlaying ? "▶" : "⏸")} {MediaVm.VlcMediaPath}  {MediaVm.VideoPositionLabel} / {MediaVm.VideoDurationLabel}"
+            : MediaVm.HasNowPlaying ? $"{MediaVm.PlayPauseGlyph} {MediaVm.NowPlayingTitle}  {MediaVm.PositionLabel} / {MediaVm.DurationLabel}"
+            : null;
 
         // Wire Settings → SyncNow so the Resync button triggers TryRefreshUserDataAsync
         SettingsVm.SyncNowAction = RequestManualSyncAsync;
@@ -989,7 +1010,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnNavigateToMediaSection = section =>
         {
             MediaVm.OpenSection(section);
-            Navigate("media");
+            Navigate(MediaVm.IsMusicPage ? "music" : "media");
         };
         DashboardVm.OnPlayFocusedCard   = LaunchFromCard;
         DashboardVm.OnOpenFocusedCardDetail = OpenTileFromDashboard;
@@ -1060,8 +1081,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.KeyboardTheme = SettingsVm.KeyboardTheme;
         MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
         MediaVm.MusicTheme = SettingsVm.MusicTheme;
+        void SyncMediaSettings()
+        {
+            MediaVm.MediaSkipSeconds = SettingsVm.MediaSkipSeconds;
+            MediaVm.ShowMovieDetails = SettingsVm.ShowMovieDetails;
+            MediaVm.ShowTvDetails = SettingsVm.ShowTvDetails;
+            MediaVm.AutoPlayNextEpisode = SettingsVm.AutoPlayNextEpisode;
+            MediaVm.MusicShuffle = SettingsVm.MusicShuffle;
+            MediaVm.MusicRepeat = SettingsVm.MusicRepeat;
+            MediaVm.OnlineInfoEnabled = SettingsVm.OnlineMediaInfo;
+        }
+        SyncMediaSettings();
+        MediaVm.MediaPresenceChanged = label =>
+        {
+            if (DetailVm.IsGameRunning || !Services.AppSettingsService.Load().BroadcastGameStart) return;
+            _ = Task.Run(async () => { try { await _client.UpdatePresenceAsync(label).ConfigureAwait(false); } catch { } });
+        };
         SettingsVm.PropertyChanged += (_, e) =>
         {
+            if (e.PropertyName is nameof(SettingsViewModel.MediaSkipSeconds) or nameof(SettingsViewModel.ShowMovieDetails)
+                or nameof(SettingsViewModel.ShowTvDetails) or nameof(SettingsViewModel.AutoPlayNextEpisode)
+                or nameof(SettingsViewModel.MusicShuffle) or nameof(SettingsViewModel.MusicRepeat) or nameof(SettingsViewModel.OnlineMediaInfo))
+                SyncMediaSettings();
             if (e.PropertyName == nameof(SettingsViewModel.MoviesTvTheme))
                 MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
             if (e.PropertyName == nameof(SettingsViewModel.MusicTheme))
@@ -1362,6 +1403,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Switch the playtime service to the current user's private data folder
         // so playtime records are stored per-account, not per-device.
         PlaytimeService.SetCurrentUser(profile.Username);
+        MediaStatsService.SetCurrentUser(profile.Username);
 
         // Attach the logged-in username to the detail view-model so review submissions
         // are correctly attributed to the right user.
@@ -2105,8 +2147,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             InboxVm.Load(_client, _profile.Username);
         if (page == "profile")
             ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
-        if (page == "media")
+        if (page == "media" || page == "music")
         {
+            // Movies & TV and Music are separate pages over one shared player.
+            if (page == "music") MediaVm.OpenSection("music");
+            else if (MediaVm.IsMusicPage) MediaVm.OpenSection("movies");
             MediaVm.EnsureMediaLibraryFresh();
             MediaVm.ResetMediaFocus();
         }
@@ -3576,6 +3621,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Unsubscribe from session-saved cloud sync and clear the per-user path
         PlaytimeService.SessionSaved -= OnSessionSaved;
         PlaytimeService.ClearCurrentUser();
+        MediaVm.EndAllSessions();
+        MediaStatsService.SetCurrentUser(null);
 
         // Clear the saved token so the next launch shows the login form
         // (equivalent to the web calling localStorage.removeItem('gameOSUser'))

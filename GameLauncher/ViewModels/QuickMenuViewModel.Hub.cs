@@ -119,8 +119,12 @@ public partial class QuickMenuViewModel
                 break;
             case "media":
                 yield return Act("⏮", "Previous", () => MediaPreviousCommand.Execute(null));
-                yield return Act("⏯", "Play / Pause", () => MediaPlayPauseCommand.Execute(null), MediaStatusLabel);
+                yield return Act("⏯", "Play / Pause", () => MediaPlayPauseCommand.Execute(null), MediaStatusProvider?.Invoke() ?? MediaStatusLabel);
                 yield return Act("⏭", "Next", () => MediaNextCommand.Execute(null));
+                yield return Act("⏪", "Skip Back", () => MediaSeekBackCommand.Execute(null));
+                yield return Act("⏩", "Skip Forward", () => MediaSeekForwardCommand.Execute(null));
+                yield return Act("⛶", "Full Screen Player", () => MediaFullScreenCommand.Execute(null));
+                yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
                 break;
             case "browser":
                 yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open your default web browser.");

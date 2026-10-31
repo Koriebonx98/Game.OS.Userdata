@@ -2,10 +2,11 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
-             x:Class="GameLauncher.Views.MediaLib.NetflixMoviesTv"
+             xmlns:lib="using:GameLauncher.Views.MediaLib"
+             x:Class="GameLauncher.Views.MediaLib.CinemaMoviesTv"
              x:DataType="vm:MediaViewModel">
 
-    <!-- Netflix-style Movies & TV: black canvas, red accent, top tabs, billboard and horizontal rows. -->
+    <!-- Cinema Movies & TV: dark canvas, red accent, top tabs, hero billboard and horizontal rows with progress and badges. -->
     <UserControl.Styles>
         <Style Selector="Button.nflx-tab">
             <Setter Property="Background" Value="Transparent"/>
@@ -59,20 +60,20 @@
     <Grid Background="#141414" RowDefinitions="Auto,*">
 
         <!-- Top bar -->
-        <Border Grid.Row="0" Padding="40,16" Background="#141414">
+        <Border Grid.Row="0" Padding="40,12,40,10" Background="#141414">
             <Grid ColumnDefinitions="Auto,*,Auto">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="22">
-                    <TextBlock Text="NETFLIX" Foreground="#E50914" FontSize="26" FontWeight="Black"
+                    <TextBlock Text="CINEMA" Foreground="#E50914" FontSize="26" FontWeight="Black"
                                VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
                                 Command="{Binding SelectMoviesCommand}" Content="Movies"/>
                         <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
                                 Command="{Binding SelectTvShowsCommand}" Content="TV Shows"/>
-                        <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabMusicFocused}" Command="{Binding SelectMusicCommand}" Content="Music"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+                    <lib:MediaFilterBar IsVisible="{Binding !HasNoActiveItems}" Margin="0,0,12,0"/>
                     <Button Classes="nflx-tab" Command="{Binding PlayLocalVideoCommand}" Content="📂 Play File"/>
                     <Button Classes="nflx-tab" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳ Refresh"/>
                 </StackPanel>
@@ -89,8 +90,13 @@
                                Foreground="#b3b3b3" FontSize="14" TextWrapping="Wrap"/>
                 </StackPanel>
 
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoResults}">
+                    <TextBlock Text="No titles match" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                    <TextBlock Text="Try a different search, or clear the filters." Foreground="#b3b3b3" FontSize="14"/>
+                </StackPanel>
+
                 <!-- Billboard: the selected title -->
-                <Grid Height="360" IsVisible="{Binding HasSelectedItem}">
+                <Grid Height="420" IsVisible="{Binding HasSelectedItem}">
                     <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
                                       FallbackGradient="{Binding SelectedItem.Gradient}" LocalCachePath="{Binding SelectedItem.CoverPath}"
                                       LetterFontSize="200" ImageCornerRadius="0"/>
@@ -114,12 +120,21 @@
                     <StackPanel Margin="40,0,0,50" VerticalAlignment="Bottom" HorizontalAlignment="Left" Spacing="12" MaxWidth="560">
                         <TextBlock Text="{Binding SelectedItem.DisplayTitle}" Foreground="White" FontSize="40"
                                    FontWeight="Black" TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="{Binding SelectedItem.ScoreLabel}" Foreground="#46d369" FontSize="14" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding SelectedItem.InfoLine}" Foreground="#d2d2d2" FontSize="14"/>
+                            <TextBlock Text="{Binding SelectedItem.RatingStars}" Foreground="#f5c518" FontSize="14"
+                                       IsVisible="{Binding SelectedItem.HasRating}"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedItem.Overview}" Foreground="White" FontSize="15" TextWrapping="Wrap"
+                                   MaxLines="3" TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedItem.HasOverview}"/>
                         <TextBlock Foreground="#b3b3b3" FontSize="13">
-                            <Run Text="{Binding SelectedItemTypeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItemSizeLabel}"/>
+                            <Run Text="{Binding SelectedItemTypeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItemSizeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItem.PlayCountLabel}"/>
                         </TextBlock>
                         <StackPanel Orientation="Horizontal" Spacing="12" Margin="0,6,0,0">
                             <Button Classes="nflx-play" Command="{Binding PlaySelectedMediaCommand}">▶  Play</Button>
-                            <Button Classes="nflx-more" Command="{Binding PlayLocalVideoCommand}">📂  Play File…</Button>
+                            <Button Classes="nflx-more" Command="{Binding OpenMediaItemCommand}" CommandParameter="{Binding SelectedItem}">ⓘ  More Info</Button>
+                            <Button Classes="nflx-more" Command="{Binding ToggleFavouriteCommand}" CommandParameter="{Binding SelectedItem}">♥  My List</Button>
                         </StackPanel>
                     </StackPanel>
                 </Grid>
@@ -138,14 +153,27 @@
                                         <ItemsControl.ItemTemplate>
                                             <DataTemplate>
                                                 <Button Classes="nflx-tile media-nav" Classes.focused="{Binding IsFocused}" Width="240"
-                                                        Command="{Binding $parent[UserControl].DataContext.PlayMediaItemCommand}"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenMediaItemCommand}"
                                                         CommandParameter="{Binding}">
                                                     <Grid Height="135">
                                                         <Border CornerRadius="4" ClipToBounds="True">
-                                                            <views:CoverImage FallbackText="{Binding DisplayTitle}"
-                                                                              FallbackGradient="{Binding Gradient}"
-                                                                              LocalCachePath="{Binding CoverPath}" LetterFontSize="60" ImageCornerRadius="4"
-                                                                              Height="135"/>
+                                                            <Grid>
+                                                                <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                                  FallbackGradient="{Binding Gradient}"
+                                                                                  LocalCachePath="{Binding CoverPath}" LetterFontSize="60" ImageCornerRadius="4"
+                                                                                  Height="135"/>
+                                                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6">
+                                                                    <Border Background="#CC000000" CornerRadius="3" Padding="5,1" IsVisible="{Binding Favourite}">
+                                                                        <TextBlock Text="♥" Foreground="#E50914" FontSize="11"/>
+                                                                    </Border>
+                                                                    <Border Background="#CC000000" CornerRadius="3" Padding="5,1" IsVisible="{Binding Watched}">
+                                                                        <TextBlock Text="✓" Foreground="#46d369" FontSize="11"/>
+                                                                    </Border>
+                                                                </StackPanel>
+                                                                <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1"
+                                                                             Value="{Binding ProgressFraction}" IsVisible="{Binding HasProgress}"
+                                                                             Foreground="#E50914" Background="#66000000"/>
+                                                            </Grid>
                                                         </Border>
                                                         <Border VerticalAlignment="Bottom" CornerRadius="0,0,4,4" Padding="10,18,10,8">
                                                             <Border.Background>

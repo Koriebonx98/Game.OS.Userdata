@@ -577,11 +577,20 @@ namespace GameLauncher.Models
         /// <summary>Layout of the Games (library) page: "Default" or "PS5".</summary>
         [JsonPropertyName("gamesTheme")] public string GamesTheme { get; set; } = "Default";
 
-        /// <summary>Movies &amp; TV page design: "Default" or "Netflix".</summary>
+        /// <summary>Movies &amp; TV page design: "Default" or "Cinema" (older "Netflix" values are still read).</summary>
         [JsonPropertyName("moviesTvTheme")] public string MoviesTvTheme { get; set; } = "Default";
 
         /// <summary>Music page design: "Default" or "Spotify".</summary>
         [JsonPropertyName("musicTheme")] public string MusicTheme { get; set; } = "Default";
+
+        /// <summary>Settings → Media: seconds skipped by the skip buttons / D-pad.</summary>
+        [JsonPropertyName("mediaSkipSeconds")] public int MediaSkipSeconds { get; set; } = 10;
+        [JsonPropertyName("showMovieDetails")] public bool ShowMovieDetails { get; set; } = true;
+        [JsonPropertyName("showTvDetails")] public bool ShowTvDetails { get; set; } = true;
+        [JsonPropertyName("autoPlayNextEpisode")] public bool AutoPlayNextEpisode { get; set; } = true;
+        [JsonPropertyName("musicShuffle")] public bool MusicShuffle { get; set; }
+        [JsonPropertyName("musicRepeat")] public bool MusicRepeat { get; set; } = true;
+        [JsonPropertyName("onlineMediaInfo")] public bool OnlineMediaInfo { get; set; } = true;
 
         /// <summary>Store page design: "Default", "Sony", "Xbox" or "Nintendo".</summary>
         [JsonPropertyName("storeTheme")] public string StoreTheme { get; set; } = "Default";

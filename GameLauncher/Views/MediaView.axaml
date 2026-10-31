@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:vlc="using:LibVLCSharp.Avalonia"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:lib="using:GameLauncher.Views.MediaLib"
              x:Class="GameLauncher.Views.MediaView"
              x:DataType="vm:MediaViewModel">
@@ -9,13 +10,13 @@
     <Panel>
         <!--
             Media page. The layouts live in separate files chosen by Settings -> Design:
-              Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Netflix.MoviesTv.axaml ("Netflix")
+              Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Cinema.MoviesTv.axaml ("Cinema")
               Views/MediaLib/Default.Music.axaml     ("Default")   Views/MediaLib/Spotify.Music.axaml    ("Spotify")
         -->
         <Panel IsVisible="{Binding !IsVlcPlayerOpen}">
             <Panel IsVisible="{Binding IsVideoSection}">
                 <lib:DefaultMoviesTv IsVisible="{Binding IsDefaultMoviesTv}"/>
-                <lib:NetflixMoviesTv IsVisible="{Binding IsNetflixMoviesTv}"/>
+                <lib:CinemaMoviesTv IsVisible="{Binding IsCinemaMoviesTv}"/>
             </Panel>
             <Panel IsVisible="{Binding IsMusicSelected}">
                 <lib:DefaultMusic IsVisible="{Binding IsDefaultMusic}"/>
@@ -57,14 +58,129 @@
                 <vlc:VideoView Grid.Row="1"
                                x:Name="VlcOverlayVideoView"/>
 
-                <!-- Bottom hint -->
-                <Border Grid.Row="2" Background="#161b22" Padding="16,8">
-                    <TextBlock Text="Powered by VLC · press Close to stop playback"
-                               FontSize="11"
-                               Foreground="#484f58"
-                               HorizontalAlignment="Center"/>
+                <!-- Transport: seek bar + play / pause / skip (A / X = pause, ◀ ▶ = skip, ▲ ▼ = ±1 min, B = close) -->
+                <Border Grid.Row="2" Background="#161b22" Padding="24,10">
+                    <StackPanel Spacing="6">
+                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <TextBlock Text="{Binding VideoPositionLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
+                            <Border Grid.Column="1" Background="Transparent" Padding="0,8" Cursor="Hand" Tag="video"
+                                    PointerPressed="OnSeekPressed" PointerMoved="OnSeekMoved" PointerReleased="OnSeekReleased">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding VideoProgressPercent}" Height="10"
+                                             IsHitTestVisible="False"/>
+                            </Border>
+                            <TextBlock Grid.Column="2" Text="{Binding VideoDurationLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
+                            <Button Classes="btn-secondary" Command="{Binding VideoSeekBackCommand}" Content="⏪"/>
+                            <Button Classes="btn-primary" MinWidth="64" HorizontalContentAlignment="Center"
+                                    Command="{Binding ToggleVideoPauseCommand}" Content="{Binding VideoPlayPauseGlyph}"/>
+                            <Button Classes="btn-secondary" Command="{Binding VideoSeekForwardCommand}" Content="⏩"/>
+                        </StackPanel>
+                    </StackPanel>
                 </Border>
 
+            </Grid>
+        </Border>
+
+        <!-- Movie / TV show info page -->
+        <Border Background="#e60d1117" IsVisible="{Binding IsDetailOpen}" ZIndex="40" Padding="48,32">
+            <Grid ColumnDefinitions="260,*" ColumnSpacing="36">
+                <Border Height="390" VerticalAlignment="Top" CornerRadius="10" ClipToBounds="True">
+                    <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
+                                      FallbackGradient="{Binding SelectedItem.Gradient}"
+                                      LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                      LetterFontSize="110" ImageCornerRadius="10" Height="390"/>
+                </Border>
+                <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,*,Auto" RowSpacing="10">
+                    <TextBlock Text="{Binding DetailKindLabel}" FontSize="12" Foreground="#58a6ff" FontWeight="Bold"/>
+                    <TextBlock Grid.Row="1" Text="{Binding SelectedItem.DisplayTitle}" FontSize="34" FontWeight="Black" TextWrapping="Wrap"/>
+                    <StackPanel Grid.Row="2" Spacing="6">
+                        <TextBlock FontSize="13" Foreground="#8b949e" TextWrapping="Wrap">
+                            <Run Text="{Binding SelectedItemTypeLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItemSizeLabel}"/><Run Text="  ·  "/><Run Text="{Binding DetailAddedLabel}"/>
+                        </TextBlock>
+                        <StackPanel Orientation="Horizontal" Spacing="10">
+                            <TextBlock Text="{Binding SelectedItem.ScoreLabel}" Foreground="#3fb950" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding SelectedItem.InfoLine}" Foreground="#c9d1d9"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedItem.Overview}" FontSize="13" Foreground="#c9d1d9" TextWrapping="Wrap"
+                                   MaxLines="5" TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedItem.HasOverview}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="Your rating" Foreground="#8b949e" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="1" Content="★"/>
+                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="2" Content="★★"/>
+                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="3" Content="★★★"/>
+                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="4" Content="★★★★"/>
+                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="5" Content="★★★★★"/>
+                            <TextBlock Text="{Binding SelectedItem.RatingStars}" Foreground="#f5c518" VerticalAlignment="Center" Margin="10,0,0,0"/>
+                        </StackPanel>
+                        <TextBlock FontSize="12" Foreground="#8b949e">
+                            <Run Text="{Binding SelectedItem.PlayCountLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItem.LastPlayedLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItem.WatchTimeLabel}"/>
+                        </TextBlock>
+                    </StackPanel>
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10" Margin="0,6,0,6">
+                        <Button Classes="btn-primary" Padding="22,10" Command="{Binding PlayDetailCommand}">▶  Play</Button>
+                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding ToggleFavouriteCommand}" CommandParameter="{Binding SelectedItem}">♥  My List</Button>
+                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding ToggleWatchedCommand}" CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
+                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
+                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
+                    </StackPanel>
+                    <StackPanel Grid.Row="4" Spacing="8" IsVisible="{Binding HasDetailRelated}">
+                        <TextBlock Text="{Binding DetailRelatedTitle}" Classes="section-header"/>
+                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                            <ItemsControl ItemsSource="{Binding DetailRelated}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                                Margin="0,0,0,4" Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
+                                                CommandParameter="{Binding}" Content="{Binding DisplayTitle}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                    <TextBlock Grid.Row="5" Text="A play  ·  X My List  ·  LB / RB rate  ·  ◀ ▶ previous / next  ·  B close" FontSize="11" Foreground="#484f58"/>
+                </Grid>
+            </Grid>
+        </Border>
+
+        <!-- Full-screen now playing (music) -->
+        <Border Background="#0d1117" IsVisible="{Binding IsNowPlayingFullScreen}" ZIndex="45" Padding="48,32">
+            <Grid RowDefinitions="Auto,*,Auto,Auto,Auto" RowSpacing="14">
+                <Button Classes="btn-secondary" HorizontalAlignment="Left" Command="{Binding CloseNowPlayingFullScreenCommand}">✕  Close</Button>
+                <StackPanel Grid.Row="1" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="14">
+                    <Border Width="300" Height="300" CornerRadius="14" ClipToBounds="True" HorizontalAlignment="Center">
+                        <views:CoverImage FallbackText="{Binding NowPlaying.DisplayTitle}"
+                                          FallbackGradient="{Binding NowPlaying.Gradient}"
+                                          LocalCachePath="{Binding NowPlaying.CoverPath}"
+                                          LetterFontSize="140" ImageCornerRadius="14" Width="300" Height="300"/>
+                    </Border>
+                    <TextBlock Text="{Binding NowPlayingTitle}" FontSize="26" FontWeight="Bold" HorizontalAlignment="Center"
+                               TextTrimming="CharacterEllipsis" MaxWidth="800"/>
+                    <TextBlock Text="{Binding NowPlayingGroup}" FontSize="14" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding NowPlaying.RatingStars}" Foreground="#f5c518" FontSize="16"/>
+                        <TextBlock Text="{Binding NowPlaying.PlayCountLabel}" Foreground="#8b949e" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </StackPanel>
+                <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12" MaxWidth="900">
+                    <TextBlock Text="{Binding PositionLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
+                    <Border Grid.Column="1" Background="Transparent" Padding="0,8" Cursor="Hand" Tag="audio"
+                            PointerPressed="OnSeekPressed" PointerMoved="OnSeekMoved" PointerReleased="OnSeekReleased">
+                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding ProgressPercent}" Height="10" IsHitTestVisible="False"/>
+                    </Border>
+                    <TextBlock Grid.Column="2" Text="{Binding DurationLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
+                </Grid>
+                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="12">
+                    <Button Classes="btn-secondary" Command="{Binding PreviousTrackCommand}" Content="⏮"/>
+                    <Button Classes="btn-secondary" Command="{Binding MusicSeekBackCommand}" Content="⏪"/>
+                    <Button Classes="btn-primary" MinWidth="72" HorizontalContentAlignment="Center"
+                            Command="{Binding TogglePlayPauseCommand}" Content="{Binding PlayPauseGlyph}"/>
+                    <Button Classes="btn-secondary" Command="{Binding MusicSeekForwardCommand}" Content="⏩"/>
+                    <Button Classes="btn-secondary" Command="{Binding NextTrackCommand}" Content="⏭"/>
+                    <Button Classes="btn-secondary" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                </StackPanel>
+                <TextBlock Grid.Row="4" Text="A / X pause  ·  ◀ ▶ seek  ·  ▲ ▼ previous / next track  ·  B close"
+                           FontSize="11" Foreground="#484f58" HorizontalAlignment="Center"/>
             </Grid>
         </Border>
 

@@ -2,9 +2,9 @@ using Avalonia.Controls;
 
 namespace GameLauncher.Views.MediaLib;
 
-public partial class NetflixMoviesTv : UserControl
+public partial class CinemaMoviesTv : UserControl
 {
-    public NetflixMoviesTv()
+    public CinemaMoviesTv()
     {
         InitializeComponent();
     }

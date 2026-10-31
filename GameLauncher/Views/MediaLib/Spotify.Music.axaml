@@ -99,7 +99,6 @@
                     </ScrollViewer>
                     <StackPanel Grid.Row="3" Spacing="2">
                         <Button Classes="sp-nav" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳  Refresh"/>
-                        <Button Classes="sp-nav media-nav" Classes.focused="{Binding IsTabMusicFocused}" Command="{Binding SelectMoviesCommand}" Content="‹  Movies &amp; TV"/>
                     </StackPanel>
                 </Grid>
             </Border>
@@ -187,6 +186,8 @@
                         <Button Classes="sp-play" Command="{Binding TogglePlayPauseCommand}" Content="{Binding PlayPauseGlyph}"/>
                         <Button Classes="sp-ctl" Command="{Binding NextTrackCommand}" Content="⏭"/>
                         <Button Classes="sp-ctl" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                        <Button Classes="sp-ctl" Command="{Binding ToggleShuffleCommand}" Content="🔀" ToolTip.Tip="Shuffle"/>
+                        <Button Classes="sp-ctl" Command="{Binding OpenNowPlayingFullScreenCommand}" Content="⛶" ToolTip.Tip="Full screen (Y)"/>
                     </StackPanel>
                     <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="10">
                         <TextBlock Text="{Binding PositionLabel}" Foreground="#b3b3b3" FontSize="11" VerticalAlignment="Center"/>
