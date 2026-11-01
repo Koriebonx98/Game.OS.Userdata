@@ -46,12 +46,10 @@ public partial class MediaView : UserControl
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_subscribedVm != null) _subscribedVm.MediaFocusChanged -= ScrollFocusedIntoView;
-        if (_subscribedVm != null) _subscribedVm.PropertyChanged -= OnVmPropertyChanged;
         _subscribedVm = DataContext as MediaViewModel;
         if (_subscribedVm != null)
         {
             _subscribedVm.MediaFocusChanged += ScrollFocusedIntoView;
-            _subscribedVm.PropertyChanged += OnVmPropertyChanged;
         }
 
         if (DataContext is MediaViewModel vm)
@@ -69,24 +67,9 @@ public partial class MediaView : UserControl
         }
     }
 
-    private WindowState? _stateBeforePlayer;
-
-    // The video player takes the whole screen while it is open and restores the previous window state afterwards.
-    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    private void OnPlayerPointerMoved(object? sender, Avalonia.Input.PointerEventArgs e)
     {
-        if (e.PropertyName is not (nameof(MediaViewModel.IsVlcFullView) or nameof(MediaViewModel.IsPlayerWindowFullscreen))
-            || TopLevel.GetTopLevel(this) is not Window win) return;
-        var vm = _subscribedVm!;
-        if (vm.IsVlcFullView && vm.IsPlayerWindowFullscreen)
-        {
-            _stateBeforePlayer ??= win.WindowState;
-            win.WindowState = WindowState.FullScreen;
-        }
-        else if (_stateBeforePlayer is { } prev)
-        {
-            win.WindowState = prev == WindowState.FullScreen ? WindowState.Maximized : prev;
-            _stateBeforePlayer = null;
-        }
+        if (DataContext is MediaViewModel { IsVlcPlayerOpen: true, IsPip: false } vm) vm.ShowOsd();
     }
 
     // Keeps the controller highlight visible: scrolls every ScrollViewer around it (list and shelf) just enough.
