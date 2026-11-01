@@ -187,11 +187,39 @@ public partial class BrowserViewModel : ViewModelBase
     {
         if (ActiveTab == null || string.IsNullOrWhiteSpace(ActiveTab.Url) || ActiveTab.Url == "about:blank") return;
         var existing = Settings.Favourites.FirstOrDefault(f => string.Equals(f.Url, ActiveTab.Url, StringComparison.OrdinalIgnoreCase));
-        if (existing != null) Settings.Favourites.Remove(existing);
-        else Settings.Favourites.Add(new BrowserFavourite { Title = string.IsNullOrWhiteSpace(ActiveTab.Title) ? ActiveTab.Url : ActiveTab.Title, Url = ActiveTab.Url });
+        if (existing == null)
+        {
+            // New favourites are named with the on-screen keyboard (pre-filled with the page title).
+            IsMenuOpen = false;
+            string url = ActiveTab.Url;
+            string initial = string.IsNullOrWhiteSpace(ActiveTab.Title) ? url : ActiveTab.Title.Trim();
+            Keyboard.Open(initial, "Name this favourite — Go / Y saves", _ => { }, name =>
+            {
+                Settings.Favourites.Add(new BrowserFavourite { Title = string.IsNullOrWhiteSpace(name) ? initial : name.Trim(), Url = url });
+                PersistFavourites();
+                StatusText = "Added to favourites ★";
+            });
+            return;
+        }
+        Settings.Favourites.Remove(existing);
         PersistFavourites();
-        StatusText = existing != null ? "Removed from favourites" : "Added to favourites ★";
+        StatusText = "Removed from favourites";
         if (IsMenuOpen) RebuildMenu();
+    }
+
+    /// <summary>Y on a favourite in the menu renames it. Returns false when the highlighted entry is not a favourite.</summary>
+    public bool RenameSelectedFavourite()
+    {
+        var fav = MenuEntries.ElementAtOrDefault(MenuIndex)?.Favourite;
+        if (fav == null) return false;
+        IsMenuOpen = false;
+        Keyboard.Open(fav.Title, "Rename favourite — Go / Y saves", _ => { }, name =>
+        {
+            if (!string.IsNullOrWhiteSpace(name)) fav.Title = name.Trim();
+            PersistFavourites();
+            StatusText = "Favourite renamed";
+        });
+        return true;
     }
 
     private void PersistFavourites()

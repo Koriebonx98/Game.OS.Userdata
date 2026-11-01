@@ -307,6 +307,7 @@ public partial class BrowserView : UserControl
         {
             if (_vm == null || _vm.Downloads?.IsPromptOpen == true) return;
             if (_vm.Keyboard.IsOpen) { _vm.Keyboard.HandleKey("Y"); return; }
+            if (_vm.IsMenuOpen && _vm.RenameSelectedFavourite()) return;
             _vm.CloseMenu();
             FocusAddress();
         };

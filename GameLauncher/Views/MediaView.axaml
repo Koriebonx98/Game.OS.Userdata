@@ -13,7 +13,7 @@
               Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Cinema.MoviesTv.axaml ("Cinema")
               Views/MediaLib/Default.Music.axaml     ("Default")   Views/MediaLib/Spotify.Music.axaml    ("Spotify")
         -->
-        <Panel IsVisible="{Binding !IsVlcPlayerOpen}">
+        <Panel IsVisible="{Binding !IsVlcFullView}">
             <Panel IsVisible="{Binding IsVideoSection}">
                 <lib:DefaultMoviesTv IsVisible="{Binding IsDefaultMoviesTv}"/>
                 <lib:CinemaMoviesTv IsVisible="{Binding IsCinemaMoviesTv}"/>
@@ -26,12 +26,12 @@
 
         <!-- VLC player overlay (shown when IsVlcPlayerOpen) -->
         <Border Background="#0d1117"
-                IsVisible="{Binding IsVlcPlayerOpen}"
+                IsVisible="{Binding IsVlcFullView}"
                 ZIndex="50">
             <Grid RowDefinitions="Auto,*,Auto">
 
                 <!-- Top bar -->
-                <Border Grid.Row="0" Background="#161b22" Padding="16,10">
+                <Border Grid.Row="0" Background="#161b22" Padding="16,10" IsVisible="False">
                     <Grid ColumnDefinitions="Auto,*,Auto">
                         <Button Grid.Column="0"
                                 Classes="btn-secondary"
@@ -58,7 +58,23 @@
                 <vlc:VideoView Grid.Row="1"
                                x:Name="VlcOverlayVideoView"/>
 
-                <!-- Transport: seek bar + play / pause / skip (A / X = pause, ◀ ▶ = skip, ▲ ▼ = ±1 min, B = close) -->
+                <!-- B on the player: picture-in-picture / stop / keep watching -->
+                <Border Grid.Row="2" Background="#161b22" Padding="24,14" ZIndex="5" IsVisible="{Binding IsPipPromptOpen}">
+                    <StackPanel Spacing="10" HorizontalAlignment="Center">
+                        <TextBlock Text="Leave the video?" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                            <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsPipChoice0}" Content="🗗  Picture-in-picture"
+                                    Command="{Binding EnterPipCommand}"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice1}" Content="⏹  Stop"
+                                    Command="{Binding CloseVlcPlayerCommand}"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice2}" Content="Keep watching"
+                                    Command="{Binding DismissPipPromptCommand}"/>
+                        </StackPanel>
+                        <TextBlock Text="◀ ▶ choose · A select · B cancel" FontSize="11" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Transport: seek bar + play / pause / skip (A / X = pause, ◀ ▶ = skip, LT / RT = rewind / fast-forward, ▲ ▼ = ±1 min, B = close) -->
                 <Border Grid.Row="2" Background="#161b22" Padding="24,10">
                     <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
@@ -118,11 +134,11 @@
                         </TextBlock>
                     </StackPanel>
                     <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="10" Margin="0,6,0,6">
-                        <Button Classes="btn-primary" Padding="22,10" Command="{Binding PlayDetailCommand}">▶  Play</Button>
-                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding ToggleFavouriteCommand}" CommandParameter="{Binding SelectedItem}">♥  My List</Button>
-                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding ToggleWatchedCommand}" CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
-                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
-                        <Button Classes="btn-secondary" Padding="18,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
+                        <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsDetailPlayFocused}" Padding="22,10" Command="{Binding PlayDetailCommand}">▶  Play</Button>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailListFocused}" Padding="18,10" Command="{Binding ToggleFavouriteCommand}" CommandParameter="{Binding SelectedItem}">♥  My List</Button>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailWatchedFocused}" Padding="18,10" Command="{Binding ToggleWatchedCommand}" CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailInfoFocused}" Padding="18,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
+                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailBackFocused}" Padding="18,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
                     </StackPanel>
                     <StackPanel Grid.Row="4" Spacing="8" IsVisible="{Binding HasDetailRelated}">
                         <TextBlock Text="{Binding DetailRelatedTitle}" Classes="section-header"/>
@@ -130,7 +146,7 @@
                             <ItemsControl ItemsSource="{Binding DetailRelated}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                                                 Margin="0,0,0,4" Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
                                                 CommandParameter="{Binding}" Content="{Binding DisplayTitle}"/>
                                     </DataTemplate>
@@ -138,7 +154,7 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </StackPanel>
-                    <TextBlock Grid.Row="5" Text="A play  ·  X My List  ·  LB / RB rate  ·  ◀ ▶ previous / next  ·  B close" FontSize="11" Foreground="#484f58"/>
+                    <TextBlock Grid.Row="5" Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  B close" FontSize="11" Foreground="#484f58"/>
                 </Grid>
             </Grid>
         </Border>
@@ -184,5 +200,31 @@
             </Grid>
         </Border>
 
-    </Panel>
+        <!-- Options menu (Start) -->
+        <Border IsVisible="{Binding IsMusicMenuOpen}" Background="#B0000000" ZIndex="80">
+            <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="12" Padding="20"
+                    HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="380" MaxWidth="560">
+                <StackPanel Spacing="10">
+                    <TextBlock Text="{Binding MusicMenuTitle}" FontSize="16" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <ItemsControl ItemsSource="{Binding MusicMenuEntries}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MediaViewModel+MusicMenuEntry">
+                                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}"
+                                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6"
+                                        Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).ActivateMusicMenuEntryCommand}"
+                                        CommandParameter="{Binding}"
+                                        Content="{Binding Label}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <TextBlock Text="A select · B / Y close" FontSize="11" Foreground="#8b949e"/>
+                </StackPanel>
+            </Border>
+        </Border>
+
+        <!-- On-screen keyboard (search / playlist name) -->
+        <Border IsVisible="{Binding MusicKeyboard.IsOpen}" Background="#B0000000" ZIndex="90">
+            <views:OnScreenKeyboardView DataContext="{Binding MusicKeyboard}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
+</Panel>
 </UserControl>

@@ -1,0 +1,115 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.MusicBrowser"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Artist / Album / Song browser: tabs + search on top, artists (or playlists) on the left, albums or songs on the right. -->
+    <UserControl.Styles>
+        <Style Selector="Button.track-row">
+            <Setter Property="Background" Value="#161b22"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,10"/>
+            <Setter Property="Margin" Value="0,0,0,6"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.track-row:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#21262d"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid>
+        <Grid RowDefinitions="Auto,*">
+            <!-- Top bar -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,Auto,*,300" Margin="20,14,20,8" ColumnSpacing="10">
+                <Button Grid.Column="0" Classes="media-nav" Classes.focused="{Binding IsMusicTabArtistsFocused}"
+                        Classes.btn-primary="{Binding IsMusicArtistsMode}" Classes.btn-secondary="{Binding !IsMusicArtistsMode}"
+                        Command="{Binding SelectMusicTabCommand}" CommandParameter="artists">🎤  Artists</Button>
+                <Button Grid.Column="1" Classes="media-nav" Classes.focused="{Binding IsMusicTabPlaylistsFocused}"
+                        Classes.btn-primary="{Binding IsMusicPlaylistMode}" Classes.btn-secondary="{Binding !IsMusicPlaylistMode}"
+                        Command="{Binding SelectMusicTabCommand}" CommandParameter="playlists">📜  Playlists</Button>
+                <Button Grid.Column="3" Classes="btn-secondary media-nav" Classes.focused="{Binding IsMusicSearchFocused}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                        Command="{Binding OpenMusicSearchCommand}">
+                    <TextBlock Text="{Binding MusicSearchLabel}" TextTrimming="CharacterEllipsis"/>
+                </Button>
+            </Grid>
+
+            <Grid Grid.Row="1" ColumnDefinitions="260,*">
+                <!-- Artists / playlists -->
+                <Border Grid.Column="0" Background="#161b22" Padding="14,12">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="6">
+                            <ItemsControl ItemsSource="{Binding MusicEntries}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:MediaViewModel+MusicEntry">
+                                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}"
+                                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6"
+                                                Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).SelectMusicEntryByClickCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="1">
+                                                <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#8b949e"/>
+                                            </StackPanel>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <Border Height="1" Background="#30363d" Margin="0,6"/>
+                            <Button Classes="btn-secondary" HorizontalAlignment="Stretch"
+                                    Command="{Binding RefreshMediaLibraryCommand}">⟳  Refresh Scan</Button>
+                        </StackPanel>
+                    </ScrollViewer>
+                </Border>
+
+                <!-- Albums / songs -->
+                <Grid Grid.Column="1" RowDefinitions="Auto,*" Margin="28,12,28,0">
+                    <StackPanel Grid.Row="0" Spacing="2" Margin="0,0,0,12">
+                        <TextBlock Text="{Binding MusicContentTitle}" Classes="page-title"/>
+                        <TextBlock Text="{Binding MusicContentSubtitle}" FontSize="12" Foreground="#8b949e"/>
+                    </StackPanel>
+
+                    <Border Grid.Row="1" Classes="empty-state-card" CornerRadius="10" Padding="28,24"
+                            VerticalAlignment="Top" IsVisible="{Binding HasNoMusicRows}">
+                        <StackPanel Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock Text="🎵" FontSize="36" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Nothing here yet" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Add songs to a Media/Music folder on any drive (Artist/Album/Song), or press Y on a song to add it to a playlist."
+                                       FontSize="12" Foreground="#8b949e" TextWrapping="Wrap" TextAlignment="Center"/>
+                        </StackPanel>
+                    </Border>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" IsVisible="{Binding !HasNoMusicRows}">
+                        <ItemsControl ItemsSource="{Binding MusicRows}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MediaViewModel+MusicRow">
+                                    <Button Classes="track-row media-nav" Classes.focused="{Binding IsFocused}"
+                                            Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).PlayMusicRowCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Grid ColumnDefinitions="48,*,Auto" ColumnSpacing="12">
+                                            <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">
+                                                <views:CoverImage FallbackText="{Binding Title}"
+                                                                  FallbackGradient="{Binding Gradient}" LocalCachePath="{Binding CoverPath}"
+                                                                  LetterFontSize="20" ImageCornerRadius="8" Width="48" Height="48"/>
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Foreground="#8b949e" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="{Binding Detail}" VerticalAlignment="Center" FontSize="11" Foreground="#8b949e"/>
+                                        </Grid>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </Grid>
+            </Grid>
+        </Grid>
+
+    </Grid>
+</UserControl>

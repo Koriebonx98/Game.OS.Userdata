@@ -28,11 +28,7 @@
                 <TextBlock Text="Movies &amp; TV" Classes="section-header" Margin="0,0,0,8"/>
                 <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
                         HorizontalAlignment="Stretch" Command="{Binding SelectMoviesCommand}">
-                    🎬  Movies
-                </Button>
-                <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
-                        HorizontalAlignment="Stretch" Command="{Binding SelectTvShowsCommand}">
-                    📺  TV Shows
+                    🎬  Movies &amp; TV
                 </Button>
                 <Border Height="1" Background="#30363d" Margin="0,10"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch"

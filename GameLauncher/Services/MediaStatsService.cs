@@ -65,6 +65,9 @@ namespace GameLauncher.Services
             }
         }
 
+        /// <summary>Per-user folder holding the media stats and playlists.</summary>
+        public static string DataDir => Dir;
+
         private static string StatsFile => Path.Combine(Dir, "stats.json");
         private static string SessionsFile => Path.Combine(Dir, "sessions.json");
 
