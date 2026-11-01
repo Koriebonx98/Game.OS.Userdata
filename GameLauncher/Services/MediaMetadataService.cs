@@ -127,13 +127,15 @@ namespace GameLauncher.Services
 
         // ── Sources ──────────────────────────────────────────────────────────────
         /// <summary>Preferred source ("Auto" = built-in order) and optional API keys; set from Settings → Media.</summary>
-        public static string PreferredSource { get; private set; } = "Auto";
+        private static readonly Dictionary<string, string> Preferred = new() { ["movie"] = "Auto", ["tv"] = "Auto", ["music"] = "Auto" };
         private static string TmdbApiKey = "";
         private static string OmdbApiKey = "";
 
-        public static void Configure(string? source, string? tmdbKey, string? omdbKey)
+        public static void Configure(string? movieSource, string? tvSource, string? musicSource, string? tmdbKey, string? omdbKey)
         {
-            PreferredSource = string.IsNullOrWhiteSpace(source) ? "Auto" : source.Trim();
+            Preferred["movie"] = string.IsNullOrWhiteSpace(movieSource) ? "Auto" : movieSource.Trim();
+            Preferred["tv"] = string.IsNullOrWhiteSpace(tvSource) ? "Auto" : tvSource.Trim();
+            Preferred["music"] = string.IsNullOrWhiteSpace(musicSource) ? "Auto" : musicSource.Trim();
             TmdbApiKey = tmdbKey?.Trim() ?? "";
             OmdbApiKey = omdbKey?.Trim() ?? "";
         }
@@ -143,12 +145,12 @@ namespace GameLauncher.Services
         {
             var order = kind switch
             {
-                "tv" => new[] { "TMDB", "TVmaze", "OMDb" },
-                "movie" => new[] { "TMDB", "OMDb", "iTunes" },
+                "tv" => new[] { "TMDB", "TVmaze", "Cinemeta", "OMDb" },
+                "movie" => new[] { "TMDB", "Cinemeta", "OMDb", "iTunes" },
                 _ => new[] { "iTunes", "Deezer", "MusicBrainz" },
             };
             var list = new List<string>(order);
-            var preferred = list.FirstOrDefault(x => x.Equals(PreferredSource, StringComparison.OrdinalIgnoreCase));
+            var preferred = list.FirstOrDefault(x => x.Equals(Preferred.GetValueOrDefault(kind, "Auto"), StringComparison.OrdinalIgnoreCase));
             if (preferred != null) { list.Remove(preferred); list.Insert(0, preferred); }
             return list.Where(x => (x != "TMDB" || TmdbApiKey.Length > 0) && (x != "OMDb" || OmdbApiKey.Length > 0));
         }
@@ -159,6 +161,7 @@ namespace GameLauncher.Services
                 "TMDB" => FetchTmdbAsync(kind, q, year, keyBase),
                 "OMDb" => FetchOmdbAsync(kind, q, year, keyBase),
                 "TVmaze" => FetchTvAsync(q, keyBase),
+                "Cinemeta" => FetchCinemetaAsync(kind, q, year, keyBase),
                 "Deezer" => FetchDeezerAsync($"{artist} {q}".Trim(), keyBase),
                 "MusicBrainz" => FetchMusicBrainzAsync(q, artist, keyBase),
                 _ => kind == "music" ? FetchItunesAsync($"{artist} {q}".Trim(), 0, "music", "song", keyBase)
@@ -293,6 +296,57 @@ namespace GameLauncher.Services
             if (releaseId.Length > 0)
                 meta.PosterFile = await DownloadPosterAsync($"https://coverartarchive.org/release/{releaseId}/front-500", keyBase);
             return meta;
+        }
+
+        /// <summary>Keyless IMDb-backed lookup (Stremio Cinemeta) – covers movies as well as TV shows.</summary>
+        private static async Task<MediaMetadata> FetchCinemetaAsync(string kind, string query, int year, string keyBase)
+        {
+            var meta = new MediaMetadata { Source = "Cinemeta" };
+            string type = kind == "tv" ? "series" : "movie";
+            using var search = JsonDocument.Parse(await Http.GetStringAsync(
+                $"https://v3-cinemeta.strem.io/catalog/{type}/top/search={Uri.EscapeDataString(query)}.json"));
+            if (!search.RootElement.TryGetProperty("metas", out var metas) || metas.ValueKind != JsonValueKind.Array || metas.GetArrayLength() == 0) return meta;
+
+            JsonElement pick = metas[0];
+            if (year > 0)
+                foreach (var cand in metas.EnumerateArray())
+                    if (YearOf(cand) == year) { pick = cand; break; }
+
+            // The search hit is thin; the full record has the description and runtime.
+            JsonElement r = pick;
+            JsonDocument? full = null;
+            string id = Str(pick, "imdb_id").Length > 0 ? Str(pick, "imdb_id") : Str(pick, "id");
+            if (id.Length > 0)
+            {
+                try
+                {
+                    full = JsonDocument.Parse(await Http.GetStringAsync($"https://v3-cinemeta.strem.io/meta/{type}/{Uri.EscapeDataString(id)}.json"));
+                    if (full.RootElement.TryGetProperty("meta", out var m) && m.ValueKind == JsonValueKind.Object) r = m;
+                }
+                catch (HttpRequestException) { /* fall back to the search hit */ }
+            }
+            using (full)
+            {
+                meta.Found = true;
+                meta.Title = Str(r, "name");
+                meta.Year = YearOf(r);
+                meta.Overview = Str(r, "description");
+                if (r.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array)
+                    meta.Genres = g.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList();
+                if (double.TryParse(Str(r, "imdbRating"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var score))
+                    meta.Score = Math.Round(score, 1);
+                var rt = Regex.Match(Str(r, "runtime"), @"\d+");
+                if (rt.Success) meta.RuntimeMinutes = int.Parse(rt.Value);
+                string poster = Str(r, "poster");
+                if (poster.StartsWith("http", StringComparison.OrdinalIgnoreCase)) meta.PosterFile = await DownloadPosterAsync(poster, keyBase);
+            }
+            return meta;
+        }
+
+        private static int YearOf(JsonElement e)
+        {
+            var m = Regex.Match(Str(e, "year") + " " + Str(e, "releaseInfo"), @"(?:19|20)\d{2}");
+            return m.Success ? int.Parse(m.Value) : 0;
         }
 
         private static async Task<MediaMetadata> FetchTvAsync(string query, string keyBase)

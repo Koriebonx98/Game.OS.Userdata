@@ -597,8 +597,12 @@ namespace GameLauncher.Models
         [JsonPropertyName("musicShuffle")] public bool MusicShuffle { get; set; }
         [JsonPropertyName("musicRepeat")] public bool MusicRepeat { get; set; } = true;
         [JsonPropertyName("onlineMediaInfo")] public bool OnlineMediaInfo { get; set; } = true;
-        /// <summary>Preferred online info source: "Auto", "TMDB", "OMDb", "TVmaze", "iTunes", "Deezer" or "MusicBrainz".</summary>
+        /// <summary>Preferred online info source: "Auto", "TMDB", "OMDb", "TVmaze", "Cinemeta", "iTunes", "Deezer" or "MusicBrainz".</summary>
         [JsonPropertyName("mediaInfoSource")] public string MediaInfoSource { get; set; } = "Auto";
+        /// <summary>Per-type info source ("Auto" = built-in order). Empty = fall back to the legacy <see cref="MediaInfoSource"/>.</summary>
+        [JsonPropertyName("movieInfoSource")] public string MovieInfoSource { get; set; } = "";
+        [JsonPropertyName("tvInfoSource")] public string TvInfoSource { get; set; } = "";
+        [JsonPropertyName("musicInfoSource")] public string MusicInfoSource { get; set; } = "";
         [JsonPropertyName("tmdbApiKey")] public string TmdbApiKey { get; set; } = "";
         [JsonPropertyName("omdbApiKey")] public string OmdbApiKey { get; set; } = "";
         /// <summary>Picture-in-picture corner: "Bottom right", "Bottom left", "Top right" or "Top left".</summary>
