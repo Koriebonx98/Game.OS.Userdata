@@ -1258,8 +1258,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 lock (_romVerifyChecked) { if (!_romVerifyChecked.Add(checkKey)) continue; }
                 try
                 {
-                    // The process-db-queue workflow verifies the game with a provider before adding it
-                    Services.DatabaseContributionQueue.EnqueueRom(platform, rom.Title, rom.TitleId);
+                    // Fetch metadata from the provider now so the user sees it immediately; only
+                    // provider-verified games are cached locally and queued (the workflow re-verifies).
+                    var proof = await Services.GitHubDataService.VerifyGameOnlineAsync(platform, rom.Title).ConfigureAwait(false);
+                    if (proof == null) continue;
+                    await new Services.GameMetadataCacheService().CacheGameInfoJsonAsync(
+                        platform, rom.TitleId, rom.Title,
+                        new Models.DatabaseGame
+                        {
+                            Title = rom.Title, TitleId = rom.TitleId,
+                            Description = proof.Value.Description, StorePageUrl = proof.Value.Url,
+                        }).ConfigureAwait(false);
+                    Services.DatabaseContributionQueue.EnqueueRom(
+                        platform, rom.Title, rom.TitleId, proof.Value.Description, proof.Value.Url);
                 }
                 catch (Exception ex)
                 {
