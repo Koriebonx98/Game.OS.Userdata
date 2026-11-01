@@ -80,6 +80,26 @@
                                 <Button Classes="btn-secondary" Command="{Binding CancelRecompCommand}"
                                         Content="Cancel" IsVisible="{Binding IsRecompBuilding}"/>
                             </StackPanel>
+                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding RecompProgress}" Height="8"
+                                         IsVisible="{Binding IsRecompBuilding}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowRecompDefaultPrompt}">
+                                <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultYesCommand}" Content="Yes, make default"/>
+                                <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultNoCommand}" Content="No"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6" IsVisible="{Binding HasRecompBuild}">
+                                <TextBlock Text="QUICK SETTINGS (applied on next launch; F11 toggles full screen in-game)" FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <TextBlock Text="Resolution" VerticalAlignment="Center" Foreground="#c9d1d9" FontSize="12"/>
+                                    <ComboBox SelectedIndex="{Binding RecompScaleIndex}" MinWidth="130">
+                                        <ComboBoxItem Content="1× native"/>
+                                        <ComboBoxItem Content="2× (strong GPU)"/>
+                                        <ComboBoxItem Content="3×"/>
+                                    </ComboBox>
+                                    <CheckBox Content="16:9 widescreen" IsChecked="{Binding RecompWidescreen}"/>
+                                </StackPanel>
+                                <Button Classes="btn-secondary" Command="{Binding ToggleRecompDefaultCommand}"
+                                        Content="{Binding RecompDefaultButtonText}" HorizontalAlignment="Left"/>
+                            </StackPanel>
                             <TextBlock Text="{Binding RecompStatus}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
                                        IsVisible="{Binding RecompStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                         </StackPanel>

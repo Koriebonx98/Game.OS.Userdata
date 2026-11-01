@@ -999,6 +999,43 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool   _isRecompBuilding;
     [ObservableProperty] private bool   _hasRecompBuild;
     [ObservableProperty] private string _recompStatus = "";
+    [ObservableProperty] private double _recompProgress;
+    [ObservableProperty] private bool   _showRecompDefaultPrompt;
+    [ObservableProperty] private bool   _recompIsDefault;
+    [ObservableProperty] private int    _recompScaleIndex;      // 0 = 1x, 1 = 2x, 2 = 3x
+    [ObservableProperty] private bool   _recompWidescreen;
+    private bool _loadingRecompSettings;
+    public string RecompDefaultButtonText => RecompIsDefault ? "Use emulator by default" : "Use PC version by default";
+    partial void OnRecompIsDefaultChanged(bool value) => OnPropertyChanged(nameof(RecompDefaultButtonText));
+    partial void OnRecompScaleIndexChanged(int value) => SaveRecompQuickSettings();
+    partial void OnRecompWidescreenChanged(bool value) => SaveRecompQuickSettings();
+
+    private void SaveRecompQuickSettings()
+    {
+        if (_loadingRecompSettings) return;
+        var iso = ResolveIsoPath();
+        if (iso == null) return;
+        Ps2RecompService.SaveSettings(iso, new Ps2RecompSettings
+        {
+            Scale = Math.Clamp(RecompScaleIndex, 0, 2) + 1,
+            Widescreen = RecompWidescreen,
+        });
+    }
+
+    private void SetRecompDefault(bool value)
+    {
+        var saved = GameSettingsService.Load(Title);
+        saved.GameTitle = Title;
+        saved.PreferRecomp = value;
+        GameSettingsService.Save(saved);
+        RecompIsDefault = value;
+        ShowRecompDefaultPrompt = false;
+        RecompStatus = value ? "✓  Play now launches the PC version." : "✓  Play launches the emulator.";
+    }
+
+    [RelayCommand] private void SetRecompDefaultYes() => SetRecompDefault(true);
+    [RelayCommand] private void SetRecompDefaultNo()  => SetRecompDefault(false);
+    [RelayCommand] private void ToggleRecompDefault() => SetRecompDefault(!RecompIsDefault);
     private System.Threading.CancellationTokenSource? _recompCts;
     public bool CanBuildRecomp => !IsRecompBuilding;
     public string RecompButtonText => HasRecompBuild ? "🔁  Rebuild PC version" : "⚙  Recomp → PC version (.exe)";
@@ -1008,9 +1045,21 @@ public partial class GameDetailViewModel : ViewModelBase
     private void RefreshPs2Recomp()
     {
         IsPs2          = string.Equals(Platform, "PS2", StringComparison.OrdinalIgnoreCase);
-        HasRecompBuild = IsPs2 && Ps2RecompService.GetBuilt(ResolveIsoPath()) != null;
+        var isoPath = ResolveIsoPath();
+        HasRecompBuild = IsPs2 && Ps2RecompService.GetBuilt(isoPath) != null;
         RefreshRomConvert();
-        if (!IsRecompBuilding) RecompStatus = HasRecompBuild ? "✓  PC version ready — Play launches it." : "";
+        if (HasRecompBuild && isoPath != null)
+        {
+            _loadingRecompSettings = true;
+            var qs = Ps2RecompService.LoadSettings(isoPath);
+            RecompScaleIndex  = Math.Clamp(qs.Scale, 1, 3) - 1;
+            RecompWidescreen  = qs.Widescreen;
+            _loadingRecompSettings = false;
+            RecompIsDefault = GameSettingsService.Load(Title).PreferRecomp != false;
+        }
+        if (!IsRecompBuilding && !ShowRecompDefaultPrompt)
+            RecompStatus = !HasRecompBuild ? ""
+                : RecompIsDefault ? "✓  PC version ready — Play launches it." : "✓  PC version ready — Play launches the emulator.";
     }
 
     private string? ResolveIsoPath()
@@ -1036,16 +1085,25 @@ public partial class GameDetailViewModel : ViewModelBase
 
         IsRecompBuilding = true;
         RecompStatus = "⏳  Starting…";
+        RecompProgress = 0;
+        ShowRecompDefaultPrompt = false;
         _recompCts = new System.Threading.CancellationTokenSource();
         string title = Title;
         var ui = Avalonia.Threading.Dispatcher.UIThread;
         var err = await System.Threading.Tasks.Task.Run(() => Ps2RecompService.BuildAsync(
-            iso, line => ui.Post(() => RecompStatus = "⏳  " + line), _recompCts.Token));
+            iso, line => ui.Post(() => RecompStatus = "⏳  " + line),
+            pct => ui.Post(() => RecompProgress = pct), _recompCts.Token));
         IsRecompBuilding = false;
         _recompCts = null;
         if (title != Title) return;
         if (err != null) { RecompStatus = "⛔  " + err; HasRecompBuild = Ps2RecompService.GetBuilt(iso) != null; }
-        else RefreshPs2Recomp();
+        else
+        {
+            RecompProgress = 100;
+            ShowRecompDefaultPrompt = true;
+            RefreshPs2Recomp();
+            RecompStatus = "✅  Recomp finished. Launch the PC version by default?";
+        }
     }
 
     [RelayCommand] private void CancelRecomp() => _recompCts?.Cancel();
@@ -2013,15 +2071,17 @@ public partial class GameDetailViewModel : ViewModelBase
         // ── ROM launch: use configured emulator if available ──────────────────
         if (IsRom)
         {
-            if (IsPs2 && Ps2RecompService.GetBuilt(ResolveIsoPath()) is { } recomp)
+            if (IsPs2 && saved.PreferRecomp != false && Ps2RecompService.GetBuilt(ResolveIsoPath()) is { } recomp)
             {
                 try
                 {
-                    var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    var psi = new System.Diagnostics.ProcessStartInfo
                     {
                         FileName = recomp.ExePath, Arguments = recomp.Arguments,
                         WorkingDirectory = recomp.WorkingDirectory, UseShellExecute = false,
-                    });
+                    };
+                    foreach (var kv in recomp.Environment) psi.Environment[kv.Key] = kv.Value;
+                    var proc = System.Diagnostics.Process.Start(psi);
                     if (proc != null)
                     {
                         _runningProcess    = proc;

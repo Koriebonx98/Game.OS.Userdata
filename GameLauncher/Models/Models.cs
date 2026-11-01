@@ -840,6 +840,8 @@ namespace GameLauncher.Models
         /// When set, this overrides the default first-enabled emulator for the platform.
         /// </summary>
         [JsonPropertyName("preferredEmulatorName")] public string? PreferredEmulatorName { get; set; }
+        /// <summary>PS2: launch the recompiled PC version by default. Null = not decided (uses it when built).</summary>
+        [JsonPropertyName("preferRecomp")] public bool? PreferRecomp { get; set; }
         /// <summary>Apps/scripts to run <b>before</b> the game launches.</summary>
         [JsonPropertyName("preLaunch")]   public List<LaunchEntry> PreLaunch    { get; set; } = new();
         /// <summary>Apps/scripts to run <b>during</b> the game (e.g. overlay or server).</summary>
