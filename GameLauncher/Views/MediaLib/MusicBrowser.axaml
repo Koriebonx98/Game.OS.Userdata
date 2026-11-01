@@ -49,7 +49,7 @@
                                     <DataTemplate x:DataType="vm:MediaViewModel+MusicEntry">
                                         <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}"
                                                 HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6"
-                                                Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).SelectMusicEntryByClickCommand}"
+                                                Command="{Binding $parent[UserControl].DataContext.SelectMusicEntryByClickCommand}"
                                                 CommandParameter="{Binding}">
                                             <StackPanel Spacing="1">
                                                 <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
@@ -88,7 +88,7 @@
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="vm:MediaViewModel+MusicRow">
                                     <Button Classes="track-row media-nav" Classes.focused="{Binding IsFocused}"
-                                            Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).PlayMusicRowCommand}"
+                                            Command="{Binding $parent[UserControl].DataContext.PlayMusicRowCommand}"
                                             CommandParameter="{Binding}">
                                         <Grid ColumnDefinitions="48,*,Auto" ColumnSpacing="12">
                                             <Border Width="48" Height="48" CornerRadius="8" ClipToBounds="True">

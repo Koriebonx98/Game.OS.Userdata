@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace GameLauncher.ViewModels;
 
@@ -166,6 +167,50 @@ public partial class MediaViewModel : ObservableObject
     // ── VLC local file player ─────────────────────────────────────────────────
     /// <summary>True when the in-app VLC file-player overlay is visible.</summary>
     [ObservableProperty] private bool   _isVlcPlayerOpen;
+
+    // ── Kodi-style on-screen controls: hidden in full screen until input, always shown when windowed ──
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ControlsVisible))] private bool _isOsdActive;
+    [ObservableProperty] private int _transportFocus = 1;
+    public bool ControlsVisible => !IsPip && (!IsPlayerWindowFullscreen || IsOsdActive);
+    public bool IsTransportFocus0 => TransportFocus == 0;
+    public bool IsTransportFocus1 => TransportFocus == 1;
+    public bool IsTransportFocus2 => TransportFocus == 2;
+    public bool IsTransportFocus3 => TransportFocus == 3;
+    public bool IsTransportFocus4 => TransportFocus == 4;
+    public bool IsTransportFocus5 => TransportFocus == 5;
+    private const int TransportButtonCount = 6;
+    private System.Threading.CancellationTokenSource? _osdCts;
+
+    partial void OnTransportFocusChanged(int value)
+    {
+        for (int i = 0; i < TransportButtonCount; i++) OnPropertyChanged("IsTransportFocus" + i);
+    }
+
+    /// <summary>Shows the transport controls and hides them again a few seconds after the last input (full screen only).</summary>
+    public void ShowOsd()
+    {
+        IsOsdActive = true;
+        _osdCts?.Cancel();
+        var cts = _osdCts = new System.Threading.CancellationTokenSource();
+        _ = Task.Delay(4000, cts.Token).ContinueWith(t =>
+        {
+            if (t.IsCanceled) return;
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (!cts.IsCancellationRequested) IsOsdActive = false; });
+        }, TaskScheduler.Default);
+    }
+
+    private void ActivateTransportButton()
+    {
+        switch (TransportFocus)
+        {
+            case 0: VideoSeekBack(); break;
+            case 1: ToggleVideoPause(); break;
+            case 2: VideoSeekForward(); break;
+            case 3: ToggleFullscreen(); break;
+            case 4: EnterPip(); break;
+            case 5: CloseVlcPlayer(); break;
+        }
+    }
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsVlcFullView))] private bool _isPip;
     [ObservableProperty] private bool _isPipPromptOpen;
     [ObservableProperty] private int _pipChoice;
@@ -177,7 +222,7 @@ public partial class MediaViewModel : ObservableObject
     public bool IsPipChoice1 => PipChoice == 1;
     public bool IsPipChoice2 => PipChoice == 2;
     public bool IsPipChoice3 => PipChoice == 3;
-    public string FullscreenToggleLabel => IsPlayerWindowFullscreen ? "🗗  Exit full screen" : "⛶  Full screen";
+    public string FullscreenToggleLabel => IsPlayerWindowFullscreen ? "🗗  Exit video full screen" : "⛶  Full screen";
 
     // The picture-in-picture video is the same overlay, just resized and pinned to a corner of the page.
     private (double w, double h) PipDims => PipSize switch { "Small" => (320, 180), "Large" => (640, 360), _ => (480, 270) };
@@ -188,16 +233,17 @@ public partial class MediaViewModel : ObservableObject
         : PipPosition.StartsWith("Top", StringComparison.OrdinalIgnoreCase) ? Avalonia.Layout.VerticalAlignment.Top : Avalonia.Layout.VerticalAlignment.Bottom;
     public double PlayerWidth => IsPip ? PipDims.w : double.NaN;
     public double PlayerHeight => IsPip ? PipDims.h + PipStripHeight : double.NaN;
-    public Avalonia.Thickness PlayerMargin => IsPip ? new Avalonia.Thickness(20) : new Avalonia.Thickness(0);
+    public Avalonia.Thickness PlayerMargin => IsPip ? new Avalonia.Thickness(20)
+        : IsPlayerWindowFullscreen ? new Avalonia.Thickness(0) : new Avalonia.Thickness(56, 36);
     public bool IsPipVisible => IsVlcPlayerOpen && IsPip;
     private void NotifyPlayerLayout()
     {
-        foreach (var n in new[] { nameof(PlayerHAlign), nameof(PlayerVAlign), nameof(PlayerWidth), nameof(PlayerHeight), nameof(PlayerMargin), nameof(IsPipVisible), nameof(FullscreenToggleLabel) })
+        foreach (var n in new[] { nameof(PlayerHAlign), nameof(PlayerVAlign), nameof(PlayerWidth), nameof(PlayerHeight), nameof(PlayerMargin), nameof(IsPipVisible), nameof(FullscreenToggleLabel), nameof(ControlsVisible) })
             OnPropertyChanged(n);
     }
     partial void OnPipPositionChanged(string value) => NotifyPlayerLayout();
     partial void OnPipSizeChanged(string value) => NotifyPlayerLayout();
-    partial void OnIsPlayerWindowFullscreenChanged(bool value) => NotifyPlayerLayout();
+    partial void OnIsPlayerWindowFullscreenChanged(bool value) { NotifyPlayerLayout(); OnPropertyChanged(nameof(ControlsVisible)); if (value) ShowOsd(); }
     public Action<bool>? PipRequested { get; set; }
     [RelayCommand] private void EnterPip() { IsPipPromptOpen = false; IsPip = true; }
     [RelayCommand] private void ExitPip() => IsPip = false;
@@ -798,6 +844,8 @@ public partial class MediaViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsVlcFullView));
         NotifyPlayerLayout();
+        if (value) { TransportFocus = 1; ShowOsd(); }
+        else { _osdCts?.Cancel(); IsOsdActive = false; }
         if (value) BeginVideoSession(_videoItem);
         else EndVideoSession();
     }
@@ -1357,6 +1405,12 @@ public partial class MediaViewModel : ObservableObject
             }
             return true;
         }
+        if (IsVlcPlayerOpen)
+        {
+            bool shown = ControlsVisible;
+            if (!IsPip) ShowOsd();
+            if (shown && HandleVideoControlsKey(key)) return true;
+        }
         switch (key)
         {
             case "LB": AdjustRating(-1); return true;
@@ -1370,6 +1424,21 @@ public partial class MediaViewModel : ObservableObject
                 if (IsVlcPlayerOpen) { PipChoice = 0; IsPipPromptOpen = true; }
                 else IsNowPlayingFullScreen = false;
                 return true;
+        }
+        return false;
+    }
+
+    /// <summary>With the on-screen controls showing, ◀ ▶ move between the buttons and A presses one; ▲ ▼ / B hide them.</summary>
+    private bool HandleVideoControlsKey(string key)
+    {
+        switch (key)
+        {
+            case "Left": TransportFocus = Math.Max(0, TransportFocus - 1); return true;
+            case "Right": TransportFocus = Math.Min(TransportButtonCount - 1, TransportFocus + 1); return true;
+            case "Enter": ActivateTransportButton(); return true;
+            case "Up": case "Down": case "Escape":
+                if (IsPlayerWindowFullscreen) { _osdCts?.Cancel(); IsOsdActive = false; return true; }
+                return key == "Escape" ? false : true;
         }
         return false;
     }
