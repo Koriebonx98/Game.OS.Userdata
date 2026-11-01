@@ -120,7 +120,8 @@ public sealed partial class MediaViewModel
             var pl = _playlists.FirstOrDefault(p => p.Name == _selKey);
             title = pl?.Name ?? "Playlists";
             sub = pl == null ? "Pick a playlist, or create one with ＋ New playlist" : "";
-            var byPath = Music.ToDictionary(m => m.FullPath, StringComparer.OrdinalIgnoreCase);
+            var byPath = new Dictionary<string, MediaLibraryItem>(StringComparer.OrdinalIgnoreCase);
+            foreach (var m in Music) byPath.TryAdd(m.FullPath, m);
             tracks = pl == null ? Array.Empty<MediaLibraryItem>()
                 : pl.Paths.Where(byPath.ContainsKey).Select(p => byPath[p]);
         }

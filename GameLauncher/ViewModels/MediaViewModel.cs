@@ -15,6 +15,18 @@ public partial class MediaViewModel : ObservableObject
     {
         /// <summary>True while the controller / keyboard highlight is on this item.</summary>
         [ObservableProperty] private bool _isFocused;
+        /// <summary>"all" / "movies" / "tv" for the browse tiles on the home shelves; empty for real files.</summary>
+        public string Special { get; init; } = "";
+        public bool IsSpecial => Special.Length > 0;
+        /// <summary>TV episodes: season / episode (0 = unknown) and the episode name.</summary>
+        public int Season { get; init; }
+        public int Episode { get; init; }
+        public string EpisodeLabel { get; init; } = "";
+        /// <summary>Text under a poster tile; a show name when the tile stands for a whole show.</summary>
+        public string TileTitle { get; init; } = "";
+        public string TileText => TileTitle.Length > 0 ? TileTitle : DisplayTitle;
+        /// <summary>Name used in episode lists.</summary>
+        public string ListTitle => IsTv && EpisodeLabel.Length > 0 ? EpisodeLabel : DisplayTitle;
         public string Title { get; init; } = "";
         public string FullPath { get; init; } = "";
         public string SourceFolder { get; init; } = "";
@@ -90,11 +102,12 @@ public partial class MediaViewModel : ObservableObject
         }
 
         /// <summary>Same file on another shelf, with its own focus flag.</summary>
-        public MediaLibraryItem Clone()
+        public MediaLibraryItem Clone(string? tileTitle = null)
         {
             var c = new MediaLibraryItem
             {
-                Title = Title, FullPath = FullPath, SourceFolder = SourceFolder, MediaType = MediaType,
+                Season = Season, Episode = Episode, EpisodeLabel = EpisodeLabel, TileTitle = tileTitle ?? TileTitle,
+                Special = Special, Title = Title, FullPath = FullPath, SourceFolder = SourceFolder, MediaType = MediaType,
                 Extension = Extension, FileSizeBytes = FileSizeBytes, Group = Group, DisplayTitle = DisplayTitle, Album = Album,
                 IsTv = IsTv, Quality = Quality, Gradient = Gradient, HasLocalCover = HasLocalCover, AddedUtc = AddedUtc,
                 CoverPath = CoverPath, Overview = Overview, Year = Year, Genres = Genres, Score = Score,
@@ -111,8 +124,13 @@ public partial class MediaViewModel : ObservableObject
     {
         [ObservableProperty] private bool _isFocused;
         public string Title { get; init; } = "";
+        /// <summary>False for the continuation rows of the A-Z grid.</summary>
+        public bool ShowHeader { get; init; } = true;
+        /// <summary>True for the rows of the A-Z grid (as opposed to the shelves above it).</summary>
+        public bool IsGrid { get; init; }
         public IReadOnlyList<MediaLibraryItem> Items { get; init; } = Array.Empty<MediaLibraryItem>();
-        public string CountLabel => Items.Count == 1 ? "1 item" : $"{Items.Count} items";
+        public int Total { get; init; }
+        public string CountLabel => Total > 0 ? (Total == 1 ? "1 title" : $"{Total} titles") : Items.Count == 1 ? "1 item" : $"{Items.Count} items";
         public MediaLibraryItem? Cover => Items.FirstOrDefault(i => i.CoverPath.Length > 0) ?? Items.FirstOrDefault();
     }
 
@@ -151,19 +169,49 @@ public partial class MediaViewModel : ObservableObject
     [ObservableProperty, NotifyPropertyChangedFor(nameof(IsVlcFullView))] private bool _isPip;
     [ObservableProperty] private bool _isPipPromptOpen;
     [ObservableProperty] private int _pipChoice;
+    /// <summary>Full-screen player also takes over the window (true) or stays inside it (false).</summary>
+    [ObservableProperty] private bool _isPlayerWindowFullscreen = true;
     /// <summary>True while the video fills the page (open and not shrunk to picture-in-picture).</summary>
     public bool IsVlcFullView => IsVlcPlayerOpen && !IsPip;
     public bool IsPipChoice0 => PipChoice == 0;
     public bool IsPipChoice1 => PipChoice == 1;
     public bool IsPipChoice2 => PipChoice == 2;
+    public bool IsPipChoice3 => PipChoice == 3;
+    public string FullscreenToggleLabel => IsPlayerWindowFullscreen ? "🗗  Exit full screen" : "⛶  Full screen";
+
+    // The picture-in-picture video is the same overlay, just resized and pinned to a corner of the page.
+    private (double w, double h) PipDims => PipSize switch { "Small" => (320, 180), "Large" => (640, 360), _ => (480, 270) };
+    private const double PipStripHeight = 40;
+    public Avalonia.Layout.HorizontalAlignment PlayerHAlign => !IsPip ? Avalonia.Layout.HorizontalAlignment.Stretch
+        : PipPosition.EndsWith("left", StringComparison.OrdinalIgnoreCase) ? Avalonia.Layout.HorizontalAlignment.Left : Avalonia.Layout.HorizontalAlignment.Right;
+    public Avalonia.Layout.VerticalAlignment PlayerVAlign => !IsPip ? Avalonia.Layout.VerticalAlignment.Stretch
+        : PipPosition.StartsWith("Top", StringComparison.OrdinalIgnoreCase) ? Avalonia.Layout.VerticalAlignment.Top : Avalonia.Layout.VerticalAlignment.Bottom;
+    public double PlayerWidth => IsPip ? PipDims.w : double.NaN;
+    public double PlayerHeight => IsPip ? PipDims.h + PipStripHeight : double.NaN;
+    public Avalonia.Thickness PlayerMargin => IsPip ? new Avalonia.Thickness(20) : new Avalonia.Thickness(0);
+    public bool IsPipVisible => IsVlcPlayerOpen && IsPip;
+    private void NotifyPlayerLayout()
+    {
+        foreach (var n in new[] { nameof(PlayerHAlign), nameof(PlayerVAlign), nameof(PlayerWidth), nameof(PlayerHeight), nameof(PlayerMargin), nameof(IsPipVisible), nameof(FullscreenToggleLabel) })
+            OnPropertyChanged(n);
+    }
+    partial void OnPipPositionChanged(string value) => NotifyPlayerLayout();
+    partial void OnPipSizeChanged(string value) => NotifyPlayerLayout();
+    partial void OnIsPlayerWindowFullscreenChanged(bool value) => NotifyPlayerLayout();
     public Action<bool>? PipRequested { get; set; }
     [RelayCommand] private void EnterPip() { IsPipPromptOpen = false; IsPip = true; }
+    [RelayCommand] private void ExitPip() => IsPip = false;
     [RelayCommand] private void DismissPipPrompt() => IsPipPromptOpen = false;
-    partial void OnIsPipChanged(bool value) => PipRequested?.Invoke(value);
+    [RelayCommand] private void ToggleFullscreen() { IsPipPromptOpen = false; if (IsPip) IsPip = false; IsPlayerWindowFullscreen = !IsPlayerWindowFullscreen; }
+    partial void OnIsPipChanged(bool value) { NotifyPlayerLayout(); PipRequested?.Invoke(value); }
     partial void OnPipChoiceChanged(int value)
     {
-        OnPropertyChanged(nameof(IsPipChoice0)); OnPropertyChanged(nameof(IsPipChoice1)); OnPropertyChanged(nameof(IsPipChoice2));
+        OnPropertyChanged(nameof(IsPipChoice0)); OnPropertyChanged(nameof(IsPipChoice1)); OnPropertyChanged(nameof(IsPipChoice2)); OnPropertyChanged(nameof(IsPipChoice3));
     }
+    /// <summary>Picture-in-picture on/off from the quick menu.</summary>
+    public void TogglePip() { if (IsVlcPlayerOpen) { IsPipPromptOpen = false; IsPip = !IsPip; } }
+    public void ToggleWindowFullscreen() { if (IsVlcPlayerOpen) ToggleFullscreen(); }
+    public void ClosePlayer() { if (IsVlcPlayerOpen) CloseVlcPlayer(); }
     /// <summary>File name of the media currently loaded in the VLC player.</summary>
     [ObservableProperty] private string _vlcMediaPath = "";
 
@@ -204,10 +252,12 @@ public partial class MediaViewModel : ObservableObject
         if (SelectedItem == null || SelectedItem.IsTv == false || !AutoPlayNextEpisode) return null;
         var list = DetailRelated;
         int idx = list.ToList().FindIndex(i => i.FullPath == SelectedItem.FullPath);
-        if (idx < 0 || idx >= list.Count - 1) return null;
+        int next = idx + 1;
+        while (SkipWatchedEpisodes && next < list.Count && list[next].Watched) next++;
+        if (idx < 0 || next >= list.Count) return null;
         _videoCompleted = true;
         EndVideoSession();
-        SelectedItem = list[idx + 1];
+        SelectedItem = list[next];
         BeginVideoSession(SelectedItem);
         return SelectedItem.FullPath;
     }
@@ -270,6 +320,34 @@ public partial class MediaViewModel : ObservableObject
     [ObservableProperty] private string _sortMode = "Title";
     [ObservableProperty] private string _filterMode = "All";
     [ObservableProperty] private string _genreFilter = AllGenres;
+    public static IReadOnlyList<string> TypeScopes { get; } = new[] { "All", "Movies", "TV Shows" };
+    /// <summary>Which kind of video the grid below the shelves lists: everything, only movies or only TV shows.</summary>
+    [ObservableProperty] private string _typeScope = "All";
+    public bool IsScoped => TypeScope != "All";
+    public bool ShowClearFilters => IsFiltering || IsScoped;
+    partial void OnTypeScopeChanged(string value)
+    {
+        OnPropertyChanged(nameof(IsScoped)); OnPropertyChanged(nameof(ShowClearFilters));
+        OnPropertyChanged(nameof(AvailableGenres));
+        RefreshShelves();
+    }
+    private const int GridColumns = 5;
+
+    private void ApplyBrowseTile(string special)
+    {
+        switch (special)
+        {
+            case "movies": TypeScope = "Movies"; break;
+            case "tv": TypeScope = "TV Shows"; break;
+            default: TypeScope = "All"; SortMode = "Recently added"; break;
+        }
+        var groups = ActiveGroups;
+        int r = groups.ToList().FindIndex(g => g.IsGrid);
+        if (r >= 0) { _row = r; _col = 0; _zone = 1; ApplyMediaFocus(); }
+    }
+
+    private static MediaLibraryItem BrowseTile(string special, string title, string sub, string gradient) =>
+        new() { Special = special, DisplayTitle = title, Extension = sub, Gradient = gradient };
 
     public bool IsFiltering => SearchText.Trim().Length > 0 || FilterMode != "All" || GenreFilter != AllGenres;
     public string SortLabel => $"Sort: {SortMode}";
@@ -296,6 +374,7 @@ public partial class MediaViewModel : ObservableObject
         SearchText = "";
         FilterMode = "All";
         GenreFilter = AllGenres;
+        TypeScope = "All";
     }
 
     private static string Next(IReadOnlyList<string> list, string current)
@@ -312,6 +391,7 @@ public partial class MediaViewModel : ObservableObject
         OnPropertyChanged(nameof(ActiveGroups));
         OnPropertyChanged(nameof(HasNoResults));
         OnPropertyChanged(nameof(IsFiltering));
+        OnPropertyChanged(nameof(ShowClearFilters));
         OnPropertyChanged(nameof(ActiveSectionSummary));
         OnPropertyChanged(nameof(AvailableGenres));
         if (GenreFilter != AllGenres && !AvailableGenres.Contains(GenreFilter, StringComparer.OrdinalIgnoreCase)) GenreFilter = AllGenres;
@@ -329,6 +409,8 @@ public partial class MediaViewModel : ObservableObject
 
     private bool Passes(MediaLibraryItem i)
     {
+        if (TypeScope == "Movies" && i.IsTv) return false;
+        if (TypeScope == "TV Shows" && !i.IsTv) return false;
         string q = SearchText.Trim();
         if (q.Length > 0 && !(i.DisplayTitle.Contains(q, StringComparison.OrdinalIgnoreCase)
                               || i.Group.Contains(q, StringComparison.OrdinalIgnoreCase)
@@ -353,34 +435,75 @@ public partial class MediaViewModel : ObservableObject
         "Most played" => items.OrderByDescending(i => i.PlayCount).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase),
         "Top rated" => items.OrderByDescending(i => i.Rating).ThenByDescending(i => i.Score).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase),
         "Year" => items.OrderByDescending(i => i.Year).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase),
-        _ => items.OrderBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase),
+        _ => items.OrderBy(i => i.IsTv ? i.Group : i.DisplayTitle, StringComparer.OrdinalIgnoreCase).ThenBy(i => i.Season).ThenBy(i => i.Episode),
     };
 
     /// <summary>
     /// Shelves for the active section. With no filter: Continue Watching, My List, Recently Added, Top Rated and Most Played
     /// first, then one shelf per show / folder. With a filter or search: only the matching titles, still grouped.
     /// </summary>
+    /// <summary>
+    /// One tile per show instead of one per episode. nextUp: the tile opens the episode to watch next (in progress, else the first
+    /// unwatched, else the first). showName: the tile reads as the show name rather than the episode.
+    /// </summary>
+    private static IEnumerable<MediaLibraryItem> OneTilePerShow(IEnumerable<MediaLibraryItem> ordered, List<MediaLibraryItem> all, bool nextUp, bool showName)
+    {
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var it in ordered)
+        {
+            if (!it.IsTv) { yield return it.Clone(); continue; }
+            if (!seen.Add(it.Group)) continue;
+            var rep = it;
+            if (nextUp)
+            {
+                var eps = all.Where(x => x.IsTv && string.Equals(x.Group, it.Group, StringComparison.OrdinalIgnoreCase))
+                             .OrderBy(x => x.Season).ThenBy(x => x.Episode).ThenBy(x => x.DisplayTitle, StringComparer.OrdinalIgnoreCase).ToList();
+                rep = eps.FirstOrDefault(x => x.HasProgress) ?? eps.FirstOrDefault(x => !x.Watched) ?? eps[0];
+            }
+            yield return rep.Clone(showName ? it.Group : null);
+        }
+    }
+
     private IReadOnlyList<MediaGroup> BuildShelves()
     {
         var items = ActiveItems.Where(Passes).ToList();
         var shelves = new List<MediaGroup>();
+        if (items.Count == 0) return shelves;
         if (!IsFiltering)
         {
-            void Add(string title, IEnumerable<MediaLibraryItem> src, int min = 1)
+            void Add(string title, IEnumerable<MediaLibraryItem> src, int take = 15, MediaLibraryItem? tail = null, bool nextUp = false, bool showName = false)
             {
-                var list = src.Take(15).Select(m => m.Clone()).ToList();
-                if (list.Count >= min) shelves.Add(new MediaGroup { Title = title, Items = list });
+                var list = OneTilePerShow(src, items, nextUp, showName).Take(take).ToList();
+                if (list.Count == 0) return;
+                if (tail != null) list.Add(tail);
+                shelves.Add(new MediaGroup { Title = title, Items = list });
             }
             Add("Continue Watching", items.Where(i => i.HasProgress).OrderByDescending(i => i.LastPlayedUtc));
-            Add("My List", items.Where(i => i.Favourite).OrderBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase));
-            Add("Recently Added", items.OrderByDescending(i => i.AddedUtc), 5);
-            Add("Recommended for You", Recommend(items), 2);
-            Add("Top Rated", items.Where(i => i.Rating >= 4).OrderByDescending(i => i.Rating));
-            Add("Most Played", items.Where(i => i.PlayCount > 0).OrderByDescending(i => i.PlayCount), 3);
+            // Ten newest, then an "All" tile that opens the full list.
+            Add("Recently Added", items.OrderByDescending(i => i.AddedUtc), 10, BrowseTile("all", "All", "Browse", "#1f2937,#4b5563"), true, true);
+            Add("Watch Again", items.Where(i => i.Watched).OrderByDescending(i => i.LastPlayedUtc), showName: true);
+            Add("Recommended for You", Recommend(items), nextUp: true, showName: true);
+            Add("My List", items.Where(i => i.Favourite).OrderBy(i => i.TileText, StringComparer.OrdinalIgnoreCase), showName: true);
+            shelves.Add(new MediaGroup
+            {
+                Title = "Browse",
+                Items = new[]
+                {
+                    BrowseTile("movies", "Movies", "Browse", "#1e1b4b,#4338ca"),
+                    BrowseTile("tv", "TV Shows", "Browse", "#064e3b,#10b981"),
+                },
+            });
         }
-        shelves.AddRange(items.GroupBy(i => i.Group, StringComparer.OrdinalIgnoreCase)
-            .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase)
-            .Select(g => new MediaGroup { Title = g.Key, Items = Sorted(g).ToList() }));
+        // Movies and TV combined in A-Z order (or the chosen sort), laid out in rows of tiles.
+        var sorted = OneTilePerShow(Sorted(items), items, true, true).ToList();
+        string gridTitle = (TypeScope == "All" ? "Movies & TV" : TypeScope) + (SortMode == "Title" ? " · A–Z" : $" · {SortMode}");
+        for (int n = 0; n < sorted.Count; n += GridColumns)
+            shelves.Add(new MediaGroup
+            {
+                Title = n == 0 ? gridTitle : "", ShowHeader = n == 0, IsGrid = true,
+                Items = sorted.GetRange(n, Math.Min(GridColumns, sorted.Count - n)),
+                Total = n == 0 ? sorted.Count : 0,
+            });
         return shelves;
     }
 
@@ -645,9 +768,13 @@ public partial class MediaViewModel : ObservableObject
     private async void EnrichTrack(MediaLibraryItem track)
     {
         if (!OnlineInfoEnabled || track.HasLocalCover || track.CoverPath.Length > 0) return;
-        var meta = await MediaMetadataService.GetAsync("music", track.DisplayTitle, track.Group).ConfigureAwait(false);
-        if (meta != null)
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => { foreach (var c in EveryCopy(track.FullPath)) c.ApplyMeta(meta); });
+        try
+        {
+            var meta = await MediaMetadataService.GetAsync("music", track.DisplayTitle, track.Group).ConfigureAwait(false);
+            if (meta != null)
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => { foreach (var c in EveryCopy(track.FullPath)) c.ApplyMeta(meta); });
+        }
+        catch (Exception ex) { DevLogService.Log($"[Media] Artwork lookup failed: {ex.Message}"); } // async void: never let it escape
     }
 
     // ── Sessions: the media counterpart of a game play session ─────────────────
@@ -662,7 +789,7 @@ public partial class MediaViewModel : ObservableObject
     private long _pendingResumeMs;
 
     /// <summary>Called by the view right after it starts playback, to jump to where the video stopped.</summary>
-    public long TakeResumeMs() { long r = _pendingResumeMs; _pendingResumeMs = 0; return r; }
+    public long TakeResumeMs() { long r = ResumePlayback ? _pendingResumeMs : 0; _pendingResumeMs = 0; return r; }
     public void MarkVideoCompleted() => _videoCompleted = true;
 
     private string KindLabel(MediaLibraryItem i) => KindOf(i);
@@ -670,6 +797,7 @@ public partial class MediaViewModel : ObservableObject
     partial void OnIsVlcPlayerOpenChanged(bool value)
     {
         OnPropertyChanged(nameof(IsVlcFullView));
+        NotifyPlayerLayout();
         if (value) BeginVideoSession(_videoItem);
         else EndVideoSession();
     }
@@ -704,7 +832,7 @@ public partial class MediaViewModel : ObservableObject
         var item = _videoItem;
         _videoItem = null;
         if (item == null) return;
-        bool done = _videoCompleted || (_lastVideoLen > 0 && _lastVideoPos >= _lastVideoLen * 0.9);
+        bool done = _videoCompleted || (_lastVideoLen > 0 && _lastVideoPos >= _lastVideoLen * (Math.Clamp(MarkWatchedPercent, 50, 100) / 100.0));
         long pos = _lastVideoPos, len = _lastVideoLen;
         Persist(item.FullPath, st =>
         {
@@ -760,6 +888,11 @@ public partial class MediaViewModel : ObservableObject
     [ObservableProperty] private bool _showMovieDetails = true;
     [ObservableProperty] private bool _showTvDetails = true;
     [ObservableProperty] private bool _autoPlayNextEpisode = true;
+    [ObservableProperty] private bool _resumePlayback = true;
+    [ObservableProperty] private int  _markWatchedPercent = 90;
+    [ObservableProperty] private bool _skipWatchedEpisodes = true;
+    [ObservableProperty] private string _pipPosition = "Bottom right";
+    [ObservableProperty] private string _pipSize = "Medium";
     [ObservableProperty] private bool _musicShuffle;
     [ObservableProperty] private bool _musicRepeat = true;
 
@@ -780,7 +913,7 @@ public partial class MediaViewModel : ObservableObject
         SelectedItem == null || SelectedItem.MediaType == "music"
             ? Array.Empty<MediaLibraryItem>()
             : ActiveItems.Where(i => string.Equals(i.Group, SelectedItem.Group, StringComparison.OrdinalIgnoreCase))
-                         .OrderBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase).ToList();
+                         .OrderBy(i => i.Season).ThenBy(i => i.Episode).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase).ToList();
     public bool HasDetailRelated => DetailRelated.Count > 1;
     public string DetailRelatedTitle => SelectedItem?.IsTv == true ? $"Episodes · {SelectedItem?.Group}" : $"More in {SelectedItem?.Group}";
     public string DetailAddedLabel => SelectedItem == null || string.IsNullOrEmpty(SelectedItem.AddedLabel) ? "" : $"Added {SelectedItem.AddedLabel}";
@@ -791,6 +924,7 @@ public partial class MediaViewModel : ObservableObject
     private void OpenMediaItem(MediaLibraryItem? item)
     {
         if (item == null) return;
+        if (item.IsSpecial) { ApplyBrowseTile(item.Special); return; }
         SelectedItem = item;
         bool details = item.MediaType != "music" && (item.IsTv ? ShowTvDetails : ShowMovieDetails);
         if (details) IsDetailOpen = true;
@@ -974,12 +1108,29 @@ public partial class MediaViewModel : ObservableObject
         if (_zone == 1 && _focusedItem != null) OpenMediaItem(_focusedItem);
     }
 
-    /// <summary>X button: jump to the filters (sort / show / genre, or the Artists / Playlists tabs).</summary>
+    /// <summary>X button: a filter menu (sort, show, genre) like the Games page, or the Artists / Playlists tabs for music.</summary>
     public void FilterMediaFocus()
     {
         if (IsMusicSelected) { if (!IsMusicMenuOpen) { _mZone = 0; _mTop = IsMusicPlaylistMode ? 1 : 0; ApplyMusicFocus(); } return; }
-        _zone = 0; _tabIdx = 1;
-        ApplyMediaFocus();
+        OpenFilterMenu();
+    }
+
+    [RelayCommand]
+    public void OpenFilterMenu()
+    {
+        if (IsMusicSelected || IsMusicMenuOpen) return;
+        MusicMenuEntries.Clear();
+        void Add(string label, Action a) => MusicMenuEntries.Add(new MusicMenuEntry { Label = label, Action = a });
+        string Mark(bool on) => on ? "✓  " : "     ";
+        foreach (var m in TypeScopes) { var v = m; Add($"{Mark(TypeScope == v)}Type: {v}", () => TypeScope = v); }
+        foreach (var m in SortModes) { var v = m; Add($"{Mark(SortMode == v)}Sort: {v}", () => SortMode = v); }
+        foreach (var m in FilterModes) { var v = m; Add($"{Mark(FilterMode == v)}Show: {v}", () => FilterMode = v); }
+        foreach (var g in AvailableGenres) { var v = g; Add($"{Mark(GenreFilter == v)}Genre: {v}", () => GenreFilter = v); }
+        if (ShowClearFilters) Add("✕  Clear all filters", () => ClearFilters());
+        MusicMenuTitle = "Filters";
+        _menuIdx = 0;
+        for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
+        IsMusicMenuOpen = true;
     }
 
     /// <summary>Y button: search with the on-screen keyboard.</summary>
@@ -996,6 +1147,7 @@ public partial class MediaViewModel : ObservableObject
         if (IsMusicSelected) { OpenMusicMenu(); return; }
         if (IsMusicMenuOpen || _focusedItem == null) return;
         var item = _focusedItem;
+        if (item.IsSpecial) { OpenFilterMenu(); return; }
         MusicMenuEntries.Clear();
         void Add(string label, Action a) => MusicMenuEntries.Add(new MusicMenuEntry { Label = label, Action = a });
         Add("▶  Play", () => PlayMediaItem(item));
@@ -1007,7 +1159,7 @@ public partial class MediaViewModel : ObservableObject
             Add($"{new string('★', stars)}{new string('☆', 5 - stars)}  Rate {stars}" + (item.Rating == stars ? " (tap to clear)" : ""),
                 () => Persist(item.FullPath, st => st.Rating = st.Rating == stars ? 0 : stars));
         }
-        if (IsPip) Add("⤢  Expand picture-in-picture", () => IsPip = false);
+        if (IsPip) { Add("⤢  Expand picture-in-picture", () => IsPip = false); Add("✕  Close player", CloseVlcPlayer); }
         MusicMenuTitle = item.DisplayTitle;
         _menuIdx = 0;
         for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
@@ -1194,12 +1346,13 @@ public partial class MediaViewModel : ObservableObject
             switch (key)
             {
                 case "Left": case "Up": PipChoice = Math.Max(0, PipChoice - 1); break;
-                case "Right": case "Down": PipChoice = Math.Min(2, PipChoice + 1); break;
+                case "Right": case "Down": PipChoice = Math.Min(3, PipChoice + 1); break;
                 case "Escape": IsPipPromptOpen = false; break;
                 case "Enter":
                     IsPipPromptOpen = false;
                     if (PipChoice == 0) IsPip = true;
-                    else if (PipChoice == 1) CloseVlcPlayer();
+                    else if (PipChoice == 1) ToggleFullscreen();
+                    else if (PipChoice == 2) CloseVlcPlayer();
                     break;
             }
             return true;
@@ -1261,9 +1414,13 @@ public partial class MediaViewModel : ObservableObject
 
         foreach (var driveRoot in roots)
         {
-            TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies", "Films");
-            TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music", "Songs");
-            TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows", "TV", "Series", "Shows", "TV Series");
+            try
+            {
+                TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies", "Films");
+                TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music", "Songs");
+                TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows", "TV", "Series", "Shows", "TV Series");
+            }
+            catch (Exception ex) { DevLogService.Log($"[Media] Scan of '{driveRoot}' failed: {ex.Message}"); }
         }
 
         _lastScanUtc = DateTime.UtcNow;
@@ -1304,16 +1461,21 @@ public partial class MediaViewModel : ObservableObject
                     .Where(path => categoryFolderNames.Contains(
                         Path.GetFileName(path), StringComparer.OrdinalIgnoreCase)));
             }
-            catch (UnauthorizedAccessException) { }
-            catch (IOException) { }
+            catch (Exception ex) { DevLogService.Log($"[Media] Listing '{parent}' failed: {ex.Message}"); }
         }
 
         foreach (var mediaFolder in categoryDirs)
         {
+            // Inaccessible sub-folders are skipped instead of throwing in the middle of the enumeration.
             IEnumerable<string> files;
-            try { files = Directory.EnumerateFiles(mediaFolder, "*", SearchOption.AllDirectories); }
-            catch (UnauthorizedAccessException) { continue; }
-            catch (IOException) { continue; }
+            try
+            {
+                files = Directory.EnumerateFiles(mediaFolder, "*", new EnumerationOptions
+                {
+                    RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.System,
+                });
+            }
+            catch (Exception ex) { DevLogService.Log($"[Media] Scan of '{mediaFolder}' failed: {ex.Message}"); continue; }
 
             foreach (var file in files)
             {
@@ -1325,6 +1487,20 @@ public partial class MediaViewModel : ObservableObject
                 var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 bool isMusic = categoryFolderNames[0] == "Music";
                 var (title, year, quality) = isMusic ? (Path.GetFileNameWithoutExtension(file).Replace('_', ' ').Trim(), 0, "") : ParseFileName(file);
+                bool isTv = categoryFolderNames[0] == "TV Shows";
+                string group = segments.Length > 1 ? segments[0] : categoryFolderNames[0];
+                int season = 0, episode = 0;
+                string episodeLabel = "";
+                if (isTv)
+                {
+                    var tv = TvPathParser.Parse(segments);
+                    group = tv.Show; season = tv.Season; episode = tv.Episode;
+                    string ep = tv.Episode > 0 ? tv.Code + (tv.EpisodeTitle.Length > 0 ? " · " + tv.EpisodeTitle : "")
+                                               : (tv.EpisodeTitle.Length > 0 ? tv.EpisodeTitle : title);
+                    episodeLabel = ep;
+                    title = string.Equals(ep, tv.Show, StringComparison.OrdinalIgnoreCase) ? ep : $"{tv.Show} · {ep}";
+                    year = 0;
+                }
                 string artwork = FindArtwork(file, mediaFolder);
                 destination.Add(new MediaLibraryItem
                 {
@@ -1333,9 +1509,10 @@ public partial class MediaViewModel : ObservableObject
                     DisplayTitle = title,
                     Year = year,
                     Quality = quality,
-                    IsTv = categoryFolderNames[0] == "TV Shows",
-                    Gradient = GradientFor(title),
-                    Group = segments.Length > 1 ? segments[0] : categoryFolderNames[0],
+                    IsTv = isTv,
+                    Season = season, Episode = episode, EpisodeLabel = episodeLabel,
+                    Gradient = GradientFor(isTv ? group : title),
+                    Group = group,
                     Album = isMusic && segments.Length > 2 ? segments[1] : "",
                     Title = Path.GetFileName(file),
                     FullPath = file,

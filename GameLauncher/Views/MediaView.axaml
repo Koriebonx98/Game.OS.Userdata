@@ -26,7 +26,9 @@
 
         <!-- VLC player overlay (shown when IsVlcPlayerOpen) -->
         <Border Background="#0d1117"
-                IsVisible="{Binding IsVlcFullView}"
+                IsVisible="{Binding IsVlcPlayerOpen}"
+                HorizontalAlignment="{Binding PlayerHAlign}" VerticalAlignment="{Binding PlayerVAlign}"
+                Width="{Binding PlayerWidth}" Height="{Binding PlayerHeight}" Margin="{Binding PlayerMargin}"
                 ZIndex="50">
             <Grid RowDefinitions="Auto,*,Auto">
 
@@ -65,9 +67,11 @@
                         <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
                             <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsPipChoice0}" Content="🗗  Picture-in-picture"
                                     Command="{Binding EnterPipCommand}"/>
-                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice1}" Content="⏹  Stop"
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice1}" Content="{Binding FullscreenToggleLabel}"
+                                    Command="{Binding ToggleFullscreenCommand}"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice2}" Content="⏹  Stop"
                                     Command="{Binding CloseVlcPlayerCommand}"/>
-                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice2}" Content="Keep watching"
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsPipChoice3}" Content="Keep watching"
                                     Command="{Binding DismissPipPromptCommand}"/>
                         </StackPanel>
                         <TextBlock Text="◀ ▶ choose · A select · B cancel" FontSize="11" Foreground="#8b949e" HorizontalAlignment="Center"/>
@@ -75,7 +79,7 @@
                 </Border>
 
                 <!-- Transport: seek bar + play / pause / skip (A / X = pause, ◀ ▶ = skip, LT / RT = rewind / fast-forward, ▲ ▼ = ±1 min, B = close) -->
-                <Border Grid.Row="2" Background="#161b22" Padding="24,10">
+                <Border Grid.Row="2" Background="#161b22" Padding="24,10" IsVisible="{Binding !IsPip}">
                     <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <TextBlock Text="{Binding VideoPositionLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
@@ -91,7 +95,19 @@
                             <Button Classes="btn-primary" MinWidth="64" HorizontalContentAlignment="Center"
                                     Command="{Binding ToggleVideoPauseCommand}" Content="{Binding VideoPlayPauseGlyph}"/>
                             <Button Classes="btn-secondary" Command="{Binding VideoSeekForwardCommand}" Content="⏩"/>
+                            <Button Classes="btn-secondary" Command="{Binding ToggleFullscreenCommand}" Content="{Binding FullscreenToggleLabel}"/>
+                            <Button Classes="btn-secondary" Command="{Binding EnterPipCommand}" Content="🗗  PiP"/>
+                            <Button Classes="btn-secondary" Command="{Binding CloseVlcPlayerCommand}" Content="✕  Close"/>
                         </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Picture-in-picture controls (below the video: the native video surface always draws on top) -->
+                <Border Grid.Row="2" Background="#161b22" Padding="8,4" IsVisible="{Binding IsPip}">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                        <Button Classes="btn-secondary" Padding="10,4" Command="{Binding ToggleVideoPauseCommand}" Content="{Binding VideoPlayPauseGlyph}"/>
+                        <Button Classes="btn-secondary" Padding="10,4" Command="{Binding ExitPipCommand}" Content="⤢  Expand"/>
+                        <Button Classes="btn-secondary" Padding="10,4" Command="{Binding CloseVlcPlayerCommand}" Content="✕  Close"/>
                     </StackPanel>
                 </Border>
 
@@ -148,7 +164,7 @@
                                     <DataTemplate>
                                         <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                                                 Margin="0,0,0,4" Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
-                                                CommandParameter="{Binding}" Content="{Binding DisplayTitle}"/>
+                                                CommandParameter="{Binding}" Content="{Binding ListTitle}"/>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
@@ -206,6 +222,7 @@
                     HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="380" MaxWidth="560">
                 <StackPanel Spacing="10">
                     <TextBlock Text="{Binding MusicMenuTitle}" FontSize="16" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <ScrollViewer MaxHeight="420" VerticalScrollBarVisibility="Auto">
                     <ItemsControl ItemsSource="{Binding MusicMenuEntries}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:MediaViewModel+MusicMenuEntry">
@@ -217,6 +234,7 @@
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+                    </ScrollViewer>
                     <TextBlock Text="A select · B / Y close" FontSize="11" Foreground="#8b949e"/>
                 </StackPanel>
             </Border>

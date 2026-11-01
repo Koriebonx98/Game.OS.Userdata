@@ -138,6 +138,12 @@ public partial class QuickMenuViewModel
                 yield return Act("⏪", "Skip Back", () => MediaSeekBackCommand.Execute(null));
                 yield return Act("⏩", "Skip Forward", () => MediaSeekForwardCommand.Execute(null));
                 yield return Act("⛶", "Full Screen Player", () => MediaFullScreenCommand.Execute(null));
+                if (IsVideoPlayerOpen?.Invoke() == true)
+                {
+                    yield return Act("🗗", "Picture-in-picture", () => OnMediaTogglePip?.Invoke());
+                    yield return Act("🖵", "Toggle Window Full Screen", () => OnMediaToggleWindowFullscreen?.Invoke());
+                    yield return Act("✕", "Close Player", () => OnMediaClosePlayer?.Invoke());
+                }
                 yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
                 break;
             case "guides":

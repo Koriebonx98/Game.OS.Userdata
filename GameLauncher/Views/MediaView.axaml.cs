@@ -74,15 +74,17 @@ public partial class MediaView : UserControl
     // The video player takes the whole screen while it is open and restores the previous window state afterwards.
     private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName != nameof(MediaViewModel.IsVlcFullView) || TopLevel.GetTopLevel(this) is not Window win) return;
-        if (_subscribedVm!.IsVlcFullView)
+        if (e.PropertyName is not (nameof(MediaViewModel.IsVlcFullView) or nameof(MediaViewModel.IsPlayerWindowFullscreen))
+            || TopLevel.GetTopLevel(this) is not Window win) return;
+        var vm = _subscribedVm!;
+        if (vm.IsVlcFullView && vm.IsPlayerWindowFullscreen)
         {
             _stateBeforePlayer ??= win.WindowState;
             win.WindowState = WindowState.FullScreen;
         }
         else if (_stateBeforePlayer is { } prev)
         {
-            win.WindowState = prev;
+            win.WindowState = prev == WindowState.FullScreen ? WindowState.Maximized : prev;
             _stateBeforePlayer = null;
         }
     }
@@ -391,47 +393,11 @@ public partial class MediaView : UserControl
             vm.CloseVlcPlayerCommand.Execute(null);
     }
 
-    private Window? _pipWindow;
-    private LibVLCSharp.Avalonia.VideoView? _pipView;
-
-    // Picture-in-picture: the same player is re-attached to a small topmost window in the bottom-right corner.
-    private void SetPip(bool on)
-    {
-        if (on)
-        {
-            if (_mediaPlayer == null) return;
-            if (VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = null;
-            _pipView = new LibVLCSharp.Avalonia.VideoView();
-            _pipWindow = new Window
-            {
-                SystemDecorations = SystemDecorations.None, ShowInTaskbar = false, Topmost = true, ShowActivated = false,
-                Width = 480, Height = 270, Background = Avalonia.Media.Brushes.Black, Content = _pipView,
-            };
-            if (TopLevel.GetTopLevel(this) is Window { Screens.Primary: { } scr })
-            {
-                var wa = scr.WorkingArea; double sc = scr.Scaling;
-                _pipWindow.WindowStartupLocation = WindowStartupLocation.Manual;
-                _pipWindow.Position = new PixelPoint(wa.Right - (int)(500 * sc), wa.Bottom - (int)(290 * sc));
-            }
-            _pipWindow.Show();
-            _pipView.MediaPlayer = _mediaPlayer;
-            return;
-        }
-        ClosePipWindow(reattach: true);
-    }
-
-    private void ClosePipWindow(bool reattach)
-    {
-        if (_pipView != null) _pipView.MediaPlayer = null;
-        _pipWindow?.Close();
-        _pipWindow = null;
-        _pipView = null;
-        if (reattach && _mediaPlayer != null && VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = _mediaPlayer;
-    }
+    // Picture-in-picture is the same video surface, resized and pinned by the view model; nothing to re-attach.
+    private void SetPip(bool on) { }
 
     private void DisposeVlc()
     {
-        ClosePipWindow(reattach: false);
         _videoTimer.Stop();
         _resumeTimer?.Stop();
         _resumeTimer = null;
