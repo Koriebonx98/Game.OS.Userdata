@@ -29,7 +29,7 @@
                 IsVisible="{Binding IsVlcPlayerOpen}"
                 HorizontalAlignment="{Binding PlayerHAlign}" VerticalAlignment="{Binding PlayerVAlign}"
                 Width="{Binding PlayerWidth}" Height="{Binding PlayerHeight}" Margin="{Binding PlayerMargin}"
-                ZIndex="50">
+                ZIndex="50" PointerMoved="OnPlayerPointerMoved">
             <Grid RowDefinitions="Auto,*,Auto">
 
                 <!-- Top bar -->
@@ -79,7 +79,7 @@
                 </Border>
 
                 <!-- Transport: seek bar + play / pause / skip (A / X = pause, ◀ ▶ = skip, LT / RT = rewind / fast-forward, ▲ ▼ = ±1 min, B = close) -->
-                <Border Grid.Row="2" Background="#161b22" Padding="24,10" IsVisible="{Binding !IsPip}">
+                <Border Grid.Row="2" Background="#161b22" Padding="24,10" IsVisible="{Binding ControlsVisible}">
                     <StackPanel Spacing="6">
                         <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
                             <TextBlock Text="{Binding VideoPositionLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
@@ -91,13 +91,13 @@
                             <TextBlock Grid.Column="2" Text="{Binding VideoDurationLabel}" FontSize="12" Foreground="#c9d1d9" VerticalAlignment="Center"/>
                         </Grid>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                            <Button Classes="btn-secondary" Command="{Binding VideoSeekBackCommand}" Content="⏪"/>
-                            <Button Classes="btn-primary" MinWidth="64" HorizontalContentAlignment="Center"
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTransportFocus0}" Command="{Binding VideoSeekBackCommand}" Content="⏪"/>
+                            <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsTransportFocus1}" MinWidth="64" HorizontalContentAlignment="Center"
                                     Command="{Binding ToggleVideoPauseCommand}" Content="{Binding VideoPlayPauseGlyph}"/>
-                            <Button Classes="btn-secondary" Command="{Binding VideoSeekForwardCommand}" Content="⏩"/>
-                            <Button Classes="btn-secondary" Command="{Binding ToggleFullscreenCommand}" Content="{Binding FullscreenToggleLabel}"/>
-                            <Button Classes="btn-secondary" Command="{Binding EnterPipCommand}" Content="🗗  PiP"/>
-                            <Button Classes="btn-secondary" Command="{Binding CloseVlcPlayerCommand}" Content="✕  Close"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTransportFocus2}" Command="{Binding VideoSeekForwardCommand}" Content="⏩"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTransportFocus3}" Command="{Binding ToggleFullscreenCommand}" Content="{Binding FullscreenToggleLabel}"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTransportFocus4}" Command="{Binding EnterPipCommand}" Content="🗗  PiP"/>
+                            <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsTransportFocus5}" Command="{Binding CloseVlcPlayerCommand}" Content="✕  Close"/>
                         </StackPanel>
                     </StackPanel>
                 </Border>
@@ -228,7 +228,7 @@
                             <DataTemplate x:DataType="vm:MediaViewModel+MusicMenuEntry">
                                 <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}"
                                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,0,0,6"
-                                        Command="{Binding $parent[UserControl].((vm:MediaViewModel)DataContext).ActivateMusicMenuEntryCommand}"
+                                        Command="{Binding $parent[UserControl].DataContext.ActivateMusicMenuEntryCommand}"
                                         CommandParameter="{Binding}"
                                         Content="{Binding Label}"/>
                             </DataTemplate>
