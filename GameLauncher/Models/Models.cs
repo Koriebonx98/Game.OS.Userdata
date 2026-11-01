@@ -597,6 +597,18 @@ namespace GameLauncher.Models
         [JsonPropertyName("musicShuffle")] public bool MusicShuffle { get; set; }
         [JsonPropertyName("musicRepeat")] public bool MusicRepeat { get; set; } = true;
         [JsonPropertyName("onlineMediaInfo")] public bool OnlineMediaInfo { get; set; } = true;
+        /// <summary>Preferred online info source: "Auto", "TMDB", "OMDb", "TVmaze", "iTunes", "Deezer" or "MusicBrainz".</summary>
+        [JsonPropertyName("mediaInfoSource")] public string MediaInfoSource { get; set; } = "Auto";
+        [JsonPropertyName("tmdbApiKey")] public string TmdbApiKey { get; set; } = "";
+        [JsonPropertyName("omdbApiKey")] public string OmdbApiKey { get; set; } = "";
+        /// <summary>Picture-in-picture corner: "Bottom right", "Bottom left", "Top right" or "Top left".</summary>
+        [JsonPropertyName("pipPosition")] public string PipPosition { get; set; } = "Bottom right";
+        /// <summary>Picture-in-picture size: "Small", "Medium" or "Large".</summary>
+        [JsonPropertyName("pipSize")] public string PipSize { get; set; } = "Medium";
+        [JsonPropertyName("resumePlayback")] public bool ResumePlayback { get; set; } = true;
+        /// <summary>Percentage of a video that has to be played before it counts as watched.</summary>
+        [JsonPropertyName("markWatchedPercent")] public int MarkWatchedPercent { get; set; } = 90;
+        [JsonPropertyName("skipWatchedEpisodes")] public bool SkipWatchedEpisodes { get; set; } = true;
 
         /// <summary>Store page design: "Default", "Sony", "Xbox" or "Nintendo".</summary>
         [JsonPropertyName("storeTheme")] public string StoreTheme { get; set; } = "Default";

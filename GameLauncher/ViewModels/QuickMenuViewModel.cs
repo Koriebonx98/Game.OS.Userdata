@@ -195,6 +195,10 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Action? OnMediaSeekBack { get; set; }
     public Action? OnMediaSeekForward { get; set; }
     public Action? OnMediaFullScreen { get; set; }
+    public Action? OnMediaTogglePip { get; set; }
+    public Action? OnMediaToggleWindowFullscreen { get; set; }
+    public Action? OnMediaClosePlayer { get; set; }
+    public Func<bool>? IsVideoPlayerOpen { get; set; }
     public Action? OnOpenMusicPage { get; set; }
     /// <summary>Now-playing text for the Media hub (null when nothing is playing in the launcher).</summary>
     public Func<string?>? MediaStatusProvider { get; set; }

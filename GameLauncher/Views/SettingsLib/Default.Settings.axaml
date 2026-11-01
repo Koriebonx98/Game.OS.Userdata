@@ -1142,6 +1142,16 @@
                                 <TextBlock Text="How far ◀ / ▶ and the skip buttons jump in the video and music players."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Picture-in-picture position" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailablePipPositions}"
+                                          SelectedItem="{Binding PipPosition}" Width="220"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Picture-in-picture size" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailablePipSizes}"
+                                          SelectedItem="{Binding PipSize}" Width="220"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -1157,6 +1167,13 @@
                             <TextBlock Text="TV Shows" FontSize="15" FontWeight="SemiBold"/>
                             <CheckBox IsChecked="{Binding ShowTvDetails}" Content="Show the info page before playing an episode"/>
                             <CheckBox IsChecked="{Binding AutoPlayNextEpisode}" Content="Play the next episode automatically"/>
+                            <CheckBox IsChecked="{Binding SkipWatchedEpisodes}" Content="Skip already-watched episodes when auto-playing"/>
+                            <CheckBox IsChecked="{Binding ResumePlayback}" Content="Resume where you left off"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Mark as watched at (%)" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableWatchedPercents}"
+                                          SelectedItem="{Binding MarkWatchedPercent}" Width="220"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 
@@ -1173,6 +1190,21 @@
                             <TextBlock Text="Info &amp; history" FontSize="15" FontWeight="SemiBold"/>
                             <CheckBox IsChecked="{Binding OnlineMediaInfo}" Content="Look up posters, summaries and ratings online (kept for offline use)"/>
                             <TextBlock Text="{Binding MediaStatsSummary}" Opacity="0.7" TextWrapping="Wrap"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Info source" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableMediaInfoSources}"
+                                          SelectedItem="{Binding MediaInfoSource}" Width="220"/>
+                                <TextBlock Text="Tried first; the others are used as fallbacks. TMDB and OMDb need a free API key. TVmaze, iTunes, Deezer and MusicBrainz need none."
+                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="TMDB API key / read token" FontSize="13" Foreground="#e6edf3"/>
+                                <TextBox Classes="form-input" Text="{Binding TmdbApiKey}" PasswordChar="•" Width="360" HorizontalAlignment="Left"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="OMDb API key" FontSize="13" Foreground="#e6edf3"/>
+                                <TextBox Classes="form-input" Text="{Binding OmdbApiKey}" PasswordChar="•" Width="360" HorizontalAlignment="Left"/>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
                 </StackPanel>

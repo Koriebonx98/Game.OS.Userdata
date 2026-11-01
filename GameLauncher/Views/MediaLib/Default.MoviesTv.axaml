@@ -73,7 +73,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="0,0,0,10">
-                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,10" IsVisible="{Binding ShowHeader}">
                                     <TextBlock Text="{Binding Title}" Classes="section-header"/>
                                     <TextBlock Text="{Binding CountLabel}" FontSize="11" Foreground="#8b949e"
                                                VerticalAlignment="Center"/>
@@ -91,7 +91,7 @@
                                                     <StackPanel Spacing="6">
                                                         <Border Height="245" CornerRadius="8" ClipToBounds="True">
                                                             <Grid>
-                                                                <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                <views:CoverImage FallbackText="{Binding TileText}"
                                                                                   FallbackGradient="{Binding Gradient}"
                                                                                   SubText="{Binding Extension}" LocalCachePath="{Binding CoverPath}"
                                                                                   LetterFontSize="72" ImageCornerRadius="8"
@@ -108,7 +108,7 @@
                                                                              Value="{Binding ProgressFraction}" IsVisible="{Binding HasProgress}"/>
                                                             </Grid>
                                                         </Border>
-                                                        <TextBlock Text="{Binding DisplayTitle}" FontSize="12" FontWeight="SemiBold"
+                                                        <TextBlock Text="{Binding TileText}" FontSize="12" FontWeight="SemiBold"
                                                                    TextWrapping="Wrap" MaxHeight="34" Margin="2,0"/>
                                                     </StackPanel>
                                                 </Button>

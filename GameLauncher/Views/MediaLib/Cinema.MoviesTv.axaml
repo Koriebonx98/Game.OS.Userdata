@@ -142,7 +142,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate>
                             <StackPanel Margin="40,8,0,14" Spacing="8">
-                                <TextBlock Text="{Binding Title}" Foreground="#e5e5e5" FontSize="18" FontWeight="SemiBold"/>
+                                <TextBlock Text="{Binding Title}" Foreground="#e5e5e5" FontSize="18" FontWeight="SemiBold" IsVisible="{Binding ShowHeader}"/>
                                 <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
                                     <ItemsControl ItemsSource="{Binding Items}" Margin="0,10,0,10">
                                         <ItemsControl.ItemsPanel>
@@ -156,7 +156,7 @@
                                                     <Grid Height="135">
                                                         <Border CornerRadius="4" ClipToBounds="True">
                                                             <Grid>
-                                                                <views:CoverImage FallbackText="{Binding DisplayTitle}"
+                                                                <views:CoverImage FallbackText="{Binding TileText}"
                                                                                   FallbackGradient="{Binding Gradient}"
                                                                                   LocalCachePath="{Binding CoverPath}" LetterFontSize="60" ImageCornerRadius="4"
                                                                                   Height="135"/>
@@ -180,7 +180,7 @@
                                                                     <GradientStop Offset="1" Color="#E6000000"/>
                                                                 </LinearGradientBrush>
                                                             </Border.Background>
-                                                            <TextBlock Text="{Binding DisplayTitle}" Foreground="White" FontSize="12"
+                                                            <TextBlock Text="{Binding TileText}" Foreground="White" FontSize="12"
                                                                        FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
                                                         </Border>
                                                     </Grid>

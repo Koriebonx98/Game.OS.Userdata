@@ -183,6 +183,18 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _musicShuffle;
     [ObservableProperty] private bool _musicRepeat = true;
     [ObservableProperty] private bool _onlineMediaInfo = true;
+    [ObservableProperty] private string _mediaInfoSource = "Auto";
+    [ObservableProperty] private string _tmdbApiKey = "";
+    [ObservableProperty] private string _omdbApiKey = "";
+    [ObservableProperty] private string _pipPosition = "Bottom right";
+    [ObservableProperty] private string _pipSize = "Medium";
+    [ObservableProperty] private bool _resumePlayback = true;
+    [ObservableProperty] private int _markWatchedPercent = 90;
+    [ObservableProperty] private bool _skipWatchedEpisodes = true;
+    public IReadOnlyList<string> AvailableMediaInfoSources { get; } = new[] { "Auto", "TMDB", "OMDb", "TVmaze", "iTunes", "Deezer", "MusicBrainz" };
+    public IReadOnlyList<string> AvailablePipPositions { get; } = new[] { "Bottom right", "Bottom left", "Top right", "Top left" };
+    public IReadOnlyList<string> AvailablePipSizes { get; } = new[] { "Small", "Medium", "Large" };
+    public IReadOnlyList<int> AvailableWatchedPercents { get; } = new[] { 80, 85, 90, 95, 98 };
     public string MediaStatsSummary => Services.MediaStatsService.Summary();
     public IReadOnlyList<int> AvailableSkipSeconds { get; } = new[] { 5, 10, 15, 30, 60 };
     /// <summary>On-screen keyboard style ("Default" or "PS5").</summary>
@@ -931,6 +943,14 @@ public partial class SettingsViewModel : ViewModelBase
         MusicShuffle               = appSettings.MusicShuffle;
         MusicRepeat                = appSettings.MusicRepeat;
         OnlineMediaInfo            = appSettings.OnlineMediaInfo;
+        MediaInfoSource            = string.IsNullOrWhiteSpace(appSettings.MediaInfoSource) ? "Auto" : appSettings.MediaInfoSource;
+        TmdbApiKey                 = appSettings.TmdbApiKey ?? "";
+        OmdbApiKey                 = appSettings.OmdbApiKey ?? "";
+        PipPosition                = AvailablePipPositions.Contains(appSettings.PipPosition) ? appSettings.PipPosition : "Bottom right";
+        PipSize                    = AvailablePipSizes.Contains(appSettings.PipSize) ? appSettings.PipSize : "Medium";
+        ResumePlayback             = appSettings.ResumePlayback;
+        MarkWatchedPercent         = appSettings.MarkWatchedPercent is >= 50 and <= 100 ? appSettings.MarkWatchedPercent : 90;
+        SkipWatchedEpisodes        = appSettings.SkipWatchedEpisodes;
         GameInfoTheme              = NormaliseGameInfoTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         foreach (var kv in appSettings.DashboardOptions)
@@ -1156,6 +1176,14 @@ public partial class SettingsViewModel : ViewModelBase
             MusicShuffle               = MusicShuffle,
             MusicRepeat                = MusicRepeat,
             OnlineMediaInfo            = OnlineMediaInfo,
+            MediaInfoSource            = MediaInfoSource,
+            TmdbApiKey                 = TmdbApiKey?.Trim() ?? "",
+            OmdbApiKey                 = OmdbApiKey?.Trim() ?? "",
+            PipPosition                = PipPosition,
+            PipSize                    = PipSize,
+            ResumePlayback             = ResumePlayback,
+            MarkWatchedPercent         = MarkWatchedPercent is >= 50 and <= 100 ? MarkWatchedPercent : 90,
+            SkipWatchedEpisodes        = SkipWatchedEpisodes,
             GameInfoTheme              = NormaliseGameInfoTheme(GameInfoTheme),
             DashboardOptions           = CloneDashboardOptions(),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),

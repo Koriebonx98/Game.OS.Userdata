@@ -563,6 +563,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (!MediaVm.IsVlcPlayerOpen) MediaVm.OpenNowPlayingFullScreenCommand.Execute(null);
         };
         QuickMenuVm.OnOpenMusicPage = () => Navigate("music");
+        QuickMenuVm.IsVideoPlayerOpen = () => MediaVm.IsVlcPlayerOpen;
+        QuickMenuVm.OnMediaTogglePip = () => { Navigate("media"); MediaVm.TogglePip(); };
+        QuickMenuVm.OnMediaToggleWindowFullscreen = () => { Navigate("media"); MediaVm.ToggleWindowFullscreen(); };
+        QuickMenuVm.OnMediaClosePlayer = () => MediaVm.ClosePlayer();
         QuickMenuVm.MediaStatusProvider = () =>
             MediaVm.IsVlcPlayerOpen ? $"{(MediaVm.IsVideoPlaying ? "▶" : "⏸")} {MediaVm.VlcMediaPath}  {MediaVm.VideoPositionLabel} / {MediaVm.VideoDurationLabel}"
             : MediaVm.HasNowPlaying ? $"{MediaVm.PlayPauseGlyph} {MediaVm.NowPlayingTitle}  {MediaVm.PositionLabel} / {MediaVm.DurationLabel}"
@@ -1119,6 +1123,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             MediaVm.MusicShuffle = SettingsVm.MusicShuffle;
             MediaVm.MusicRepeat = SettingsVm.MusicRepeat;
             MediaVm.OnlineInfoEnabled = SettingsVm.OnlineMediaInfo;
+            MediaVm.ResumePlayback = SettingsVm.ResumePlayback;
+            MediaVm.MarkWatchedPercent = SettingsVm.MarkWatchedPercent;
+            MediaVm.SkipWatchedEpisodes = SettingsVm.SkipWatchedEpisodes;
+            MediaVm.PipPosition = SettingsVm.PipPosition;
+            MediaVm.PipSize = SettingsVm.PipSize;
+            Services.MediaMetadataService.Configure(SettingsVm.MediaInfoSource, SettingsVm.TmdbApiKey, SettingsVm.OmdbApiKey);
         }
         SyncMediaSettings();
         MediaVm.MediaPresenceChanged = label =>
@@ -1130,7 +1140,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             if (e.PropertyName is nameof(SettingsViewModel.MediaSkipSeconds) or nameof(SettingsViewModel.ShowMovieDetails)
                 or nameof(SettingsViewModel.ShowTvDetails) or nameof(SettingsViewModel.AutoPlayNextEpisode)
-                or nameof(SettingsViewModel.MusicShuffle) or nameof(SettingsViewModel.MusicRepeat) or nameof(SettingsViewModel.OnlineMediaInfo))
+                or nameof(SettingsViewModel.MusicShuffle) or nameof(SettingsViewModel.MusicRepeat) or nameof(SettingsViewModel.OnlineMediaInfo)
+                or nameof(SettingsViewModel.ResumePlayback) or nameof(SettingsViewModel.MarkWatchedPercent)
+                or nameof(SettingsViewModel.SkipWatchedEpisodes) or nameof(SettingsViewModel.PipPosition)
+                or nameof(SettingsViewModel.PipSize) or nameof(SettingsViewModel.MediaInfoSource)
+                or nameof(SettingsViewModel.TmdbApiKey) or nameof(SettingsViewModel.OmdbApiKey))
                 SyncMediaSettings();
             if (e.PropertyName == nameof(SettingsViewModel.MoviesTvTheme))
                 MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
