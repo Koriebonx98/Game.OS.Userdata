@@ -166,15 +166,22 @@ namespace GameLauncher.Services
             var done = new List<Item>();
             using var svc = new GitHubDataService();
 
-            var games = snapshot.Where(i => i.Kind == "steamgame").ToList();
-            if (games.Count > 0)
+            // Steam and ROM games share one path: queue files merged by the scheduled workflow.
+            var steam = snapshot.Where(i => i.Kind == "steamgame").ToList();
+            if (steam.Count > 0)
             {
                 try
                 {
-                    await svc.ContributeSteamGamesToDatabaseAsync(
-                        games.Select(g => new SteamOwnedGame { AppId = (int)g.AppId, Name = g.Name }).ToList(), ct)
+                    var known = svc.FilterKnownSteamGames(
+                        steam.Select(g => new SteamOwnedGame { AppId = (int)g.AppId, Name = g.Name }).ToList())
+                        .Select(g => (long)g.AppId).ToHashSet();
+                    done.AddRange(steam.Where(g => !known.Contains(g.AppId)));
+                    var fresh = steam.Where(g => known.Contains(g.AppId)).ToList();
+                    var handled = await svc.SubmitGamesToQueueAsync(fresh.Select(g => new GitHubDataService.QueuedGame(
+                        g.Key, "PC", g.Name, g.AppId.ToString(), null,
+                        $"https://store.steampowered.com/app/{g.AppId}/", "Steam", g.AppId.ToString(), g.AppId)).ToList(), ct)
                         .ConfigureAwait(false);
-                    done.AddRange(games);
+                    done.AddRange(fresh.Where(g => handled.Contains(g.Key)));
                 }
                 catch (Exception ex) { DevLogService.Log($"[DbQueue] Steam games batch failed: {ex.Message}"); }
             }
@@ -184,10 +191,11 @@ namespace GameLauncher.Services
             {
                 try
                 {
-                    var handled = await svc.ContributeRomsToDatabaseAsync(
-                        roms.Select(r => (r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl)).ToList(), ct).ConfigureAwait(false);
-                    done.AddRange(roms.Where(r => handled.Contains(r.Platform)));
-                    if (handled.Count == roms.Select(r => r.Platform).Distinct().Count())
+                    var handled = await svc.SubmitGamesToQueueAsync(
+                        roms.Select(r => new GitHubDataService.QueuedGame(
+                            r.Key, r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl)).ToList(), ct).ConfigureAwait(false);
+                    done.AddRange(roms.Where(r => handled.Contains(r.Key)));
+                    if (handled.Count == roms.Count)
                         _lastRomFlushUtc = DateTime.UtcNow;
                 }
                 catch (Exception ex) { DevLogService.Log($"[DbQueue] ROM batch failed: {ex.Message}"); }

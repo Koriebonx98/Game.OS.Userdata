@@ -1240,8 +1240,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     /// <summary>
-    /// Checks local ROMs missing from the games database; ones verified online (Wikipedia) as real games are queued and
-    /// batch-added (hourly) to the platform database so other users get them too.
+    /// Queues local ROMs missing from the games database. The scheduled process-db-queue workflow checks the
+    /// database, verifies each game via a provider (Wikipedia) and adds it so other users get it too.
     /// </summary>
     private static readonly HashSet<string> _romVerifyChecked = new();
 
@@ -1258,21 +1258,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 lock (_romVerifyChecked) { if (!_romVerifyChecked.Add(checkKey)) continue; }
                 try
                 {
-                    // Only contribute games with online proof that they are real for this platform
-                    var proof = await Services.GitHubDataService.VerifyGameOnlineAsync(platform, rom.Title).ConfigureAwait(false);
-                    if (proof == null)
-                    {
-                        DevLogService.Log($"[DbQueue] '{rom.Title}' ({platform}) not verified online — not queued.");
-                        continue;
-                    }
-                    Services.DatabaseContributionQueue.EnqueueRom(
-                        platform, rom.Title, rom.TitleId, proof.Value.Description, proof.Value.Url);
+                    // The process-db-queue workflow verifies the game with a provider before adding it
+                    Services.DatabaseContributionQueue.EnqueueRom(platform, rom.Title, rom.TitleId);
                 }
                 catch (Exception ex)
                 {
-                    // Network problem: allow a retry on the next scan
                     lock (_romVerifyChecked) _romVerifyChecked.Remove(checkKey);
-                    DevLogService.Log($"[DbQueue] Online check failed for '{rom.Title}': {ex.Message}");
+                    DevLogService.Log($"[DbQueue] Queueing '{rom.Title}' failed: {ex.Message}");
                 }
             }
         }

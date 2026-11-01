@@ -2516,72 +2516,72 @@ namespace GameLauncher.Services
         private static string NormalizeTitleForMatch(string t)
             => new string(t.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
 
+        /// <summary>A game submitted to the Games.Database queue (any platform / store).</summary>
+        public record QueuedGame(
+            string Key, string Platform, string Title, string? TitleId, string? Description,
+            string? SourceUrl, string? Store = null, string? StoreId = null, long AppId = 0);
+
         /// <summary>
-        /// Adds queued ROM games to each platform's <c>{Platform}.Games.json</c> (same as a dev
-        /// adding a game). Returns the platforms that were fully processed.
+        /// Submits games as create-only files under <c>Queue/Games/{Platform}/</c> in Games.Database.
+        /// The scheduled <c>process-db-queue</c> workflow (every 4 hours) merges them into each
+        /// <c>{Platform}.Games.json</c>: adds missing games, merges stores of the same game and
+        /// fills empty metadata. Returns the keys that were submitted (or already queued).
         /// </summary>
-        public async Task<HashSet<string>> ContributeRomsToDatabaseAsync(
-            IReadOnlyList<(string Platform, string Title, string? TitleId, string? Description, string? SourceUrl)> roms, CancellationToken ct = default)
+        public async Task<HashSet<string>> SubmitGamesToQueueAsync(
+            IReadOnlyList<QueuedGame> games, CancellationToken ct = default)
         {
-            var handled = new HashSet<string>();
-            foreach (var group in roms.GroupBy(r => r.Platform))
+            var submitted = new HashSet<string>();
+            foreach (var r in games)
             {
                 if (ct.IsCancellationRequested) break;
-                string platform = NormalizePlatform(group.Key);
-                string filePath = $"{platform}.Games.json";
+                string platform = NormalizePlatform(r.Platform);
+                string hash = Convert.ToHexString(
+                    System.Security.Cryptography.SHA1.HashData(Encoding.UTF8.GetBytes(r.Key))).ToLowerInvariant()[..16];
+                string path = $"Queue/Games/{platform}/{hash}.json";
                 try
                 {
-                    var (root, sha) = await ReadGamesDatabaseFileAsync<System.Text.Json.Nodes.JsonNode>(filePath, ct)
-                        .ConfigureAwait(false);
-                    if (root == null) { handled.Add(group.Key); continue; } // platform file must already exist
-
-                    System.Text.Json.Nodes.JsonArray? arr = root as System.Text.Json.Nodes.JsonArray
-                        ?? ((root as System.Text.Json.Nodes.JsonObject)?["Games"]
-                            ?? (root as System.Text.Json.Nodes.JsonObject)?["games"]) as System.Text.Json.Nodes.JsonArray;
-                    if (arr == null) { handled.Add(group.Key); continue; }
-
-                    var titles = new HashSet<string>();
-                    var ids = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    foreach (var e in arr.OfType<System.Text.Json.Nodes.JsonObject>())
+                    var (existing, sha) = await ReadGamesDatabaseFileAsync<object>(path, ct).ConfigureAwait(false);
+                    if (existing == null && sha == null)
                     {
-                        foreach (var k in new[] { "Title", "title", "game_name", "name" })
-                            if (e[k] is System.Text.Json.Nodes.JsonValue v && v.TryGetValue<string>(out var s))
-                                titles.Add(NormalizeTitleForMatch(s));
-                        foreach (var k in new[] { "TitleID", "title_id", "titleId" })
-                            if (e[k] is System.Text.Json.Nodes.JsonValue v2 && v2.TryGetValue<string>(out var s2))
-                                ids.Add(s2);
+                        var entry = new
+                        {
+                            Platform = platform,
+                            Title = r.Title,
+                            TitleID = r.TitleId,
+                            Description = r.Description,
+                            StorePageUrl = r.SourceUrl,
+                            Store = r.Store,
+                            StoreId = r.StoreId,
+                            AppId = r.AppId > 0 ? r.AppId : (long?)null,
+                            SubmittedUtc = DateTime.UtcNow.ToString("o"),
+                        };
+                        await WriteGamesDatabaseFileAsync(path, entry,
+                            $"Queue {platform} game: {r.Title}", null, ct).ConfigureAwait(false);
                     }
-
-                    int added = 0;
-                    foreach (var r in group)
-                    {
-                        if (titles.Contains(NormalizeTitleForMatch(r.Title)) ||
-                            (!string.IsNullOrEmpty(r.TitleId) && ids.Contains(r.TitleId))) continue;
-                        var obj = new System.Text.Json.Nodes.JsonObject { ["Title"] = r.Title };
-                        if (!string.IsNullOrEmpty(r.TitleId)) obj["TitleID"] = r.TitleId;
-                        if (!string.IsNullOrWhiteSpace(r.Description)) obj["Description"] = r.Description;
-                        if (!string.IsNullOrWhiteSpace(r.SourceUrl)) obj["StorePageUrl"] = r.SourceUrl;
-                        arr.Add(obj);
-                        titles.Add(NormalizeTitleForMatch(r.Title));
-                        added++;
-                    }
-
-                    if (added > 0)
-                    {
-                        await WriteGamesDatabaseFileAsync(filePath, root,
-                            $"Add {added} {platform} game(s) contributed from user ROM libraries", sha, ct)
-                            .ConfigureAwait(false);
-                        InvalidatePlatformCache(platform);
-                        DevLogService.Log($"[GamesDB] Contributed {added} new {platform} ROM game(s).");
-                    }
-                    handled.Add(group.Key);
+                    submitted.Add(r.Key);
+                    await Task.Delay(500, ct).ConfigureAwait(false);
                 }
+                catch (OperationCanceledException) { break; }
                 catch (Exception ex)
                 {
-                    DevLogService.Log($"[GamesDB] ROM contribution for {platform} failed: {ex.Message}");
+                    DevLogService.Log($"[GamesDB] Queueing '{r.Title}' ({platform}) failed: {ex.Message}");
                 }
             }
-            return handled;
+            if (submitted.Count > 0)
+                DevLogService.Log($"[GamesDB] Queued {submitted.Count} game(s) for the next database update.");
+            return submitted;
+        }
+
+        /// <summary>Drops Steam games already present in the cached PC database.</summary>
+        public IReadOnlyList<SteamOwnedGame> FilterKnownSteamGames(IReadOnlyList<SteamOwnedGame> games)
+        {
+            lock (_dbMemoryCache)
+            {
+                if (!_dbMemoryCache.TryGetValue("PC", out var cached)) return games;
+                var ids = new HashSet<long>(cached.Where(g => g.AppId.HasValue).Select(g => g.AppId!.Value));
+                var titles = new HashSet<string>(cached.Select(g => g.Title ?? ""), StringComparer.OrdinalIgnoreCase);
+                return games.Where(g => !ids.Contains(g.AppId) && !titles.Contains(g.Name)).ToList();
+            }
         }
 
         /// <summary>
