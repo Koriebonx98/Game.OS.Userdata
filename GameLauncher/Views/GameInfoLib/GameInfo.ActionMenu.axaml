@@ -68,6 +68,23 @@
                 Width="560" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="🧩  MODS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="4,0,0,8"/>
+                <StackPanel DockPanel.Dock="Top" IsVisible="{Binding IsPs2}" Spacing="6" Margin="0,0,0,10">
+                    <TextBlock Text="RECOMP" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
+                    <Border Background="#0d1117" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="12,10">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Recompile this PS2 game into a standalone native PC .exe (ps2-native-recomp), saved in a folder beside the ROM named after it. CHD images are converted to ISO first. Takes several minutes."
+                                       FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button Classes="btn-secondary" Command="{Binding BuildRecompCommand}"
+                                        Content="{Binding RecompButtonText}" IsEnabled="{Binding CanBuildRecomp}"/>
+                                <Button Classes="btn-secondary" Command="{Binding CancelRecompCommand}"
+                                        Content="Cancel" IsVisible="{Binding IsRecompBuilding}"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding RecompStatus}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
+                                       IsVisible="{Binding RecompStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
                 <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
                          Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">

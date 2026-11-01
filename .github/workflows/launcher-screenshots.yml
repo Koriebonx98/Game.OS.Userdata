@@ -323,6 +323,14 @@ jobs:
         with:
           dotnet-version: '8.x'
 
+      - name: Set up Python for Quartz automation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Quartz automation dependency
+        run: python -m pip install pyobjc-framework-Quartz
+
       - name: Inject auth credentials
         env:
           DATA_REPO_TOKEN:    ${{ secrets.DATA_REPO_TOKEN }}

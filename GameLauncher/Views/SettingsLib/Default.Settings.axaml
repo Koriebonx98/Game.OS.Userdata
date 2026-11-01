@@ -1207,6 +1207,19 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+
+                    <!-- Save button -->
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                        <Button Classes="btn-primary"
+                                Content="💾  Save Settings"
+                                Command="{Binding SaveCommand}"
+                                Width="180"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="#3fb950"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding IsSaveSuccess}"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- ── Design ── -->
@@ -1687,6 +1700,19 @@
                             </StackPanel>
                         </StackPanel>
                     </Border>
+
+                    <!-- Save button -->
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                        <Button Classes="btn-primary"
+                                Content="💾  Save Settings"
+                                Command="{Binding SaveCommand}"
+                                Width="180"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="#3fb950"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding IsSaveSuccess}"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- ── Downloads ── -->
@@ -1865,6 +1891,19 @@
                             </Grid>
                         </StackPanel>
                     </Border>
+
+                    <!-- Save button -->
+                    <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,0,0,24">
+                        <Button Classes="btn-primary"
+                                Content="💾  Save Settings"
+                                Command="{Binding SaveCommand}"
+                                Width="180"/>
+                        <TextBlock Text="{Binding StatusMessage}"
+                                   Foreground="#3fb950"
+                                   FontSize="13"
+                                   VerticalAlignment="Center"
+                                   IsVisible="{Binding IsSaveSuccess}"/>
+                    </StackPanel>
                 </StackPanel>
 
                 <!-- ── Notifications ── -->

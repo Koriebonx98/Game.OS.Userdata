@@ -994,6 +994,115 @@ public partial class GameDetailViewModel : ViewModelBase
 
     [RelayCommand] private void OpenRyujinxMods() { IsModBrowserOpen = false; OpenModsPanel(); }
 
+    // ── PS2 Recomp (native PC build via ps2-native-recomp) ─────────────────────
+    [ObservableProperty] private bool   _isPs2;
+    [ObservableProperty] private bool   _isRecompBuilding;
+    [ObservableProperty] private bool   _hasRecompBuild;
+    [ObservableProperty] private string _recompStatus = "";
+    private System.Threading.CancellationTokenSource? _recompCts;
+    public bool CanBuildRecomp => !IsRecompBuilding;
+    public string RecompButtonText => HasRecompBuild ? "🔁  Rebuild PC version" : "⚙  Recomp → PC version (.exe)";
+    partial void OnIsRecompBuildingChanged(bool value) => OnPropertyChanged(nameof(CanBuildRecomp));
+    partial void OnHasRecompBuildChanged(bool value)   => OnPropertyChanged(nameof(RecompButtonText));
+
+    private void RefreshPs2Recomp()
+    {
+        IsPs2          = string.Equals(Platform, "PS2", StringComparison.OrdinalIgnoreCase);
+        HasRecompBuild = IsPs2 && Ps2RecompService.GetBuilt(ResolveIsoPath()) != null;
+        RefreshRomConvert();
+        if (!IsRecompBuilding) RecompStatus = HasRecompBuild ? "✓  PC version ready — Play launches it." : "";
+    }
+
+    private string? ResolveIsoPath()
+    {
+        var saved = GameSettingsService.Load(Title);
+        if (!string.IsNullOrEmpty(saved.RomPath) && File.Exists(saved.RomPath)) return saved.RomPath;
+        if (_driveInstances.Count > 0)
+        {
+            int idx = Math.Clamp(SelectedDriveIndex, 0, _driveInstances.Count - 1);
+            var p = _driveInstances[idx].ExecutablePath;
+            if (!string.IsNullOrEmpty(p) && File.Exists(p)) return p;
+        }
+        return null;
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task BuildRecompAsync()
+    {
+        if (IsRecompBuilding) return;
+        var iso = ResolveIsoPath();
+        if (iso == null) { RecompStatus = "⛔  No PS2 disc image found for this game."; return; }
+        if (!Ps2RecompService.IsSupported) { RecompStatus = "⛔  PS2 Recomp is only supported on Windows."; return; }
+
+        IsRecompBuilding = true;
+        RecompStatus = "⏳  Starting…";
+        _recompCts = new System.Threading.CancellationTokenSource();
+        string title = Title;
+        var ui = Avalonia.Threading.Dispatcher.UIThread;
+        var err = await System.Threading.Tasks.Task.Run(() => Ps2RecompService.BuildAsync(
+            iso, line => ui.Post(() => RecompStatus = "⏳  " + line), _recompCts.Token));
+        IsRecompBuilding = false;
+        _recompCts = null;
+        if (title != Title) return;
+        if (err != null) { RecompStatus = "⛔  " + err; HasRecompBuild = Ps2RecompService.GetBuilt(iso) != null; }
+        else RefreshPs2Recomp();
+    }
+
+    [RelayCommand] private void CancelRecomp() => _recompCts?.Cancel();
+
+    // ── ROM format conversion (PS1/PS2: CHD ⇄ ISO via chdman) ──────────────────
+    [ObservableProperty] private bool   _canConvertRom;
+    [ObservableProperty] private bool   _isConvertingRom;
+    [ObservableProperty] private string _romConvertStatus = "";
+    [ObservableProperty] private string _romConvertButtonText = "";
+    public bool CanStartRomConvert => !IsConvertingRom;
+    private System.Threading.CancellationTokenSource? _convertCts;
+    partial void OnIsConvertingRomChanged(bool value) => OnPropertyChanged(nameof(CanStartRomConvert));
+
+    private bool IsPs1Platform => string.Equals(Platform, "PS1", StringComparison.OrdinalIgnoreCase);
+
+    private void RefreshRomConvert()
+    {
+        var rom = ResolveIsoPath();
+        bool supported = IsPs2 || IsPs1Platform;
+        CanConvertRom = supported && rom != null
+            && (RomConvertService.IsChd(rom) || RomConvertService.IsIso(rom)
+                || rom.EndsWith(".cue", StringComparison.OrdinalIgnoreCase));
+        RomConvertButtonText = rom != null && RomConvertService.IsChd(rom)
+            ? (IsPs1Platform ? "CHD → BIN/CUE" : "CHD → ISO") : "ISO → CHD";
+        if (!IsConvertingRom) RomConvertStatus = "";
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task ConvertRomAsync()
+    {
+        if (IsConvertingRom) return;
+        var rom = ResolveIsoPath();
+        if (rom == null) return;
+        IsConvertingRom = true;
+        RomConvertStatus = "⏳  Starting…";
+        _convertCts = new System.Threading.CancellationTokenSource();
+        var ui = Avalonia.Threading.Dispatcher.UIThread;
+        Action<string> log = line => ui.Post(() => RomConvertStatus = "⏳  " + line);
+        bool ps1 = IsPs1Platform;
+        string? output = null, error = null;
+        try
+        {
+            (output, error) = await System.Threading.Tasks.Task.Run(() => RomConvertService.IsChd(rom)
+                ? RomConvertService.ChdToIsoAsync(rom, System.IO.Path.GetDirectoryName(rom)!, ps1, log, _convertCts.Token)
+                : RomConvertService.ToChdAsync(rom, ps1, log, _convertCts.Token));
+        }
+        catch (OperationCanceledException) { error = "Cancelled."; }
+        catch (Exception ex) { error = ex.Message; }
+        IsConvertingRom = false;
+        _convertCts = null;
+        RomConvertStatus = error != null ? "⛔  " + error
+            : $"✓  Created {System.IO.Path.GetFileName(output)} next to the original. The original was kept; choose it under ROM File to use it.";
+        if (output != null && !AvailableRomPaths.Contains(output)) AvailableRomPaths.Add(output);
+    }
+
+    [RelayCommand] private void CancelRomConvert() => _convertCts?.Cancel();
+
     // ── Settings panel ────────────────────────────────────────────────────────
     /// <summary>True when the settings overlay is visible.</summary>
     [ObservableProperty] private bool _showSettings;
@@ -1904,6 +2013,26 @@ public partial class GameDetailViewModel : ViewModelBase
         // ── ROM launch: use configured emulator if available ──────────────────
         if (IsRom)
         {
+            if (IsPs2 && Ps2RecompService.GetBuilt(ResolveIsoPath()) is { } recomp)
+            {
+                try
+                {
+                    var proc = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = recomp.ExePath, Arguments = recomp.Arguments,
+                        WorkingDirectory = recomp.WorkingDirectory, UseShellExecute = false,
+                    });
+                    if (proc != null)
+                    {
+                        _runningProcess    = proc;
+                        IsGameRunning      = true;
+                        PlayButtonIsResume = false;
+                        OnRequestPlaytimeTracking?.Invoke(proc, Title, Platform);
+                        return;
+                    }
+                }
+                catch { /* fall back to the emulator */ }
+            }
             // Determine the ROM file path: saved override → selected drive entry → auto-detected
             string romPath = "";
             if (!string.IsNullOrEmpty(saved.RomPath) && System.IO.File.Exists(saved.RomPath))
@@ -4789,6 +4918,7 @@ public partial class GameDetailViewModel : ViewModelBase
         _ryujinxModsJsonPath    = null;
 
         IsSwitch = string.Equals(Platform, "Switch", StringComparison.OrdinalIgnoreCase);
+        RefreshPs2Recomp();
         if (!IsSwitch) return;
 
         // Resolve TitleID using a three-tier fallback:
