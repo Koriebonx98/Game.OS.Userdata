@@ -1128,7 +1128,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             MediaVm.SkipWatchedEpisodes = SettingsVm.SkipWatchedEpisodes;
             MediaVm.PipPosition = SettingsVm.PipPosition;
             MediaVm.PipSize = SettingsVm.PipSize;
-            Services.MediaMetadataService.Configure(SettingsVm.MediaInfoSource, SettingsVm.TmdbApiKey, SettingsVm.OmdbApiKey);
+            Services.MediaMetadataService.Configure(SettingsVm.MovieInfoSource, SettingsVm.TvInfoSource, SettingsVm.MusicInfoSource, SettingsVm.TmdbApiKey, SettingsVm.OmdbApiKey);
         }
         SyncMediaSettings();
         MediaVm.MediaPresenceChanged = label =>
@@ -1143,7 +1143,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 or nameof(SettingsViewModel.MusicShuffle) or nameof(SettingsViewModel.MusicRepeat) or nameof(SettingsViewModel.OnlineMediaInfo)
                 or nameof(SettingsViewModel.ResumePlayback) or nameof(SettingsViewModel.MarkWatchedPercent)
                 or nameof(SettingsViewModel.SkipWatchedEpisodes) or nameof(SettingsViewModel.PipPosition)
-                or nameof(SettingsViewModel.PipSize) or nameof(SettingsViewModel.MediaInfoSource)
+                or nameof(SettingsViewModel.PipSize) or nameof(SettingsViewModel.MovieInfoSource) or nameof(SettingsViewModel.TvInfoSource) or nameof(SettingsViewModel.MusicInfoSource)
                 or nameof(SettingsViewModel.TmdbApiKey) or nameof(SettingsViewModel.OmdbApiKey))
                 SyncMediaSettings();
             if (e.PropertyName == nameof(SettingsViewModel.MoviesTvTheme))

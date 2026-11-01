@@ -409,6 +409,8 @@ public sealed partial class MediaViewModel
         }
         else if (targets.Count > 0)
         {
+            Add("⏭  Play next", () => EnqueueTracks(targets, next: true));
+            Add("☰  Add to queue", () => EnqueueTracks(targets, next: false));
             foreach (var p in _playlists.ToList())
             {
                 var pp = p;
@@ -447,6 +449,19 @@ public sealed partial class MediaViewModel
         _menuIdx = 0;
         for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
         IsMusicMenuOpen = true;
+    }
+
+    /// <summary>Adds songs to the play queue (right after the current song when <paramref name="next"/>), starting a queue from the library if none is active.</summary>
+    private void EnqueueTracks(IEnumerable<MediaLibraryItem> items, bool next)
+    {
+        if (_playQueue.Count == 0) _playQueue = Music.ToList();
+        var add = items.ToList();
+        var addPaths = add.Select(t => t.FullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var queue = _playQueue.Where(t => !addPaths.Contains(t.FullPath) || t.FullPath == NowPlaying?.FullPath).ToList();
+        add.RemoveAll(t => t.FullPath == NowPlaying?.FullPath);
+        int at = next && NowPlaying != null ? queue.FindIndex(t => t.FullPath == NowPlaying.FullPath) + 1 : queue.Count;
+        queue.InsertRange(Math.Clamp(at, 0, queue.Count), add);
+        _playQueue = queue;
     }
 
     private void AddToPlaylist(MediaPlaylist pl, IEnumerable<MediaLibraryItem> items)

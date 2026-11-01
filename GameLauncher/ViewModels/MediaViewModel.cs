@@ -68,11 +68,11 @@ public partial class MediaViewModel : ObservableObject
 
         // ── online info (Data\MediaCache) ──
         [ObservableProperty, NotifyPropertyChangedFor(nameof(HasOverview))] private string _overview = "";
-        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine))] private int _year;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine)), NotifyPropertyChangedFor(nameof(FactsLine))] private int _year;
         [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine))] private string _genres = "";
-        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine)), NotifyPropertyChangedFor(nameof(ScoreLabel))] private double _score;
-        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine))] private string _certification = "";
-        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine))] private int _runtimeMinutes;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine)), NotifyPropertyChangedFor(nameof(ScoreLabel)), NotifyPropertyChangedFor(nameof(HasScore))] private double _score;
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine)), NotifyPropertyChangedFor(nameof(FactsLine))] private string _certification = "";
+        [ObservableProperty, NotifyPropertyChangedFor(nameof(InfoLine)), NotifyPropertyChangedFor(nameof(FactsLine))] private int _runtimeMinutes;
 
         public bool HasOverview => Overview.Length > 0;
         public bool HasRating => Rating > 0;
@@ -84,6 +84,13 @@ public partial class MediaViewModel : ObservableObject
         public bool HasProgress => !Watched && ResumeMs > 0 && DurationMs > 0;
         /// <summary>0..1 for the progress bar under a "Continue Watching" tile.</summary>
         public double ProgressFraction => HasProgress ? Math.Clamp((double)ResumeMs / DurationMs, 0, 1) : 0;
+        public IReadOnlyList<string> GenreList => Genres.Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+        public string FactsLine => string.Join("   ·   ", new[]
+        {
+            Year > 0 ? Year.ToString() : "", Certification, RuntimeMinutes > 0 ? (RuntimeMinutes >= 60 ? $"{RuntimeMinutes / 60}h {RuntimeMinutes % 60:00}m" : $"{RuntimeMinutes} min") : "", Quality, Format,
+        }.Where(x => x.Length > 0));
+        public bool HasScore => Score > 0;
+        public bool HasGenres => Genres.Length > 0;
         public string InfoLine => string.Join("  ·  ", new[]
         {
             Year > 0 ? Year.ToString() : "", Quality, Format, Certification, RuntimeMinutes > 0 ? $"{RuntimeMinutes} min" : "", Genres,
@@ -975,7 +982,12 @@ public partial class MediaViewModel : ObservableObject
         if (item.IsSpecial) { ApplyBrowseTile(item.Special); return; }
         SelectedItem = item;
         bool details = item.MediaType != "music" && (item.IsTv ? ShowTvDetails : ShowMovieDetails);
-        if (details) IsDetailOpen = true;
+        if (details)
+        {
+            IsDetailOpen = true;
+            // Fetch missing info automatically instead of waiting for a manual refresh.
+            if (OnlineInfoEnabled && item.Overview.Length == 0) _ = EnrichAsync(new[] { item }, force: false, _enrichRun);
+        }
         else PlaySelectedMedia();
     }
 
@@ -1156,9 +1168,10 @@ public partial class MediaViewModel : ObservableObject
         if (_zone == 1 && _focusedItem != null) OpenMediaItem(_focusedItem);
     }
 
-    /// <summary>X button: a filter menu (sort, show, genre) like the Games page, or the Artists / Playlists tabs for music.</summary>
+    /// <summary>X button: a filter menu (sort, show, genre) like the Games page; on the music page it opens the full-screen player, or the Artists / Playlists tabs when nothing is playing.</summary>
     public void FilterMediaFocus()
     {
+        if (IsMusicSelected && HasNowPlaying && !IsMusicMenuOpen) { OpenNowPlayingFullScreen(); return; }
         if (IsMusicSelected) { if (!IsMusicMenuOpen) { _mZone = 0; _mTop = IsMusicPlaylistMode ? 1 : 0; ApplyMusicFocus(); } return; }
         OpenFilterMenu();
     }
@@ -1342,6 +1355,39 @@ public partial class MediaViewModel : ObservableObject
     // ── Full-screen now playing ──────────────────────────────────────────────
     [ObservableProperty] private bool _isNowPlayingFullScreen;
 
+    // D-pad / left-stick focus on the full-screen player buttons: previous, back, play / pause, forward, next, stop.
+    private const int MusicTransportCount = 6;
+    [ObservableProperty] private int _musicTransportFocus = 2;
+    public bool IsMusicTransportFocus0 => MusicTransportFocus == 0;
+    public bool IsMusicTransportFocus1 => MusicTransportFocus == 1;
+    public bool IsMusicTransportFocus2 => MusicTransportFocus == 2;
+    public bool IsMusicTransportFocus3 => MusicTransportFocus == 3;
+    public bool IsMusicTransportFocus4 => MusicTransportFocus == 4;
+    public bool IsMusicTransportFocus5 => MusicTransportFocus == 5;
+
+    partial void OnMusicTransportFocusChanged(int value)
+    {
+        for (int i = 0; i < MusicTransportCount; i++) OnPropertyChanged("IsMusicTransportFocus" + i);
+    }
+
+    partial void OnIsNowPlayingFullScreenChanged(bool value)
+    {
+        if (value) MusicTransportFocus = 2;
+    }
+
+    private void ActivateMusicTransportButton()
+    {
+        switch (MusicTransportFocus)
+        {
+            case 0: StepTrack(-1); break;
+            case 1: MusicSeekBack(); break;
+            case 2: TogglePlayPause(); break;
+            case 3: MusicSeekForward(); break;
+            case 4: StepTrack(1); break;
+            case 5: StopMusic(); break;
+        }
+    }
+
     [RelayCommand]
     private void OpenNowPlayingFullScreen()
     {
@@ -1415,9 +1461,16 @@ public partial class MediaViewModel : ObservableObject
         {
             case "LB": AdjustRating(-1); return true;
             case "RB": AdjustRating(1); return true;
-            case "Enter": case "X": TransportPlayPause(); return true;
-            case "Left":  TransportSeek(-1); return true;
-            case "Right": TransportSeek(1); return true;
+            case "X": TransportPlayPause(); return true;
+            case "Enter":
+                if (IsVlcPlayerOpen) TransportPlayPause(); else ActivateMusicTransportButton();
+                return true;
+            case "Left":
+                if (IsVlcPlayerOpen) TransportSeek(-1); else MusicTransportFocus = Math.Max(0, MusicTransportFocus - 1);
+                return true;
+            case "Right":
+                if (IsVlcPlayerOpen) TransportSeek(1); else MusicTransportFocus = Math.Min(MusicTransportCount - 1, MusicTransportFocus + 1);
+                return true;
             case "Up":    if (IsVlcPlayerOpen) TransportStep(1); else StepTrack(-1); return true;
             case "Down":  if (IsVlcPlayerOpen) TransportStep(-1); else StepTrack(1); return true;
             case "Escape": case "Y":

@@ -184,6 +184,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _musicRepeat = true;
     [ObservableProperty] private bool _onlineMediaInfo = true;
     [ObservableProperty] private string _mediaInfoSource = "Auto";
+    [ObservableProperty] private string _movieInfoSource = "Auto";
+    [ObservableProperty] private string _tvInfoSource = "Auto";
+    [ObservableProperty] private string _musicInfoSource = "Auto";
     [ObservableProperty] private string _tmdbApiKey = "";
     [ObservableProperty] private string _omdbApiKey = "";
     [ObservableProperty] private string _pipPosition = "Bottom right";
@@ -191,7 +194,16 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _resumePlayback = true;
     [ObservableProperty] private int _markWatchedPercent = 90;
     [ObservableProperty] private bool _skipWatchedEpisodes = true;
-    public IReadOnlyList<string> AvailableMediaInfoSources { get; } = new[] { "Auto", "TMDB", "OMDb", "TVmaze", "iTunes", "Deezer", "MusicBrainz" };
+    private static string PickSource(string? chosen, string? legacy, IReadOnlyList<string> allowed)
+    {
+        foreach (var c in new[] { chosen, legacy })
+            if (!string.IsNullOrWhiteSpace(c) && allowed.Contains(c.Trim(), StringComparer.OrdinalIgnoreCase)) return allowed.First(a => a.Equals(c.Trim(), StringComparison.OrdinalIgnoreCase));
+        return "Auto";
+    }
+
+    public IReadOnlyList<string> AvailableMovieInfoSources { get; } = new[] { "Auto", "TMDB", "Cinemeta", "OMDb", "iTunes" };
+    public IReadOnlyList<string> AvailableTvInfoSources { get; } = new[] { "Auto", "TMDB", "TVmaze", "Cinemeta", "OMDb" };
+    public IReadOnlyList<string> AvailableMusicInfoSources { get; } = new[] { "Auto", "iTunes", "Deezer", "MusicBrainz" };
     public IReadOnlyList<string> AvailablePipPositions { get; } = new[] { "Bottom right", "Bottom left", "Top right", "Top left" };
     public IReadOnlyList<string> AvailablePipSizes { get; } = new[] { "Small", "Medium", "Large" };
     public IReadOnlyList<int> AvailableWatchedPercents { get; } = new[] { 80, 85, 90, 95, 98 };
@@ -944,6 +956,10 @@ public partial class SettingsViewModel : ViewModelBase
         MusicRepeat                = appSettings.MusicRepeat;
         OnlineMediaInfo            = appSettings.OnlineMediaInfo;
         MediaInfoSource            = string.IsNullOrWhiteSpace(appSettings.MediaInfoSource) ? "Auto" : appSettings.MediaInfoSource;
+        // A source picked before the per-type split still applies to the types it supports.
+        MovieInfoSource            = PickSource(appSettings.MovieInfoSource, appSettings.MediaInfoSource, AvailableMovieInfoSources);
+        TvInfoSource               = PickSource(appSettings.TvInfoSource, appSettings.MediaInfoSource, AvailableTvInfoSources);
+        MusicInfoSource            = PickSource(appSettings.MusicInfoSource, appSettings.MediaInfoSource, AvailableMusicInfoSources);
         TmdbApiKey                 = appSettings.TmdbApiKey ?? "";
         OmdbApiKey                 = appSettings.OmdbApiKey ?? "";
         PipPosition                = AvailablePipPositions.Contains(appSettings.PipPosition) ? appSettings.PipPosition : "Bottom right";
@@ -1177,6 +1193,9 @@ public partial class SettingsViewModel : ViewModelBase
             MusicRepeat                = MusicRepeat,
             OnlineMediaInfo            = OnlineMediaInfo,
             MediaInfoSource            = MediaInfoSource,
+            MovieInfoSource            = MovieInfoSource,
+            TvInfoSource               = TvInfoSource,
+            MusicInfoSource            = MusicInfoSource,
             TmdbApiKey                 = TmdbApiKey?.Trim() ?? "",
             OmdbApiKey                 = OmdbApiKey?.Trim() ?? "",
             PipPosition                = PipPosition,

@@ -1191,12 +1191,22 @@
                             <CheckBox IsChecked="{Binding OnlineMediaInfo}" Content="Look up posters, summaries and ratings online (kept for offline use)"/>
                             <TextBlock Text="{Binding MediaStatsSummary}" Opacity="0.7" TextWrapping="Wrap"/>
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Info source" FontSize="13" Foreground="#e6edf3"/>
-                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableMediaInfoSources}"
-                                          SelectedItem="{Binding MediaInfoSource}" Width="220"/>
-                                <TextBlock Text="Tried first; the others are used as fallbacks. TMDB and OMDb need a free API key. TVmaze, iTunes, Deezer and MusicBrainz need none."
-                                           FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                <TextBlock Text="Movie scraper" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableMovieInfoSources}"
+                                          SelectedItem="{Binding MovieInfoSource}" Width="220"/>
                             </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="TV show scraper" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableTvInfoSources}"
+                                          SelectedItem="{Binding TvInfoSource}" Width="220"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Music scraper" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableMusicInfoSources}"
+                                          SelectedItem="{Binding MusicInfoSource}" Width="220"/>
+                            </StackPanel>
+                            <TextBlock Text="Tried first; the others are used as fallbacks. TMDB and OMDb need a free API key. TVmaze, Cinemeta (movies and TV), iTunes, Deezer and MusicBrainz need none."
+                                       FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             <StackPanel Spacing="6">
                                 <TextBlock Text="TMDB API key / read token" FontSize="13" Foreground="#e6edf3"/>
                                 <TextBox Classes="form-input" Text="{Binding TmdbApiKey}" PasswordChar="•" Width="360" HorizontalAlignment="Left"/>
