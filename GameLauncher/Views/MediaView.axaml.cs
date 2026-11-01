@@ -46,8 +46,13 @@ public partial class MediaView : UserControl
     private void OnDataContextChanged(object? sender, EventArgs e)
     {
         if (_subscribedVm != null) _subscribedVm.MediaFocusChanged -= ScrollFocusedIntoView;
+        if (_subscribedVm != null) _subscribedVm.PropertyChanged -= OnVmPropertyChanged;
         _subscribedVm = DataContext as MediaViewModel;
-        if (_subscribedVm != null) _subscribedVm.MediaFocusChanged += ScrollFocusedIntoView;
+        if (_subscribedVm != null)
+        {
+            _subscribedVm.MediaFocusChanged += ScrollFocusedIntoView;
+            _subscribedVm.PropertyChanged += OnVmPropertyChanged;
+        }
 
         if (DataContext is MediaViewModel vm)
         {
@@ -60,6 +65,25 @@ public partial class MediaView : UserControl
             vm.ToggleVideoPauseRequested = ToggleVideoPause;
             vm.SeekByRequested = SeekBy;
             vm.SeekToRequested = SeekTo;
+            vm.PipRequested = SetPip;
+        }
+    }
+
+    private WindowState? _stateBeforePlayer;
+
+    // The video player takes the whole screen while it is open and restores the previous window state afterwards.
+    private void OnVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(MediaViewModel.IsVlcFullView) || TopLevel.GetTopLevel(this) is not Window win) return;
+        if (_subscribedVm!.IsVlcFullView)
+        {
+            _stateBeforePlayer ??= win.WindowState;
+            win.WindowState = WindowState.FullScreen;
+        }
+        else if (_stateBeforePlayer is { } prev)
+        {
+            win.WindowState = prev;
+            _stateBeforePlayer = null;
         }
     }
 
@@ -320,15 +344,23 @@ public partial class MediaView : UserControl
     }
 
     // VLC only accepts a seek once playback has actually started, so retry for a couple of seconds.
+    private DispatcherTimer? _resumeTimer;
+
     private void ResumeWhenReady(long resumeMs)
     {
+        _resumeTimer?.Stop();
         int tries = 0;
         var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+        _resumeTimer = t;
         t.Tick += (_, _) =>
         {
-            var p = _mediaPlayer;
-            if (p == null || ++tries > 12) { t.Stop(); return; }
-            if (p.IsPlaying && p.Length > resumeMs) { p.Time = resumeMs; t.Stop(); }
+            try
+            {
+                var p = _mediaPlayer;
+                if (p == null || ++tries > 12) { t.Stop(); return; }
+                if (p.IsPlaying && p.Length > resumeMs) { p.Time = resumeMs; t.Stop(); }
+            }
+            catch (Exception ex) { DevLogService.Log($"[MediaView] resume failed: {ex.Message}"); t.Stop(); }
         };
         t.Start();
     }
@@ -359,9 +391,52 @@ public partial class MediaView : UserControl
             vm.CloseVlcPlayerCommand.Execute(null);
     }
 
+    private Window? _pipWindow;
+    private LibVLCSharp.Avalonia.VideoView? _pipView;
+
+    // Picture-in-picture: the same player is re-attached to a small topmost window in the bottom-right corner.
+    private void SetPip(bool on)
+    {
+        if (on)
+        {
+            if (_mediaPlayer == null) return;
+            if (VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = null;
+            _pipView = new LibVLCSharp.Avalonia.VideoView();
+            _pipWindow = new Window
+            {
+                SystemDecorations = SystemDecorations.None, ShowInTaskbar = false, Topmost = true, ShowActivated = false,
+                Width = 480, Height = 270, Background = Avalonia.Media.Brushes.Black, Content = _pipView,
+            };
+            if (TopLevel.GetTopLevel(this) is Window { Screens.Primary: { } scr })
+            {
+                var wa = scr.WorkingArea; double sc = scr.Scaling;
+                _pipWindow.WindowStartupLocation = WindowStartupLocation.Manual;
+                _pipWindow.Position = new PixelPoint(wa.Right - (int)(500 * sc), wa.Bottom - (int)(290 * sc));
+            }
+            _pipWindow.Show();
+            _pipView.MediaPlayer = _mediaPlayer;
+            return;
+        }
+        ClosePipWindow(reattach: true);
+    }
+
+    private void ClosePipWindow(bool reattach)
+    {
+        if (_pipView != null) _pipView.MediaPlayer = null;
+        _pipWindow?.Close();
+        _pipWindow = null;
+        _pipView = null;
+        if (reattach && _mediaPlayer != null && VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = _mediaPlayer;
+    }
+
     private void DisposeVlc()
     {
+        ClosePipWindow(reattach: false);
         _videoTimer.Stop();
+        _resumeTimer?.Stop();
+        _resumeTimer = null;
+        // The video surface must let go of the player first, or it touches a disposed player on the next layout / resize.
+        if (VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = null;
         if (_mediaPlayer != null)
         {
             _mediaPlayer.EndReached       -= OnVlcEndReached;

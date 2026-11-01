@@ -67,9 +67,7 @@
                                VerticalAlignment="Center"/>
                     <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
                         <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabMoviesFocused}" Classes.active="{Binding IsMoviesSelected}"
-                                Command="{Binding SelectMoviesCommand}" Content="Movies"/>
-                        <Button Classes="nflx-tab media-nav" Classes.focused="{Binding IsTabTvFocused}" Classes.active="{Binding IsTvShowsSelected}"
-                                Command="{Binding SelectTvShowsCommand}" Content="TV Shows"/>
+                                Command="{Binding SelectMoviesCommand}" Content="Movies &amp; TV"/>
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">

@@ -375,9 +375,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private void RefreshBrowserSuspend()
     {
         if (BrowserVm == null) return;
-        BrowserVm.IsActive = ActivePage == "browser" && !ShowDetail && !ShowQuickMenu && !IsNavExpanded;
-        BrowserVm.SuspendWebView = IsNavExpanded || ShowQuickMenu || ShowDetail || (DownloadsVm?.IsPromptOpen ?? false);
+        // The overlay window shows the browser over a running game, independent of the launcher's own page / menus.
+        BrowserVm.IsActive = IsBrowserOverlay || (ActivePage == "browser" && !ShowDetail && !ShowQuickMenu && !IsNavExpanded);
+        BrowserVm.SuspendWebView = !IsBrowserOverlay && (IsNavExpanded || ShowQuickMenu || ShowDetail || (DownloadsVm?.IsPromptOpen ?? false));
     }
+
+    /// <summary>True while the browser is shown in the always-on-top overlay window above a running game.</summary>
+    [ObservableProperty] private bool _isBrowserOverlay;
+    /// <summary>Raised to show (true) or hide (false) the browser overlay window.</summary>
+    public Action<bool>? BrowserOverlayRequested { get; set; }
+    partial void OnIsBrowserOverlayChanged(bool value) => RefreshBrowserSuspend();
     /// <summary>True when the Friends or Inbox page is active (both show FriendsView).</summary>
     public bool IsFriendsOrInbox => ActivePage == "friends" || ActivePage == "inbox";
 
@@ -468,6 +475,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         BrowserVm.ExitRequested += () => Navigate("dashboard");
         BrowserVm.ReturnToGameRequested += () =>
         {
+            if (IsBrowserOverlay)
+            {
+                IsBrowserOverlay = false;
+                BrowserOverlayRequested?.Invoke(false);
+                DetailVm.ResumeGameWindow();
+                return;
+            }
             Navigate("dashboard");
             DetailVm.ResumeGameWindow();
             MinimizeWindowRequested?.Invoke();
@@ -2152,9 +2166,22 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         BrowserVm.IsPeek = peek;
         BrowserVm.SetContext(platform, game);
-        _browserContextKept = true;
-        Navigate("browser");
-        _browserContextKept = false;
+        // Over a running game the browser opens in an overlay window (like the quick menu) instead of pulling the launcher forward.
+        bool overlay = peek && BrowserOverlayRequested != null && OperatingSystem.IsWindows();
+        if (overlay)
+        {
+            BrowserVm.ApplySettings(Services.AppSettingsService.Load().Browser);
+            BrowserVm.EnsureTab();
+            IsBrowserOverlay = true;
+            BrowserOverlayRequested!(true);
+        }
+        else
+        {
+            _browserContextKept = true;
+            Navigate("browser");
+            _browserContextKept = false;
+            if (peek) BringToForegroundRequested?.Invoke();
+        }
         if (!string.IsNullOrWhiteSpace(url)) BrowserVm.NewTab(url);
         // No page requested: start on the saved links / favourites list.
         else if (BrowserVm.HasContext && (GameLinksService.ForGame(BrowserVm.ContextPlatform, BrowserVm.ContextGame).Count > 0 || BrowserVm.Settings.Favourites.Count > 0))

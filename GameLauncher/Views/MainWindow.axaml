@@ -78,9 +78,9 @@
                             <Border IsVisible="{Binding IsSettings}">
                                 <views:SettingsView DataContext="{Binding SettingsVm}"/>
                             </Border>
-                            <Border IsVisible="{Binding IsBrowser}"
+                            <Border x:Name="BrowserHost" IsVisible="{Binding IsBrowser}"
                                     Height="{Binding $parent[ScrollViewer].Bounds.Height}">
-                                <views:BrowserView DataContext="{Binding BrowserVm}"/>
+                                <views:BrowserView x:Name="BrowserPage" DataContext="{Binding BrowserVm}"/>
                             </Border>
                             <Border IsVisible="{Binding IsDownloads}">
                                 <views:DownloadsView DataContext="{Binding DownloadsVm}"/>

@@ -32,6 +32,7 @@ public partial class MainWindow : Window
     // Separate overlay window for the global Quick Menu (shown over games without
     // restoring the full launcher — mirrors the Steam/NVIDIA overlay pattern).
     private QuickMenuWindow? _quickMenuWindow;
+    private Window? _browserOverlayWindow;
 
     // ── XInput controller support ────────────────────────────────────────────
     private readonly XInputService _xinput = new();
@@ -60,6 +61,52 @@ public partial class MainWindow : Window
         _xinputPoller.Stop();
         _quickMenuWindow?.Close();
         _quickMenuWindow = null;
+        _browserOverlayWindow?.Close();
+        _browserOverlayWindow = null;
+    }
+
+    /// <summary>
+    /// Shows / hides the browser in an always-on-top borderless window above the running game.
+    /// The page's own BrowserView is moved into the window and handed back when it closes.
+    /// </summary>
+    private void SetBrowserOverlay(bool show)
+    {
+        var host = this.FindControl<Border>("BrowserHost");
+        var view = this.FindControl<BrowserView>("BrowserPage");
+        if (host == null || view == null) return;
+
+        if (!show)
+        {
+            _browserOverlayWindow?.Hide();
+            if (_browserOverlayWindow != null) _browserOverlayWindow.Content = null;
+            if (host.Child == null) host.Child = view;
+            return;
+        }
+
+        _browserOverlayWindow ??= new Window
+        {
+            SystemDecorations = SystemDecorations.None,
+            ShowInTaskbar = false,
+            Topmost = true,
+            Background = Avalonia.Media.Brushes.Black,
+        };
+        host.Child = null;
+        _browserOverlayWindow.Content = view;
+
+        if (Screens.Primary is { } screen)
+        {
+            var wa = screen.WorkingArea;
+            _browserOverlayWindow.Position = new Avalonia.PixelPoint(wa.X, wa.Y);
+            _browserOverlayWindow.Width = wa.Width / screen.Scaling;
+            _browserOverlayWindow.Height = wa.Height / screen.Scaling;
+        }
+        _browserOverlayWindow.Show();
+        if (_browserOverlayWindow.TryGetPlatformHandle() is { } handle && OperatingSystem.IsWindows())
+        {
+            NativeMethods.SetWindowPos(handle.Handle, NativeMethods.HWND_TOPMOST, 0, 0, 0, 0,
+                NativeMethods.SWP_NOMOVE | NativeMethods.SWP_NOSIZE | NativeMethods.SWP_SHOWWINDOW);
+            NativeMethods.SetForegroundWindow(handle.Handle);
+        }
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -90,6 +137,7 @@ public partial class MainWindow : Window
                 WindowState = _stateBeforeMinimize;
                 Activate();
             };
+            vm.BrowserOverlayRequested = show => Dispatcher.UIThread.Post(() => SetBrowserOverlay(show));
             vm.BringToForegroundRequested = () =>
             {
                 if (WindowState == WindowState.Minimized)
@@ -800,9 +848,16 @@ public partial class MainWindow : Window
             _ => "",
         };
         // Video player, full-screen music player and the info page take every key while open.
-        if (media.IsVlcPlayerOpen || media.IsNowPlayingFullScreen) { media.HandlePlayerKey(name); return true; }
+        if (media.IsVlcFullView || media.IsNowPlayingFullScreen) { media.HandlePlayerKey(name); return true; }
         if (media.IsDetailOpen) { media.HandleDetailKey(name); return true; }
-        if (key == Key.Y && media.IsMusicPage && media.HasNowPlaying) { media.OpenNowPlayingFullScreenCommand.Execute(null); return true; }
+        if (media.HandleMusicOverlayKey(name)) return true;
+        if (key == Key.Y) { media.SearchMediaFocus(); return true; }
+        if (key == Key.Apps) { media.OpenOptionsMenu(); return true; }
+        if (key is Key.Escape or Key.BrowserBack)
+        {
+            if (!media.MusicBack()) vm.NavigateCommand.Execute("dashboard");
+            return true;
+        }
         switch (key)
         {
             case Key.Left:
@@ -812,8 +867,7 @@ public partial class MainWindow : Window
             case Key.Up:    vm.MediaVm.MoveMediaFocus(0, -1); return true;
             case Key.Down:  vm.MediaVm.MoveMediaFocus(0, 1); return true;
             case Key.Enter: vm.MediaVm.ActivateMediaFocus(); return true;
-            case Key.X:     vm.MediaVm.QuickActionMediaFocus(); return true;
-            case Key.Y when !media.IsMusicPage: vm.MediaVm.FavouriteMediaFocus(); return true;
+            case Key.X:     vm.MediaVm.FilterMediaFocus(); return true;
         }
         return false;
     }
@@ -1003,8 +1057,9 @@ public partial class MainWindow : Window
         return focused is TextBox or NumericUpDown;
     }
 
+    // Music is reachable from the nav menu but is skipped by the LB / RB page cycle.
     private static readonly string[] _navPages =
-        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media", "music", "browser", "downloads"];
+        ["dashboard", "library", "store", "friends", "inbox", "profile", "settings", "media", "browser", "downloads"];
 
     private static void NavigatePrev(MainViewModel vm)
     {
@@ -1300,8 +1355,8 @@ public partial class MainWindow : Window
     ///   Back / Select      → back / cancel      (Escape)
     ///   LB / L1            → previous page      (PageUp)
     ///   RB / R1            → next page          (PageDown)
-    ///   LT / L2            → disabled (reserved; does not page-switch tabs)
-    ///   RT / R2            → disabled (reserved; does not page-switch tabs)
+    ///   LT / L2            → rewind while the media player is open (never page-switches)
+    ///   RT / R2            → fast-forward while the media player is open (never page-switches)
     ///   Guide / Home / Xbox → toggle Quick Menu (≡ Left Ctrl + Left Shift)
     ///   Share              → screenshot via Win+Alt+PrintScreen
     /// </summary>
@@ -1318,12 +1373,15 @@ public partial class MainWindow : Window
         _xinput.OnBack    = () => HandleControllerKey(Key.Escape);
         _xinput.OnLb      = () => HandleControllerKey(Key.PageUp);
         _xinput.OnRb      = () => HandleControllerKey(Key.PageDown);
-        // Leave analog triggers unbound in launcher navigation so LT/RT do not switch tabs/pages.
-        _xinput.OnLt      = null;
-        _xinput.OnRt      = null;
+        // Triggers never switch pages; they only rewind / fast-forward while a video or music player is open.
+        _xinput.OnLt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(-1));
+        _xinput.OnRt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(1));
 
         // Start does not open the Quick Menu; only Guide / Home / Xbox does.
-        _xinput.OnStart = null;
+        _xinput.OnStart = () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (_boundVm is { IsMediaOrMusic: true, ShowQuickMenu: false }) HandleControllerKey(Key.Apps);
+        });
 
         // While another app is on top, Game OS ignores the controller entirely except Start + Select,
         // which brings up the quick guide menu. Once the guide menu is showing, input works as normal.

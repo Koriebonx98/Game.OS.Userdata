@@ -166,12 +166,12 @@ public partial class QuickMenuViewModel
                     foreach (var l in inSection)
                     {
                         var capturedLink = l;
-                        yield return Act(capturedLink.Icon, capturedLink.Name, () => { OnOpenUrl?.Invoke(gp, gt, capturedLink.Url); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); }, capturedLink.Kind);
+                        yield return Act(capturedLink.Icon, capturedLink.Name, () => { OnOpenUrl?.Invoke(gp, gt, capturedLink.Url); OnDismiss?.Invoke(); }, capturedLink.Kind);
                     }
                 }
                 if (links.Count == 0)
                     yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = $"No saved links for {gt}.", Subtitle = "Open the browser from the game page to save walkthroughs." };
-                yield return Act("🔍", "Search walkthrough", () => { OnOpenUrl?.Invoke(gp, gt, "https://duckduckgo.com/?q=" + Uri.EscapeDataString($"{gt} {gp} walkthrough")); OnRequestLauncherForeground?.Invoke(); OnDismiss?.Invoke(); });
+                yield return Act("🔍", "Search walkthrough", () => { OnOpenUrl?.Invoke(gp, gt, "https://duckduckgo.com/?q=" + Uri.EscapeDataString($"{gt} {gp} walkthrough")); OnDismiss?.Invoke(); });
                 break;
             case "browser":
                 yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open the built-in web browser.");
