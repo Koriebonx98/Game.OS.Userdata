@@ -199,16 +199,16 @@ namespace GameLauncher.Services
                         result.Add(new TexturePack(name, name, entry));
                         continue;
                     }
-                    if (!nameMatch) continue;
-
                     // {GameName} is a folder of {TitleID}[.zip] entries, or the pack itself.
                     var inner = Directory.Exists(entry)
                         ? Directory.EnumerateFileSystemEntries(entry).Where(IsPackEntry).ToList()
                         : new List<string>();
-                    var idEntries = inner.Where(i => LooksLikeTitleId(EntryId(i)) || ids.Contains(NormalizeId(EntryId(i)))).ToList();
+                    var idEntries = inner.Where(i =>
+                        ids.Contains(NormalizeId(EntryId(i))) ||
+                        (nameMatch && LooksLikeTitleId(EntryId(i)))).ToList();
                     if (idEntries.Count > 0)
                         foreach (var i in idEntries) result.Add(new TexturePack(name, EntryId(i), i));
-                    else if (firstId != null)
+                    else if (nameMatch && firstId != null)
                         result.Add(new TexturePack(name, firstId.Trim().ToUpperInvariant(), entry));
                 }
             }
