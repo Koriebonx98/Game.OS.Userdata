@@ -1045,6 +1045,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Wire up OpenDetail from child VMs
         DashboardVm.OnOpenDetail        = OpenDetailFromGame;
         DashboardVm.OnOpenStoreDetail   = OpenDetailFromStoreGame;
+        DashboardVm.OnShowRelatedAll    = query => { StoreVm.SearchText = query; Navigate("store"); };
         DashboardVm.OnOpenLocalDetail   = OpenTileFromDashboard;
         DashboardVm.OnContinuePlaying   = LaunchFromCard;
         DashboardVm.OnNavigateToLibrary = () => Navigate("library");

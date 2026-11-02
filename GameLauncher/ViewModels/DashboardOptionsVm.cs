@@ -51,6 +51,9 @@ public static class DashboardCatalog
             new("header", "Header (Games / Media)"), new("media", "Media tab in the header"),
             new("achievements", "Achievements / trophies (panel & counter)"),
             new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
+            new("achpercent", "Achievement completion percent"),
+            new("achbar", "Achievement progress bar"),
+            new("captures", "Captures of the highlighted game"),
             new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
             new("coverbg", "Highlighted game cover as background"),
         },
@@ -186,6 +189,9 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowRecommended  => Get("recommended");
     public bool ShowRelated      => Get("related");
     public bool ShowCoverBackground => Get("coverbg");
+    public bool ShowAchPercent   => Get("achpercent");
+    public bool ShowAchBar       => Get("achbar");
+    public bool ShowCaptures     => Get("captures");
     public bool ShowNavBar       => Get("navbar");
     public bool ShowShelf        => Get("shelf");
     /// <summary>PS5 calls achievements "Trophies"; the setting switches the wording back to "Achievements".</summary>

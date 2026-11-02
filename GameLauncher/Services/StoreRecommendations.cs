@@ -30,6 +30,29 @@ internal static class StoreRecommendations
         return t.Length >= 3 ? t : "";
     }
 
+    private static string Plain(string? title) =>
+        Regex.Replace(Regex.Replace((title ?? "").ToLowerInvariant(), @"[^a-z0-9 ]", " "), @"\s+", " ").Trim();
+
+    /// <summary>True when both titles belong to one franchise ("Skate", "Skate 2", "Skate." / "Call of Duty", "Call of Duty: Black Ops").</summary>
+    public static bool SameSeries(string? a, string? b)
+    {
+        string sa = Series(a), sb = Series(b);
+        if (sa.Length == 0 || sb.Length == 0) return false;
+        if (sa == sb) return true;
+        string pa = Plain(a), pb = Plain(b);
+        return pa.StartsWith(sb + " ", StringComparison.Ordinal) || pb.StartsWith(sa + " ", StringComparison.Ordinal);
+    }
+
+    /// <summary>All catalog games in the same franchise as <paramref name="title"/> on any platform (the title itself excluded).</summary>
+    public static List<StoreGame> RelatedSeries(IEnumerable<StoreGame> catalog, string platform, string title)
+    {
+        var seen = new HashSet<string> { Key(platform, title) };
+        return catalog
+            .Where(g => !string.IsNullOrWhiteSpace(g.Title) && SameSeries(g.Title, title) && seen.Add(Key(g.Platform, g.Title)))
+            .OrderBy(g => g.Title, StringComparer.OrdinalIgnoreCase).ThenBy(g => g.Platform, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
     /// <summary>Up to <paramref name="count"/> unowned store games, mixed across platforms (best <paramref name="perPlatform"/> of each).</summary>
     public static List<StoreGame> ForUser(IEnumerable<StoreGame> catalog, IEnumerable<(string Platform, string Title, string Genre)> owned,
                                           int count, int perPlatform = 3)

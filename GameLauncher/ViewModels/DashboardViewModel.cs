@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.IO;
 using System.Linq;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -104,6 +105,8 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Invoked when the user clicks a game card to open the detail overlay.</summary>
     public Action<Game>?            OnOpenDetail        { get; set; }
     public Action<StoreGame>?       OnOpenStoreDetail   { get; set; }
+    /// <summary>Opens the store filtered to a franchise (the shelf's "All" tile).</summary>
+    public Action<string>?          OnShowRelatedAll    { get; set; }
     public Action<LocalGameCardVm>? OnOpenLocalDetail   { get; set; }
     /// <summary>
     /// Invoked when the user clicks "Continue Playing" on the hero banner.
@@ -117,6 +120,7 @@ public partial class DashboardViewModel : ViewModelBase
     {
         Profile           = profile;
         _libraryGames     = library;
+        _allAchievements  = achievements;
         AchievementsCount = achievements.Count;
         PlatformsCount    = library.Select(g => g.Platform).Distinct().Count();
 
@@ -724,6 +728,57 @@ public partial class DashboardViewModel : ViewModelBase
     public ObservableCollection<Achievement> FocusedCardAchievements { get; } = new();
     public bool HasFocusedCardAchievements => FocusedCardAchievements.Count > 0;
     [ObservableProperty] private string _focusedCardTrophyHeader = "";
+    private List<Achievement> _allAchievements = new();
+
+    // ── Highlighted game: completion, full list, captures ───────────────────
+    [ObservableProperty] private string _focusedCardAchPercentLabel = "";
+    [ObservableProperty] private double _focusedCardAchPercent;
+    public ObservableCollection<Achievement> FocusedCardAllAchievements { get; } = new();
+    public ObservableCollection<string> FocusedCardCaptures { get; } = new();
+    public bool HasFocusedCardCaptures => FocusedCardCaptures.Count > 0;
+    [ObservableProperty] private bool _showAchievementList;
+    [ObservableProperty] private string _achievementListTitle = "";
+
+    [RelayCommand]
+    private void ToggleAchievementList()
+    {
+        if (!ShowAchievementList && FocusedCardAllAchievements.Count == 0 && FocusedCardAchievements.Count == 0) return;
+        ShowAchievementList = !ShowAchievementList;
+    }
+
+    [RelayCommand] private void CloseAchievementList() => ShowAchievementList = false;
+
+    private void RefreshFocusedCardExtras(LocalGameCardVm? card)
+    {
+        ShowAchievementList = false;
+        FocusedCardAllAchievements.Clear();
+        FocusedCardCaptures.Clear();
+        FocusedCardAchPercent = 0;
+        FocusedCardAchPercentLabel = "";
+        if (card != null)
+        {
+            var all = _allAchievements
+                .Where(a => string.Equals(a.GameTitle, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))
+                .OrderByDescending(a => a.IsUnlocked).ToList();
+            foreach (var a in all) FocusedCardAllAchievements.Add(a);
+            if (all.Count > 0)
+            {
+                int done = all.Count(a => a.IsUnlocked);
+                FocusedCardAchPercent = 100.0 * done / all.Count;
+                FocusedCardAchPercentLabel = $"{done}/{all.Count} · {FocusedCardAchPercent:0}%";
+            }
+            AchievementListTitle = $"{card.EffectiveTitle} · {Options.AchievementsWord}";
+            try
+            {
+                string dir = CaptureService.GameFolder(card.Platform, card.EffectiveTitle);
+                if (Directory.Exists(dir))
+                    foreach (var f in Directory.EnumerateFiles(dir, "*.png").OrderByDescending(f => f).Take(4))
+                        FocusedCardCaptures.Add(f);
+            }
+            catch (Exception ex) { DevLogService.Log($"[Dashboard] captures failed: {ex.Message}"); }
+        }
+        OnPropertyChanged(nameof(HasFocusedCardCaptures));
+    }
     /// <summary>Top-rated store title shown as the store brief when the Store tile is highlighted.</summary>
     public StoreGame? StoreBriefGame => GameCatalog.Store.OrderByDescending(g => g.Rating).FirstOrDefault();
 
@@ -731,12 +786,17 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>One card on the PS5 shelf.</summary>
     public sealed partial class ShelfCardVm : ObservableObject
     {
-        public StoreGame Game { get; }
-        public ShelfCardVm(StoreGame game) { Game = game; }
+        public StoreGame? Game { get; }
+        /// <summary>The trailing "All" tile that opens every related title.</summary>
+        public bool IsAll => Game == null;
+        public string SeriesQuery { get; }
+        public ShelfCardVm(StoreGame game) { Game = game; SeriesQuery = ""; }
+        public ShelfCardVm(string seriesQuery) { SeriesQuery = seriesQuery; }
         [ObservableProperty] private bool _isFocused;
     }
 
     private const int Ps5ShelfSize = 10;
+    private const int RelatedShown = 5;
     private List<Game> _libraryGames = new();
     /// <summary>Supplies the store catalog (curated + loaded platform shelves) used for recommendations.</summary>
     public Func<IReadOnlyList<StoreGame>>? StoreCatalogProvider { get; set; }
@@ -765,9 +825,19 @@ public partial class DashboardViewModel : ViewModelBase
                     var card = Ps5RecentGames[SelectedCardIndex];
                     var genre = _libraryGames.FirstOrDefault(g =>
                         string.Equals(g.Title, card.EffectiveTitle, StringComparison.OrdinalIgnoreCase))?.Genre;
-                    foreach (var g in StoreRecommendations.Related(StoreCatalog(), card.Platform, card.EffectiveTitle, genre, Ps5ShelfSize))
-                        Ps5Shelf.Add(new ShelfCardVm(g));
-                    title = $"More like {card.EffectiveTitle}";
+                    var series = StoreRecommendations.RelatedSeries(StoreCatalog(), card.Platform, card.EffectiveTitle);
+                    if (series.Count > 0)
+                    {
+                        foreach (var g in series.Take(RelatedShown)) Ps5Shelf.Add(new ShelfCardVm(g));
+                        if (series.Count > RelatedShown) Ps5Shelf.Add(new ShelfCardVm(StoreRecommendations.Series(card.EffectiveTitle)));
+                        title = $"Related to {card.EffectiveTitle}";
+                    }
+                    else
+                    {
+                        foreach (var g in StoreRecommendations.Related(StoreCatalog(), card.Platform, card.EffectiveTitle, genre, Ps5ShelfSize))
+                            Ps5Shelf.Add(new ShelfCardVm(g));
+                        title = $"More like {card.EffectiveTitle}";
+                    }
                 }
             }
             else if (Options.ShowRecommended)
@@ -805,7 +875,9 @@ public partial class DashboardViewModel : ViewModelBase
     [RelayCommand]
     private void OpenShelfGame(ShelfCardVm? card)
     {
-        if (card != null) OnOpenStoreDetail?.Invoke(card.Game);
+        if (card == null) return;
+        if (card.Game != null) OnOpenStoreDetail?.Invoke(card.Game);
+        else OnShowRelatedAll?.Invoke(card.SeriesQuery);
     }
 
     /// <summary>
@@ -905,6 +977,24 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>PS6 vertical navigation: games row ⇄ dock (Down / Up) and games row ⇄ header (Up / Down).</summary>
     public bool HandlePs6DockKey(Avalonia.Input.Key key)
     {
+        if (ShowAchievementList)
+        {
+            if (key is Avalonia.Input.Key.Escape or Avalonia.Input.Key.Y or Avalonia.Input.Key.Enter or Avalonia.Input.Key.X)
+                ShowAchievementList = false;
+            return true;
+        }
+        if (key == Avalonia.Input.Key.Y && !IsPs6DockActive && !IsPs6HeaderActive && Options.ShowAchievements)
+        {
+            ToggleAchievementList();
+            return true;
+        }
+        if (IsPs5ShelfActive)
+        {
+            if (key == Avalonia.Input.Key.Down) { ExitPs5Shelf(); Ps6DockIndex = 0; return true; }
+            return HandlePs5ShelfKey(key);
+        }
+        if (!IsPs6DockActive && !IsPs6HeaderActive && key == Avalonia.Input.Key.Down && Ps5Shelf.Count > 0)
+            return HandlePs5ShelfKey(key);
         if (IsPs6HeaderActive)
         {
             switch (key)
@@ -1190,6 +1280,7 @@ public partial class DashboardViewModel : ViewModelBase
     private void UpdateFocusedCard()
     {
         UpdateFocusedCardCore();
+        RefreshFocusedCardExtras(FocusedCard);
         RefreshPs5Shelf();
         OnPropertyChanged(nameof(Ps6BackdropUrl));
     }

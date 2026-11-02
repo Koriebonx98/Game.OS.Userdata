@@ -35,7 +35,7 @@
             <Setter Property="Background" Value="Transparent"/>
         </Style>
         <Style Selector="Border.ps6-lib-cover">
-            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="CornerRadius" Value="18"/>
             <Setter Property="ClipToBounds" Value="True"/>
             <Setter Property="BorderBrush" Value="#2A3070"/>
             <Setter Property="BorderThickness" Value="1"/>
@@ -52,6 +52,20 @@
             <Setter Property="BorderBrush" Value="#9BE7FF"/>
             <Setter Property="BorderThickness" Value="2"/>
             <Setter Property="BoxShadow" Value="0 0 26 4 #889BE7FF"/>
+        </Style>
+        <Style Selector="ListBox.ps6-rail ListBoxItem">
+            <Setter Property="Padding" Value="14,9"/>
+            <Setter Property="Margin" Value="0,2"/>
+            <Setter Property="Foreground" Value="#B9BCE6"/>
+            <Setter Property="CornerRadius" Value="12"/>
+        </Style>
+        <Style Selector="ListBox.ps6-rail ListBoxItem:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#26305F"/>
+        </Style>
+        <Style Selector="ListBox.ps6-rail ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4350B8"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="BoxShadow" Value="0 0 16 1 #669BE7FF"/>
         </Style>
         <Style Selector="Border.ps6-lib-chipbadge">
             <Setter Property="Background" Value="#CC030319"/>
@@ -89,106 +103,107 @@
             </Border.Background>
         </Border>
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="40,28,40,0">
-        <!-- Header + search -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
-                <TextBlock Text="LIBRARY" FontSize="30" FontWeight="Bold" LetterSpacing="6" Foreground="#FFFFFF"/>
-                <Border Classes="ps6-lib-chipbadge" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} GAMES'}"
-                               FontSize="11" FontWeight="SemiBold" Foreground="#9BE7FF"/>
-                </Border>
-            </StackPanel>
-            <TextBox Grid.Column="1"
-                     Name="LibrarySearchBox"
-                     Classes="form-input"
-                     IsTabStop="False"
-                     Text="{Binding SearchText}"
-                     Watermark="🔍  Search games…"
-                     Width="260" VerticalAlignment="Center"/>
+        <!-- Blurred cover of the highlighted game tints the whole page -->
+        <Panel IsVisible="{Binding HasFocusedGame}" IsHitTestVisible="False">
+            <views:CoverImage ImageUrl="{Binding FocusedGame.CoverUrl}" Opacity="0.3">
+                <views:CoverImage.Effect><BlurEffect Radius="60"/></views:CoverImage.Effect>
+            </views:CoverImage>
+            <Border Background="#BB030319"/>
+        </Panel>
+
+        <Grid ColumnDefinitions="220,*" Margin="0,0,0,0">
+            <!-- Platform rail -->
+            <Border Grid.Column="0" Background="#99070718" BorderBrush="#2A3070" BorderThickness="0,0,1,0">
+                <Grid RowDefinitions="Auto,*" Margin="22,28,14,0">
+                    <StackPanel Spacing="2" Margin="0,0,0,18">
+                        <TextBlock Text="LIBRARY" FontSize="26" FontWeight="Bold" LetterSpacing="5" Foreground="#FFFFFF"/>
+                        <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} games'}" FontSize="12" Foreground="#9BE7FF"/>
+                    </StackPanel>
+                    <ListBox Grid.Row="1" Classes="ps6-rail" ItemsSource="{Binding Platforms}"
+                             SelectedItem="{Binding FilterPlatform}" Background="Transparent" BorderThickness="0">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Text="{Binding}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*" Margin="36,28,40,0">
+                <!-- Spotlight + search -->
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+                    <StackPanel Grid.Column="0" VerticalAlignment="Center" Spacing="3">
+                        <TextBlock Text="{Binding FocusedGame.EffectiveTitle}" IsVisible="{Binding HasFocusedGame}"
+                                   FontSize="28" FontWeight="SemiBold" Foreground="#FFFFFF" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding FocusedGame.Platform}" IsVisible="{Binding HasFocusedGame}"
+                                   FontSize="13" Foreground="#9BE7FF"/>
+                        <TextBlock Text="Pick something to play" IsVisible="{Binding !HasFocusedGame}"
+                                   FontSize="22" Foreground="#B9BCE6"/>
+                    </StackPanel>
+                    <TextBox Grid.Column="1"
+                             Name="LibrarySearchBox"
+                             Classes="form-input"
+                             IsTabStop="False"
+                             Text="{Binding SearchText}"
+                             Watermark="🔍  Search games…"
+                             Width="260" VerticalAlignment="Center"/>
+                </Grid>
+
+                <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                    <Button Classes="ps6-lib-chip" Classes.filter-chip-active="{Binding IsInstallFilterAll}"
+                            Command="{Binding SetInstallFilterCommand}" CommandParameter="All">
+                        <TextBlock Text="ALL" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
+                    </Button>
+                    <Button Classes="ps6-lib-chip" Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
+                            Command="{Binding SetInstallFilterCommand}" CommandParameter="Installed">
+                        <TextBlock Text="INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
+                    </Button>
+                    <Button Classes="ps6-lib-chip" Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
+                            Command="{Binding SetInstallFilterCommand}" CommandParameter="Uninstalled">
+                        <TextBlock Text="NOT INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
+                    </Button>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Disabled"
+                              VerticalScrollBarVisibility="Auto" Padding="0,10,0,28">
+                    <ItemsControl ItemsSource="{Binding FilteredMyGames}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:LocalGameCardVm">
+                                <Button Classes="ps6-lib-card"
+                                        Classes.focused="{Binding IsFocused}"
+                                        Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Border Classes="ps6-lib-cover">
+                                        <Panel>
+                                            <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                              FallbackText="{Binding EffectiveTitle}"
+                                                              FallbackGradient="{Binding CoverGradient}"
+                                                              LetterFontSize="56"
+                                                              ImageCornerRadius="18"
+                                                              Height="230"/>
+                                            <!-- Glass caption: title + platform, never overlaps the art -->
+                                            <Border VerticalAlignment="Bottom" Background="#D9070718" Padding="10,7">
+                                                <StackPanel Spacing="1">
+                                                    <TextBlock Text="{Binding EffectiveTitle}" FontSize="12" FontWeight="SemiBold"
+                                                               Foreground="#FFFFFF" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Platform}" FontSize="10" Foreground="#9BE7FF"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                </StackPanel>
+                                            </Border>
+                                            <Ellipse Width="10" Height="10" Fill="#3FB950" HorizontalAlignment="Right"
+                                                     VerticalAlignment="Top" Margin="10" IsVisible="{Binding IsInstalledLocal}"/>
+                                        </Panel>
+                                    </Border>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
         </Grid>
-        <Rectangle Grid.Row="0" Height="2" VerticalAlignment="Bottom" Margin="0,0,0,-8" HorizontalAlignment="Stretch">
-            <Rectangle.Fill>
-                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                    <GradientStop Color="#9BE7FF" Offset="0"/>
-                    <GradientStop Color="#4350B8" Offset="0.4"/>
-                    <GradientStop Color="#00030319" Offset="1"/>
-                </LinearGradientBrush>
-            </Rectangle.Fill>
-        </Rectangle>
-
-        <!-- Platform dropdown + install-status chips -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,22,0,10">
-            <ComboBox ItemsSource="{Binding Platforms}"
-                      SelectedItem="{Binding FilterPlatform}"
-                      MinWidth="180"
-                      VerticalAlignment="Center"/>
-            <Button Classes="ps6-lib-chip"
-                    Classes.filter-chip-active="{Binding IsInstallFilterAll}"
-                    Command="{Binding SetInstallFilterCommand}"
-                    CommandParameter="All">
-                <TextBlock Text="ALL" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
-            </Button>
-            <Button Classes="ps6-lib-chip"
-                    Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
-                    Command="{Binding SetInstallFilterCommand}"
-                    CommandParameter="Installed">
-                <TextBlock Text="INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
-            </Button>
-            <Button Classes="ps6-lib-chip"
-                    Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
-                    Command="{Binding SetInstallFilterCommand}"
-                    CommandParameter="Uninstalled">
-                <TextBlock Text="NOT INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
-            </Button>
-        </StackPanel>
-
-        <!-- Tile grid -->
-        <ScrollViewer Grid.Row="2"
-                      HorizontalScrollBarVisibility="Disabled"
-                      VerticalScrollBarVisibility="Auto"
-                      Padding="0,6,0,28">
-            <ItemsControl ItemsSource="{Binding FilteredMyGames}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <WrapPanel/>
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:LocalGameCardVm">
-                        <Button Classes="ps6-lib-card"
-                                Classes.focused="{Binding IsFocused}"
-                                Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
-                                CommandParameter="{Binding}">
-                            <StackPanel>
-                                <Border Classes="ps6-lib-cover">
-                                    <Panel>
-                                        <views:CoverImage
-                                            ImageUrl="{Binding CoverUrl}"
-                                            FallbackText="{Binding EffectiveTitle}"
-                                            FallbackGradient="{Binding CoverGradient}"
-                                            SubText="{Binding Platform}"
-                                            LetterFontSize="56"
-                                            ImageCornerRadius="6"
-                                            Height="230"/>
-                                        <Border Classes="ps6-lib-chipbadge" HorizontalAlignment="Left"
-                                                VerticalAlignment="Bottom" Margin="8">
-                                            <TextBlock Text="{Binding Platform}" FontSize="9" FontWeight="Bold"
-                                                       Foreground="#C9D4FF"/>
-                                        </Border>
-                                    </Panel>
-                                </Border>
-                                <TextBlock Text="{Binding EffectiveTitle}"
-                                           FontSize="12" FontWeight="SemiBold" Foreground="#ECECFF"
-                                           TextTrimming="CharacterEllipsis"
-                                           Margin="2,8,2,0"/>
-                            </StackPanel>
-                        </Button>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-
-    </Grid>
     </Grid>
 </UserControl>

@@ -142,13 +142,15 @@
             <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,12,0,0">
                 <Border Classes="ps6-key"><TextBlock Text="L1"/></Border>
                 <Border Classes="ps6-key"><TextBlock Text="R1"/></Border>
-                <TextBlock Classes="ps6-hint" Text="Section" Margin="0,0,14,0"/>
-                <Border Classes="ps6-key"><TextBlock Text="▲▼"/></Border>
-                <TextBlock Classes="ps6-hint" Text="Action" Margin="0,0,14,0"/>
+                <TextBlock Classes="ps6-hint" Text="Section" Margin="0,0,14,0" IsVisible="{Binding !Ps6ListFocused}"/>
+                <Border Classes="ps6-key" IsVisible="{Binding Ps6ListFocused}"><TextBlock Text="▲▼"/></Border>
+                <TextBlock Classes="ps6-hint" Text="Action" Margin="0,0,14,0" IsVisible="{Binding Ps6ListFocused}"/>
                 <Border Classes="ps6-key"><TextBlock Text="✕"/></Border>
-                <TextBlock Classes="ps6-hint" Text="Select" Margin="0,0,14,0"/>
+                <TextBlock Classes="ps6-hint" Text="Open menu" Margin="0,0,14,0" IsVisible="{Binding !Ps6ListFocused}"/>
+                <TextBlock Classes="ps6-hint" Text="Select" Margin="0,0,14,0" IsVisible="{Binding Ps6ListFocused}"/>
                 <Border Classes="ps6-key"><TextBlock Text="○"/></Border>
-                <TextBlock Classes="ps6-hint" Text="Back"/>
+                <TextBlock Classes="ps6-hint" Text="Back to guide" IsVisible="{Binding Ps6ListFocused}"/>
+                <TextBlock Classes="ps6-hint" Text="Back" IsVisible="{Binding !Ps6ListFocused}"/>
             </StackPanel>
         </Grid>
     </Grid>
