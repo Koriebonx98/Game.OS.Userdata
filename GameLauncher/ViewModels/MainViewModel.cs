@@ -2414,6 +2414,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             localRom = FindMatchingRom(game.Title, game.Platform, game.TitleId);
 
         DetailVm.LoadFromGame(game, localGame, repack, localRom, BuildKnownUnlockedForGame(game));
+        ApplyLibraryCoverToDetail(game.Title, game.Platform);
         ShowDetail = true;
 
         // Always re-check the cloud so the info page never shows stale unlock state
@@ -3344,9 +3345,28 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// When <paramref name="steamAppId"/> is provided and the game has no achievements in the
     /// database, the Steam API is queried to fetch and upload a fresh achievement schema.
     /// </summary>
+    /// <summary>Game Info falls back to the cover the library card already shows (metadata providers / cache).</summary>
+    private void ApplyLibraryCoverToDetail(string title, string platform)
+    {
+        void Apply()
+        {
+            if (!string.IsNullOrEmpty(DetailVm.CoverUrl)) return;
+            string? cover = LibraryVm.FindMyGameCard(title, platform)?.CoverUrl;
+            if (string.IsNullOrEmpty(cover))
+            {
+                var meta = GameMetadataResolver.LoadCached(GameMetadataResolver.CleanTitle(title), platform);
+                if (meta is { CoverUrl: not "" }) cover = meta.CoverUrl;
+            }
+            if (!string.IsNullOrEmpty(cover)) DetailVm.CoverUrl = cover;
+        }
+        if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess()) Apply();
+        else Avalonia.Threading.Dispatcher.UIThread.Post(Apply);
+    }
+
     private async Task EnrichLocalGameDetailAsync(string localTitle, string platform,
                                                    string? titleId = null, int steamAppId = 0)
     {
+        ApplyLibraryCoverToDetail(localTitle, platform);
         // Load cached metadata on a background thread to avoid blocking the UI with file I/O.
         DatabaseGame? dbGame = null;
         var cached = await System.Threading.Tasks.Task.Run(
@@ -3381,6 +3401,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 DevLogService.Log($"[Detail] Using cached game.json for '{localTitle}' ({platform}) — network unavailable.");
             }
         }
+
+        // Metadata-provider covers (Steam/SGDB/IGDB…) may have arrived while the DB lookup ran.
+        ApplyLibraryCoverToDetail(localTitle, platform);
 
         // For PC Steam games whose achievements are missing from the database, automatically
         // fetch the schema from Steam, upload it to the Games.Database, and sync the
