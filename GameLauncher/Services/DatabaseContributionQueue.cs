@@ -40,6 +40,8 @@ namespace GameLauncher.Services
             /// <summary>Online proof for "rom" items: description and source page URL.</summary>
             public string? Description { get; set; }
             public string? SourceUrl { get; set; }
+            /// <summary>Locally gathered metadata in the admin add-game template (image, genres, background_images, release_date …).</summary>
+            public Dictionary<string, object?>? Meta { get; set; }
         }
 
         private static readonly string QueuePath = System.IO.Path.Combine(
@@ -107,7 +109,7 @@ namespace GameLauncher.Services
         }
 
         /// <summary>Queues a locally found ROM that is missing from the platform games database.</summary>
-        public static bool EnqueueRom(string platform, string title, string? titleId, string? description = null, string? sourceUrl = null)
+        public static bool EnqueueRom(string platform, string title, string? titleId, string? description = null, string? sourceUrl = null, Dictionary<string, object?>? meta = null)
         {
             if (string.IsNullOrWhiteSpace(platform) || string.IsNullOrWhiteSpace(title)) return false;
             string key = "rom:" + platform.ToLowerInvariant() + ":" +
@@ -115,8 +117,15 @@ namespace GameLauncher.Services
             lock (_lock)
             {
                 var items = Items();
-                if (items.Count >= MaxQueueSize || items.Any(i => i.Key == key)) return false;
-                items.Add(new Item { Kind = "rom", Key = key, Platform = platform, Name = title, TitleId = titleId, Description = description, SourceUrl = sourceUrl });
+                if (items.Count >= MaxQueueSize) return false;
+                var existing = items.FirstOrDefault(i => i.Key == key);
+                if (existing != null)
+                {
+                    // Richer metadata found later is kept on the still-pending item
+                    if (existing.Meta == null && meta != null) { existing.Meta = meta; Save(); return true; }
+                    return false;
+                }
+                items.Add(new Item { Kind = "rom", Key = key, Platform = platform, Name = title, TitleId = titleId, Description = description, SourceUrl = sourceUrl, Meta = meta });
                 Save();
                 return true;
             }
@@ -193,7 +202,7 @@ namespace GameLauncher.Services
                 {
                     var handled = await svc.SubmitGamesToQueueAsync(
                         roms.Select(r => new GitHubDataService.QueuedGame(
-                            r.Key, r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl)).ToList(), ct).ConfigureAwait(false);
+                            r.Key, r.Platform, r.Name, r.TitleId, r.Description, r.SourceUrl, Meta: r.Meta)).ToList(), ct).ConfigureAwait(false);
                     done.AddRange(roms.Where(r => handled.Contains(r.Key)));
                     if (handled.Count == roms.Count)
                         _lastRomFlushUtc = DateTime.UtcNow;

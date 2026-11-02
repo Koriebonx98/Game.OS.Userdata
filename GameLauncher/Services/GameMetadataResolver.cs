@@ -342,6 +342,17 @@ public static class GameMetadataResolver
     {
         if (m.SteamAppId > 0) DatabaseContributionQueue.EnqueueSteamGame(m.SteamAppId, m.Title);
         else DatabaseContributionQueue.EnqueueRom(string.IsNullOrWhiteSpace(platform) ? "PC" : platform, m.Title, null,
-            m.Description == "" ? null : m.Description, null);
+            m.Description == "" ? null : m.Description, null, ToTemplate(m));
+    }
+
+    /// <summary>Local metadata in the same shape the admin add-game form writes (empty fields omitted).</summary>
+    public static Dictionary<string, object?> ToTemplate(GameMetadata m)
+    {
+        var t = new Dictionary<string, object?>();
+        if (m.CoverUrl != "") t["image"] = m.CoverUrl;
+        if (m.BackgroundUrl != "") t["background_images"] = new[] { m.BackgroundUrl };
+        if (m.Genres.Count > 0) t["genres"] = m.Genres;
+        if (m.ReleaseYear > 0) t["release_date"] = m.ReleaseYear.ToString();
+        return t;
     }
 }

@@ -2,7 +2,7 @@
 #
 # The launcher submits ROM games and Steam library games as small JSON files in
 #   Games.Database/Queue/Games/{Platform}/{hash}.json
-# This workflow runs every 4 hours and runs .github/scripts/process_db_queue.py, which
+# This workflow runs every 2 hours and runs .github/scripts/process_db_queue.py, which
 # for each item:
 #   - checks {Platform}.Games.json (created if the platform is new) by store id, fuzzy
 #     title ("The Witcher 3" = "Witcher 3") and TitleID
@@ -13,6 +13,8 @@
 #     EMPTY Description / StorePageUrl / TitleID / appid / image fields (never overwrites)
 #   - merges duplicates already in the database (same normalised title, or subtitle variants
 #     confirmed by a Wikipedia redirect); entries with different TitleIDs/appids stay separate
+#   - writes Data/{platform folder}/Games/{id}/ (Name.txt + info.json) per game, like the
+#     Xbox 360 folders; missing folders for existing games are backfilled (1500 per run)
 # Processed queue files are deleted and a single commit is pushed. Running in CI serialises
 # writes from many launchers and avoids SHA-conflict failures.
 #
@@ -24,7 +26,7 @@ name: Process Games Database Queue
 
 on:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: '0 */2 * * *'
   workflow_dispatch:
 
 permissions:

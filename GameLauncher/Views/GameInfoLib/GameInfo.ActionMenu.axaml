@@ -68,98 +68,229 @@
                 Width="560" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="🧩  MODS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="4,0,0,8"/>
-                <StackPanel DockPanel.Dock="Top" IsVisible="{Binding IsPs2}" Spacing="6" Margin="0,0,0,10">
-                    <TextBlock Text="RECOMP" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
-                    <Border Background="#0d1117" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="12,10">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="Recompile this PS2 game into a standalone native PC .exe (ps2-native-recomp), saved in a folder beside the ROM named after it. CHD images are converted to ISO first. Takes several minutes."
-                                       FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button Classes="btn-secondary" Command="{Binding BuildRecompCommand}"
-                                        Content="{Binding RecompButtonText}" IsEnabled="{Binding CanBuildRecomp}"/>
-                                <Button Classes="btn-secondary" Command="{Binding CancelRecompCommand}"
-                                        Content="Cancel" IsVisible="{Binding IsRecompBuilding}"/>
-                            </StackPanel>
-                            <ProgressBar Minimum="0" Maximum="100" Value="{Binding RecompProgress}" Height="8"
-                                         IsVisible="{Binding IsRecompBuilding}"/>
-                            <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowRecompDefaultPrompt}">
-                                <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultYesCommand}" Content="Yes, make default"/>
-                                <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultNoCommand}" Content="No"/>
-                            </StackPanel>
-                            <StackPanel Spacing="6" IsVisible="{Binding HasRecompBuild}">
-                                <TextBlock Text="QUICK SETTINGS (applied on next launch; F11 toggles full screen in-game)" FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
-                                <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <TextBlock Text="Resolution" VerticalAlignment="Center" Foreground="#c9d1d9" FontSize="12"/>
-                                    <ComboBox SelectedIndex="{Binding RecompScaleIndex}" MinWidth="130">
-                                        <ComboBoxItem Content="1× native"/>
-                                        <ComboBoxItem Content="2× (strong GPU)"/>
-                                        <ComboBoxItem Content="3×"/>
-                                    </ComboBox>
-                                    <CheckBox Content="16:9 widescreen" IsChecked="{Binding RecompWidescreen}"/>
-                                </StackPanel>
-                                <Button Classes="btn-secondary" Command="{Binding ToggleRecompDefaultCommand}"
-                                        Content="{Binding RecompDefaultButtonText}" HorizontalAlignment="Left"/>
-                            </StackPanel>
-                            <TextBlock Text="{Binding RecompStatus}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
-                                       IsVisible="{Binding RecompStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                        </StackPanel>
-                    </Border>
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
+                    <Button Classes="btn-secondary" Command="{Binding ShowModsInstalledTabCommand}" Content="Installed"
+                            Opacity="{Binding InstalledTabOpacity}"/>
+                    <Button Classes="btn-secondary" Command="{Binding ShowModsBrowseTabCommand}" Content="Browse"
+                            Opacity="{Binding BrowseTabOpacity}"/>
                 </StackPanel>
-                <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
-                         Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
-                    <Button Classes="btn-secondary" Command="{Binding OpenRyujinxModsCommand}"
-                            Content="Ryujinx mod manager" IsVisible="{Binding IsSwitch}"/>
                     <Button Classes="btn-secondary" Command="{Binding CloseModBrowserCommand}" Content="✕  Close"/>
                 </StackPanel>
-                <TextBlock Text="No mods listed for this game." Foreground="#8b949e" Margin="4,8"
-                           IsVisible="{Binding NoModsFound}"/>
-                <ScrollViewer VerticalScrollBarVisibility="Hidden">
-                    <ItemsControl ItemsSource="{Binding FilteredMods}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="models:GameModEntry">
-                                <StackPanel Margin="0,0,0,6" Spacing="4">
-                                    <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
-                                            Padding="12,10"
-                                            Command="{Binding $parent[UserControl].DataContext.ToggleModDetailCommand}"
-                                            CommandParameter="{Binding}">
-                                        <Grid ColumnDefinitions="Auto,*,Auto">
-                                            <TextBlock Grid.Column="0" Text="🧩" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
-                                            <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="White"
-                                                           TextTrimming="CharacterEllipsis"/>
-                                                <ItemsControl ItemsSource="{Binding Genres}">
-                                                    <ItemsControl.ItemsPanel>
-                                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
-                                                    </ItemsControl.ItemsPanel>
-                                                    <ItemsControl.ItemTemplate>
-                                                        <DataTemplate x:DataType="x:String">
-                                                            <Border Background="#336c8cff" CornerRadius="10" Padding="8,2" Margin="0,0,4,0">
-                                                                <TextBlock Text="{Binding}" FontSize="11" Foreground="#c9d1d9"/>
-                                                            </Border>
-                                                        </DataTemplate>
-                                                    </ItemsControl.ItemTemplate>
-                                                </ItemsControl>
-                                            </StackPanel>
-                                            <TextBlock Grid.Column="2" Text="{Binding ExpandArrow}" Foreground="#8b949e"
-                                                       VerticalAlignment="Center" Margin="10,0,0,0"/>
-                                        </Grid>
-                                    </Button>
-                                    <Border IsVisible="{Binding IsExpanded}" Background="#0d1117" BorderBrush="#30363d"
-                                            BorderThickness="1" CornerRadius="10" Padding="14,10">
-                                        <StackPanel Spacing="8">
-                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
-                                            <TextBlock Text="{Binding DisplayDescription}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
-                                            <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="↗  Open in browser"
-                                                    Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
-                                                    CommandParameter="{Binding}"/>
-                                        </StackPanel>
-                                    </Border>
+                <Panel>
+                    <!-- Installed: what is already set up for this game -->
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden" IsVisible="{Binding IsModsInstalledTab}">
+                        <StackPanel Spacing="6">
+                        <!-- Installed: Ryujinx mod manager (Switch only) -->
+                        <StackPanel IsVisible="{Binding IsSwitch}" Spacing="10" Margin="0,0,0,10">
+                            <TextBlock Text="RYUJINX MODS" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
+                            <TextBlock Text="Enable or disable mods for this game in Ryujinx."
+                                       FontSize="12" Foreground="#8b949e"/>
+
+                            <!-- mods.json file path hint -->
+                            <Border IsVisible="{Binding SwitchModsJsonPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                                    Background="#21262d" CornerRadius="6" Padding="10,6">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="📄" FontSize="11" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding SwitchModsJsonPath}"
+                                               FontSize="10" Foreground="#6e7681"
+                                               TextWrapping="Wrap"
+                                               VerticalAlignment="Center"/>
                                 </StackPanel>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-                </ScrollViewer>
+                            </Border>
+
+                            <!-- Mod list -->
+                            <ItemsControl ItemsSource="{Binding SwitchMods}"
+                                          IsVisible="{Binding HasSwitchMods}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:RyujinxModVm">
+                                        <Border Background="#21262d" CornerRadius="8"
+                                                Padding="14,10" Margin="0,0,0,6">
+                                            <Grid ColumnDefinitions="*,Auto">
+
+                                                <!-- Mod info -->
+                                                <StackPanel Grid.Column="0" Spacing="4"
+                                                            VerticalAlignment="Center">
+                                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                                        <TextBlock Text="{Binding Name}"
+                                                                   FontSize="13" FontWeight="SemiBold"
+                                                                   Foreground="White"/>
+                                                        <!-- Enabled/Disabled badge -->
+                                                        <Border CornerRadius="4" Padding="6,2"
+                                                                Background="{Binding StatusBackground}">
+                                                            <TextBlock Text="{Binding StatusLabel}"
+                                                                       FontSize="10" FontWeight="Bold"
+                                                                       Foreground="{Binding StatusForeground}"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                    <TextBlock Text="{Binding Path}"
+                                                               FontSize="10" Foreground="#6e7681"
+                                                               TextTrimming="CharacterEllipsis"
+                                                               MaxWidth="500"/>
+                                                </StackPanel>
+
+                                                <!-- Toggle button -->
+                                                <Button Grid.Column="1"
+                                                        Padding="14,7"
+                                                        CornerRadius="6"
+                                                        BorderThickness="0"
+                                                        Cursor="Hand"
+                                                        VerticalAlignment="Center"
+                                                        Command="{Binding $parent[UserControl].DataContext.ToggleSwitchModCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <Button.Background>
+                                                        <SolidColorBrush Color="{Binding ToggleBackground}"/>
+                                                    </Button.Background>
+                                                    <TextBlock Text="{Binding ToggleLabel}"
+                                                               FontSize="12" FontWeight="Bold"
+                                                               Foreground="{Binding ToggleForeground}"/>
+                                                </Button>
+
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <!-- Empty state: mods.json exists but has no entries -->
+                            <Border IsVisible="{Binding ModsJsonExistsButEmpty}"
+                                    Background="#21262d" CornerRadius="8" Padding="16,12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="No mods found in mods.json."
+                                               FontSize="13" Foreground="#8b949e"/>
+                                    <TextBlock Text="Add mods to the mods folder, then re-open this panel."
+                                               FontSize="11" Foreground="#6e7681"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Empty state: mods.json not yet created (no mods folder set up) -->
+                            <Border IsVisible="{Binding ShowModsNotFoundMessage}"
+                                    Background="#21262d" CornerRadius="8" Padding="16,12">
+                                <StackPanel Spacing="6">
+                                    <TextBlock Text="No mods.json found for this game."
+                                               FontSize="13" Foreground="#8b949e"/>
+                                    <TextBlock Text="Place mods in the mods folder and re-open this panel."
+                                               FontSize="11" Foreground="#6e7681"/>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- Status message -->
+                            <TextBlock Text="{Binding SwitchModsStatus}"
+                                       FontSize="12" Foreground="#3fb950"
+                                       IsVisible="{Binding SwitchModsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+
+                            <!-- Open Mods Folder button -->
+                            <Button Classes="btn-secondary"
+                                    Padding="14,8"
+                                    Command="{Binding OpenSwitchModsFolderCommand}"
+                                    HorizontalAlignment="Left">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <TextBlock Text="📂" FontSize="13" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Open Mods Folder" FontSize="12"
+                                               FontWeight="SemiBold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel IsVisible="{Binding ShowRecompInMods}" Spacing="6" Margin="0,0,0,10">
+                            <TextBlock Text="RECOMP" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
+                            <Border Background="#0d1117" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="12,10">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Recompile this PS2 game into a standalone native PC .exe (ps2-native-recomp), saved in a folder beside the ROM named after it. CHD images are converted to ISO first. Takes several minutes."
+                                               FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Button Classes="btn-secondary" Command="{Binding BuildRecompCommand}"
+                                                Content="{Binding RecompButtonText}" IsEnabled="{Binding CanBuildRecomp}"/>
+                                        <Button Classes="btn-secondary" Command="{Binding CancelRecompCommand}"
+                                                Content="Cancel" IsVisible="{Binding IsRecompBuilding}"/>
+                                    </StackPanel>
+                                    <ProgressBar Minimum="0" Maximum="100" Value="{Binding RecompProgress}" Height="8"
+                                                 IsVisible="{Binding IsRecompBuilding}"/>
+                                    <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowRecompDefaultPrompt}">
+                                        <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultYesCommand}" Content="Yes, make default"/>
+                                        <Button Classes="btn-secondary" Command="{Binding SetRecompDefaultNoCommand}" Content="No"/>
+                                    </StackPanel>
+                                    <StackPanel Spacing="6" IsVisible="{Binding HasRecompBuild}">
+                                        <TextBlock Text="QUICK SETTINGS (applied on next launch; F11 toggles full screen in-game)" FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="Resolution" VerticalAlignment="Center" Foreground="#c9d1d9" FontSize="12"/>
+                                            <ComboBox SelectedIndex="{Binding RecompScaleIndex}" MinWidth="130">
+                                                <ComboBoxItem Content="1× native"/>
+                                                <ComboBoxItem Content="2× (strong GPU)"/>
+                                                <ComboBoxItem Content="3×"/>
+                                            </ComboBox>
+                                            <CheckBox Content="16:9 widescreen" IsChecked="{Binding RecompWidescreen}"/>
+                                        </StackPanel>
+                                        <Button Classes="btn-secondary" Command="{Binding ToggleRecompDefaultCommand}"
+                                                Content="{Binding RecompDefaultButtonText}" HorizontalAlignment="Left"/>
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding RecompStatus}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
+                                               IsVisible="{Binding RecompStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+
+                            <TextBlock Text="Nothing installed for this game." Foreground="#8b949e" Margin="4,8"
+                                       IsVisible="{Binding NoInstalledMods}"/>
+                        </StackPanel>
+                    </ScrollViewer>
+                    <!-- Browse: your saved URLs for this game + the Game OS database's mods -->
+                    <DockPanel IsVisible="{Binding IsModsBrowseTab}">
+                    <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
+                             Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
+                    <TextBlock DockPanel.Dock="Top" Text="No mods or saved links for this game yet. Add links from 🌐 Browser (kind: Mod)."
+                               Foreground="#8b949e" Margin="4,8" TextWrapping="Wrap"
+                               IsVisible="{Binding NoModsFound}"/>
+
+                    <ScrollViewer VerticalScrollBarVisibility="Hidden">
+                        <ItemsControl ItemsSource="{Binding FilteredMods}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:GameModEntry">
+                                    <StackPanel Margin="0,0,0,6" Spacing="4">
+                                        <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                                Padding="12,10"
+                                                Command="{Binding $parent[UserControl].DataContext.ToggleModDetailCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <TextBlock Grid.Column="0" Text="🧩" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="White"
+                                                               TextTrimming="CharacterEllipsis"/>
+                                                    <ItemsControl ItemsSource="{Binding Genres}">
+                                                        <ItemsControl.ItemsPanel>
+                                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                                        </ItemsControl.ItemsPanel>
+                                                        <ItemsControl.ItemTemplate>
+                                                            <DataTemplate x:DataType="x:String">
+                                                                <Border Background="#336c8cff" CornerRadius="10" Padding="8,2" Margin="0,0,4,0">
+                                                                    <TextBlock Text="{Binding}" FontSize="11" Foreground="#c9d1d9"/>
+                                                                </Border>
+                                                            </DataTemplate>
+                                                        </ItemsControl.ItemTemplate>
+                                                    </ItemsControl>
+                                                </StackPanel>
+                                                <TextBlock Grid.Column="2" Text="{Binding ExpandArrow}" Foreground="#8b949e"
+                                                           VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                            </Grid>
+                                        </Button>
+                                        <Border IsVisible="{Binding IsExpanded}" Background="#0d1117" BorderBrush="#30363d"
+                                                BorderThickness="1" CornerRadius="10" Padding="14,10">
+                                            <StackPanel Spacing="8">
+                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
+                                                <TextBlock Text="{Binding DisplayDescription}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                                                <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="↗  Open in browser"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
+                                                        CommandParameter="{Binding}"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+
+                    </DockPanel>
+                </Panel>
             </DockPanel>
         </Border>
     </Border>
