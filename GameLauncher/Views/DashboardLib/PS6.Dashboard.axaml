@@ -7,8 +7,9 @@
 
     <Border Classes="dashboard-ps6-layout"
             Height="{Binding $parent[ScrollViewer].Bounds.Height}">
-        <Grid RowDefinitions="Auto,*,Auto">
-            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="56,28">
+        <Viewbox Stretch="Uniform">
+        <Grid RowDefinitions="Auto,*,Auto" Width="1280" Height="720">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="56,24,56,0">
                 <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="36" VerticalAlignment="Center">
                     <Border Width="38" Height="38" CornerRadius="12" Background="#F4F5FF">
                         <TextBlock Text="☺" Foreground="#17143D" FontSize="26" FontWeight="Bold"
@@ -27,11 +28,11 @@
 
             <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
                 <Border Width="540" Height="540" CornerRadius="270" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Margin="0,110,0,0" Classes="ps6-orb-large"/>
+                        Margin="0,60,0,0" Classes="ps6-orb-large"/>
                 <Border Width="174" Height="174" CornerRadius="87" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Margin="-180,54,0,0" Classes="ps6-orb-small"/>
+                        Margin="-180,10,0,0" Classes="ps6-orb-small"/>
                 <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled" Padding="24,28,24,44">
+                              VerticalScrollBarVisibility="Disabled" Padding="24,20,24,30">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Classes="ps6-carousel-card" Classes.focused="{Binding IsStoreFocused}" Tag="store"
                                 Command="{Binding OpenFeaturedDetailCommand}">
@@ -99,7 +100,7 @@
                 </StackPanel>
             </Grid>
 
-            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,34">
+            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,28">
                 <TextBlock Text="{Binding Ps6DockLabel}" Classes="ps6-dock-label"/>
                 <Border Classes="ps6-dock">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -116,5 +117,6 @@
                 </Border>
             </StackPanel>
         </Grid>
+        </Viewbox>
     </Border>
 </UserControl>
