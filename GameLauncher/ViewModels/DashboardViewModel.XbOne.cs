@@ -71,7 +71,9 @@ public partial class DashboardViewModel
                     {
                         Col = 5, Row = 0, Title = IsFeaturedLastPlayed ? "Continue " + FeaturedGame.Title : FeaturedGame.Title,
                         CoverUrl = FeaturedGame.CoverUrl, CoverGradient = FeaturedGame.CoverGradient ?? FeaturedGradient, Glyph = "🎮",
-                        Action = () => { if (IsFeaturedLastPlayed) ContinuePlayingCommand.Execute(null); else OpenFeaturedDetailCommand.Execute(null); },
+                        Action = () => OpenFeaturedDetailCommand.Execute(null),
+                        SecondaryAction = IsFeaturedLastPlayed ? () => ContinuePlayingCommand.Execute(null) : null,
+                        SecondaryLabel = "Play",
                     });
                 else list.Add(Cell(5, 0, "Find your next game", "🛍", "store"));
                 if (recent.Count > 3) list.Add(GameTile(5, 1, 1, 1, recent[3]));
