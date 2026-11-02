@@ -2519,11 +2519,12 @@ namespace GameLauncher.Services
         /// <summary>A game submitted to the Games.Database queue (any platform / store).</summary>
         public record QueuedGame(
             string Key, string Platform, string Title, string? TitleId, string? Description,
-            string? SourceUrl, string? Store = null, string? StoreId = null, long AppId = 0);
+            string? SourceUrl, string? Store = null, string? StoreId = null, long AppId = 0,
+            Dictionary<string, object?>? Meta = null);
 
         /// <summary>
         /// Submits games as create-only files under <c>Queue/Games/{Platform}/</c> in Games.Database.
-        /// The scheduled <c>process-db-queue</c> workflow (every 4 hours) merges them into each
+        /// The scheduled <c>process-db-queue</c> workflow (every 2 hours) merges them into each
         /// <c>{Platform}.Games.json</c>: adds missing games, merges stores of the same game and
         /// fills empty metadata. Returns the keys that were submitted (or already queued).
         /// </summary>
@@ -2553,6 +2554,7 @@ namespace GameLauncher.Services
                             Store = r.Store,
                             StoreId = r.StoreId,
                             AppId = r.AppId > 0 ? r.AppId : (long?)null,
+                            Meta = r.Meta,
                             SubmittedUtc = DateTime.UtcNow.ToString("o"),
                         };
                         await WriteGamesDatabaseFileAsync(path, entry,

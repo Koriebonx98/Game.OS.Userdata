@@ -991,10 +991,48 @@ public partial class GameDetailViewModel : ViewModelBase
 
     // ── Mod browser (Steam-workshop-style list of the database's mod links) ─────
     private List<GameModEntry> _dbMods = new();
+    private List<GameModEntry> _browseMods = new();
     [ObservableProperty] private bool   _isModBrowserOpen;
+    [ObservableProperty] private bool   _isModsInstalledTab = true;
+    public bool IsModsBrowseTab => !IsModsInstalledTab;
+    public double InstalledTabOpacity => IsModsInstalledTab ? 1.0 : 0.55;
+    public double BrowseTabOpacity => IsModsInstalledTab ? 0.55 : 1.0;
+    /// <summary>PS2 recomp lives in Mods → Installed and only exists for PS2 games.</summary>
+    public bool ShowRecompInMods => IsPs2;
+    public bool NoInstalledMods => !IsSwitch && !IsPs2;
+    partial void OnIsModsInstalledTabChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsModsBrowseTab));
+        OnPropertyChanged(nameof(InstalledTabOpacity));
+        OnPropertyChanged(nameof(BrowseTabOpacity));
+    }
+    partial void OnIsPs2Changed(bool value)
+    {
+        OnPropertyChanged(nameof(ShowRecompInMods));
+        OnPropertyChanged(nameof(NoInstalledMods));
+    }
+    partial void OnIsSwitchChanged(bool value) => OnPropertyChanged(nameof(NoInstalledMods));
+    [RelayCommand] private void ShowModsInstalledTab() => IsModsInstalledTab = true;
+    [RelayCommand] private void ShowModsBrowseTab() => IsModsInstalledTab = false;
+
+    /// <summary>Browse list = the user's saved URLs for this game, then the database's mods.json entries.</summary>
+    private void RebuildBrowseMods()
+    {
+        var mine = Services.GameLinksService.ForGame(Platform, Title)
+            .Where(l => Uri.TryCreate(l.Url, UriKind.Absolute, out _))
+            .Select(l => new GameModEntry
+            {
+                Name = string.IsNullOrWhiteSpace(l.Name) ? l.Url : l.Name,
+                Url = l.Url,
+                Description = "Your saved link (" + l.Kind + ")",
+                Genres = new List<string> { "My link" },
+            });
+        _browseMods = mine.Concat(_dbMods).ToList();
+        RefreshModList();
+    }
     [ObservableProperty] private string _modSearchText = "";
     public ObservableCollection<GameModEntry> FilteredMods { get; } = new();
-    public bool HasDbMods => _dbMods.Count > 0;
+    public bool HasDbMods => _browseMods.Count > 0;
     public bool NoModsFound => FilteredMods.Count == 0;
 
     partial void OnModSearchTextChanged(string value) => RefreshModList();
@@ -1003,7 +1041,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         var term = (ModSearchText ?? "").Trim();
         FilteredMods.Clear();
-        foreach (var m in _dbMods.Where(m => term.Length == 0
+        foreach (var m in _browseMods.Where(m => term.Length == 0
                      || m.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
                      || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase))))
             FilteredMods.Add(m);
@@ -1027,8 +1065,6 @@ public partial class GameDetailViewModel : ViewModelBase
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = u.AbsoluteUri, UseShellExecute = true }); }
         catch { /* best-effort */ }
     }
-
-    [RelayCommand] private void OpenRyujinxMods() { IsModBrowserOpen = false; OpenModsPanel(); }
 
     // ── PS2 Recomp (native PC build via ps2-native-recomp) ─────────────────────
     [ObservableProperty] private bool   _isPs2;
@@ -3530,7 +3566,15 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Opens the built-in browser for this game (platform, title).</summary>
     public Action<string, string>? OnOpenBrowserForGame { get; set; }
     [RelayCommand] private void MenuOpenBrowser() { IsActionMenuOpen = false; OnOpenBrowserForGame?.Invoke(Platform, Title); }
-    [RelayCommand] private void MenuOpenMods()       { IsActionMenuOpen = false; ModSearchText = ""; RefreshModList(); IsModBrowserOpen = true; }
+    [RelayCommand] private void MenuOpenMods()
+    {
+        IsActionMenuOpen = false;
+        ModSearchText = "";
+        IsModsInstalledTab = true;
+        LoadSwitchMods();       // also refreshes IsSwitch / IsPs2 for the current game
+        RebuildBrowseMods();
+        IsModBrowserOpen = true;
+    }
     [RelayCommand] private void MenuLaunchViaSteam()
     {
         IsActionMenuOpen = false;
@@ -4046,7 +4090,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public void EnrichFromDatabaseGame(DatabaseGame dbGame)
     {
         _dbMods = dbGame.Mods ?? new List<GameModEntry>();
-        RefreshModList();
+        RebuildBrowseMods();
         // Use the canonical database title (e.g. "Call of Duty: Black Ops II"
         // instead of the Windows-safe folder name "Call of Duty - Black Ops II")
         if (!string.IsNullOrEmpty(dbGame.Title))

@@ -30,6 +30,8 @@ MAX_DESC = 500
 MAX_ATTEMPTS = 6
 MAX_DEDUP_CALLS = int(os.environ.get('MAX_DEDUP_CALLS', '40'))
 DEDUP_CACHE = 'Queue/dedup-checked.json'
+# Missing folders for existing games are created gradually so one commit stays small
+MAX_BACKFILL_FOLDERS = int(os.environ.get('MAX_BACKFILL_FOLDERS', '1500'))
 MAX_PROVIDER_CALLS = int(os.environ.get('MAX_PROVIDER_CALLS', '120'))
 UA = 'GameOS-DB-Queue/1.0 (https://github.com/Koriebonx98/Game.OS.Userdata)'
 
@@ -45,6 +47,21 @@ PLATFORM_NAMES = {
     'Xbox 360': ['Xbox 360'],
     'Xbox One': ['Xbox One'],
     'Switch': ['Nintendo Switch', 'Switch'],
+}
+
+# Platform -> folder under Data/ (same map as the site and the launcher)
+DATA_FOLDERS = {
+    'PC': 'PC',
+    'PS1': 'Sony - PlayStation',
+    'PS2': 'Sony - PlayStation 2',
+    'PS3': 'Sony - PlayStation 3',
+    'PS4': 'Sony - PlayStation 4',
+    'PS5': 'Sony - PlayStation 5',
+    'PSP': 'Sony - PSP',
+    'PS Vita': 'Sony - PS Vita',
+    'Xbox 360': 'Microsoft - Xbox 360',
+    'Xbox One': 'Microsoft - Xbox One',
+    'Switch': 'Nintendo - Switch',
 }
 
 EDITION = re.compile(
@@ -386,6 +403,58 @@ def dedupe_platform(arr, checked, budget):
     return merged
 
 
+def game_folder_id(entry):
+    """Folder name for a game: its title id / appid when usable, else None."""
+    for key in ('TitleID', 'title_id', 'titleid', 'titleId', 'appid', 'id'):
+        v = str(entry.get(key) or '').strip()
+        if v and re.fullmatch(r'[A-Za-z0-9_-]+', v):
+            return v
+    return None
+
+
+def write_game_folder(platform, entry, refresh):
+    """Data/{platform folder}/Games/{id}/ with Name.txt and info.json (like the Xbox 360 folders).
+    Existing folders are only refreshed (info.json rewritten) when `refresh` is set."""
+    folder = DATA_FOLDERS.get(platform)
+    gid = game_folder_id(entry)
+    if not folder or not gid:
+        return False
+    d = os.path.join('Data', folder, 'Games', gid)
+    info = os.path.join(d, 'info.json')
+    existed = os.path.isdir(d)
+    if existed and not refresh:
+        return False
+    os.makedirs(d, exist_ok=True)
+    name = os.path.join(d, 'Name.txt')
+    title = entry_title(entry)
+    if title and not os.path.isfile(name):
+        with open(name, 'w', encoding='utf-8', newline='\n') as fh:
+            fh.write(title)
+    with open(info, 'w', encoding='utf-8', newline='\n') as fh:
+        json.dump(entry, fh, indent=2, ensure_ascii=False)
+        fh.write('\n')
+    return not existed
+
+
+def apply_meta(entry, meta):
+    """Fill EMPTY fields from the launcher's locally gathered metadata (admin add-game template)."""
+    if not isinstance(meta, dict):
+        return
+    img = meta.get('image')
+    if isinstance(img, str) and img.startswith('https://'):
+        fill(entry, {'image': img})
+    for key in ('background_images', 'genres'):
+        vals = meta.get(key)
+        if isinstance(vals, list) and not entry.get(key):
+            vals = [v for v in vals if isinstance(v, str) and v and
+                    (key == 'genres' or v.startswith('https://'))][:10]
+            if vals:
+                entry[key] = vals
+    rd = meta.get('release_date')
+    if isinstance(rd, str) and rd.strip() and not first(entry, ['release_date', 'releaseDate']):
+        entry['release_date'] = rd.strip()[:32]
+
+
 def save_platform(path, text, data):
     pretty = '\n  ' in text[:300]
     with open(path, 'w', encoding='utf-8', newline='\n') as fh:
@@ -421,6 +490,7 @@ def main():
     stats = {'added': 0, 'filled': 0, 'rejected': 0, 'deferred': 0, 'deduped': 0}
     calls = 0
     alias_budget = [MAX_DEDUP_CALLS]
+    backfill_left = [MAX_BACKFILL_FOLDERS]
     try:
         with open(DEDUP_CACHE, encoding='utf-8') as fh:
             checked = set(json.load(fh))
@@ -440,6 +510,7 @@ def main():
             stats['deduped'] += merged
             changed_file = True
         idx = build_index(arr)
+        touched = []
 
         for f, item in items:
             url = (item.get('StorePageUrl') or '').strip()
@@ -500,6 +571,8 @@ def main():
             if (item.get('Store') or '').lower() == 'steam' and item.get('AppId'):
                 values['appid'] = item['AppId']
             fill(entry, values)
+            apply_meta(entry, item.get('Meta'))
+            touched.append(entry)
             item['StorePageUrl'] = item['StorePageUrl'] or found.get('StorePageUrl', '')
             merge_store(entry, item)
             index_entry(idx, entry)
@@ -510,8 +583,27 @@ def main():
             save_platform(path, text, data)
             print(f'✅ {path} updated')
 
+        # Per-game folders: refresh the ones touched now, create any that are missing
+        made = 0
+        for e in touched:
+            made += bool(write_game_folder(platform, e, True))
+        touched_ids = {id(e) for e in touched}
+        for e in arr:
+            if backfill_left[0] <= 0:
+                break
+            if isinstance(e, dict) and id(e) not in touched_ids and write_game_folder(platform, e, False):
+                made += 1
+                backfill_left[0] -= 1
+        if made:
+            print(f'📁 {platform}: created {made} game folder(s)')
+
     for f in remove:
         os.remove(f)
+    # Keep the queue directory in the repo so it is visible even when empty
+    os.makedirs('Queue/Games', exist_ok=True)
+    keep = 'Queue/Games/.gitkeep'
+    if not os.path.exists(keep):
+        open(keep, 'w').close()
     if len(checked) != checked_before:
         os.makedirs(os.path.dirname(DEDUP_CACHE), exist_ok=True)
         with open(DEDUP_CACHE, 'w', encoding='utf-8') as fh:
