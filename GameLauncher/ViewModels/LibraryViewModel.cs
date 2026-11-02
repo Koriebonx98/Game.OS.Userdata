@@ -62,6 +62,7 @@ public partial class LibraryViewModel : ViewModelBase
     [ObservableProperty] private string _filterPlatform = "All";
     [ObservableProperty] private string _searchText = "";
     [ObservableProperty] private int    _totalGames;
+    [ObservableProperty] private int    _installedCount;
     /// <summary>
     /// Install-status filter: "All" (default), "Installed" (only locally-installed games),
     /// or "Not Installed" (only cloud/Steam games without a local copy).
@@ -238,6 +239,7 @@ public partial class LibraryViewModel : ViewModelBase
                 RebuildPlatformChips();
 
                 TotalGames = newMyGames.Count;
+                InstalledCount = newMyGames.Count(c => c.IsInstalledLocal);
 
                 // If the filter changed between scheduling and arriving here re-apply with
                 // current values; otherwise use the pre-computed result (common case).
@@ -1214,6 +1216,7 @@ public partial class LibraryViewModel : ViewModelBase
         ResetGameFocusAfterRebuild();
 
         TotalGames = _allMyGames.Count;
+        InstalledCount = _allMyGames.Count(c => c.IsInstalledLocal);
     }
 
     /// <summary>
