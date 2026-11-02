@@ -82,7 +82,39 @@
             </StackPanel>
 
             <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
-                <ItemsControl ItemsSource="{Binding HubActions}">
+              <StackPanel>
+                <Border IsVisible="{Binding ShowMediaBar}" Background="#33000000" CornerRadius="8" Padding="10,6" Margin="0,0,0,10">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding MediaStatusLabel}" Foreground="#c7d5e0" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Button Classes="stg-tab" Width="44" Height="36" Command="{Binding MediaPreviousCommand}">⏮</Button>
+                      <Button Classes="stg-tab" Width="44" Height="36" Command="{Binding MediaPlayPauseCommand}">⏯</Button>
+                      <Button Classes="stg-tab" Width="44" Height="36" Command="{Binding MediaNextCommand}">⏭</Button>
+                      <Button Classes="stg-tab" Width="44" Height="36" Command="{Binding MediaVolumeDownCommand}">🔉</Button>
+                      <Button Classes="stg-tab" Width="44" Height="36" Command="{Binding MediaVolumeUpCommand}">🔊</Button>
+                      <TextBlock Text="{Binding MediaVolumeLabel}" Foreground="White" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+                <StackPanel IsVisible="{Binding IsMediaPage}" Spacing="10">
+                    <TextBlock Text="{Binding MediaStatusLabel}" Foreground="#8f98a0" FontSize="13" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding MediaVolumeLabel}" Foreground="White" FontSize="16" FontWeight="SemiBold"/>
+                    <ItemsControl ItemsSource="{Binding HubActions}">
+                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                            <Button Classes="stg-row" Classes.cursor="{Binding IsCursor}" Width="86" Height="72" Margin="0,0,8,8"
+                                    HorizontalContentAlignment="Center" Command="{Binding ActivateCommand}">
+                                <StackPanel HorizontalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{Binding Glyph}" FontSize="22" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{Binding Title}" FontSize="11" Foreground="White" HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+                <ItemsControl ItemsSource="{Binding HubActions}" IsVisible="{Binding !IsMediaPage}">
                     <ItemsControl.ItemsPanel>
                         <ItemsPanelTemplate><StackPanel Spacing="6"/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
@@ -105,6 +137,7 @@
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+              </StackPanel>
             </ScrollViewer>
 
             <TextBlock Grid.Row="3" Margin="0,14,0,0" Foreground="#8f98a0" FontSize="13" TextWrapping="Wrap"

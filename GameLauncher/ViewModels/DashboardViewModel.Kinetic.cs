@@ -21,6 +21,9 @@ public partial class KineticTileVm : ObservableObject
     public int ColSpan { get; init; } = 1;
     public int RowSpan { get; init; } = 1;
     public Action? Action { get; init; }
+    /// <summary>X button: a quick action such as launching the game straight away.</summary>
+    public Action? SecondaryAction { get; init; }
+    public string SecondaryLabel { get; init; } = "";
     public bool HasCover => !string.IsNullOrEmpty(CoverUrl) || !string.IsNullOrEmpty(CoverGradient);
     public bool IsSolid => !HasCover;
     public bool HasSubtitle => !string.IsNullOrEmpty(Subtitle);
@@ -86,7 +89,8 @@ public partial class DashboardViewModel
     private KineticTileVm GameTile(int col, int row, int cs, int rs, LocalGameCardVm c, string? caption = null) =>
         new() { Col = col, Row = row, ColSpan = cs, RowSpan = rs, Title = caption ?? c.EffectiveTitle, Subtitle = c.Platform,
                 CoverUrl = c.CoverUrl, CoverGradient = c.CoverGradient, Glyph = "🎮",
-                Action = () => OnOpenLocalDetail?.Invoke(c) };
+                Action = () => OnOpenLocalDetail?.Invoke(c),
+                SecondaryAction = () => OnContinuePlaying?.Invoke(c), SecondaryLabel = "Play" };
 
     private List<KineticTileVm> BuildKineticTiles(string tab)
     {
@@ -169,11 +173,22 @@ public partial class DashboardViewModel
         return list;
     }
 
+    /// <summary>Label for the X button in the hint bar; empty when the focused tile has no quick action.</summary>
+    [ObservableProperty] private string _kineticSecondaryHint = "";
+
     private void SetKineticTile(int index)
     {
         foreach (var t in KineticTiles) t.IsFocused = false;
         KineticTileIndex = index;
         if (index >= 0 && index < KineticTiles.Count) KineticTiles[index].IsFocused = true;
+        var cur = index >= 0 && index < KineticTiles.Count ? KineticTiles[index] : null;
+        KineticSecondaryHint = cur?.SecondaryAction != null ? "Ⓧ " + cur.SecondaryLabel : "";
+    }
+
+    private void SwitchKineticTab(int delta)
+    {
+        KineticTabIndex = (KineticTabIndex + delta + KineticTabs.Count) % KineticTabs.Count;
+        RebuildKineticTiles();
     }
 
     private void FocusKineticHeader(bool on)
@@ -187,6 +202,15 @@ public partial class DashboardViewModel
     public KineticKeyResult HandleKineticKey(string key)
     {
         if (KineticTiles.Count == 0 && KineticTabs.All(t => !t.IsActive)) RebuildKineticTiles();
+
+        // LB / RB switch tabs from anywhere on the dashboard.
+        if (key is "PageUp" or "PageDown") { SwitchKineticTab(key == "PageUp" ? -1 : 1); return KineticKeyResult.Handled; }
+        if (key == "X")
+        {
+            if (!KineticInHeader && KineticTileIndex >= 0 && KineticTileIndex < KineticTiles.Count && KineticTiles[KineticTileIndex].SecondaryAction is { } quick)
+            { quick(); return KineticKeyResult.Handled; }
+            return KineticKeyResult.NotHandled;
+        }
 
         if (KineticInHeader)
         {

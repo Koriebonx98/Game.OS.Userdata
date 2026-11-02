@@ -62,6 +62,7 @@ public partial class MediaView : UserControl
             vm.StopVideoRequested = DisposeVlc;
             vm.ToggleVideoPauseRequested = ToggleVideoPause;
             vm.SeekByRequested = SeekBy;
+            vm.VolumeRequested = SetVolume;
             vm.SeekToRequested = SeekTo;
             vm.PipRequested = SetPip;
         }
@@ -98,6 +99,12 @@ public partial class MediaView : UserControl
         }, DispatcherPriority.Background);
 
     // ── Transport (video overlay and music) ──────────────────────────────────
+
+    private void SetVolume(int volume)
+    {
+        if (_audioPlayer != null) _audioPlayer.Volume = volume;
+        if (_mediaPlayer != null) _mediaPlayer.Volume = volume;
+    }
 
     private void ToggleVideoPause()
     {
@@ -188,6 +195,7 @@ public partial class MediaView : UserControl
             _audioPlayer.EncounteredError += OnAudioError;
             _audioMedia = new Media(_audioVlc, new Uri(path));
             _audioPlayer.Play(_audioMedia);
+            _audioPlayer.Volume = vm.Volume;
             vm.IsMusicPlaying = true;
             _audioTimer.Start();
         }
@@ -317,6 +325,7 @@ public partial class MediaView : UserControl
                 if (VlcOverlayVideoView != null)
                     VlcOverlayVideoView.MediaPlayer = _mediaPlayer;
                 _mediaPlayer?.Play(_media);
+                if (_mediaPlayer != null) _mediaPlayer.Volume = vm.Volume;
                 long resume = vm.TakeResumeMs();
                 if (resume > 0) ResumeWhenReady(resume);
             }, DispatcherPriority.Background);

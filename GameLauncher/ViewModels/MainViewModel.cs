@@ -557,6 +557,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.OnMediaNext = () => { if (MediaVm.HasActivePlayback) MediaVm.TransportStep(1); else SendMediaNext(); };
         QuickMenuVm.OnMediaSeekBack = () => MediaVm.TransportSeek(-1);
         QuickMenuVm.OnMediaSeekForward = () => MediaVm.TransportSeek(1);
+        QuickMenuVm.OnMediaVolumeStep = d => MediaVm.AdjustVolume(d);
+        QuickMenuVm.MediaVolumeProvider = () => MediaVm.Volume;
         QuickMenuVm.OnMediaFullScreen = () =>
         {
             Navigate(MediaVm.IsVlcPlayerOpen ? "media" : "music");
@@ -1269,6 +1271,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
         }
         catch (Exception ex) { DevLogService.Log($"[DbQueue] ROM check failed: {ex.Message}"); }
+    }
+
+    /// <summary>Settings → Games: PC games and ROMs can each be limited to already-cached metadata.</summary>
+    private static bool OnlineMetadataAllowed(string platform)
+    {
+        var st = Services.AppSettingsService.Load();
+        string provider = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase) ? st.GameMetadataProvider : st.RomMetadataProvider;
+        return !string.Equals(provider, "Cache only", StringComparison.OrdinalIgnoreCase);
     }
 
     public void BeginStartup()
@@ -5681,7 +5691,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     string.IsNullOrEmpty(g.CoverUrl) ||
                     string.IsNullOrEmpty(g.AchievementsUrl) ||
                     !_metadataCache.IsGameInfoCached(g.Platform, g.TitleId, g.Title));
-                if (anyNeedDb)
+                if (anyNeedDb && OnlineMetadataAllowed(platform))
                 {
                     try { dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform).ConfigureAwait(false); }
                     catch { /* best-effort — fall through to cache whatever we already have */ }
@@ -5863,6 +5873,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         if (pendingEntries.Count == 0)
                             continue;
 
+                        if (!OnlineMetadataAllowed(platform)) continue;
                         var dbGames = await GameOsClient.FetchGamesDatabaseAsync(platform).ConfigureAwait(false);
                         if (dbGames.Count == 0) continue;
 

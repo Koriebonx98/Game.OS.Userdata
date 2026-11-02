@@ -795,7 +795,32 @@ public partial class MediaViewModel : ObservableObject
         // One lookup per movie / per TV show, and only for titles that have no cached info yet.
         var todo = _movies.Concat(_tvShows).Where(i => i.Overview.Length == 0)
             .GroupBy(i => (KindOf(i), LookupName(i).ToLowerInvariant())).Select(g => g.First()).Take(60).ToList();
-        if (todo.Count > 0) _ = EnrichAsync(todo, false, run);
+        _ = EnrichLibraryAsync(todo, run);
+    }
+
+    /// <summary>Startup scan: movies / TV first (title + provider lookup), then one artwork lookup per music album.</summary>
+    private async System.Threading.Tasks.Task EnrichLibraryAsync(IReadOnlyList<MediaLibraryItem> videos, int run)
+    {
+        try
+        {
+            if (videos.Count > 0) await EnrichAsync(videos, false, run).ConfigureAwait(false);
+            var albums = _music.Where(t => !t.HasLocalCover && t.CoverPath.Length == 0)
+                .GroupBy(t => (t.Group.ToLowerInvariant(), t.Album.ToLowerInvariant())).Select(g => g.First()).Take(40).ToList();
+            foreach (var track in albums)
+            {
+                if (run != _enrichRun) return;
+                var meta = await MediaMetadataService.GetAsync("music", track.DisplayTitle, track.Group).ConfigureAwait(false);
+                if (meta == null) continue;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    foreach (var t in _music.Where(x => string.Equals(x.Group, track.Group, StringComparison.OrdinalIgnoreCase)
+                                                      && string.Equals(x.Album, track.Album, StringComparison.OrdinalIgnoreCase)))
+                        t.ApplyMeta(meta);
+                });
+                await System.Threading.Tasks.Task.Delay(3500).ConfigureAwait(false);
+            }
+        }
+        catch (Exception ex) { DevLogService.Log($"[Media] Background scan failed: {ex.Message}"); }
     }
 
     private async System.Threading.Tasks.Task EnrichAsync(IReadOnlyList<MediaLibraryItem> items, bool force, int run)
@@ -1406,6 +1431,31 @@ public partial class MediaViewModel : ObservableObject
     /// <summary>True when the in-app player has something to control (video overlay or a music track).</summary>
     public bool HasActivePlayback => IsVlcPlayerOpen || NowPlaying != null;
 
+    // ── Volume (right stick) ─────────────────────────────────────────────────
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(VolumeLabel))] private int _volume = 80;
+    [ObservableProperty] private bool _isVolumeHudVisible;
+    public string VolumeLabel => (Volume == 0 ? "🔇 " : "🔊 ") + Volume + "%";
+    public Action<int>? VolumeRequested { get; set; }
+    private System.Threading.CancellationTokenSource? _volumeHudCts;
+
+    /// <summary>The right stick controls volume while a video or the full-screen music player is open.</summary>
+    public bool IsVolumeStickActive => (IsVlcPlayerOpen || IsNowPlayingFullScreen) && !IsMusicMenuOpen;
+
+    partial void OnVolumeChanged(int value) => VolumeRequested?.Invoke(value);
+
+    public void AdjustVolume(int delta)
+    {
+        if (delta == 0) return;
+        Volume = Math.Clamp(Volume + delta, 0, 100);
+        IsVolumeHudVisible = true;
+        _volumeHudCts?.Cancel();
+        var cts = _volumeHudCts = new System.Threading.CancellationTokenSource();
+        _ = System.Threading.Tasks.Task.Delay(1500, cts.Token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled) Avalonia.Threading.Dispatcher.UIThread.Post(() => IsVolumeHudVisible = false);
+        });
+    }
+
     public void TransportPlayPause()
     {
         if (IsVlcPlayerOpen) ToggleVideoPause();
@@ -1459,6 +1509,7 @@ public partial class MediaViewModel : ObservableObject
         }
         switch (key)
         {
+            case "Menu": if (!IsVlcPlayerOpen) OpenNowPlayingMenu(); return true;
             case "LB": AdjustRating(-1); return true;
             case "RB": AdjustRating(1); return true;
             case "X": TransportPlayPause(); return true;

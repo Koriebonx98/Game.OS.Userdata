@@ -13,6 +13,8 @@ public partial class QuickMenuHubActionVm : ObservableObject
     public string Title { get; init; } = "";
     public string Subtitle { get; init; } = "";
     public string Glyph { get; init; } = "";
+    /// <summary>Stable id used by Settings → Quick Menu customisation to hide the action.</summary>
+    public string Key { get; init; } = "";
     /// <summary>Null for read-only rows (e.g. achievements); the cursor skips them.</summary>
     public Action? Run { get; init; }
     public bool IsActionable => Run != null;
@@ -40,7 +42,11 @@ public partial class QuickMenuViewModel
         try
         {
             HubActions.Clear();
-            foreach (var a in BuildHubActions()) HubActions.Add(a);
+            var hidden = Services.AppSettingsService.Load().QuickMenuHiddenActions ?? new();
+            foreach (var a in BuildHubActions())
+                if (a.Key.Length == 0 || !hidden.Contains(a.Key, StringComparer.OrdinalIgnoreCase)) HubActions.Add(a);
+            HasActiveMedia = MediaStatusProvider?.Invoke() != null;
+            RefreshMediaVolume();
             HubActionIndex = Array.FindIndex(HubActions.ToArray(), a => a.IsActionable);
             SyncHubCursor();
             OnPropertyChanged(nameof(HasHubActions));
@@ -55,18 +61,36 @@ public partial class QuickMenuViewModel
         for (int i = 0; i < HubActions.Count; i++) HubActions[i].IsCursor = i == HubActionIndex;
     }
 
-    private static QuickMenuHubActionVm Act(string glyph, string title, Action run, string sub = "") =>
-        new() { Glyph = glyph, Title = title, Subtitle = sub, Run = run };
+    private static QuickMenuHubActionVm Act(string glyph, string title, Action run, string sub = "", string key = "") =>
+        new() { Glyph = glyph, Title = title, Subtitle = sub, Run = run, Key = key };
+
+    /// <summary>True while a video or song is playing in the launcher; the guide then shows a compact media bar.</summary>
+    [ObservableProperty] private bool _hasActiveMedia;
+    public bool ShowMediaBar => HasActiveMedia && !IsMediaPage;
+    partial void OnHasActiveMediaChanged(bool value) => OnPropertyChanged(nameof(ShowMediaBar));
+
+    /// <summary>Screenshot / record / on-screen keyboard — shared by every guide layout.</summary>
+    private System.Collections.Generic.IEnumerable<QuickMenuHubActionVm> SharedTools()
+    {
+        string cp = IsPlayingGame ? CurrentGamePlatform : "PC", ct = IsPlayingGame ? CurrentGameTitle : "Desktop";
+        yield return Act("📷", "Screenshot", () => CaptureAfterDismiss(() => Services.CaptureService.TakeScreenshot(cp, ct)), "Saved to your Media folder", "screenshot");
+        if (Services.CaptureService.IsRecording)
+            yield return Act("⏺", "Stop Recording", () => CaptureAfterDismiss(() => { Services.CaptureService.StopRecording(); return null; }), "", "record");
+        else
+            yield return Act("🎥", "Record Screen", () => CaptureAfterDismiss(() => { Services.CaptureService.StartRecording(cp, ct); return null; }), "Saved to your Media folder", "record");
+        yield return Act("⌨", "On-Screen Keyboard", () => { OnDismiss?.Invoke(); Services.CaptureService.OpenOnScreenKeyboard(); }, "", "keyboard");
+    }
 
     private System.Collections.Generic.IEnumerable<QuickMenuHubActionVm> BuildHubActions()
     {
         if (IsWiiTheme)
         {
-            yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null));
+            yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "", "home");
             yield return Act("🎮", "Recent", () => OpenLibraryPageCommand.Execute(null));
             yield return Act("👥", "Friends", () => OpenFriendsPageCommand.Execute(null));
             yield return Act("📬", "Inbox", () => OpenInboxPageCommand.Execute(null));
             yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null));
+            foreach (var t in SharedTools()) yield return t;
             if (IsPlayingGame) yield return Act("⏹", "Exit Game", () => ExitGameCommand.Execute(null));
             yield return Act("✕", "Close", () => DismissCommand.Execute(null));
             yield break;
@@ -75,6 +99,7 @@ public partial class QuickMenuViewModel
         switch (ActivePage)
         {
             case "home":
+                yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "Back to desktop", "home");
                 yield return Act("▶", "Resume", () => DismissCommand.Execute(null));
                 if (IsPlayingGame) yield return Act("⏹", "Exit Game", () => ExitGameCommand.Execute(null), CurrentGameTitle);
                 if (IsPlayingGame)
@@ -82,17 +107,9 @@ public partial class QuickMenuViewModel
                     yield return Act("📖", "Guides & Walkthroughs", () => SelectGuidesCommand.Execute(null), $"Saved links for {CurrentGameTitle}");
                     yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null), "Saved links & favourites - returns to your game");
                 }
-                if (IsPlayingGame)
-                {
-                    string cp = CurrentGamePlatform, ct = CurrentGameTitle;
-                    yield return Act("📷", "Screenshot", () => CaptureAfterDismiss(() => Services.CaptureService.TakeScreenshot(cp, ct)), "Saved to your Media folder");
-                    if (Services.CaptureService.IsRecording)
-                        yield return Act("⏺", "Stop Recording", () => CaptureAfterDismiss(() => { Services.CaptureService.StopRecording(); return null; }));
-                    else
-                        yield return Act("🎥", "Record Screen", () => CaptureAfterDismiss(() => { Services.CaptureService.StartRecording(cp, ct); return null; }), "Saved to your Media folder");
-                }
-                if (HasAchievementsProgress) yield return Act("🏆", "Achievements", () => OpenAchievementsCommand.Execute(null), AchievementsLabel);
-                yield return Act("⚙", "Settings", () => OpenSettingsPageCommand.Execute(null));
+                foreach (var t in SharedTools()) yield return t;
+                if (HasAchievementsProgress) yield return Act("🏆", "Achievements", () => OpenAchievementsCommand.Execute(null), AchievementsLabel, "achievements");
+                yield return Act("⚙", "Settings", () => OpenSettingsPageCommand.Execute(null), "", "settings");
                 break;
             case "switcher":
                 foreach (var item in SwitcherItems.ToList())
@@ -132,19 +149,22 @@ public partial class QuickMenuViewModel
                 yield return Act("📬", "Open Inbox Page", () => OpenInboxPageCommand.Execute(null));
                 break;
             case "media":
+                RefreshMediaVolume();
                 yield return Act("⏮", "Previous", () => MediaPreviousCommand.Execute(null));
-                yield return Act("⏯", "Play / Pause", () => MediaPlayPauseCommand.Execute(null), MediaStatusProvider?.Invoke() ?? MediaStatusLabel);
+                yield return Act("⏪", "Back", () => MediaSeekBackCommand.Execute(null));
+                yield return Act("⏯", "Play / Pause", () => MediaPlayPauseCommand.Execute(null));
+                yield return Act("⏩", "Forward", () => MediaSeekForwardCommand.Execute(null));
                 yield return Act("⏭", "Next", () => MediaNextCommand.Execute(null));
-                yield return Act("⏪", "Skip Back", () => MediaSeekBackCommand.Execute(null));
-                yield return Act("⏩", "Skip Forward", () => MediaSeekForwardCommand.Execute(null));
-                yield return Act("⛶", "Full Screen Player", () => MediaFullScreenCommand.Execute(null));
+                yield return Act("🔉", "Vol −", () => MediaVolumeDownCommand.Execute(null));
+                yield return Act("🔊", "Vol +", () => MediaVolumeUpCommand.Execute(null));
+                yield return Act("⛶", "Full Screen", () => MediaFullScreenCommand.Execute(null));
                 if (IsVideoPlayerOpen?.Invoke() == true)
                 {
-                    yield return Act("🗗", "Picture-in-picture", () => OnMediaTogglePip?.Invoke());
-                    yield return Act("🖵", "Toggle Window Full Screen", () => OnMediaToggleWindowFullscreen?.Invoke());
-                    yield return Act("✕", "Close Player", () => OnMediaClosePlayer?.Invoke());
+                    yield return Act("🗗", "PiP", () => OnMediaTogglePip?.Invoke());
+                    yield return Act("🖵", "Window", () => OnMediaToggleWindowFullscreen?.Invoke());
+                    yield return Act("✕", "Close", () => OnMediaClosePlayer?.Invoke());
                 }
-                yield return Act("🎵", "Open Music", () => OpenMusicPageCommand.Execute(null));
+                yield return Act("🎵", "Music", () => OpenMusicPageCommand.Execute(null));
                 break;
             case "guides":
                 yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "Dashboard");

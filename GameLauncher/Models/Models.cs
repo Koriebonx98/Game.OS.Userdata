@@ -624,6 +624,14 @@ namespace GameLauncher.Models
         [JsonPropertyName("keyboardTheme")] public string KeyboardTheme { get; set; } = "Default";
 
         /// <summary>Style of quick menu overlay: "GameOS", "PS5", "XB360", "Wii", "Switch", or "SteamBPM".</summary>
+        /// <summary>Quick guide actions switched off in Settings → Design → Quick Menu ⚙ (keys such as "screenshot", "record", "keyboard").</summary>
+        [JsonPropertyName("quickMenuHiddenActions")] public List<string> QuickMenuHiddenActions { get; set; } = new();
+        /// <summary>Settings → Games: minutes between background drive rescans (0 = only at startup).</summary>
+        [JsonPropertyName("gameScanIntervalMinutes")] public int GameScanIntervalMinutes { get; set; } = 60;
+        /// <summary>Settings → Games: "Games.Database" or "Cache only" for PC game metadata.</summary>
+        [JsonPropertyName("gameMetadataProvider")] public string GameMetadataProvider { get; set; } = "Games.Database";
+        /// <summary>Settings → Games: "Games.Database" or "Cache only" for ROM metadata.</summary>
+        [JsonPropertyName("romMetadataProvider")] public string RomMetadataProvider { get; set; } = "Games.Database";
         [JsonPropertyName("quickMenuTheme")] public string QuickMenuTheme { get; set; } = "PS5";
 
         /// <summary>

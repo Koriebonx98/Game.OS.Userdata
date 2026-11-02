@@ -177,6 +177,29 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<string> AvailableMusicThemes { get; } = new[] { "Default", "Spotify" };
     // ── Settings → Media ──
     [ObservableProperty] private int  _mediaSkipSeconds = 10;
+
+    // ── Game / ROM metadata providers and scanner ───────────────────────────
+    public IReadOnlyList<string> AvailableMetadataProviders { get; } = new[] { "Games.Database", "Cache only" };
+    public IReadOnlyList<int> AvailableScanIntervals { get; } = new[] { 0, 15, 30, 60, 120, 240 };
+    [ObservableProperty] private string _gameMetadataProvider = "Games.Database";
+    [ObservableProperty] private string _romMetadataProvider = "Games.Database";
+    [ObservableProperty] private int _gameScanIntervalMinutes = 60;
+
+    // ── Quick menu customisation (⚙ next to Quick Menu Style) ───────────────
+    private static readonly (string Key, string Label)[] QuickMenuActionDefs =
+    {
+        ("home", "Home"), ("screenshot", "Screenshot"), ("record", "Record screen"), ("keyboard", "On-screen keyboard"),
+        ("achievements", "Achievements"), ("settings", "Settings"),
+    };
+    public ObservableCollection<DashboardAssetToggleVm> QuickMenuActionToggles { get; } = new();
+
+    private void LoadQuickMenuToggles(IEnumerable<string>? hidden)
+    {
+        var off = new HashSet<string>(hidden ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase);
+        QuickMenuActionToggles.Clear();
+        foreach (var (key, label) in QuickMenuActionDefs)
+            QuickMenuActionToggles.Add(new DashboardAssetToggleVm(key, label, !off.Contains(key)));
+    }
     [ObservableProperty] private bool _showMovieDetails = true;
     [ObservableProperty] private bool _showTvDetails = true;
     [ObservableProperty] private bool _autoPlayNextEpisode = true;
@@ -220,11 +243,13 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Which ⚙ options panel is open in Settings → Design ("dashboard", "library", …; empty = none).</summary>
     [ObservableProperty] private string _openOptionsPanel = "";
     public bool IsDashboardOptionsOpen => OpenOptionsPanel == "dashboard";
-    public bool IsOtherOptionsOpen => !string.IsNullOrEmpty(OpenOptionsPanel) && OpenOptionsPanel != "dashboard";
+    public bool IsQuickMenuOptionsOpen => OpenOptionsPanel == "quickmenu";
+    public bool IsOtherOptionsOpen => !string.IsNullOrEmpty(OpenOptionsPanel) && OpenOptionsPanel is not ("dashboard" or "quickmenu");
     partial void OnOpenOptionsPanelChanged(string value)
     {
         OnPropertyChanged(nameof(IsDashboardOptionsOpen));
         OnPropertyChanged(nameof(IsOtherOptionsOpen));
+        OnPropertyChanged(nameof(IsQuickMenuOptionsOpen));
     }
 
     [RelayCommand]
@@ -949,6 +974,10 @@ public partial class SettingsViewModel : ViewModelBase
         MoviesTvTheme              = appSettings.MoviesTvTheme?.Trim() is { } t && (t.Equals("Cinema", StringComparison.OrdinalIgnoreCase) || t.Equals("Netflix", StringComparison.OrdinalIgnoreCase)) ? "Cinema" : "Default";
         MusicTheme                 = string.Equals(appSettings.MusicTheme?.Trim(), "Spotify", StringComparison.OrdinalIgnoreCase) ? "Spotify" : "Default";
         MediaSkipSeconds           = appSettings.MediaSkipSeconds > 0 ? appSettings.MediaSkipSeconds : 10;
+        GameMetadataProvider       = AvailableMetadataProviders.Contains(appSettings.GameMetadataProvider) ? appSettings.GameMetadataProvider : "Games.Database";
+        RomMetadataProvider        = AvailableMetadataProviders.Contains(appSettings.RomMetadataProvider) ? appSettings.RomMetadataProvider : "Games.Database";
+        GameScanIntervalMinutes    = AvailableScanIntervals.Contains(appSettings.GameScanIntervalMinutes) ? appSettings.GameScanIntervalMinutes : 60;
+        LoadQuickMenuToggles(appSettings.QuickMenuHiddenActions);
         ShowMovieDetails           = appSettings.ShowMovieDetails;
         ShowTvDetails              = appSettings.ShowTvDetails;
         AutoPlayNextEpisode        = appSettings.AutoPlayNextEpisode;
@@ -1186,6 +1215,10 @@ public partial class SettingsViewModel : ViewModelBase
             MoviesTvTheme              = MoviesTvTheme == "Cinema" ? "Cinema" : "Default",
             MusicTheme                 = MusicTheme == "Spotify" ? "Spotify" : "Default",
             MediaSkipSeconds           = MediaSkipSeconds > 0 ? MediaSkipSeconds : 10,
+            GameMetadataProvider       = GameMetadataProvider,
+            RomMetadataProvider        = RomMetadataProvider,
+            GameScanIntervalMinutes    = GameScanIntervalMinutes,
+            QuickMenuHiddenActions     = QuickMenuActionToggles.Where(t => !t.IsOn).Select(t => t.Key).ToList(),
             ShowMovieDetails           = ShowMovieDetails,
             ShowTvDetails              = ShowTvDetails,
             AutoPlayNextEpisode        = AutoPlayNextEpisode,

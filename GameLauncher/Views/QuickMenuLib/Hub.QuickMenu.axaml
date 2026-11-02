@@ -213,11 +213,21 @@
                         Padding="18">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Media Controls" FontSize="20" FontWeight="SemiBold" Foreground="White"/>
-                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10">
-                            <Button Classes="btn-secondary" Command="{Binding MediaPreviousCommand}" Padding="16,10">⏮</Button>
-                            <Button Classes="btn-secondary" Command="{Binding MediaPlayPauseCommand}" Padding="16,10">⏯</Button>
-                            <Button Classes="btn-secondary" Command="{Binding MediaNextCommand}" Padding="16,10">⏭</Button>
-                        </StackPanel>
+                        <ItemsControl ItemsSource="{Binding HubActions}">
+                            <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel HorizontalAlignment="Center"/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                                    <Button Classes="btn-secondary" Classes.active="{Binding IsCursor}" Width="76" Height="64" Margin="0,0,6,6"
+                                            HorizontalContentAlignment="Center" Command="{Binding ActivateCommand}">
+                                        <StackPanel HorizontalAlignment="Center">
+                                            <TextBlock Text="{Binding Glyph}" FontSize="20" HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{Binding Title}" FontSize="10" HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding MediaVolumeLabel}" Foreground="White" FontSize="16" HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding MediaStatusLabel}" Foreground="#9E9E9E" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Border>

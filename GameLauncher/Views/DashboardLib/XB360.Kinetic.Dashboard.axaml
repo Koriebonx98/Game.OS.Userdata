@@ -126,7 +126,9 @@
             <!-- Hints -->
             <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="24" IsVisible="{Binding Options.ShowHints}">
                 <TextBlock Text="Ⓐ Select" Foreground="White" FontSize="16"/>
-                <TextBlock Text="◀ ▶ Tabs / Tiles" Foreground="White" FontSize="16"/>
+                <TextBlock Text="{Binding KineticSecondaryHint}" Foreground="White" FontSize="16" IsVisible="{Binding KineticSecondaryHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <TextBlock Text="LB RB Tabs" Foreground="White" FontSize="16"/>
+                <TextBlock Text="◀ ▶ ▲ ▼ Move" Foreground="White" FontSize="16"/>
             </StackPanel>
         </Grid>
     </Border>

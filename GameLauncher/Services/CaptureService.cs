@@ -77,6 +77,14 @@ namespace GameLauncher.Services
             }
         }
 
+        /// <summary>Opens the Windows on-screen keyboard (a no-op elsewhere).</summary>
+        public static void OpenOnScreenKeyboard()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            try { Process.Start(new ProcessStartInfo("osk.exe") { UseShellExecute = true }); }
+            catch (Exception ex) { DevLogService.Log($"[Capture] on-screen keyboard failed: {ex.Message}"); }
+        }
+
         public static void StopRecording()
         {
             lock (Gate)

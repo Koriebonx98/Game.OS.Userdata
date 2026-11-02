@@ -164,6 +164,21 @@ public partial class QuickMenuViewModel : ViewModelBase
 
     // ── Media ───────────────────────────────────────────────────────────────
     [ObservableProperty] private string _mediaStatusLabel = "Media controls are ready.";
+    [ObservableProperty] private string _mediaVolumeLabel = "🔊 80%";
+    public Action<int>? OnMediaVolumeStep { get; set; }
+    public Func<int>? MediaVolumeProvider { get; set; }
+
+    private void RefreshMediaVolume()
+    {
+        if (MediaVolumeProvider?.Invoke() is not { } v) return;
+        MediaVolumeLabel = (v == 0 ? "🔇 " : "🔊 ") + v + "%";
+    }
+
+    [RelayCommand]
+    private void MediaVolumeUp() { OnMediaVolumeStep?.Invoke(10); RefreshMediaVolume(); }
+
+    [RelayCommand]
+    private void MediaVolumeDown() { OnMediaVolumeStep?.Invoke(-10); RefreshMediaVolume(); }
 
     // ── Friend chat mini-window ────────────────────────────────────────────
     [ObservableProperty] private bool _showChatWindow;
@@ -311,6 +326,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsFriendsPage));
         OnPropertyChanged(nameof(IsInboxPage));
         OnPropertyChanged(nameof(IsMediaPage));
+        OnPropertyChanged(nameof(ShowMediaBar));
         OnPropertyChanged(nameof(IsSettingsPage));
         OnPropertyChanged(nameof(IsBrowserPage));
         OnPropertyChanged(nameof(IsGuidesPage));
