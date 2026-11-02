@@ -24,13 +24,14 @@ namespace GameLauncher.Services
         private static readonly string FfmpegDir = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GameOS", "ffmpeg");
         private static int _ffmpegDownloadStarted;
+        private static Task? _ffmpegDownload;
 
         /// <summary>Downloads ffmpeg via the Xabe.FFmpeg.Downloader NuGet package (once, in the background) if none is found.</summary>
-        public static void EnsureFfmpegAsync()
+        public static Task EnsureFfmpegAsync()
         {
-            if (!OperatingSystem.IsWindows() || FindFfmpeg() != null) return;
-            if (Interlocked.Exchange(ref _ffmpegDownloadStarted, 1) == 1) return;
-            _ = Task.Run(async () =>
+            if (!OperatingSystem.IsWindows() || FindFfmpeg() != null) return Task.CompletedTask;
+            if (Interlocked.Exchange(ref _ffmpegDownloadStarted, 1) == 1) return _ffmpegDownload ?? Task.CompletedTask;
+            return _ffmpegDownload = Task.Run(async () =>
             {
                 try
                 {

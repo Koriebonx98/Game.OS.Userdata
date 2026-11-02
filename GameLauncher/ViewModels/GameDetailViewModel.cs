@@ -272,6 +272,16 @@ public partial class GameDetailViewModel : ViewModelBase
     [NotifyPropertyChangedFor(nameof(PlayButtonIsResume))]
     private bool _isGameRunning;
 
+    /// <summary>Identity of the game that was launched; this VM is reused for whichever game page is open, so Title/Platform can differ.</summary>
+    public string RunningTitle { get; private set; } = "";
+    public string RunningPlatform { get; private set; } = "";
+
+    partial void OnIsGameRunningChanged(bool value)
+    {
+        if (value) { RunningTitle = Title; RunningPlatform = Platform; }
+        else { RunningTitle = ""; RunningPlatform = ""; }
+    }
+
     /// <summary>
     /// Label shown on the main play button text block (the arrow icon is separate in XAML).
     /// "Play" normally, "Playing..." while the process is active.
@@ -583,10 +593,18 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Fetches the community votes the website shows (compatibility/&lt;platform&gt;/&lt;title&gt;.json).</summary>
     private void LoadRemoteCompatVotes()
     {
-        if (IsPcPlatformName(Platform) || string.IsNullOrWhiteSpace(Title)) return;
+        if (IsPcPlatformName(Platform) || string.IsNullOrWhiteSpace(Title))
+        {
+            _remoteCompatKey = "";
+            _remoteCompatVotes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            return;
+        }
+        FlushPendingCompatVotes();
         string key = Platform + "|" + Title;
         if (key == _remoteCompatKey) return;
         _remoteCompatKey = key;
+        // This VM is reused across games: never carry the previous game's votes over.
+        _remoteCompatVotes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         string platform = Platform, title = Title;
         _ = System.Threading.Tasks.Task.Run(async () =>
         {
@@ -646,17 +664,35 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             string platform = Platform, title = Title, user = _currentUsername;
             string? titleId = _currentLocalRom?.TitleId ?? _databaseTitleId;
-            _ = System.Threading.Tasks.Task.Run(async () =>
-            {
-                try
-                {
-                    using var svc = new Services.GitHubDataService();
-                    await svc.QueueGameCompatVoteAsync(user, platform, title, rating, titleId);
-                }
-                catch (Exception ex) { Services.DevLogService.Log($"[Compat] Vote upload failed: {ex.Message}"); }
-            });
+            Services.GameReviewService.AddPendingCompatVote(new Services.GameReviewService.PendingCompatVote(user, platform, title, rating, titleId));
+            FlushPendingCompatVotes();
         }
         RefreshCompatVotes();
+    }
+
+    private int _flushingCompat;
+
+    /// <summary>Uploads queued votes to the repo's compat-queue; failed ones stay on disk and retry next time.</summary>
+    private void FlushPendingCompatVotes()
+    {
+        if (System.Threading.Interlocked.Exchange(ref _flushingCompat, 1) == 1) return;
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                foreach (var v in Services.GameReviewService.LoadPendingCompatVotes())
+                {
+                    try
+                    {
+                        using var svc = new Services.GitHubDataService();
+                        await svc.QueueGameCompatVoteAsync(v.Username, v.Platform, v.Title, v.Rating, v.TitleId);
+                        Services.GameReviewService.RemovePendingCompatVote(v);
+                    }
+                    catch (Exception ex) { Services.DevLogService.Log($"[Compat] Vote upload failed (will retry): {ex.Message}"); }
+                }
+            }
+            finally { System.Threading.Interlocked.Exchange(ref _flushingCompat, 0); }
+        });
     }
 
     [RelayCommand]
@@ -1842,6 +1878,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         IsVlcPlayerOpen = false;
         VlcMediaPath    = "";
+        if (HasViewerVideo) { IsCaptureMenuOpen = false; ViewerItem = null; }
     }
 
     /// <summary>Dismisses the in-app trailer player overlay.</summary>
@@ -4616,7 +4653,130 @@ public partial class GameDetailViewModel : ViewModelBase
     public ObservableCollection<CaptureItem> Captures { get; } = new();
     [ObservableProperty] private bool _hasCaptures;
 
-    [RelayCommand] private void OpenCapture(CaptureItem? item) { if (item != null) OpenWithSystem(item.Path); }
+    // ── Built-in capture viewer (images in an overlay, videos via the VLC overlay) ──
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(ViewerTitle)), NotifyPropertyChangedFor(nameof(HasViewerVideo))] private CaptureItem? _viewerItem;
+    [ObservableProperty] private Avalonia.Media.Imaging.Bitmap? _viewerBitmap;
+    [ObservableProperty] private bool _isCaptureViewerOpen;
+    [ObservableProperty] private bool _isCaptureMenuOpen;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(IsShareSelected)), NotifyPropertyChangedFor(nameof(IsDeleteSelected))] private int _captureMenuIndex;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(DeleteLabel))] private bool _deleteArmed;
+    [ObservableProperty] private string _captureStatus = "";
+
+    public string ViewerTitle => ViewerItem == null ? "" : ViewerItem.Name;
+    public bool HasViewerVideo => ViewerItem is { IsVideo: true };
+    public bool IsShareSelected => CaptureMenuIndex == 0;
+    public bool IsDeleteSelected => CaptureMenuIndex == 1;
+    public string DeleteLabel => DeleteArmed ? "🗑  Press again to confirm" : "🗑  Delete";
+
+    /// <summary>Set by the view: plays a video inside the built-in VLC overlay.</summary>
+    public System.Action<string>? PlayVideoFileRequested { get; set; }
+    /// <summary>Set by the view: stops/closes the VLC overlay (releases the file handle).</summary>
+    public System.Action? StopVideoRequested { get; set; }
+    /// <summary>Set by the view: shares a capture (clipboard).</summary>
+    public System.Func<string, System.Threading.Tasks.Task<string>>? ShareCaptureRequested { get; set; }
+
+    partial void OnIsCaptureMenuOpenChanged(bool value) { CaptureMenuIndex = 0; DeleteArmed = false; }
+
+    [RelayCommand]
+    private void OpenCapture(CaptureItem? item)
+    {
+        if (item == null || !File.Exists(item.Path)) return;
+        CaptureStatus = "";
+        IsCaptureMenuOpen = false;
+        ViewerItem = item;
+        if (item.IsVideo) { PlayVideoFileRequested?.Invoke(item.Path); return; }
+        ShowViewerImage(item);
+    }
+
+    private void ShowViewerImage(CaptureItem item)
+    {
+        var old = ViewerBitmap;
+        try
+        {
+            using var fs = File.OpenRead(item.Path);
+            ViewerBitmap = new Avalonia.Media.Imaging.Bitmap(fs);
+        }
+        catch { ViewerBitmap = null; }
+        old?.Dispose();
+        ViewerItem = item;
+        IsCaptureViewerOpen = true;
+    }
+
+    /// <summary>Closes the capture menu first, then the viewer. Returns false when nothing was open.</summary>
+    public bool CloseCaptureViewer()
+    {
+        if (IsCaptureMenuOpen) { IsCaptureMenuOpen = false; return true; }
+        if (!IsCaptureViewerOpen && !(HasViewerVideo && IsVlcPlayerOpen)) return false;
+        if (HasViewerVideo) StopVideoRequested?.Invoke();
+        IsCaptureViewerOpen = false;
+        var old = ViewerBitmap;
+        ViewerBitmap = null;
+        old?.Dispose();
+        ViewerItem = null;
+        return true;
+    }
+
+    [RelayCommand] private void CloseViewer() => CloseCaptureViewer();
+
+    [RelayCommand] private void ToggleCaptureMenu() => IsCaptureMenuOpen = !IsCaptureMenuOpen;
+
+    private void StepViewer(int delta)
+    {
+        var images = Captures.Where(c => c.IsImage).ToList();
+        int i = images.FindIndex(c => c.Path == ViewerItem?.Path);
+        if (i < 0 || images.Count < 2) return;
+        ShowViewerImage(images[(i + delta + images.Count) % images.Count]);
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task ShareCapture()
+    {
+        if (ViewerItem == null || ShareCaptureRequested == null) return;
+        CaptureStatus = await ShareCaptureRequested(ViewerItem.Path);
+        IsCaptureMenuOpen = false;
+    }
+
+    [RelayCommand]
+    private void DeleteCapture()
+    {
+        var item = ViewerItem;
+        if (item == null) return;
+        if (!DeleteArmed) { DeleteArmed = true; return; }
+        var images = Captures.Where(c => c.IsImage).ToList();
+        int idx = images.FindIndex(c => c.Path == item.Path);
+        if (item.IsVideo) StopVideoRequested?.Invoke();
+        try { File.Delete(item.Path); }
+        catch (Exception ex) { CaptureStatus = "Couldn't delete: " + ex.Message; DeleteArmed = false; return; }
+        Captures.Remove(item);
+        HasCaptures = Captures.Count > 0;
+        IsCaptureMenuOpen = false;
+        CaptureStatus = "Deleted";
+        var next = item.IsImage ? Captures.Where(c => c.IsImage).ElementAtOrDefault(Math.Min(Math.Max(idx, 0), Math.Max(images.Count - 2, 0))) : null;
+        if (next != null) ShowViewerImage(next);
+        else CloseCaptureViewer();
+    }
+
+    /// <summary>Routes a keyboard / controller key to the capture viewer (B/Esc close, X menu). True when consumed.</summary>
+    public bool HandleViewerKey(Avalonia.Input.Key key)
+    {
+        if (!IsCaptureViewerOpen && !(HasViewerVideo && IsVlcPlayerOpen)) return false;
+        switch (key)
+        {
+            case Avalonia.Input.Key.Escape: case Avalonia.Input.Key.B: case Avalonia.Input.Key.BrowserBack:
+                CloseCaptureViewer(); break;
+            case Avalonia.Input.Key.X:
+                ToggleCaptureMenu(); break;
+            case Avalonia.Input.Key.Up when IsCaptureMenuOpen: CaptureMenuIndex = 0; DeleteArmed = false; break;
+            case Avalonia.Input.Key.Down when IsCaptureMenuOpen: CaptureMenuIndex = 1; DeleteArmed = false; break;
+            case Avalonia.Input.Key.Enter when IsCaptureMenuOpen:
+                if (CaptureMenuIndex == 0) _ = ShareCapture(); else DeleteCapture();
+                break;
+            case Avalonia.Input.Key.Left when !IsCaptureMenuOpen && IsCaptureViewerOpen: StepViewer(-1); break;
+            case Avalonia.Input.Key.Right when !IsCaptureMenuOpen && IsCaptureViewerOpen: StepViewer(1); break;
+        }
+        // Video: let VLC keys (space etc.) through only when no menu; otherwise everything is consumed.
+        return true;
+    }
 
     /// <summary>Loads this game's own screenshots / recordings from the Media location.</summary>
     private void LoadCaptures()

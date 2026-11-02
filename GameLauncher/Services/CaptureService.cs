@@ -16,7 +16,7 @@ namespace GameLauncher.Services
         private static Process? _recorder;
         private static readonly object Gate = new();
 
-        public static bool IsRecording { get { lock (Gate) return _recorder is { HasExited: false }; } }
+        public static bool IsRecording { get { lock (Gate) return _starting || _recorder is { HasExited: false }; } }
 
         public static string GameFolder(string platform, string game)
         {
@@ -51,30 +51,51 @@ namespace GameLauncher.Services
             catch (Exception ex) { DevLogService.Log($"[Capture] screenshot failed: {ex.Message}"); return null; }
         }
 
-        /// <summary>Starts recording the desktop. Returns false if already recording or ffmpeg is unavailable.</summary>
+        private static bool _starting;
+
+        /// <summary>Starts recording the desktop to the game's media folder (same place as screenshots).
+        /// Downloads ffmpeg first when missing. Returns false if already recording/starting or unsupported.</summary>
         public static bool StartRecording(string platform, string game)
         {
             if (!OperatingSystem.IsWindows()) return false;
             lock (Gate)
             {
-                if (_recorder is { HasExited: false }) return false;
-                string? ffmpeg = StreamHostService.FindFfmpeg();
-                if (ffmpeg == null) { StreamHostService.EnsureFfmpegAsync(); return false; }
+                if (_starting || _recorder is { HasExited: false }) return false;
+                _starting = true;
+            }
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
                 try
                 {
+                    string? ffmpeg = StreamHostService.FindFfmpeg();
+                    if (ffmpeg == null)
+                    {
+                        await StreamHostService.EnsureFfmpegAsync();
+                        ffmpeg = StreamHostService.FindFfmpeg();
+                    }
+                    if (ffmpeg == null) { DevLogService.Log("[Capture] record failed: ffmpeg unavailable"); return; }
+
                     string path = NewFile(platform, game, "mp4");
-                    _recorder = Process.Start(new ProcessStartInfo
+                    // libx264 + yuv420p need even dimensions, otherwise ffmpeg exits immediately.
+                    var p = Process.Start(new ProcessStartInfo
                     {
                         FileName = ffmpeg,
-                        Arguments = $"-y -f gdigrab -framerate 30 -i desktop -c:v libx264 -preset ultrafast -pix_fmt yuv420p \"{path}\"",
+                        Arguments = $"-y -f gdigrab -framerate 30 -i desktop -vf \"scale=trunc(iw/2)*2:trunc(ih/2)*2\" -c:v libx264 -preset ultrafast -pix_fmt yuv420p -movflags +faststart \"{path}\"",
                         UseShellExecute = false,
                         CreateNoWindow = true,
                         RedirectStandardInput = true,
+                        RedirectStandardError = true,
                     });
-                    return _recorder != null;
+                    if (p == null) return;
+                    // Drain stderr so ffmpeg never blocks on a full pipe.
+                    p.ErrorDataReceived += (_, e) => { if (e.Data != null && e.Data.Contains("rror")) DevLogService.Log("[Capture] ffmpeg: " + e.Data); };
+                    p.BeginErrorReadLine();
+                    lock (Gate) _recorder = p;
                 }
-                catch (Exception ex) { DevLogService.Log($"[Capture] record failed: {ex.Message}"); return false; }
-            }
+                catch (Exception ex) { DevLogService.Log($"[Capture] record failed: {ex.Message}"); }
+                finally { lock (Gate) _starting = false; }
+            });
+            return true;
         }
 
         /// <summary>Types a key token from the Game OS on-screen keyboard into the foreground window (Windows only).</summary>

@@ -424,6 +424,13 @@ public partial class MainWindow : Window
             }
         }
 
+        // Built-in capture viewer owns B / Esc / X / arrows while it is open
+        if (vm.ShowDetail && !vm.ShowQuickMenu && vm.DetailVm.HandleViewerKey(e.Key))
+        {
+            e.Handled = true;
+            return;
+        }
+
         // Game detail: arrow keys move the highlight between every control on the page
         if (vm.ShowDetail && !vm.ShowQuickMenu && !IsTextInputFocused() &&
             e.Key is Key.Up or Key.Down or Key.Left or Key.Right &&
@@ -1557,6 +1564,9 @@ public partial class MainWindow : Window
             }
             return;
         }
+
+        // Built-in capture viewer: B closes, X opens the Share / Delete menu
+        if (vm.ShowDetail && vm.DetailVm.HandleViewerKey(key)) return;
 
         // A game is running and the quick menu is closed — block Game OS navigation
         // and inject the button press into the game via the active controller profile.
