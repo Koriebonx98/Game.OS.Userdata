@@ -999,7 +999,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public double BrowseTabOpacity => IsModsInstalledTab ? 0.55 : 1.0;
     /// <summary>PS2 recomp lives in Mods → Installed and only exists for PS2 games.</summary>
     public bool ShowRecompInMods => IsPs2;
-    public bool NoInstalledMods => !IsSwitch && !IsPs2 && !HasInstalledMods;
+    public bool NoInstalledMods => !IsSwitch && !IsPs2 && !HasInstalledMods && !HasEmulatorMods;
     partial void OnIsModsInstalledTabChanged(bool value)
     {
         OnPropertyChanged(nameof(IsModsBrowseTab));
@@ -1081,9 +1081,104 @@ public partial class GameDetailViewModel : ViewModelBase
         var folders = GameModsService.DetectModFolders(root);
         DetectedModFolders = folders.Count == 0 ? "" :
             "Detected mod folders: " + string.Join(", ", folders.Select(f => $"{Path.GetFileName(f.Path)} ({f.Type.Name})"));
+        AddPlatformContent();
         OnPropertyChanged(nameof(HasInstalledMods));
         OnPropertyChanged(nameof(HasWorkshop));
         OnPropertyChanged(nameof(NoInstalledMods));
+        _ = RefreshEmulatorModsAsync();
+    }
+
+    // ── Emulator-level mods: Xenia optimized settings, PS2 HD texture packs ─────
+    public ObservableCollection<EmulatorModVm> EmulatorMods { get; } = new();
+    public bool HasEmulatorMods => EmulatorMods.Count > 0;
+    [ObservableProperty] private string _emulatorModsStatus = "";
+    private int _emulatorModsGeneration;
+
+    private string? PlatformDirForCurrentGame() =>
+        EmulatorModsService.PlatformDirForRom(ResolveIsoPath() ?? _currentLocalRom?.FilePath);
+
+    /// <summary>Adds Roms/&lt;Platform&gt;/Mods|DLC|Updates entries that belong to this game to the Installed list.</summary>
+    private void AddPlatformContent()
+    {
+        var dir = PlatformDirForCurrentGame();
+        if (dir == null) return;
+        foreach (var m in EmulatorModsService.ScanPlatformContent(dir, Title, ResolveKnownTitleIdsForCurrentGame()))
+            InstalledMods.Add(m);
+    }
+
+    private async System.Threading.Tasks.Task RefreshEmulatorModsAsync()
+    {
+        int gen = ++_emulatorModsGeneration;
+        EmulatorMods.Clear();
+        EmulatorModsStatus = "";
+        OnPropertyChanged(nameof(HasEmulatorMods));
+        OnPropertyChanged(nameof(NoInstalledMods));
+        try
+        {
+            if (string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase))
+            {
+                var emu = EmulatorSettingsService.Load("Xbox 360").EmulatorPath;
+                if (string.IsNullOrEmpty(emu)) return;
+                foreach (var id in ResolveKnownTitleIdsForCurrentGame().Where(EmulatorModsService.IsXeniaTitleId))
+                {
+                    var toml = await EmulatorModsService.EnsureXeniaSettingsAsync(id);
+                    if (gen != _emulatorModsGeneration) return;
+                    if (toml == null) continue;
+                    EmulatorMods.Add(new EmulatorModVm
+                    {
+                        Name = $"Optimized Xenia settings ({id})",
+                        Description = "Community-tuned Xenia config from xenia-manager/optimized-settings; auto-updated.",
+                        Icon = "⚙", Kind = "Xenia", EmulatorPath = emu, TitleId = id, SourcePath = toml,
+                        Enabled = EmulatorModsService.IsXeniaSettingsEnabled(emu, id, toml),
+                    });
+                }
+            }
+            else if (IsPs2)
+            {
+                var emu = EmulatorSettingsService.Load("PS2").EmulatorPath;
+                if (string.IsNullOrEmpty(emu)) return;
+                foreach (var pack in EmulatorModsService.FindTexturePacks(PlatformDirForCurrentGame(), Title, ResolveKnownTitleIdsForCurrentGame()))
+                    EmulatorMods.Add(new EmulatorModVm
+                    {
+                        Name = $"HD Texture pack ({pack.TitleId})",
+                        Description = $"{(pack.IsArchive ? "Archive" : "Folder")} · installed into PCSX2 textures/{pack.TitleId} when enabled.",
+                        Icon = "🖼", Kind = "Pcsx2Textures", EmulatorPath = emu, TitleId = pack.TitleId,
+                        SourcePath = pack.SourcePath, Pack = pack,
+                        Enabled = EmulatorModsService.IsTexturePackEnabled(emu, pack),
+                    });
+            }
+        }
+        catch (Exception ex) { EmulatorModsStatus = "Could not load emulator mods: " + ex.Message; }
+        OnPropertyChanged(nameof(HasEmulatorMods));
+        OnPropertyChanged(nameof(NoInstalledMods));
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task ToggleEmulatorMod(EmulatorModVm? mod)
+    {
+        if (mod == null) return;
+        try
+        {
+            bool enable = !mod.Enabled;
+            if (mod.Kind == "Xenia")
+            {
+                if (enable) EmulatorModsService.EnableXeniaSettings(mod.EmulatorPath, mod.TitleId, mod.SourcePath);
+                else EmulatorModsService.DisableXeniaSettings(mod.EmulatorPath, mod.TitleId);
+            }
+            else if (mod.Pack != null)
+            {
+                EmulatorModsStatus = enable ? "Installing texture pack…" : "Removing…";
+                var pack = mod.Pack; var emu = mod.EmulatorPath;
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    if (enable) EmulatorModsService.EnableTexturePack(emu, pack);
+                    else EmulatorModsService.DisableTexturePack(emu, pack);
+                });
+            }
+            mod.Enabled = enable;
+            EmulatorModsStatus = enable ? "✓  Enabled." : "✓  Disabled.";
+        }
+        catch (Exception ex) { EmulatorModsStatus = "Failed: " + ex.Message; }
     }
 
     [RelayCommand]
@@ -1195,11 +1290,31 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mod != null) mod.IsExpanded = !mod.IsExpanded;
     }
 
+    /// <summary>Opens a URL in the built-in browser, tied to this game (platform, title, url).</summary>
+    public Action<string, string, string>? OnOpenUrlInBrowser { get; set; }
+
     [RelayCommand]
-    private void OpenModUrl(GameModEntry? mod)
+    private async System.Threading.Tasks.Task OpenModUrl(GameModEntry? mod)
     {
         if (mod == null || !Uri.TryCreate(mod.Url, UriKind.Absolute, out var u) ||
             (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps)) return;
+
+        // GitHub releases: grab the latest asset with our downloader instead of browsing.
+        if (GameModsService.ParseGitHubReleaseUrl(u.AbsoluteUri) is { } gh)
+        {
+            ModsStatus = $"Checking latest release of {gh.Owner}/{gh.Repo}…";
+            var latest = await GameModsService.GetLatestReleaseAssetAsync(gh.Owner, gh.Repo);
+            if (latest is { Asset: { } asset })
+            {
+                string platform = string.IsNullOrWhiteSpace(Platform) ? "PC" : Platform;
+                Services.DownloadManagerService.Instance.Add(asset.Url, asset.Name, Services.DownloadPathResolver.CategoryMod, platform, game: Title);
+                ModsStatus = $"⬇ Downloading {asset.Name} ({latest.Value.Tag}) — see Downloads.";
+                return;
+            }
+            ModsStatus = "No downloadable release asset found — opening the page.";
+        }
+
+        if (OnOpenUrlInBrowser != null) { IsModBrowserOpen = false; OnOpenUrlInBrowser(Platform, Title, u.AbsoluteUri); return; }
         try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = u.AbsoluteUri, UseShellExecute = true }); }
         catch { /* best-effort */ }
     }

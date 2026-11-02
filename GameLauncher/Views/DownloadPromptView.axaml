@@ -15,6 +15,8 @@
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="Game" Command="{Binding SetCategoryCommand}" CommandParameter="Game" Classes.on="{Binding IsGameCategory}"/>
                     <Button Content="Mod" Command="{Binding SetCategoryCommand}" CommandParameter="Mod" Classes.on="{Binding IsModCategory}"/>
+                    <Button Content="DLC" Command="{Binding SetCategoryCommand}" CommandParameter="DLC" Classes.on="{Binding IsDlcCategory}"/>
+                    <Button Content="Update" Command="{Binding SetCategoryCommand}" CommandParameter="Update" Classes.on="{Binding IsUpdateCategory}"/>
                     <Button Content="Other" Command="{Binding SetCategoryCommand}" CommandParameter="Other" Classes.on="{Binding IsOtherCategory}"/>
                 </StackPanel>
                 <TextBlock Text="PLATFORM" FontSize="11" Foreground="#8b949e"/>

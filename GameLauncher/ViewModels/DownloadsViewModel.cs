@@ -42,6 +42,8 @@ public partial class DownloadsViewModel : ViewModelBase
     public bool IsPromptStartRow => PromptRow == 2;
     public bool IsGameCategory => PromptCategory == DownloadPathResolver.CategoryGame;
     public bool IsModCategory => PromptCategory == DownloadPathResolver.CategoryMod;
+    public bool IsDlcCategory => PromptCategory == DownloadPathResolver.CategoryDlc;
+    public bool IsUpdateCategory => PromptCategory == DownloadPathResolver.CategoryUpdate;
     public bool IsOtherCategory => PromptCategory == DownloadPathResolver.CategoryOther;
 
     /// <summary>Raised after a download is queued so the shell can notify the user / switch pages.</summary>
@@ -64,6 +66,8 @@ public partial class DownloadsViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsGameCategory));
         OnPropertyChanged(nameof(IsModCategory));
+        OnPropertyChanged(nameof(IsDlcCategory));
+        OnPropertyChanged(nameof(IsUpdateCategory));
         OnPropertyChanged(nameof(IsOtherCategory));
         RefreshFolder();
     }

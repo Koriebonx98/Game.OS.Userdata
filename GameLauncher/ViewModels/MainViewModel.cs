@@ -547,6 +547,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle, null, QuickMenuVm.IsPlayingGame);
         QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url, QuickMenuVm.IsPlayingGame);
         DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
+        DetailVm.OnOpenUrlInBrowser = (platform, title, url) => OpenBrowserForGame(platform, title, url);
         QuickMenuVm.OnSignOut = () => SignOutCommand.Execute(null);
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
         QuickMenuVm.OnExitApplication = () => ExitAppCommand.Execute(null);

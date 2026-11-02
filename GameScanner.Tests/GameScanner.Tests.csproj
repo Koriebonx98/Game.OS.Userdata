@@ -7,6 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="SharpCompress" Version="0.50.7" />
+  </ItemGroup>
+
+  <ItemGroup>
     <!-- Share the scanner and models source directly (no Avalonia/UI dependency needed) -->
     <Compile Include="../GameLauncher/GameScannerService.cs" />
     <Compile Include="../GameLauncher/Models/Models.cs" />
@@ -25,5 +29,9 @@
     <Compile Include="../GameLauncher/Services/EmulatorSettingsService.cs" />
     <Compile Include="../GameLauncher/Services/SteamEmuAchievementService.cs" />
     <Compile Include="../GameLauncher/Services/GameReviewService.cs" />
+    <Compile Include="../GameLauncher/Services/EmulatorModsService.cs" />
+    <Compile Include="../GameLauncher/Services/ArchiveExtractor.cs" />
+    <Compile Include="../GameLauncher/Services/GameModsService.cs" />
+    <Compile Include="../GameLauncher/Services/DownloadPathResolver.cs" />
   </ItemGroup>
 </Project>
