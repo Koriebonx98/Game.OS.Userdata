@@ -999,7 +999,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public double BrowseTabOpacity => IsModsInstalledTab ? 0.55 : 1.0;
     /// <summary>PS2 recomp lives in Mods → Installed and only exists for PS2 games.</summary>
     public bool ShowRecompInMods => IsPs2;
-    public bool NoInstalledMods => !IsSwitch && !IsPs2;
+    public bool NoInstalledMods => !IsSwitch && !IsPs2 && !HasInstalledMods;
     partial void OnIsModsInstalledTabChanged(bool value)
     {
         OnPropertyChanged(nameof(IsModsBrowseTab));
@@ -1025,7 +1025,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 Name = string.IsNullOrWhiteSpace(l.Name) ? l.Url : l.Name,
                 Url = l.Url,
                 Description = "Your saved link (" + l.Kind + ")",
-                Genres = new List<string> { "My link" },
+                Genres = string.IsNullOrWhiteSpace(l.ModType) ? new List<string> { "My link" } : new List<string> { "My link", l.ModType },
             });
         _browseMods = mine.Concat(_dbMods).ToList();
         RefreshModList();
@@ -1050,6 +1050,144 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [RelayCommand] private void CloseModBrowser() => IsModBrowserOpen = false;
+
+    // ── Mods: installed detection, URLs with type presets, Steam Workshop ───────
+    public ObservableCollection<InstalledMod> InstalledMods { get; } = new();
+    public string[] ModTypeNames { get; } = GameModsService.PresetNames;
+    [ObservableProperty] private string _detectedModFolders = "";
+    [ObservableProperty] private string _newModName = "";
+    [ObservableProperty] private string _newModUrl = "";
+    [ObservableProperty] private int    _newModTypeIndex;
+    [ObservableProperty] private string _modsStatus = "";
+    [ObservableProperty] private string _workshopInput = "";
+    [ObservableProperty] private bool   _isWorkshopBusy;
+    public bool HasInstalledMods => InstalledMods.Count > 0;
+    public bool HasWorkshop => _steamAppId > 0 && string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Folder used to look for mod sub-folders: the install folder, the saved exe's folder, or the Steam library copy.</summary>
+    private string? ResolveModsRoot()
+    {
+        if (!string.IsNullOrEmpty(ActiveDrivePath) && Directory.Exists(ActiveDrivePath)) return ActiveDrivePath;
+        var exe = GameSettingsService.Load(Title).ExePath;
+        if (!string.IsNullOrEmpty(exe) && File.Exists(exe) && Path.GetDirectoryName(exe) is { } d) return d;
+        return GameModsService.FindSteamGameDir(_steamAppId);
+    }
+
+    private void RefreshInstalledMods()
+    {
+        var root = ResolveModsRoot();
+        InstalledMods.Clear();
+        foreach (var m in GameModsService.ScanInstalled(root, _steamAppId)) InstalledMods.Add(m);
+        var folders = GameModsService.DetectModFolders(root);
+        DetectedModFolders = folders.Count == 0 ? "" :
+            "Detected mod folders: " + string.Join(", ", folders.Select(f => $"{Path.GetFileName(f.Path)} ({f.Type.Name})"));
+        OnPropertyChanged(nameof(HasInstalledMods));
+        OnPropertyChanged(nameof(HasWorkshop));
+        OnPropertyChanged(nameof(NoInstalledMods));
+    }
+
+    [RelayCommand]
+    private void AddModUrl()
+    {
+        var url = (NewModUrl ?? "").Trim();
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps))
+        {
+            ModsStatus = "Enter a valid http(s) URL.";
+            return;
+        }
+        var type = ModTypeNames[Math.Clamp(NewModTypeIndex, 0, ModTypeNames.Length - 1)];
+        GameLinksService.Add(Platform, Title, NewModName, url, GameLink.KindMod, type);
+        NewModUrl = ""; NewModName = "";
+        ModsStatus = "Saved mod link (" + type + ").";
+        RebuildBrowseMods();
+    }
+
+    [RelayCommand]
+    private void OpenSteamWorkshop()
+    {
+        if (_steamAppId <= 0) return;
+        OpenModUrl(new GameModEntry { Url = GameModsService.WorkshopUrl(_steamAppId) });
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task DownloadWorkshopItem()
+    {
+        var id = GameModsService.ParseWorkshopId(WorkshopInput);
+        if (id == null) { ModsStatus = "Paste a Steam Workshop item URL or ID."; return; }
+        IsWorkshopBusy = true;
+        try
+        {
+            var progress = new Progress<string>(m => ModsStatus = m);
+            if (await GameModsService.DownloadWorkshopItemAsync(_steamAppId, id, progress) != null) WorkshopInput = "";
+            RefreshInstalledMods();
+        }
+        finally { IsWorkshopBusy = false; }
+    }
+
+    [RelayCommand]
+    private void OpenInstalledMod(InstalledMod? mod)
+    {
+        if (mod == null) return;
+        OpenWithSystem(mod.IsDirectory ? mod.Path : (Path.GetDirectoryName(mod.Path) ?? mod.Path));
+    }
+
+    [RelayCommand]
+    private void DeleteInstalledMod(InstalledMod? mod)
+    {
+        if (mod == null) return;
+        try { GameModsService.Delete(mod); ModsStatus = "Deleted " + mod.Name; }
+        catch (Exception ex) { ModsStatus = "Delete failed: " + ex.Message; }
+        RefreshInstalledMods();
+    }
+
+    [RelayCommand]
+    private void MoveInstalledMod(InstalledMod? mod)
+    {
+        if (mod == null || BrowseCustomSaveRequested == null) return;
+        BrowseCustomSaveRequested(true, dest =>
+        {
+            try { GameModsService.Move(mod, dest); ModsStatus = "Moved " + mod.Name; }
+            catch (Exception ex) { ModsStatus = "Move failed: " + ex.Message; }
+            RefreshInstalledMods();
+        });
+    }
+
+    // ── First-run launch target prompt ──────────────────────────────────────────
+    [ObservableProperty] private bool   _showLaunchTargetPrompt;
+    [ObservableProperty] private string _launchTargetPromptPath = "";
+    public string LaunchTargetPromptText => IsRom
+        ? "Choose the ROM file to launch this game with. It is saved for next time."
+        : "Choose the game's executable. It is saved for next time.";
+
+    private bool NeedsLaunchTarget(GameSettings saved)
+    {
+        if (IsRom)
+        {
+            if (!string.IsNullOrEmpty(saved.RomPath) && File.Exists(saved.RomPath)) return false;
+            return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
+        }
+        if (!string.IsNullOrEmpty(saved.ExePath) && IsLaunchTargetAvailable(saved.ExePath)) return false;
+        if (_steamAppId > 0) return false;
+        return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
+    }
+
+    [RelayCommand]
+    private void BrowseLaunchTargetPrompt() => BrowseLaunchPathRequested?.Invoke(p => LaunchTargetPromptPath = p);
+
+    [RelayCommand] private void CancelLaunchTargetPrompt() => ShowLaunchTargetPrompt = false;
+
+    [RelayCommand]
+    private void ConfirmLaunchTargetPrompt()
+    {
+        var path = (LaunchTargetPromptPath ?? "").Trim();
+        if (path.Length == 0 || !File.Exists(path)) return;
+        var saved = GameSettingsService.Load(Title);
+        saved.GameTitle = Title;
+        if (IsRom) saved.RomPath = path; else saved.ExePath = path;
+        GameSettingsService.Save(saved);
+        ShowLaunchTargetPrompt = false;
+        LaunchGame();
+    }
 
     [RelayCommand]
     private void ToggleModDetail(GameModEntry? mod)
@@ -2136,6 +2274,15 @@ public partial class GameDetailViewModel : ViewModelBase
 
         // Load saved settings to get the preferred exe path / arguments
         var saved = GameSettingsService.Load(Title);
+
+        // First run: nothing to launch yet, so ask once and remember the choice
+        if (NeedsLaunchTarget(saved))
+        {
+            LaunchTargetPromptPath = "";
+            OnPropertyChanged(nameof(LaunchTargetPromptText));
+            ShowLaunchTargetPrompt = true;
+            return;
+        }
 
         // Run pre-launch entries first (fire-and-forget, best-effort)
         foreach (var pre in saved.PreLaunch.Where(e => e.Enabled))
@@ -3573,6 +3720,7 @@ public partial class GameDetailViewModel : ViewModelBase
         IsModsInstalledTab = true;
         LoadSwitchMods();       // also refreshes IsSwitch / IsPs2 for the current game
         RebuildBrowseMods();
+        RefreshInstalledMods();
         IsModBrowserOpen = true;
     }
     [RelayCommand] private void MenuLaunchViaSteam()
