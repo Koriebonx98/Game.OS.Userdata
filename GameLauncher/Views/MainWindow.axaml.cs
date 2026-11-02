@@ -4,6 +4,7 @@ using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using GameLauncher.Services;
@@ -47,6 +48,8 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         KeyDown += OnKeyDown;
+        // A focused dashboard Button would otherwise swallow Enter/A and click itself instead of the highlighted tile.
+        AddHandler(KeyDownEvent, OnDashboardEnterTunnel, RoutingStrategies.Tunnel);
         DataContextChanged += OnDataContextChanged;
         Opened += (_, _) => RefreshGlobalHotkeyPolling();
         Closed += OnMainWindowClosed;
@@ -285,6 +288,15 @@ public partial class MainWindow : Window
                 return true;
         }
         return false;
+    }
+
+    private void OnDashboardEnterTunnel(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.Enter || e.Source is not Button) return;
+        if (DataContext is not MainViewModel vm || !vm.IsHome || vm.ShowQuickMenu || vm.IsNavExpanded || vm.ShowDetail || vm.ShowFriendProfile) return;
+        string theme = vm.SettingsVm.DesignTheme;
+        if (!DashboardCatalog.IsXb360(theme) && !vm.DashboardVm.Options.IsXbOne) return;
+        OnKeyDown(sender, e);
     }
 
     private void OnKeyDown(object? sender, KeyEventArgs e)
@@ -957,6 +969,9 @@ public partial class MainWindow : Window
                 if (lib.IsWiiGamesLib && (lib.FocusedGameIndex < 0 ||
                     lib.FocusedGameIndex % Math.Max(1, lib.ColumnsProvider?.Invoke() ?? 1) == 0))
                 { vm.NavigateCommand.Execute("dashboard"); return true; }
+                if (lib.IsXbOneGamesLib && (lib.FocusedGameIndex < 0 ||
+                    lib.FocusedGameIndex % Math.Max(1, lib.ColumnsProvider?.Invoke() ?? 1) == 0))
+                { lib.OpenFilterMenu(); return true; }
                 lib.MoveGameFocus(-1);
                 return true;
             case Key.Right:    lib.MoveGameFocus(1);         return true;

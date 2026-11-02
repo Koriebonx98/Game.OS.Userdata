@@ -46,6 +46,24 @@
         <Style Selector="Border.ps5 Border.osk-key.hl > TextBlock">
             <Setter Property="Foreground" Value="White"/>
         </Style>
+        <Style Selector="Border.xbone">
+            <Setter Property="Background" Value="#F0101010"/>
+            <Setter Property="BorderBrush" Value="#107c10"/>
+            <Setter Property="BorderThickness" Value="0,0,0,4"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <Style Selector="Border.xbone Border.osk-key">
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="Background" Value="#2d2d2d"/>
+            <Setter Property="MinWidth" Value="56"/>
+            <Setter Property="Padding" Value="0,16"/>
+        </Style>
+        <Style Selector="Border.xbone Border.osk-key.hl">
+            <Setter Property="Background" Value="#107c10"/>
+        </Style>
+        <Style Selector="Border.xbone Border.osk-key.hl > TextBlock">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
         <Style Selector="Border.filter-row">
             <Setter Property="Padding" Value="14,10"/>
             <Setter Property="CornerRadius" Value="8"/>
@@ -94,6 +112,7 @@
             <Border VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="0,0,0,40"
                     Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
                     Classes.ps5="{Binding IsPs5Keyboard}"
+                    Classes.xbone="{Binding IsXbOneKeyboard}"
                     CornerRadius="14" Padding="16">
                 <StackPanel Spacing="4">
                     <Border Background="#0d1117" CornerRadius="8" Padding="12,10" Margin="3,0,3,8">
