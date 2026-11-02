@@ -74,6 +74,7 @@ public partial class DashboardViewModel
     /// <summary>Rebuilds the active tab's tiles from the current library / profile data.</summary>
     public void RebuildKineticTiles()
     {
+        SyncKineticTabs();
         for (int i = 0; i < KineticTabs.Count; i++) KineticTabs[i].IsActive = i == KineticTabIndex;
         KineticTiles.Clear();
         foreach (var t in BuildKineticTiles(KineticTabs[Math.Clamp(KineticTabIndex, 0, KineticTabs.Count - 1)].Key))
@@ -94,6 +95,7 @@ public partial class DashboardViewModel
 
     private List<KineticTileVm> BuildKineticTiles(string tab)
     {
+        if (Options.IsXbOne) return BuildXbOneTiles(tab);
         var list = new List<KineticTileVm>();
         var recent = RecentLocalGames.ToList();
         switch (tab)

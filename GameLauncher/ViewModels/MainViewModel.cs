@@ -1043,6 +1043,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnContinuePlaying   = LaunchFromCard;
         DashboardVm.OnNavigateToLibrary = () => Navigate("library");
         DashboardVm.OnNavigateToPage    = Navigate;
+        DashboardVm.OnOpenSettingsSection = section =>
+        {
+            SettingsVm.SelectedSection = section;
+            Navigate("settings");
+        };
         DashboardVm.OnNavigateToMediaSection = section =>
         {
             MediaVm.OpenSection(section);

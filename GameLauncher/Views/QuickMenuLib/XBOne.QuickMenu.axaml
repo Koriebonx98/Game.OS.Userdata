@@ -1,0 +1,150 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.QuickMenuLib.XbOneQuickMenu"
+             x:DataType="vm:QuickMenuViewModel">
+
+    <!--
+        Xbox One guide: left-hand panel with an icon tab strip, a green title bar and a list of actions.
+        Uses the shared hub model (pages + HubActions), so D-pad / LB / RB / A / B behave like the other guides.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.xog-tab">
+            <Setter Property="Width" Value="48"/>
+            <Setter Property="Height" Value="48"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="FontSize" Value="22"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.xog-tab /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#9a9a9a"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <Style Selector="Button.xog-tab:pointerover /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xog-tab.active /template/ ContentPresenter">
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="BorderThickness" Value="0,0,0,3"/>
+        </Style>
+
+        <Style Selector="Button.xog-row">
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.xog-row /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="CornerRadius" Value="0"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="3"/>
+        </Style>
+        <Style Selector="Button.xog-row:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3a3a3a"/>
+        </Style>
+        <Style Selector="Button.xog-row.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3a3a3a"/>
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+        <Style Selector="Button.xog-row.info /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border HorizontalAlignment="Left" VerticalAlignment="Stretch" Width="570" Margin="66,22,0,22"
+            Background="#F2262626" IsVisible="{Binding UsesXbOneGuideLayout}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="36,14,36,14">
+
+            <!-- Icon tab strip -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8" Margin="-18,0,0,0">
+                <Border Width="40" Height="40" CornerRadius="20" Background="#107c10" Margin="0,4,12,0">
+                    <TextBlock Text="{Binding Xb360UserInitial}" Foreground="White" FontWeight="Bold" FontSize="18"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+                <Button Classes="xog-tab" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" ToolTip.Tip="Achievements">🏆</Button>
+                <Button Classes="xog-tab" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" ToolTip.Tip="Friends">👥</Button>
+                <Button Classes="xog-tab" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" ToolTip.Tip="Messages">📬</Button>
+                <Button Classes="xog-tab" Classes.active="{Binding IsHomePage}" Command="{Binding SelectHomeCommand}" ToolTip.Tip="Home">Ⓧ</Button>
+                <Button Classes="xog-tab" Classes.active="{Binding IsSwitcherPage}" Command="{Binding SelectSwitcherCommand}" ToolTip.Tip="Switch">🗂</Button>
+                <Button Classes="xog-tab" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}" ToolTip.Tip="Downloads">⬇</Button>
+                <Button Classes="xog-tab" Command="{Binding OpenSettingsPageCommand}" ToolTip.Tip="Settings">⚙</Button>
+            </StackPanel>
+
+            <!-- Green page title bar -->
+            <Border Grid.Row="1" Background="#107c10" Margin="0,14,0,0" Padding="14,12">
+                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                    <TextBlock Text="⌂" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding MenuTitle}" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+
+            <!-- Quick tiles: now playing, media, pin -->
+            <UniformGrid Grid.Row="2" Rows="1" Margin="0,2,0,12" Height="70">
+                <Button Classes="xog-row" Margin="0,0,2,0" Command="{Binding SelectMediaCommand}" HorizontalContentAlignment="Center">
+                    <TextBlock Text="🎵" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+                <Button Classes="xog-row" Margin="2,0" Command="{Binding SelectBrowserCommand}" HorizontalContentAlignment="Center">
+                    <TextBlock Text="🌐" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+                <Button Classes="xog-row" Margin="2,0,0,0" Command="{Binding SelectPowerCommand}" HorizontalContentAlignment="Center">
+                    <TextBlock Text="⏻" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Button>
+            </UniformGrid>
+
+            <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+              <StackPanel>
+                <Border IsVisible="{Binding ShowMediaBar}" Background="#33000000" Padding="10,6" Margin="0,0,0,10">
+                  <StackPanel Spacing="6">
+                    <TextBlock Text="{Binding MediaStatusLabel}" Foreground="#d0d0d0" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <Button Classes="xog-tab" Width="44" Height="36" Command="{Binding MediaPreviousCommand}">⏮</Button>
+                      <Button Classes="xog-tab" Width="44" Height="36" Command="{Binding MediaPlayPauseCommand}">⏯</Button>
+                      <Button Classes="xog-tab" Width="44" Height="36" Command="{Binding MediaNextCommand}">⏭</Button>
+                      <Button Classes="xog-tab" Width="44" Height="36" Command="{Binding MediaVolumeDownCommand}">🔉</Button>
+                      <Button Classes="xog-tab" Width="44" Height="36" Command="{Binding MediaVolumeUpCommand}">🔊</Button>
+                      <TextBlock Text="{Binding MediaVolumeLabel}" Foreground="White" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                    </StackPanel>
+                  </StackPanel>
+                </Border>
+                <ItemsControl ItemsSource="{Binding HubActions}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="0"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                            <Button Classes="xog-row" Classes.cursor="{Binding IsCursor}"
+                                    Classes.info="{Binding !IsActionable}"
+                                    IsHitTestVisible="{Binding IsActionable}"
+                                    Command="{Binding ActivateCommand}">
+                                <Grid ColumnDefinitions="Auto,*" MinHeight="64">
+                                    <Border Width="64" Height="64" Background="#107c10">
+                                        <TextBlock Text="{Binding Glyph}" FontSize="26" Foreground="White"
+                                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="16,0,8,0">
+                                        <TextBlock Text="{Binding Title}" FontSize="20" Foreground="White"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="14" Foreground="#bdbdbd"
+                                                   TextTrimming="CharacterEllipsis" IsVisible="{Binding HasSubtitle}"/>
+                                    </StackPanel>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+
+            <TextBlock Grid.Row="4" Margin="0,10,0,0" Foreground="#9a9a9a" FontSize="13"
+                       Text="LB RB / ◀ ▶ Tab     ▲ ▼ Select     Ⓐ Select     Ⓑ Back"/>
+        </Grid>
+    </Border>
+</UserControl>

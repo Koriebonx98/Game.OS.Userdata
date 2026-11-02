@@ -1,0 +1,182 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.DashboardLib.XbOneDashboard"
+             x:DataType="vm:DashboardViewModel">
+
+    <!--
+        Xbox One home: pivot header (Home / Community / My Games / Media / Settings), a mosaic of flat tiles
+        and a button-hint bar. Shares tiles + controller navigation with the Kinetic dashboard
+        (DashboardViewModel.XbOne.cs / .Kinetic.cs).
+        Controller: D-pad moves, A = open, X = quick play, LB / RB = switch pivot, Left from the first column = nav menu.
+    -->
+    <UserControl.Styles>
+        <Style Selector="Button.xo-tab">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#7fb89a"/>
+            <Setter Property="FontSize" Value="44"/>
+            <Setter Property="FontWeight" Value="Light"/>
+            <Setter Property="Padding" Value="6,2"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.xo-tab /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Button.xo-tab:pointerover">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xo-tab.active">
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.xo-tile">
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="4"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="VerticalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.xo-tile /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1141a8"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="4"/>
+            <Setter Property="CornerRadius" Value="0"/>
+        </Style>
+        <Style Selector="Button.xo-tile.solid /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1141a8"/>
+        </Style>
+        <Style Selector="Button.xo-tile:pointerover /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#7fa8ff"/>
+        </Style>
+        <Style Selector="Button.xo-tile.focused /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+        <Style Selector="Button.xo-tile.focused">
+            <Setter Property="ZIndex" Value="5"/>
+            <Setter Property="RenderTransform" Value="scale(1.0)"/>
+        </Style>
+        <Style Selector="Button.xo-tile">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Border.xo-caption.cover">
+            <Setter Property="Background" Value="#CC0b1a2e"/>
+        </Style>
+        <Style Selector="ItemsControl.xo-grid > ContentPresenter" x:DataType="vm:KineticTileVm">
+            <Setter Property="Grid.Column" Value="{Binding Col}"/>
+            <Setter Property="Grid.Row" Value="{Binding Row}"/>
+            <Setter Property="Grid.ColumnSpan" Value="{Binding ColSpan}"/>
+            <Setter Property="Grid.RowSpan" Value="{Binding RowSpan}"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Border Classes="dashboard-xbone-layout" Height="{Binding $parent[ScrollViewer].Bounds.Height}">
+        <Border.Background>
+            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                <GradientStop Color="#0f4a2c" Offset="0"/>
+                <GradientStop Color="#0a3a22" Offset="0.35"/>
+                <GradientStop Color="#146a3c" Offset="0.6"/>
+                <GradientStop Color="#07291a" Offset="1"/>
+            </LinearGradientBrush>
+        </Border.Background>
+        <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="44,24,0,16">
+
+            <!-- User chip + Xbox logo -->
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="0,0,44,0" IsVisible="{Binding Options.ShowProfile}">
+                <Border Grid.Column="0" Background="#1141a8" Padding="0">
+                    <StackPanel Orientation="Horizontal">
+                        <Border Width="64" Height="64" Background="#1141a8">
+                            <TextBlock Text="🌐" FontSize="30" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <Border Width="64" Height="64" Background="{DynamicResource DashAccent}">
+                            <TextBlock Text="{Binding SteamProfileInitial}" FontSize="30" FontWeight="Bold" Foreground="White"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="{Binding Profile.Username}" Foreground="White" FontSize="22" VerticalAlignment="Center"
+                                   Margin="14,0,70,0"/>
+                    </StackPanel>
+                </Border>
+                <TextBlock Grid.Column="0" Text="▾" Foreground="White" FontSize="16" HorizontalAlignment="Right"
+                           VerticalAlignment="Center" Margin="0,0,12,0"/>
+                <Border Grid.Column="2" Width="56" Height="56" CornerRadius="28" Background="White">
+                    <TextBlock Text="✕" FontSize="30" FontWeight="Bold" Foreground="#0a3a22"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                </Border>
+            </Grid>
+
+            <!-- Pivot header -->
+            <ItemsControl Grid.Row="1" ItemsSource="{Binding KineticTabs}" IsVisible="{Binding Options.ShowTabs}" Margin="0,18,0,0">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="40"/></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:KineticTabVm">
+                        <Button Classes="xo-tab" Classes.active="{Binding IsActive}" Content="{Binding Title}"
+                                Command="{ReflectionBinding $parent[UserControl].DataContext.SelectKineticTabCommand}"
+                                CommandParameter="{Binding}"/>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+
+            <!-- Column headings (Home pivot only) -->
+            <Grid Grid.Row="2" ColumnDefinitions="*,*,*,*,*,1.78*,1.78*" Margin="0,22,0,4"
+                  IsVisible="{Binding XbOneHomeActive}">
+                <TextBlock Grid.Column="5" Text="FEATURED" Foreground="White" FontSize="15" FontWeight="SemiBold" Margin="8,0,0,0"/>
+                <TextBlock Grid.Column="6" Text="FRIENDS" Foreground="White" FontSize="15" FontWeight="SemiBold" Margin="8,0,0,0"/>
+            </Grid>
+
+            <!-- Tile mosaic: 5 main columns plus the wider Featured and Friends columns -->
+            <Grid Grid.Row="3" MinHeight="150">
+                <ItemsControl Classes="xo-grid" ItemsSource="{Binding KineticTiles}"
+                              HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Grid ColumnDefinitions="*,*,*,*,*,1.78*,1.78*" RowDefinitions="*,*,*"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:KineticTileVm">
+                            <Button Classes="xo-tile" Classes.solid="{Binding IsSolid}" Classes.focused="{Binding IsFocused}"
+                                    Command="{Binding ActivateCommand}">
+                                <Grid>
+                                    <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackGradient="{Binding CoverGradient}"
+                                                      FallbackText="" IsVisible="{Binding HasCover}"/>
+                                    <TextBlock Text="{Binding Glyph}" FontSize="52" Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,24"
+                                               IsVisible="{Binding IsSolid}"/>
+                                    <Border Classes="xo-caption" Classes.cover="{Binding HasCover}" VerticalAlignment="Bottom"
+                                            HorizontalAlignment="Left" Padding="14,8">
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Foreground="White" FontSize="21" FontWeight="Light"
+                                                       TextWrapping="Wrap"/>
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="#d6e2ff" FontSize="13"
+                                                       TextTrimming="CharacterEllipsis" IsVisible="{Binding HasSubtitle}"/>
+                                        </StackPanel>
+                                    </Border>
+                                </Grid>
+                            </Button>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+
+            <!-- Hints + clock -->
+            <Grid Grid.Row="4" ColumnDefinitions="*,Auto" Margin="0,8,44,0">
+                <StackPanel Orientation="Horizontal" Spacing="26" VerticalAlignment="Center" IsVisible="{Binding Options.ShowHints}">
+                    <TextBlock Text="Ⓐ Select" Foreground="#cfe8d8" FontSize="15"/>
+                    <TextBlock Text="{Binding KineticSecondaryHint}" Foreground="#cfe8d8" FontSize="15"
+                               IsVisible="{Binding KineticSecondaryHint, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <TextBlock Text="LB RB Switch" Foreground="#cfe8d8" FontSize="15"/>
+                    <TextBlock Text="◀ ▶ ▲ ▼ Move" Foreground="#cfe8d8" FontSize="15"/>
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="{Binding SteamClockTime}" Foreground="White" FontSize="34" FontWeight="Light"
+                           IsVisible="{Binding Options.ShowClock}"/>
+            </Grid>
+        </Grid>
+    </Border>
+</UserControl>

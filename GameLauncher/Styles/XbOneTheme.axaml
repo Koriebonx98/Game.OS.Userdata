@@ -1,0 +1,24 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Xbox One dashboard theme: near-black surfaces, green accent (see Views/DashboardLib/XBOne.Dashboard.axaml) -->
+    <Style Selector="Border.dashboard-xbone-layout">
+        <Setter Property="IsVisible" Value="True"/>
+    </Style>
+    <Style Selector="StackPanel.dashboard-default-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
+    <Style Selector="Window.main-window-shell">
+        <Setter Property="Background" Value="#101010"/>
+    </Style>
+    <Style Selector="Border.main-content-surface">
+        <Setter Property="Background" Value="#101010"/>
+    </Style>
+    <Style Selector="Border.detail-overlay-surface">
+        <Setter Property="Background" Value="#141414"/>
+    </Style>
+    <Style Selector="UserControl.dashboard-root">
+        <Setter Property="Background" Value="#101010"/>
+    </Style>
+</Styles>

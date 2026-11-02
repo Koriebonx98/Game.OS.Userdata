@@ -24,6 +24,8 @@ public partial class App : Application
     private const string WiiDesignTheme     = "Wii";
     private const string SwitchDesignTheme  = "Switch";
     private const string SteamBpmDesignTheme = "SteamBPM";
+    private const string XbOneDesignTheme   = "XBOne";
+    private const string XbOneThemeSource   = "avares://GameLauncher/Styles/XbOneTheme.axaml";
     private const string Xb360ThemeSource   = "avares://GameLauncher/Styles/Xb360Theme.axaml";
     private const string Ps5ThemeSource     = "avares://GameLauncher/Styles/Ps5Theme.axaml";
     private const string WiiThemeSource     = "avares://GameLauncher/Styles/WiiTheme.axaml";
@@ -191,6 +193,8 @@ public partial class App : Application
         if (string.Equals(trimmed, Xb360DesignTheme, StringComparison.OrdinalIgnoreCase) ||
             ViewModels.DashboardCatalog.IsXb360(trimmed))
             normalised = Xb360DesignTheme;
+        else if (string.Equals(trimmed, XbOneDesignTheme, StringComparison.OrdinalIgnoreCase))
+            normalised = XbOneDesignTheme;
         else if (string.Equals(trimmed, Ps5DesignTheme, StringComparison.OrdinalIgnoreCase))
             normalised = Ps5DesignTheme;
         else if (string.Equals(trimmed, WiiDesignTheme, StringComparison.OrdinalIgnoreCase))
@@ -211,6 +215,7 @@ public partial class App : Application
         string? themeSource = normalised switch
         {
             Xb360DesignTheme => Xb360ThemeSource,
+            XbOneDesignTheme => XbOneThemeSource,
             Ps5DesignTheme   => Ps5ThemeSource,
             WiiDesignTheme   => WiiThemeSource,
             SwitchDesignTheme => SwitchThemeSource,
