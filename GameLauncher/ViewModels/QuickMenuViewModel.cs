@@ -55,7 +55,8 @@ public partial class QuickMenuViewModel : ViewModelBase
     public bool IsWiiTheme => string.Equals(QuickMenuTheme, "Wii", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchTheme => string.Equals(QuickMenuTheme, "Switch", StringComparison.OrdinalIgnoreCase);
     public bool IsSteamBpmTheme => string.Equals(QuickMenuTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
-    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme && !IsXb360Theme && !IsSwitchTheme && !IsSteamBpmTheme;
+    public bool IsXbOneTheme => string.Equals(QuickMenuTheme, "XBOne", StringComparison.OrdinalIgnoreCase);
+    public bool UsesHubLayout => !IsGameOsTheme && !IsWiiTheme && !IsXb360Theme && !IsSwitchTheme && !IsSteamBpmTheme && !IsXbOneTheme;
     public bool UsesXb360GuideLayout => IsXb360Theme;
 
     // ── Hub page state ──────────────────────────────────────────────────────
@@ -279,6 +280,8 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsWiiTheme));
         OnPropertyChanged(nameof(IsSwitchTheme));
         OnPropertyChanged(nameof(IsSteamBpmTheme));
+        OnPropertyChanged(nameof(IsXbOneTheme));
+        OnPropertyChanged(nameof(UsesXbOneGuideLayout));
         OnPropertyChanged(nameof(UsesHubLayout));
         OnPropertyChanged(nameof(UsesXb360GuideLayout));
         OnPropertyChanged(nameof(UsesSwitchGuideLayout));
@@ -418,7 +421,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         var navigationOrder = GetCurrentNavigationOrder();
         if (navigationOrder.Length == 0) return;
         // Steam clamps at the ends (no jarring jump across all tabs); other themes wrap in both directions.
-        int next = IsSteamBpmTheme
+        int next = IsSteamBpmTheme || IsXbOneTheme
             ? Math.Clamp(SelectedHubIndex + delta, 0, navigationOrder.Length - 1)
             : ((SelectedHubIndex + delta) % navigationOrder.Length + navigationOrder.Length) % navigationOrder.Length;
         SelectedHubIndex = next;
@@ -1240,6 +1243,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
+        if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         return "PS5";
     }
 

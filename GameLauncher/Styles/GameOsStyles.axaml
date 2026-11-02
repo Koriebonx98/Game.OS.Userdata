@@ -496,6 +496,10 @@
         <Setter Property="IsVisible" Value="False"/>
     </Style>
 
+    <Style Selector="Border.dashboard-xbone-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
     <Style Selector="Border.dashboard-steambpm-layout">
         <Setter Property="IsVisible" Value="False"/>
     </Style>

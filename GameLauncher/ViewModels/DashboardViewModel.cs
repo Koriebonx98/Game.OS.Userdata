@@ -27,7 +27,7 @@ public partial class DashboardViewModel : ViewModelBase
             OnPropertyChanged(nameof(SteamClockTime));
         };
         _wiiClockTimer.Start();
-        Options.PropertyChanged += (_, _) => { UpdateFocusedCard(); ClampSteamFocus(); };
+        Options.PropertyChanged += (_, _) => { UpdateFocusedCard(); ClampSteamFocus(); if (Options.Design != _kineticDesign) RebuildKineticTiles(); };
     }
 
     [ObservableProperty] private UserProfile _profile = new();

@@ -623,7 +623,7 @@ namespace GameLauncher.Models
         /// <summary>On-screen keyboard style: "Default" or "PS5".</summary>
         [JsonPropertyName("keyboardTheme")] public string KeyboardTheme { get; set; } = "Default";
 
-        /// <summary>Style of quick menu overlay: "GameOS", "PS5", "XB360", "Wii", "Switch", or "SteamBPM".</summary>
+        /// <summary>Style of quick menu overlay: "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM", or "XBOne".</summary>
         /// <summary>Quick guide actions switched off in Settings → Design → Quick Menu ⚙ (keys such as "screenshot", "record", "keyboard").</summary>
         [JsonPropertyName("quickMenuHiddenActions")] public List<string> QuickMenuHiddenActions { get; set; } = new();
         /// <summary>Settings → Games: minutes between background drive rescans (0 = only at startup).</summary>

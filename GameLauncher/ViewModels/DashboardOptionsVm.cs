@@ -13,8 +13,9 @@ public sealed record DashboardAssetDef(string Key, string Label);
 /// <summary>Which assets each dashboard design offers in Settings → Design → ⚙, plus default accents.</summary>
 public static class DashboardCatalog
 {
-    public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", "Wii", "Switch", "SteamBPM" };
+    public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", "Wii", "Switch", "SteamBPM", XbOne };
 
+    public const string XbOne = "XBOne";
     public const string Xb360Og = "XB360 OG";
     public const string Xb360Kinetic = "XB360 Kinetic";
 
@@ -43,6 +44,11 @@ public static class DashboardCatalog
             new("achievements", "Achievements / trophies (panel & counter)"),
             new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
             new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
+        },
+        XbOne => new DashboardAssetDef[]
+        {
+            new("tabs", "Pivot header (home / community / …)"), new("profile", "Gamertag & profile picture"),
+            new("clock", "Clock"), new("hints", "Controller button hints"),
         },
         Xb360Og => new DashboardAssetDef[]
         {
@@ -75,6 +81,7 @@ public static class DashboardCatalog
         "Switch" => "#00c3e3",
         "PS5" => "#0070D1",
         Xb360Og or Xb360Kinetic => "#1f9d1f",
+        XbOne => "#107c10",
         "SteamBPM" => "#1a9fff",
         _ => "#58a6ff",
     };
@@ -176,6 +183,7 @@ public partial class DashboardOptionsVm : ObservableObject
 
     public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
     public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;
+    public bool IsXbOne        => Design == DashboardCatalog.XbOne;
 }
 
 /// <summary>One asset checkbox in the Settings editor.</summary>

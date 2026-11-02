@@ -11,7 +11,8 @@
              Classes.qm-theme-xb360="{Binding IsXb360Theme}"
              Classes.qm-theme-wii="{Binding IsWiiTheme}"
              Classes.qm-theme-switch="{Binding IsSwitchTheme}"
-             Classes.qm-theme-steambpm="{Binding IsSteamBpmTheme}">
+             Classes.qm-theme-steambpm="{Binding IsSteamBpmTheme}"
+             Classes.qm-theme-xbone="{Binding IsXbOneTheme}">
 
     <UserControl.Styles>
         <Style Selector="Border.qm-overlay-backdrop">
@@ -309,6 +310,7 @@
           Views/QuickMenuLib/Hub.QuickMenu.axaml      ("PS5" hub bar)
           Views/QuickMenuLib/Switch.QuickMenu.axaml   ("Switch" Quick Guide)
           Views/QuickMenuLib/Steam.QuickMenu.axaml    ("SteamBPM" Quick Guide)
+          Views/QuickMenuLib/XBOne.QuickMenu.axaml    ("XBOne" guide)
           Views/QuickMenuLib/QuickMenu.Chat.axaml     (chat mini-window, all themes)
         Shared theme styles stay in this file.
     -->
@@ -320,6 +322,7 @@
         <qm:HubQuickMenu/>
         <qm:SwitchQuickMenu/>
         <qm:SteamQuickMenu/>
+        <qm:XbOneQuickMenu/>
         <qm:QuickMenuChat/>
         <views:OnScreenKeyboardView DataContext="{Binding Keyboard}"/>
     </Grid>

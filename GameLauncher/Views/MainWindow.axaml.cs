@@ -442,7 +442,7 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
-        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
+        if (vm.IsHome && (isXb360 && vm.DashboardVm.Options.IsXb360Kinetic || vm.DashboardVm.Options.IsXbOne) && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
             && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter or Key.PageUp or Key.PageDown or Key.X)
         {
             var kr = vm.DashboardVm.HandleKineticKey(e.Key.ToString());
@@ -1668,7 +1668,7 @@ public partial class MainWindow : Window
 
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
-        if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
+        if (vm.IsHome && (isXb360 && vm.DashboardVm.Options.IsXb360Kinetic || vm.DashboardVm.Options.IsXbOne) && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
             && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter or Key.PageUp or Key.PageDown or Key.X)
         {
             var kr = vm.DashboardVm.HandleKineticKey(key.ToString());

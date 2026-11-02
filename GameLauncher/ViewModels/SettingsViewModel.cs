@@ -341,12 +341,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
-    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM" };
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM", "XBOne" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
     /// <summary>Available quick-menu styles.</summary>
-    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM" };
+    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM", "XBOne" };
 
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
@@ -1373,6 +1373,7 @@ public partial class SettingsViewModel : ViewModelBase
     private static string NormaliseGamesLibTheme(string value)
     {
         var v = (value ?? "").Trim();
+        if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
@@ -1399,6 +1400,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
+        if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         return "PS5";
     }
 }
