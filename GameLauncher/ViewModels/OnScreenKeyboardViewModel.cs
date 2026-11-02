@@ -37,6 +37,7 @@ public sealed partial class OnScreenKeyboardViewModel : ObservableObject
 
     private Action<string>? _onChanged;
     private Action<string>? _onSubmit;
+    private Action<string>? _typeSink;
     private int _row, _col;
     private bool _upper;
 
@@ -64,7 +65,17 @@ public sealed partial class OnScreenKeyboardViewModel : ObservableObject
         IsOpen = true;
     }
 
-    public void Close() { IsOpen = false; _onChanged = null; _onSubmit = null; }
+    /// <summary>
+    /// Opens the keyboard in "typing" mode: every key press is forwarded to <paramref name="sink"/> as it happens
+    /// (a character, or "{BACKSPACE}" / "{ENTER}") instead of editing a text buffer — used to type into a running game/app.
+    /// </summary>
+    public void OpenForTyping(string title, Action<string> sink)
+    {
+        Open("", title, _ => { }, _ => sink("{ENTER}"));
+        _typeSink = sink;
+    }
+
+    public void Close() { IsOpen = false; _onChanged = null; _onSubmit = null; _typeSink = null; }
 
     public void Move(int dx, int dy)
     {
@@ -94,17 +105,24 @@ public sealed partial class OnScreenKeyboardViewModel : ObservableObject
         switch (key.Label)
         {
             case "Shift": _upper = !_upper; Refresh(); return;
-            case "Space": Set(Text + " "); return;
+            case "Space": _typeSink?.Invoke(" "); Set(Text + " "); return;
             case "Backspace": Backspace(); return;
             case "Clear": Set(""); return;
             case "Done": Close(); return;
             case "Go": { var cb = _onSubmit; var t = Text; Close(); cb?.Invoke(t); return; }
-            default: Set(Text + (_upper ? key.Label.ToUpperInvariant() : key.Label)); return;
+            default:
+            {
+                string ch = _upper ? key.Label.ToUpperInvariant() : key.Label;
+                _typeSink?.Invoke(ch);
+                Set(Text + ch);
+                return;
+            }
         }
     }
 
     public void Backspace()
     {
+        _typeSink?.Invoke("{BACKSPACE}");
         if (Text.Length > 0) Set(Text[..^1]);
     }
 

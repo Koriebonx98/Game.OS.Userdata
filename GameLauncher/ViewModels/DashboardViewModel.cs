@@ -1308,6 +1308,25 @@ public partial class DashboardViewModel : ViewModelBase
         Xb360FocusedGame.IsFocused = true;
     }
 
+    /// <summary>A button on the classic XB360 dash: opens the focused game's info, or runs the active blade's main function.</summary>
+    public void ActivateXb360()
+    {
+        switch (Xb360ActiveBlade)
+        {
+            case "social": OnNavigateToPage?.Invoke("friends"); return;
+            case "media": OnNavigateToMediaSection?.Invoke("movies"); return;
+            case "settings": OnNavigateToPage?.Invoke("settings"); return;
+            case "games":
+                if (Xb360FocusedGame != null) OnOpenLocalDetail?.Invoke(Xb360FocusedGame);
+                else OnNavigateToLibrary?.Invoke();
+                return;
+            default:
+                if (Xb360FocusedGame != null) OnOpenLocalDetail?.Invoke(Xb360FocusedGame);
+                else OnNavigateToLibrary?.Invoke();
+                return;
+        }
+    }
+
     [RelayCommand]
     private void PlayXb360FocusedGame()
     {

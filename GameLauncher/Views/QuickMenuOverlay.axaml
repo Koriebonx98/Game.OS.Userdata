@@ -321,6 +321,7 @@
         <qm:SwitchQuickMenu/>
         <qm:SteamQuickMenu/>
         <qm:QuickMenuChat/>
+        <views:OnScreenKeyboardView DataContext="{Binding Keyboard}"/>
     </Grid>
 
 </UserControl>

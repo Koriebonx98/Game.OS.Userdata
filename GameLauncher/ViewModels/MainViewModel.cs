@@ -3233,8 +3233,48 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 }
                 catch { /* best-effort per platform */ }
             }
+
+            await EnrichFromMetadataProvidersAsync(sources.Select(x => (x.Title, x.Platform, x.TitleId)));
         }
         catch { /* best-effort — cards already show gradient placeholder */ }
+    }
+
+    /// <summary>
+    /// Scanned games, repacks and ROMs that the Game OS database could not cover get free metadata: Steam's store for
+    /// PC (title or steam_appid.txt, so cracked copies work), plus SteamGridDB / TheGamesDB / IGDB when keys are set.
+    /// Results are cached locally and queued for the Game OS games database.
+    /// </summary>
+    private async Task EnrichFromMetadataProvidersAsync(IEnumerable<(string Title, string Platform, string? TitleId)> sources)
+    {
+        var cfg = AppSettingsService.Load();
+        bool keyed = !string.IsNullOrWhiteSpace(cfg.SteamGridDbApiKey) || !string.IsNullOrWhiteSpace(cfg.TheGamesDbApiKey)
+                     || (!string.IsNullOrWhiteSpace(cfg.IgdbClientId) && !string.IsNullOrWhiteSpace(cfg.IgdbClientSecret));
+        int budget = 40; // network lookups per pass; cached results are free
+        foreach (var (title, platform, titleId) in sources.Distinct())
+        {
+            bool pc = string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase);
+            if (!pc && !keyed) continue;
+            var card = LibraryVm.FindMyGameCard(title, platform);
+            if (card == null || !string.IsNullOrEmpty(card.CoverUrl)) continue;
+            // A raw title id (e.g. CUSA00572) is not searchable; use the resolved name or skip.
+            string search = card.DisplayTitle ?? (string.IsNullOrEmpty(titleId) ? title : "");
+            if (search == "") continue;
+            try
+            {
+                bool cached = GameMetadataResolver.LoadCached(GameMetadataResolver.CleanTitle(search), platform) is { IsEmpty: false };
+                if (!cached && budget-- <= 0) break;
+                string? dir = card.SourceGame?.FolderPath;
+                var meta = await GameMetadataResolver.ResolveAsync(search, dir, platform,
+                    cfg.SteamGridDbApiKey, cfg.TheGamesDbApiKey, cfg.IgdbClientId, cfg.IgdbClientSecret);
+                if (meta.IsEmpty) continue;
+                Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                {
+                    if (string.IsNullOrEmpty(card.CoverUrl) && meta.CoverUrl != "") card.CoverUrl = meta.CoverUrl;
+                });
+            }
+            catch (Exception ex) { DevLogService.Log($"[Metadata] '{title}' ({platform}): {ex.Message}"); }
+        }
+        RefreshDashboardLocalGames();
     }
 
     /// <summary>

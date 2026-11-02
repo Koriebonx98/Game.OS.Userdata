@@ -702,6 +702,13 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("steamApiKey")] public string SteamApiKey { get; set; } = "";
 
+        /// <summary>IGDB (Twitch application) client id / secret — stored locally only. Used for game metadata lookups.</summary>
+        [JsonPropertyName("igdbClientId")]     public string IgdbClientId     { get; set; } = "";
+        [JsonPropertyName("igdbClientSecret")] public string IgdbClientSecret { get; set; } = "";
+        /// <summary>Optional free keys for SteamGridDB (artwork) and TheGamesDB (metadata). Steam's store needs no key.</summary>
+        [JsonPropertyName("steamGridDbApiKey")] public string SteamGridDbApiKey { get; set; } = "";
+        [JsonPropertyName("theGamesDbApiKey")]  public string TheGamesDbApiKey  { get; set; } = "";
+
         /// <summary>
         /// Steam 64-bit User ID (SteamID64).  Used with the Steam Web API to fetch
         /// the user's owned games library.  Shown on the user's Steam profile page.

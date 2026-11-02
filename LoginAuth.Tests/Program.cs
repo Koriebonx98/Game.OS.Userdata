@@ -1,3 +1,4 @@
+using System.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -87,6 +88,12 @@ class Program
 
         // ── 13. GitHub-direct achievement mirror sync ───────────────────────
         allPassed &= await TestAchievementMirrorSyncAsync();
+
+        // ── 14. Game providers (Epic manifest + IGDB parsing) ───────────────
+        allPassed &= TestGameProviders();
+
+        // ── 15. Free metadata resolver (title cleaning, Steam/SteamGridDB/TheGamesDB parsing) ──
+        allPassed &= TestMetadataResolver();
 
         // ── Summary ───────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -715,6 +722,70 @@ class Program
             passed &= ok;
         }
 
+        return passed;
+    }
+
+    // ── Test 14: provider parsing ─────────────────────────────────────────────
+    static bool TestGameProviders()
+    {
+        Section("14. Game providers  (Epic manifest + IGDB response parsing)");
+        bool passed = true;
+
+        var epic = GameProviderService.ParseEpicManifest(
+            "{\"DisplayName\":\"Fortnite\",\"AppName\":\"Fortnite\",\"InstallLocation\":\"C:\\\\Games\\\\Fortnite\",\"CatalogNamespace\":\"fn\",\"CatalogItemId\":\"abc\"}");
+        bool ok = epic is { Provider: "Epic", Title: "Fortnite" } && epic.LaunchUri.StartsWith("com.epicgames.launcher://apps/");
+        Pass(ok, "Epic manifest → installed game with launch URI");
+        passed &= ok;
+
+        ok = GameProviderService.ParseEpicManifest("{\"DisplayName\":\"X\",\"AppName\":\"X\",\"InstallLocation\":\"C:\\\\X\",\"bIsIncompleteInstall\":true}") == null;
+        Pass(ok, "Incomplete Epic install is skipped");
+        passed &= ok;
+
+        var igdb = IgdbService.ParseGames(
+            "[{\"id\":7,\"name\":\"Halo\",\"total_rating\":80,\"first_release_date\":1005782400,\"cover\":{\"image_id\":\"co1\"},\"genres\":[{\"name\":\"Shooter\"}]}]");
+        ok = igdb.Count == 1 && igdb[0].Name == "Halo" && Math.Abs(igdb[0].Rating - 4.0) < 0.001
+             && igdb[0].ReleaseYear == 2001 && igdb[0].Genres.SequenceEqual(new[] { "Shooter" })
+             && igdb[0].CoverUrl!.EndsWith("co1.jpg");
+        Pass(ok, "IGDB JSON → name, 0–5 rating, year, genre, cover");
+        passed &= ok;
+
+        return passed;
+    }
+
+    // ── Test 15: metadata resolver ────────────────────────────────────────────
+    static bool TestMetadataResolver()
+    {
+        Section("15. Metadata resolver  (cracked-game titles, Steam / SteamGridDB / TheGamesDB parsing)");
+        bool passed = true;
+        void Check(bool ok, string msg) { Pass(ok, msg); passed &= ok; }
+
+        Check(GameMetadataResolver.CleanTitle("Cyberpunk.2077.v2.1.REPACK-FitGirl") == "Cyberpunk 2077", "CleanTitle strips version/release tags");
+        Check(GameMetadataResolver.CleanTitle("Elden Ring [DODI Repack] (build 1234)") == "Elden Ring", "CleanTitle strips brackets");
+
+        long id = GameMetadataResolver.ParseSteamSearch("{\"items\":[{\"id\":1,\"name\":\"Portal 2 Soundtrack\"},{\"id\":620,\"name\":\"Portal 2\"}]}", "Portal 2");
+        Check(id == 620, "Steam search picks the exact title");
+
+        var sd = GameMetadataResolver.ParseSteamDetails(
+            "{\"620\":{\"success\":true,\"data\":{\"name\":\"Portal 2\",\"short_description\":\"Puzzle.\",\"developers\":[\"Valve\"],\"genres\":[{\"description\":\"Action\"}],\"release_date\":{\"date\":\"18 Apr, 2011\"},\"metacritic\":{\"score\":95}}}}", 620);
+        Check(sd is { Title: "Portal 2", Developer: "Valve", ReleaseYear: 2011, SteamAppId: 620 } && Math.Abs(sd.Rating - 4.75) < 0.001
+              && sd.CoverUrl.Contains("/620/library_600x900"), "Steam appdetails → merged metadata + free artwork");
+
+        var sg = GameMetadataResolver.ParseSteamGridDb("{\"data\":[{\"url\":\"g\"}]}", "{\"data\":[]}", "{\"data\":[{\"url\":\"l\"}]}", "{}");
+        Check(sg is { CoverUrl: "g", LogoUrl: "l", BackgroundUrl: "" }, "SteamGridDB first grid/logo");
+
+        var tg = GameMetadataResolver.ParseTheGamesDb(
+            "{\"data\":{\"games\":[{\"id\":5,\"game_name\":\"Halo\",\"release_date\":\"2001-11-15\",\"overview\":\"FPS\"}]},\"include\":{\"boxart\":{\"base_url\":{\"original\":\"http://x/\"},\"data\":{\"5\":[{\"side\":\"front\",\"filename\":\"b.jpg\"}]}}}}", "Halo");
+        Check(tg is { ReleaseYear: 2001, CoverUrl: "http://x/b.jpg" }, "TheGamesDB game + boxart");
+
+        string dir = Path.Combine(Path.GetTempPath(), "gameos-meta-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "steam_appid.txt"), "620\n");
+        Check(GameMetadataResolver.ReadLocalSteamAppId(dir) == 620, "steam_appid.txt next to a cracked game is detected");
+        Directory.Delete(dir, true);
+
+        var a = new GameMetadata { Title = "A" };
+        a.FillFrom(new GameMetadata { Title = "B", Description = "d" }, "X");
+        Check(a.Title == "A" && a.Description == "d" && a.Sources == "X", "FillFrom only fills empty fields");
         return passed;
     }
 

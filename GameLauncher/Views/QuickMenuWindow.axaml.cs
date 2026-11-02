@@ -83,6 +83,9 @@ public partial class QuickMenuWindow : Window
         if (textInputFocused && e.Key is not Key.Escape and not Key.BrowserBack)
             return;
 
+        if (vm.HandleKeyboardKey(e.Key))
+            return;
+
         switch (e.Key)
         {
             case Key.Left:
@@ -95,11 +98,11 @@ public partial class QuickMenuWindow : Window
                 return;
             // LB / RB blade navigation in XB360 guide.
             case Key.PageUp:
-                if (vm.IsXb360Theme) vm.MoveXb360Blade(-1);
+                if (vm.IsXb360Theme) vm.CycleXb360Blade(-1);
                 else vm.MoveHubSelection(-1);
                 return;
             case Key.PageDown:
-                if (vm.IsXb360Theme) vm.MoveXb360Blade(1);
+                if (vm.IsXb360Theme) vm.CycleXb360Blade(1);
                 else vm.MoveHubSelection(1);
                 return;
             case Key.Up:

@@ -990,6 +990,36 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- Metadata providers -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="🗂  Metadata Providers"
+                                       FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                                Scanned games and ROMs (including non-Steam / cracked copies) get covers and details automatically.
+                                Steam's store is used for PC games and needs no key. Add free keys below to also use SteamGridDB,
+                                TheGamesDB and IGDB (needed for ROM / console games). Results are cached locally and shared with the
+                                Game OS games database. Keys are stored on this device only.
+                            </TextBlock>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="SteamGridDB API Key (steamgriddb.com/profile/preferences/api)" FontSize="12" Foreground="#8b949e"/>
+                                <TextBox Classes="form-input" Text="{Binding SteamGridDbApiKey}" PasswordChar="•" FontSize="12" Watermark="Optional"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="TheGamesDB API Key (api.thegamesdb.net)" FontSize="12" Foreground="#8b949e"/>
+                                <TextBox Classes="form-input" Text="{Binding TheGamesDbApiKey}" PasswordChar="•" FontSize="12" Watermark="Optional"/>
+                            </StackPanel>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="IGDB Client ID (Twitch developer application)" FontSize="12" Foreground="#8b949e"/>
+                                <TextBox Classes="form-input" Text="{Binding IgdbClientId}" FontSize="12" Watermark="Optional"/>
+                                <TextBlock Text="IGDB Client Secret" FontSize="12" Foreground="#8b949e"/>
+                                <TextBox Classes="form-input" Text="{Binding IgdbClientSecret}" PasswordChar="•" FontSize="12" Watermark="Optional"/>
+                            </StackPanel>
+                            <Button Classes="btn-primary" Content="💾  Save Settings" Command="{Binding SaveCommand}"
+                                    Width="150" HorizontalAlignment="Left"/>
+                        </StackPanel>
+                    </Border>
+
                     <!-- Exophase integration -->
                     <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,20">
                         <StackPanel Spacing="14">

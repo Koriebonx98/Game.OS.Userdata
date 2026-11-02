@@ -19,6 +19,8 @@
     <Compile Include="../GameLauncher/Services/OfflineDataCacheService.cs" />
     <Compile Include="../GameLauncher/Services/PendingChangesService.cs" />
     <Compile Include="../GameLauncher/Services/GameReviewService.cs" />
+    <Compile Include="../GameLauncher/Services/GameProviderService.cs" />
+    <Compile Include="../GameLauncher/Services/GameMetadataResolver.cs" />
     <Compile Include="../GameLauncher/GameOsClient.cs" />
     <Compile Include="../GameLauncher/Models/Models.cs" />
   </ItemGroup>
