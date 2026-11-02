@@ -65,6 +65,10 @@ internal sealed class XInputService
     public Action? OnRt { get; set; }
     /// <summary>Start / Options / Menu button — opens the quick menu.</summary>
     public Action? OnStart { get; set; }
+    /// <summary>When this returns true the right stick is not used for navigation; its vertical tilt goes to <see cref="OnRightStickY"/> instead.</summary>
+    public Func<bool>? CaptureRightStick { get; set; }
+    /// <summary>Receives the right stick's vertical tilt (-1..1, dead zone applied, up positive) on every poll while captured.</summary>
+    public Action<double>? OnRightStickY { get; set; }
     /// <summary>
     /// Guide / Home / Xbox button — opens the quick guide menu.
     /// Detected via the undocumented XInputGetStateEx (xinput9_1_0.dll ordinal 100).
@@ -209,8 +213,9 @@ internal sealed class XInputService
         Fire(b, BackMask,      ref _latchedButtons, OnBack);
         Fire(b, LbMask,        ref _latchedButtons, OnLb);
         Fire(b, RbMask,        ref _latchedButtons, OnRb);
-        // Start is intentionally not polled: it must pass through to games untouched.
-        // Only the Guide / Home / Xbox button opens the Quick Menu.
+        // Start passes through to games untouched: the IsBlocked check above already returns early
+        // whenever a game or another app has the controller.
+        Fire(b, StartMask,     ref _latchedButtons, OnStart);
 
         // Guide / Home / Xbox button (bit 0x0400 from XInputGetStateEx)
         FireStick((b & GuideMask) != 0, ref _guideLatched, OnGuide);
@@ -221,11 +226,20 @@ internal sealed class XInputService
         FireStick(gp.sThumbLX < -StickDeadZone, ref _stickLeftLatched,  OnLeft);
         FireStick(gp.sThumbLX >  StickDeadZone, ref _stickRightLatched, OnRight);
 
-        // Right stick — shares the same directional callbacks as D-pad / left stick
-        FireStick(gp.sThumbRY >  StickDeadZone, ref _rstickUpLatched,    OnUp);
-        FireStick(gp.sThumbRY < -StickDeadZone, ref _rstickDownLatched,  OnDown);
-        FireStick(gp.sThumbRX < -StickDeadZone, ref _rstickLeftLatched,  OnLeft);
-        FireStick(gp.sThumbRX >  StickDeadZone, ref _rstickRightLatched, OnRight);
+        // Right stick — navigation, unless a player claims it for volume
+        if (CaptureRightStick?.Invoke() == true)
+        {
+            _rstickUpLatched = _rstickDownLatched = _rstickLeftLatched = _rstickRightLatched = false;
+            double tilt = Math.Abs((int)gp.sThumbRY) > StickDeadZone ? gp.sThumbRY / 32767.0 : 0;
+            OnRightStickY?.Invoke(tilt);
+        }
+        else
+        {
+            FireStick(gp.sThumbRY >  StickDeadZone, ref _rstickUpLatched,    OnUp);
+            FireStick(gp.sThumbRY < -StickDeadZone, ref _rstickDownLatched,  OnDown);
+            FireStick(gp.sThumbRX < -StickDeadZone, ref _rstickLeftLatched,  OnLeft);
+            FireStick(gp.sThumbRX >  StickDeadZone, ref _rstickRightLatched, OnRight);
+        }
 
         // Analog triggers as digital buttons (threshold = 30 / 255)
         FireStick(gp.bLeftTrigger  >= TriggerThreshold, ref _ltLatched, OnLt);

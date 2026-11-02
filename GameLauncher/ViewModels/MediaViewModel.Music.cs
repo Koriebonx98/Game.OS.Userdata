@@ -348,7 +348,7 @@ public sealed partial class MediaViewModel
             case "Enter":
                 if (_menuIdx >= 0 && _menuIdx < MusicMenuEntries.Count) { var a = MusicMenuEntries[_menuIdx].Action; CloseMusicMenu(); a(); }
                 return true;
-            case "Escape": case "Y": CloseMusicMenu(); return true;
+            case "Escape": case "Y": case "Menu": CloseMusicMenu(); return true;
         }
         for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == _menuIdx;
         MediaFocusChanged?.Invoke();
@@ -446,6 +446,36 @@ public sealed partial class MediaViewModel
         if (HasNowPlaying) Add("⛶  Full-screen player", () => OpenNowPlayingFullScreenCommand.Execute(null));
 
         MusicMenuTitle = title;
+        _menuIdx = 0;
+        for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
+        IsMusicMenuOpen = true;
+    }
+
+    /// <summary>Start in the full-screen player: rate, favourite, playlists and queue for the playing song.</summary>
+    public void OpenNowPlayingMenu()
+    {
+        if (NowPlaying is not { } song || IsMusicMenuOpen) return;
+        var targets = new List<MediaLibraryItem> { song };
+        MusicMenuEntries.Clear();
+        void Add(string label, Action a) => MusicMenuEntries.Add(new MusicMenuEntry { Label = label, Action = a });
+
+        for (int n = 5; n >= 1; n--)
+        {
+            int stars = n;
+            Add($"{new string('★', stars)}{new string('☆', 5 - stars)}  Rate {stars}" + (song.Rating == stars ? " (tap to clear)" : ""),
+                () => Persist(song.FullPath, st => st.Rating = st.Rating == stars ? 0 : stars));
+        }
+        Add(song.Favourite ? "♥  Remove from favourites" : "♡  Add to favourites", () => Persist(song.FullPath, st => st.Favourite = !st.Favourite));
+        foreach (var p in _playlists.ToList())
+        {
+            var pp = p;
+            Add($"＋  Add to playlist: {pp.Name}", () => AddToPlaylist(pp, targets));
+        }
+        Add("＋  Add to new playlist…", () => PromptNewPlaylist(null, targets));
+        Add("⏭  Play next", () => EnqueueTracks(targets, next: true));
+        Add("☰  Add to queue", () => EnqueueTracks(targets, next: false));
+
+        MusicMenuTitle = song.DisplayTitle;
         _menuIdx = 0;
         for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
         IsMusicMenuOpen = true;

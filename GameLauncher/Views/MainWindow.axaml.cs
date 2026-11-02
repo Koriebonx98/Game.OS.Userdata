@@ -435,7 +435,7 @@ public partial class MainWindow : Window
         // XB360 dashboard navigation
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
         if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused()
-            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
+            && e.Key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter or Key.PageUp or Key.PageDown or Key.X)
         {
             var kr = vm.DashboardVm.HandleKineticKey(e.Key.ToString());
             if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);
@@ -844,9 +844,11 @@ public partial class MainWindow : Window
         {
             Key.Left => "Left", Key.Right => "Right", Key.Up => "Up", Key.Down => "Down",
             Key.Enter => "Enter", Key.X => "X", Key.Y => "Y", Key.Escape or Key.BrowserBack => "Escape",
-            Key.PageUp => "LB", Key.PageDown => "RB",
+            Key.PageUp => "LB", Key.PageDown => "RB", Key.Apps => "Menu",
             _ => "",
         };
+        // The options menu sits above the full-screen player and takes keys first.
+        if ((media.IsMusicMenuOpen || media.MusicKeyboard.IsOpen) && media.HandleMusicOverlayKey(name)) return true;
         // Video player, full-screen music player and the info page take every key while open.
         if (media.IsVlcFullView || media.IsNowPlayingFullScreen) { media.HandlePlayerKey(name); return true; }
         if (media.IsDetailOpen) { media.HandleDetailKey(name); return true; }
@@ -1377,7 +1379,11 @@ public partial class MainWindow : Window
         _xinput.OnLt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(-1));
         _xinput.OnRt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(1));
 
-        // Start does not open the Quick Menu; only Guide / Home / Xbox does.
+        // Right stick = volume while a music or video player is open.
+        _xinput.CaptureRightStick = () => _boundVm is { IsMediaOrMusic: true, ShowQuickMenu: false } vm && vm.MediaVm.IsVolumeStickActive;
+        _xinput.OnRightStickY = tilt => { if (tilt != 0) Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.AdjustVolume((int)Math.Round(tilt * 6))); };
+
+        // Start opens the media options menu (rate / playlist / queue) while on a media page.
         _xinput.OnStart = () => Avalonia.Threading.Dispatcher.UIThread.Post(() =>
         {
             if (_boundVm is { IsMediaOrMusic: true, ShowQuickMenu: false }) HandleControllerKey(Key.Apps);
@@ -1624,7 +1630,7 @@ public partial class MainWindow : Window
         // XB360 dashboard navigation (blade-style carousel)
         bool isXb360 = DashboardCatalog.IsXb360(vm.SettingsVm.DesignTheme);
         if (vm.IsHome && isXb360 && vm.DashboardVm.Options.IsXb360Kinetic && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile
-            && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter)
+            && key is Key.Left or Key.Right or Key.Up or Key.Down or Key.Enter or Key.PageUp or Key.PageDown or Key.X)
         {
             var kr = vm.DashboardVm.HandleKineticKey(key.ToString());
             if (kr == KineticKeyResult.OpenNav) OpenNavWithCurrentHighlight(vm);

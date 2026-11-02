@@ -38,7 +38,9 @@ public sealed class GameScannerService : IDisposable
 
     // How often the background timer rescans all drives.  Two minutes is short
     // enough to notice a freshly-mounted USB drive without hammering the disk.
-    private static readonly TimeSpan PeriodicInterval = TimeSpan.FromMinutes(60);
+    private static readonly TimeSpan PeriodicInterval = TimeSpan.FromMinutes(
+        AppSettingsService.Load().GameScanIntervalMinutes is var m && m > 0 ? m : 60);
+    private static readonly bool PeriodicEnabled = AppSettingsService.Load().GameScanIntervalMinutes != 0;
 
     // ── Cache paths ───────────────────────────────────────────────────────────
     private static readonly string CacheDir  = Path.Combine(
@@ -127,7 +129,7 @@ public sealed class GameScannerService : IDisposable
     {
         try
         {
-            while (!ct.IsCancellationRequested)
+            while (!ct.IsCancellationRequested && PeriodicEnabled)
             {
                 try
                 {

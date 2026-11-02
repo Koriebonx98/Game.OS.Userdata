@@ -184,7 +184,7 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </StackPanel>
-                    <TextBlock Grid.Row="7" Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  B close" FontSize="11" Foreground="#484f58"/>
+                    <TextBlock Grid.Row="7" Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  Start menu  ·  Right stick volume  ·  B close" FontSize="11" Foreground="#484f58"/>
                 </Grid>
             </Grid>
         </Border>
@@ -228,6 +228,12 @@
                 <TextBlock Grid.Row="4" Text="◀ ▶ choose button  ·  A press  ·  X pause  ·  LT / RT seek  ·  ▲ ▼ previous / next track  ·  LB / RB rate  ·  B close"
                            FontSize="11" Foreground="#484f58" HorizontalAlignment="Center"/>
             </Grid>
+        </Border>
+
+        <!-- Volume HUD (right stick) -->
+        <Border IsVisible="{Binding IsVolumeHudVisible}" ZIndex="70" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,90"
+                Background="#E6161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="18,10" IsHitTestVisible="False">
+            <TextBlock Text="{Binding VolumeLabel}" FontSize="18" FontWeight="Bold"/>
         </Border>
 
         <!-- Options menu (Start) -->
