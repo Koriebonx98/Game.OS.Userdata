@@ -36,6 +36,10 @@ public partial class QuickMenuViewModel
 
     private bool _rebuildingHubActions;
 
+    /// <summary>PS6 guide: false = focus on the dock (L1/R1 switch tabs), true = focus inside the tab's menu.</summary>
+    [ObservableProperty] private bool _ps6ListFocused;
+    partial void OnPs6ListFocusedChanged(bool value) => SyncHubCursor();
+
     /// <summary>Rebuilds the action list for the active page (or the fixed Wii bubble row).</summary>
     public void RebuildHubActions()
     {
@@ -60,7 +64,7 @@ public partial class QuickMenuViewModel
 
     private void SyncHubCursor()
     {
-        for (int i = 0; i < HubActions.Count; i++) HubActions[i].IsCursor = i == HubActionIndex;
+        for (int i = 0; i < HubActions.Count; i++) HubActions[i].IsCursor = i == HubActionIndex && (!IsPs6Theme || Ps6ListFocused);
     }
 
     private static QuickMenuHubActionVm Act(string glyph, string title, Action run, string sub = "", string key = "") =>
@@ -222,6 +226,12 @@ public partial class QuickMenuViewModel
                     yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = $"No saved links for {gt}.", Subtitle = "Open the browser from the game page to save walkthroughs." };
                 yield return Act("🔍", "Search walkthrough", () => { OnOpenUrl?.Invoke(gp, gt, "https://duckduckgo.com/?q=" + Uri.EscapeDataString($"{gt} {gp} walkthrough")); OnDismiss?.Invoke(); });
                 break;
+            case "settings":
+                yield return Act("⚙", "Open Settings", () => OpenSettingsPageCommand.Execute(null), "Full settings page", "settings");
+                yield return Act("🎬", "Toggle intro video", () => QuickToggleIntroCommand.Execute(null));
+                yield return Act("🗕", "Toggle minimise on launch", () => QuickToggleMinimizeCommand.Execute(null));
+                yield return Act("🔔", "Toggle friend-online alerts", () => QuickToggleFriendOnlineCommand.Execute(null));
+                break;
             case "browser":
                 yield return Act("🌐", "Open Browser", () => OpenBrowserCommand.Execute(null), "Open the built-in web browser.");
                 break;
@@ -253,6 +263,7 @@ public partial class QuickMenuViewModel
     public void MoveHubItem(int delta)
     {
         if (IsXb360Theme || HubActions.Count == 0) return;
+        if (IsPs6Theme && !Ps6ListFocused) return;
         int i = HubActionIndex;
         do
         {

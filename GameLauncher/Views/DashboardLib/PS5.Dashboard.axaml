@@ -151,6 +151,7 @@
                                         CommandParameter="{Binding}">
                                     <StackPanel>
                                         <Border Height="100" ClipToBounds="True" CornerRadius="10">
+                                          <Panel>
                                             <views:CoverImage
                                                 ImageUrl="{Binding Game.CoverUrl}"
                                                 FallbackText="{Binding Game.Title}"
@@ -159,6 +160,11 @@
                                                 LetterFontSize="32"
                                                 ImageCornerRadius="10"
                                                 Height="100"/>
+                                            <Border Background="#E61F2A5A" IsVisible="{Binding IsAll}">
+                                                <TextBlock Text="ALL ›" Foreground="White" FontWeight="Bold" FontSize="16"
+                                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                            </Border>
+                                          </Panel>
                                         </Border>
                                         <TextBlock Text="{Binding Game.Title}" Classes="ps5-card-title" Margin="8,6,8,0"/>
                                     </StackPanel>

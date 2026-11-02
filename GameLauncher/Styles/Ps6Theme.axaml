@@ -449,6 +449,19 @@
         <Setter Property="Foreground" Value="#9BE7FF"/>
         <Setter Property="RenderTransform" Value="scale(1.25)"/>
     </Style>
+    <Style Selector="Button.ps6-ach-mini">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+    </Style>
+    <Style Selector="Button.ps6-ach-mini /template/ ContentPresenter">
+        <Setter Property="Background" Value="Transparent"/>
+    </Style>
+    <Style Selector="Button.ps6-ach-mini:pointerover Border.ps6-achievements-panel">
+        <Setter Property="BorderBrush" Value="#9BE7FF"/>
+    </Style>
     <Style Selector="Button.ps6-shelf-card">
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Margin" Value="0,0,10,0"/>

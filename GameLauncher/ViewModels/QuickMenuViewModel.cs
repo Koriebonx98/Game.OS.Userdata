@@ -27,7 +27,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     private static readonly string[] Ps6HubOrder =
     {
         "home", "switcher", "notifications", "friends", "media", "recent",
-        "downloads", "guides", "achievements", "inbox", "power"
+        "downloads", "guides", "achievements", "inbox", "settings", "power"
     };
     private static readonly string[] XbOneHubOrder =
         { "achievements", "friends", "inbox", "home", "switcher", "downloads" };
@@ -346,6 +346,7 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsPowerPage));
         OnPropertyChanged(nameof(IsAchievementsPage));
         UpdateMenuHeader(value);
+        Ps6ListFocused = false;
         RebuildHubActions();
 
         // XB360 uses Xb360CenterIndex/BladeId for navigation — do not sync ActivePage ↔ SelectedHubIndex.
@@ -379,6 +380,13 @@ public partial class QuickMenuViewModel : ViewModelBase
 
     public bool HandleBackNavigation()
     {
+        // PS6: B inside an opened menu returns focus to the quick-guide dock first.
+        if (IsPs6Theme && Ps6ListFocused)
+        {
+            Ps6ListFocused = false;
+            return true;
+        }
+
         if (ShowChatWindow)
         {
             CloseChatWindow();
@@ -635,7 +643,16 @@ public partial class QuickMenuViewModel : ViewModelBase
             return;
         }
 
-        if (ActivateHubAction()) return;
+        // PS6: A on a dock tab enters its menu; the cursor only moves once focus is inside.
+        if (IsPs6Theme && !Ps6ListFocused)
+        {
+            if (HubActions.Any(a => a.IsActionable))
+            {
+                Ps6ListFocused = true;
+                return;
+            }
+        }
+        else if (ActivateHubAction()) return;
 
         var navigationOrder = GetCurrentNavigationOrder();
         if (SelectedHubIndex < 0 || SelectedHubIndex >= navigationOrder.Length) return;

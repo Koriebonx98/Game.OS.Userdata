@@ -107,11 +107,22 @@
                                    Classes="ps6-focused-title"/>
 
                         <StackPanel IsVisible="{Binding Options.ShowAchievements}">
-                        <Border Classes="ps6-achievements-panel" Padding="16,10" Margin="0,8,0,0" MaxWidth="470"
-                                HorizontalAlignment="Left" IsVisible="{Binding !IsStoreFocused}">
+                        <Button Classes="ps6-ach-mini" HorizontalAlignment="Left" Margin="0,8,0,0" MaxWidth="470"
+                                IsVisible="{Binding !IsStoreFocused}"
+                                Command="{Binding ToggleAchievementListCommand}"
+                                ToolTip.Tip="Show full list">
+                        <Border Classes="ps6-achievements-panel" Padding="16,10">
                             <StackPanel>
-                                <TextBlock Text="{Binding FocusedCardTrophyHeader}" Foreground="#E6E6F8" FontSize="12"
-                                           FontWeight="SemiBold" Margin="0,0,0,4" TextTrimming="CharacterEllipsis"/>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                                    <TextBlock Text="{Binding FocusedCardTrophyHeader}" Foreground="#E6E6F8" FontSize="12"
+                                               FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                    <TextBlock Grid.Column="1" Text="{Binding FocusedCardAchPercentLabel}" Foreground="#9BE7FF"
+                                               FontSize="12" FontWeight="SemiBold" Margin="12,0,0,0"
+                                               IsVisible="{Binding Options.ShowAchPercent}"/>
+                                </Grid>
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding FocusedCardAchPercent}" Height="6"
+                                             Foreground="#9BE7FF" Background="#26305F" Margin="0,0,0,6"
+                                             IsVisible="{Binding Options.ShowAchBar}"/>
                                 <TextBlock Text="{Binding Options.AchievementsWordLower, StringFormat='No {0} yet'}"
                                            Foreground="#9E9EC0" FontSize="12"
                                            IsVisible="{Binding !HasFocusedCardAchievements}"/>
@@ -130,8 +141,32 @@
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
+                                <TextBlock Text="Click or press Y for the full list" Foreground="#7F82B5" FontSize="10" Margin="0,6,0,0"
+                                           IsVisible="{Binding HasFocusedCardAchievements}"/>
                             </StackPanel>
                         </Border>
+                        </Button>
+                        </StackPanel>
+
+                        <!-- Captures of the highlighted game -->
+                        <StackPanel Spacing="4" Margin="0,10,0,0"
+                                    IsVisible="{Binding Options.ShowCaptures}">
+                            <StackPanel IsVisible="{Binding HasFocusedCardCaptures}" Spacing="4">
+                                <TextBlock Text="Captures" Foreground="#E6E6F8" FontSize="12" FontWeight="SemiBold"/>
+                                <ItemsControl ItemsSource="{Binding FocusedCardCaptures}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8"/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Border Width="112" Height="64" CornerRadius="8" ClipToBounds="True"
+                                                    BorderBrush="#3A4272" BorderThickness="1">
+                                                <views:CoverImage LocalCachePath="{Binding}" ImageCornerRadius="8" Height="64"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
                         </StackPanel>
                     </StackPanel>
 
@@ -148,6 +183,7 @@
                                                 Command="{Binding $parent[UserControl].DataContext.OpenShelfGameCommand}"
                                                 CommandParameter="{Binding}">
                                             <Border Width="90" Height="120" ClipToBounds="True" CornerRadius="6">
+                                              <Panel>
                                                 <views:CoverImage ImageUrl="{Binding Game.CoverUrl}"
                                                                   FallbackText="{Binding Game.Title}"
                                                                   FallbackGradient="{Binding Game.CoverGradient}"
@@ -155,6 +191,11 @@
                                                                   LetterFontSize="28"
                                                                   ImageCornerRadius="6"
                                                                   Height="120"/>
+                                                <Border Background="#E61F2A5A" IsVisible="{Binding IsAll}">
+                                                    <TextBlock Text="ALL ›" Foreground="White" FontWeight="Bold" FontSize="16"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                              </Panel>
                                             </Border>
                                         </Button>
                                     </DataTemplate>
@@ -183,6 +224,35 @@
             </StackPanel>
         </Grid>
         </Viewbox>
+        <!-- Full achievement list (click the mini panel / Y) -->
+        <Border IsVisible="{Binding ShowAchievementList}" Background="#CC030319">
+            <Border Width="560" MaxHeight="560" Padding="20" CornerRadius="20" Background="#E60B0E22"
+                    BorderBrush="#556B72C8" BorderThickness="1" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid RowDefinitions="Auto,Auto,*,Auto">
+                    <TextBlock Text="{Binding AchievementListTitle}" Foreground="White" FontSize="18" FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"/>
+                    <ProgressBar Grid.Row="1" Minimum="0" Maximum="100" Value="{Binding FocusedCardAchPercent}" Height="6"
+                                 Foreground="#9BE7FF" Background="#26305F" Margin="0,8,0,10"/>
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding FocusedCardAllAchievements}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="models:Achievement">
+                                    <Grid Margin="0,4" ColumnDefinitions="30,*" Opacity="{Binding LockedOpacity}">
+                                        <TextBlock Text="{Binding StatusIcon}" FontSize="18" VerticalAlignment="Center"/>
+                                        <StackPanel Grid.Column="1">
+                                            <TextBlock Text="{Binding Name}" Foreground="#F2F2FF" FontSize="13" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding Description}" Foreground="#B8B5D9" FontSize="11" TextWrapping="Wrap"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <Button Grid.Row="3" Content="Close  (○ / Y)" Command="{Binding CloseAchievementListCommand}"
+                            HorizontalAlignment="Right" Margin="0,10,0,0"/>
+                </Grid>
+            </Border>
+        </Border>
         </Panel>
     </Border>
 </UserControl>
