@@ -23,6 +23,8 @@ namespace GameLauncher.Services
         [JsonPropertyName("name")]     public string Name { get; set; } = "";
         [JsonPropertyName("url")]      public string Url { get; set; } = "";
         [JsonPropertyName("kind")]     public string Kind { get; set; } = KindOther;
+        /// <summary>Mod type preset (see <see cref="GameModsService.Presets"/>) when <see cref="Kind"/> is Mod.</summary>
+        [JsonPropertyName("modType")]  public string ModType { get; set; } = "";
         [JsonPropertyName("created")]  public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
         [JsonIgnore] public bool IsGuideLike => Kind is KindWalkthrough or KindGuide;
@@ -111,7 +113,7 @@ namespace GameLauncher.Services
             lock (Gate) return All().FirstOrDefault(l => NormUrl(l.Url) == n);
         }
 
-        public static GameLink Add(string platform, string game, string name, string url, string kind)
+        public static GameLink Add(string platform, string game, string name, string url, string kind, string modType = "")
         {
             GameLink link;
             lock (Gate)
@@ -121,11 +123,12 @@ namespace GameLauncher.Services
                 {
                     if (!string.IsNullOrWhiteSpace(name)) existing.Name = name.Trim();
                     existing.Kind = kind;
+                    existing.ModType = modType;
                     link = existing;
                 }
                 else
                 {
-                    link = new GameLink { Platform = platform.Trim(), Game = game.Trim(), Name = string.IsNullOrWhiteSpace(name) ? url : name.Trim(), Url = url.Trim(), Kind = kind };
+                    link = new GameLink { Platform = platform.Trim(), Game = game.Trim(), Name = string.IsNullOrWhiteSpace(name) ? url : name.Trim(), Url = url.Trim(), Kind = kind, ModType = modType };
                     All().Add(link);
                 }
                 SaveGame(platform, game);

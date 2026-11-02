@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:models="using:GameLauncher.Models"
+             xmlns:svc="using:GameLauncher.Services"
              x:Class="GameLauncher.Views.GameInfoLib.GameInfoActionMenu"
              x:DataType="vm:GameDetailViewModel">
 
@@ -230,12 +231,77 @@
                             </Border>
                         </StackPanel>
 
+                        <!-- Installed: mods detected in the game's mod folders / Steam Workshop -->
+                        <StackPanel IsVisible="{Binding HasInstalledMods}" Spacing="6" Margin="0,0,0,10">
+                            <TextBlock Text="INSTALLED MODS" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
+                            <TextBlock Text="{Binding DetectedModFolders}" FontSize="11" Foreground="#6e7681" TextWrapping="Wrap" Margin="4,0,0,0"/>
+                            <ItemsControl ItemsSource="{Binding InstalledMods}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="svc:InstalledMod">
+                                        <Border Background="#21262d" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
+                                            <Grid ColumnDefinitions="Auto,*,Auto">
+                                                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/>
+                                                    <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#6e7681"/>
+                                                </StackPanel>
+                                                <Button Grid.Column="2" Classes="btn-secondary" Content="✕" Padding="10,6">
+                                                    <Button.Flyout>
+                                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                                            <MenuItem Header="📂  Open location"
+                                                                      Command="{Binding $parent[UserControl].DataContext.OpenInstalledModCommand}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <MenuItem Header="📦  Move to…"
+                                                                      Command="{Binding $parent[UserControl].DataContext.MoveInstalledModCommand}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <MenuItem Header="🗑  Delete"
+                                                                      Command="{Binding $parent[UserControl].DataContext.DeleteInstalledModCommand}"
+                                                                      CommandParameter="{Binding}"/>
+                                                        </MenuFlyout>
+                                                    </Button.Flyout>
+                                                </Button>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+
                             <TextBlock Text="Nothing installed for this game." Foreground="#8b949e" Margin="4,8"
                                        IsVisible="{Binding NoInstalledMods}"/>
                         </StackPanel>
                     </ScrollViewer>
                     <!-- Browse: your saved URLs for this game + the Game OS database's mods -->
                     <DockPanel IsVisible="{Binding IsModsBrowseTab}">
+                    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                        <Border Background="#0d1117" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="10">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="ADD A MOD URL" FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Grid.Column="0" Classes="form-input" Text="{Binding NewModName}" Watermark="Name (optional)"/>
+                                    <ComboBox Grid.Column="1" ItemsSource="{Binding ModTypeNames}" SelectedIndex="{Binding NewModTypeIndex}" MinWidth="130"/>
+                                </Grid>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Grid.Column="0" Classes="form-input" Text="{Binding NewModUrl}" Watermark="https://…"/>
+                                    <Button Grid.Column="1" Classes="btn-secondary" Content="＋ Add" Command="{Binding AddModUrlCommand}"/>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                        <Border IsVisible="{Binding HasWorkshop}" Background="#0d1117" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="10">
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="STEAM WORKSHOP" FontSize="11" FontWeight="Bold" Foreground="#8b949e"/>
+                                <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="↗  Browse Steam mods" Command="{Binding OpenSteamWorkshopCommand}"/>
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                    <TextBox Grid.Column="0" Classes="form-input" Text="{Binding WorkshopInput}" Watermark="Workshop item URL or ID"/>
+                                    <Button Grid.Column="1" Classes="btn-secondary" Content="⬇  Download" Command="{Binding DownloadWorkshopItemCommand}"
+                                            IsEnabled="{Binding !IsWorkshopBusy}"/>
+                                </Grid>
+                                <TextBlock Text="Downloads use SteamCMD (fetched automatically). Items appear under Installed." FontSize="11" Foreground="#6e7681" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </Border>
+                        <TextBlock Text="{Binding ModsStatus}" FontSize="12" Foreground="#3fb950" TextWrapping="Wrap"
+                                   IsVisible="{Binding ModsStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    </StackPanel>
                     <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
                              Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
                     <TextBlock DockPanel.Dock="Top" Text="No mods or saved links for this game yet. Add links from 🌐 Browser (kind: Mod)."
@@ -292,6 +358,23 @@
                     </DockPanel>
                 </Panel>
             </DockPanel>
+        </Border>
+    </Border>
+
+    <!-- First run: pick the exe / ROM to launch, remembered for next time -->
+    <Border IsVisible="{Binding ShowLaunchTargetPrompt}" Background="#CC000000">
+        <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="16" Padding="18"
+                Width="460" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel Spacing="10">
+                <TextBlock Text="▶  FIRST LAUNCH" FontSize="16" FontWeight="Bold" Foreground="White"/>
+                <TextBlock Text="{Binding LaunchTargetPromptText}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                <TextBox Classes="form-input" Text="{Binding LaunchTargetPromptPath}" Watermark="Path to file…"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button Classes="btn-secondary" Content="📂  Browse…" Command="{Binding BrowseLaunchTargetPromptCommand}"/>
+                    <Button Classes="btn-primary" Content="Save &amp; Play" Command="{Binding ConfirmLaunchTargetPromptCommand}"/>
+                    <Button Classes="btn-secondary" Content="Cancel" Command="{Binding CancelLaunchTargetPromptCommand}"/>
+                </StackPanel>
+            </StackPanel>
         </Border>
     </Border>
     </Panel>
