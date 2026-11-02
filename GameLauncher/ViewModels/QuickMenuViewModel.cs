@@ -593,7 +593,25 @@ public partial class QuickMenuViewModel : ViewModelBase
         if (!IsXb360Theme) return;
         int idx = Array.IndexOf(Xb360BladeOrder, Xb360BladeId);
         if (idx < 0) idx = 2; // default: "main"
-        Xb360BladeId = Xb360BladeOrder[Math.Clamp(idx + delta, 0, Xb360BladeOrder.Length - 1)];
+        SetXb360Blade(Xb360BladeOrder[Math.Clamp(idx + delta, 0, Xb360BladeOrder.Length - 1)]);
+    }
+
+    /// <summary>LB / RB: cycles games ↔ profile ↔ main ↔ media ↔ settings, wrapping at the ends.</summary>
+    public void CycleXb360Blade(int delta)
+    {
+        if (!IsXb360Theme) return;
+        int idx = Array.IndexOf(Xb360BladeOrder, Xb360BladeId);
+        if (idx < 0) idx = 2;
+        int n = Xb360BladeOrder.Length;
+        SetXb360Blade(Xb360BladeOrder[((idx + delta) % n + n) % n]);
+    }
+
+    private void SetXb360Blade(string id)
+    {
+        Xb360RecentSubMode = false;
+        Xb360FriendsSubMode = false;
+        Xb360FriendContextMenuOpen = false;
+        Xb360BladeId = id;
     }
 
     public void ActivateSelectedHub()
@@ -756,7 +774,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     }
 
     [RelayCommand]
-    private void Dismiss() => OnDismiss?.Invoke();
+    private void Dismiss() { Keyboard.Close(); OnDismiss?.Invoke(); }
 
     [RelayCommand] private void SelectHome() => ActivePage = "home";
     [RelayCommand] private void SelectSwitcher() => ActivePage = "switcher";

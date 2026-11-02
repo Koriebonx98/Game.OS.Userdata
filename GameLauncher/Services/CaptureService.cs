@@ -77,12 +77,16 @@ namespace GameLauncher.Services
             }
         }
 
-        /// <summary>Opens the Windows on-screen keyboard (a no-op elsewhere).</summary>
-        public static void OpenOnScreenKeyboard()
+        /// <summary>Types a key token from the Game OS on-screen keyboard into the foreground window (Windows only).</summary>
+        public static void TypeIntoForeground(string token)
         {
             if (!OperatingSystem.IsWindows()) return;
-            try { Process.Start(new ProcessStartInfo("osk.exe") { UseShellExecute = true }); }
-            catch (Exception ex) { DevLogService.Log($"[Capture] on-screen keyboard failed: {ex.Message}"); }
+            switch (token)
+            {
+                case "{BACKSPACE}": NativeMethods.SendSingleKey(0x08); break;
+                case "{ENTER}": NativeMethods.SendSingleKey(NativeMethods.VK_RETURN); break;
+                default: NativeMethods.SendText(token); break;
+            }
         }
 
         public static void StopRecording()

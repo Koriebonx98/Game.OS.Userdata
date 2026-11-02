@@ -78,7 +78,28 @@ public partial class QuickMenuViewModel
             yield return Act("⏺", "Stop Recording", () => CaptureAfterDismiss(() => { Services.CaptureService.StopRecording(); return null; }), "", "record");
         else
             yield return Act("🎥", "Record Screen", () => CaptureAfterDismiss(() => { Services.CaptureService.StartRecording(cp, ct); return null; }), "Saved to your Media folder", "record");
-        yield return Act("⌨", "On-Screen Keyboard", () => { OnDismiss?.Invoke(); Services.CaptureService.OpenOnScreenKeyboard(); }, "", "keyboard");
+        yield return Act("⌨", "On-Screen Keyboard", OpenGameOsKeyboard, "Types into your game / app", "keyboard");
+    }
+
+    /// <summary>Game OS's own controller-driven keyboard (never the Windows one); keys are typed into whatever is behind the guide.</summary>
+    public OnScreenKeyboardViewModel Keyboard { get; } = new();
+
+    private void OpenGameOsKeyboard() => Keyboard.OpenForTyping("Game OS Keyboard", Services.CaptureService.TypeIntoForeground);
+
+    /// <summary>Routes a controller / keyboard key to the keyboard when it is open. Returns true if consumed.</summary>
+    public bool HandleKeyboardKey(Avalonia.Input.Key key)
+    {
+        if (!Keyboard.IsOpen) return false;
+        string? name = key switch
+        {
+            Avalonia.Input.Key.Up => "Up", Avalonia.Input.Key.Down => "Down",
+            Avalonia.Input.Key.Left => "Left", Avalonia.Input.Key.Right => "Right",
+            Avalonia.Input.Key.Enter => "A", Avalonia.Input.Key.X => "X", Avalonia.Input.Key.Y => "Y",
+            Avalonia.Input.Key.Escape or Avalonia.Input.Key.BrowserBack => "B",
+            _ => null
+        };
+        if (name != null) Keyboard.HandleKey(name);
+        return true;
     }
 
     private System.Collections.Generic.IEnumerable<QuickMenuHubActionVm> BuildHubActions()

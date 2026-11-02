@@ -309,6 +309,7 @@ public partial class MainWindow : Window
         if (vm.ShowQuickMenu)
         {
             bool textInputFocused = IsTextInputFocused();
+            if (!textInputFocused && vm.QuickMenuVm.HandleKeyboardKey(e.Key)) { e.Handled = true; return; }
             bool isXb360QuickMenu = vm.QuickMenuVm.IsXb360Theme;
             switch (e.Key)
             {
@@ -332,7 +333,7 @@ public partial class MainWindow : Window
                 case Key.PageUp:
                     if (!textInputFocused)
                     {
-                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                        if (isXb360QuickMenu) vm.QuickMenuVm.CycleXb360Blade(-1);
                         else vm.QuickMenuVm.MoveHubSelection(-1);
                     }
                     e.Handled = true;
@@ -340,7 +341,7 @@ public partial class MainWindow : Window
                 case Key.PageDown:
                     if (!textInputFocused)
                     {
-                        if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(1);
+                        if (isXb360QuickMenu) vm.QuickMenuVm.CycleXb360Blade(1);
                         else vm.QuickMenuVm.MoveHubSelection(1);
                     }
                     e.Handled = true;
@@ -461,7 +462,19 @@ public partial class MainWindow : Window
                     vm.DashboardVm.MoveXb360GameFocus(1);
                     e.Handled = true;
                     return;
+                case Key.PageUp:
+                    vm.DashboardVm.MoveXb360Blade(-1);
+                    e.Handled = true;
+                    return;
+                case Key.PageDown:
+                    vm.DashboardVm.MoveXb360Blade(1);
+                    e.Handled = true;
+                    return;
                 case Key.Enter:
+                    vm.DashboardVm.ActivateXb360();
+                    e.Handled = true;
+                    return;
+                case Key.X:
                     vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null);
                     e.Handled = true;
                     return;
@@ -1466,11 +1479,18 @@ public partial class MainWindow : Window
         if (_quickMenuWindow?.IsVisible == true)
         {
             var qvm = vm.QuickMenuVm;
+            if (qvm.HandleKeyboardKey(key)) return;
             bool isXb360Overlay = qvm.IsXb360Theme;
             switch (key)
             {
+                case Key.PageUp:
+                    if (isXb360Overlay) qvm.CycleXb360Blade(-1); else qvm.MoveHubSelection(-1);
+                    return;
+                case Key.PageDown:
+                    if (isXb360Overlay) qvm.CycleXb360Blade(1); else qvm.MoveHubSelection(1);
+                    return;
                 case Key.Left:
-                    if (isXb360Overlay) qvm.MoveXb360Blade(-1); else qvm.MoveHubSelection(-1);
+                    if (isXb360Overlay) qvm.CycleXb360Blade(-1); else qvm.MoveHubSelection(-1);
                     return;
                 case Key.Right:
                     if (isXb360Overlay) qvm.MoveXb360Blade(1); else qvm.MoveHubSelection(1);
@@ -1497,11 +1517,20 @@ public partial class MainWindow : Window
         // While the inline quick menu is open, prioritise its navigation.
         if (vm.ShowQuickMenu)
         {
+            if (vm.QuickMenuVm.HandleKeyboardKey(key)) return;
             bool isXb360QuickMenu = vm.QuickMenuVm.IsXb360Theme;
             switch (key)
             {
+                case Key.PageUp:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.CycleXb360Blade(-1);
+                    else vm.QuickMenuVm.MoveHubSelection(-1);
+                    return;
+                case Key.PageDown:
+                    if (isXb360QuickMenu) vm.QuickMenuVm.CycleXb360Blade(1);
+                    else vm.QuickMenuVm.MoveHubSelection(1);
+                    return;
                 case Key.Left:
-                    if (isXb360QuickMenu) vm.QuickMenuVm.MoveXb360Blade(-1);
+                    if (isXb360QuickMenu) vm.QuickMenuVm.CycleXb360Blade(-1);
                     else vm.QuickMenuVm.MoveHubSelection(-1);
                     return;
                 case Key.Right:
@@ -1644,8 +1673,11 @@ public partial class MainWindow : Window
                 case Key.Right: vm.DashboardVm.MoveXb360Blade(1);  return;
                 case Key.Up:    vm.DashboardVm.MoveXb360GameFocus(-1); return;
                 case Key.Down:  vm.DashboardVm.MoveXb360GameFocus(1);  return;
-                case Key.Enter: vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null); return;
-                case Key.Y:     vm.DashboardVm.OpenFocusedCardDetailCommand.Execute(null); return;
+                case Key.PageUp:   vm.DashboardVm.MoveXb360Blade(-1); return;
+                case Key.PageDown: vm.DashboardVm.MoveXb360Blade(1);  return;
+                case Key.Enter: vm.DashboardVm.ActivateXb360(); return;
+                case Key.X:     vm.DashboardVm.PlayXb360FocusedGameCommand.Execute(null); return;
+                case Key.Y:     vm.DashboardVm.OpenXb360FocusedGameDetailCommand.Execute(null); return;
             }
         }
 

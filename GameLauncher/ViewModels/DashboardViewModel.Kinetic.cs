@@ -67,7 +67,7 @@ public partial class DashboardViewModel
     {
         if (tab == null) return;
         KineticTabIndex = Math.Max(0, KineticTabs.IndexOf(tab));
-        KineticInHeader = true;
+        KineticInHeader = false;
         RebuildKineticTiles();
     }
 
@@ -234,6 +234,7 @@ public partial class DashboardViewModel
 
         if (key == "Enter")
         {
+            if (KineticTileIndex < 0 && KineticTiles.Count > 0) SetKineticTile(0);
             if (KineticTileIndex >= 0 && KineticTileIndex < KineticTiles.Count) KineticTiles[KineticTileIndex].Action?.Invoke();
             return KineticKeyResult.Handled;
         }

@@ -131,6 +131,11 @@ public partial class SettingsViewModel : ViewModelBase
     // ── Third-party integration settings (stored locally, never synced) ────
     /// <summary>Steam Web API key — local only.</summary>
     [ObservableProperty] private string _steamApiKey = "";
+    /// <summary>Metadata provider keys (SteamGridDB, TheGamesDB, IGDB/Twitch) — local only. Steam's store needs no key.</summary>
+    [ObservableProperty] private string _steamGridDbApiKey = "";
+    [ObservableProperty] private string _theGamesDbApiKey = "";
+    [ObservableProperty] private string _igdbClientId = "";
+    [ObservableProperty] private string _igdbClientSecret = "";
     /// <summary>Steam 64-bit User ID (SteamID64) for fetching the owned games library.</summary>
     [ObservableProperty] private string _steamUserId = "";
     /// <summary>True while a Steam library import is in progress.</summary>
@@ -952,6 +957,10 @@ public partial class SettingsViewModel : ViewModelBase
         NotifyExophaseStatus   = appSettings.NotifyExophaseStatus;
         SteamApiKey            = appSettings.SteamApiKey;
         SteamUserId            = appSettings.SteamUserId;
+        SteamGridDbApiKey      = appSettings.SteamGridDbApiKey;
+        TheGamesDbApiKey       = appSettings.TheGamesDbApiKey;
+        IgdbClientId           = appSettings.IgdbClientId;
+        IgdbClientSecret       = appSettings.IgdbClientSecret;
         ExophaseProfileId      = appSettings.ExophaseProfileId;
         LudusaviPath           = appSettings.LudusaviPath;
         RequireCloudSaveConfirmation = appSettings.RequireCloudSaveConfirmation;
@@ -1200,6 +1209,10 @@ public partial class SettingsViewModel : ViewModelBase
             NotifyExophaseStatus  = NotifyExophaseStatus,
             SteamApiKey           = SteamApiKey,
             SteamUserId           = SteamUserId,
+            SteamGridDbApiKey     = SteamGridDbApiKey.Trim(),
+            TheGamesDbApiKey      = TheGamesDbApiKey.Trim(),
+            IgdbClientId          = IgdbClientId.Trim(),
+            IgdbClientSecret      = IgdbClientSecret.Trim(),
             ExophaseProfileId     = NormaliseExophaseProfileId(ExophaseProfileId),
             LudusaviPath          = LudusaviPath.Trim(),
             EnableSteamSync       = EnableSteamSync,

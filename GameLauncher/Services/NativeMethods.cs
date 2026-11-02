@@ -41,6 +41,7 @@ internal static class NativeMethods
 
     private const int INPUT_KEYBOARD = 1;
     private const uint KEYEVENTF_KEYUP = 0x0002;
+    private const uint KEYEVENTF_UNICODE = 0x0004;
 
     [DllImport("user32.dll", SetLastError = false)]
     [return: MarshalAs(UnmanagedType.Bool)]
@@ -131,6 +132,21 @@ internal static class NativeMethods
         inputs[1].type = INPUT_KEYBOARD;
         inputs[1].u.ki = new KEYBDINPUT { wVk = virtualKey, dwFlags = KEYEVENTF_KEYUP };
         return SendInput(2, inputs, Marshal.SizeOf<INPUT>()) > 0;
+    }
+
+    /// <summary>Types text into the foreground window as Unicode key events (layout independent).</summary>
+    internal static bool SendText(string text)
+    {
+        if (string.IsNullOrEmpty(text)) return false;
+        var inputs = new INPUT[text.Length * 2];
+        for (int i = 0; i < text.Length; i++)
+        {
+            inputs[i * 2].type = INPUT_KEYBOARD;
+            inputs[i * 2].u.ki = new KEYBDINPUT { wScan = text[i], dwFlags = KEYEVENTF_UNICODE };
+            inputs[i * 2 + 1].type = INPUT_KEYBOARD;
+            inputs[i * 2 + 1].u.ki = new KEYBDINPUT { wScan = text[i], dwFlags = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP };
+        }
+        return SendInput((uint)inputs.Length, inputs, Marshal.SizeOf<INPUT>()) > 0;
     }
 
     [StructLayout(LayoutKind.Sequential)]
