@@ -122,7 +122,7 @@ public partial class DashboardViewModel
                 var sections = new (string Title, string Glyph, string Section)[]
                 {
                     ("General", "⚙", "app"), ("Account", "🙂", "account"), ("Design", "🎨", "design"),
-                    ("Customise", "🖌", "customise"), ("Controller", "🎮", "controller"),
+                    ("Customise", "🖌", "customise"), ("Library", "▦", "design"), ("Controller", "🎮", "controller"),
                     ("Notifications", "🔔", "notifications"), ("Downloads", "⬇", "downloads"), ("Media", "🎬", "media"),
                     ("Emulators", "🕹", "emulator"), ("Sync", "☁", "sync"), ("System", "🖥", "system"),
                     ("Browser", "🌐", "browser"),

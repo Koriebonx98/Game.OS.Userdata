@@ -495,10 +495,12 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public bool IsPs5Keyboard     => string.Equals(KeyboardTheme, "PS5", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultKeyboard => !IsPs5Keyboard;
+    public bool IsXbOneKeyboard   => string.Equals(KeyboardTheme, "XBOne", StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultKeyboard => !IsPs5Keyboard && !IsXbOneKeyboard;
     partial void OnKeyboardThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5Keyboard));
+        OnPropertyChanged(nameof(IsXbOneKeyboard));
         OnPropertyChanged(nameof(IsDefaultKeyboard));
     }
 

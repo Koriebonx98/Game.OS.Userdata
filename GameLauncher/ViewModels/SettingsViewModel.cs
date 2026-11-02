@@ -173,7 +173,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
-    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM" };
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM", "XBOne" };
     /// <summary>Movies &amp; TV page design.</summary>
     [ObservableProperty] private string _moviesTvTheme = "Default";
     public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Cinema" };
@@ -340,7 +340,7 @@ public partial class SettingsViewModel : ViewModelBase
     }
 
     [ObservableProperty] private string _keyboardTheme = "Default";
-    public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5" };
+    public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5", "XBOne" };
     public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM", "XBOne" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
@@ -978,7 +978,7 @@ public partial class SettingsViewModel : ViewModelBase
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
-        KeyboardTheme              = NormaliseGamesTheme(appSettings.KeyboardTheme);
+        KeyboardTheme              = NormaliseKeyboardTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
         MoviesTvTheme              = appSettings.MoviesTvTheme?.Trim() is { } t && (t.Equals("Cinema", StringComparison.OrdinalIgnoreCase) || t.Equals("Netflix", StringComparison.OrdinalIgnoreCase)) ? "Cinema" : "Default";
         MusicTheme                 = string.Equals(appSettings.MusicTheme?.Trim(), "Spotify", StringComparison.OrdinalIgnoreCase) ? "Spotify" : "Default";
@@ -1223,7 +1223,7 @@ public partial class SettingsViewModel : ViewModelBase
             PreferOfflineCachedMetadata = PreferOfflineCachedMetadata,
             DesignTheme                = NormaliseDesignTheme(DesignTheme),
             GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
-            KeyboardTheme              = NormaliseGamesTheme(KeyboardTheme),
+            KeyboardTheme              = NormaliseKeyboardTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
             MoviesTvTheme              = MoviesTvTheme == "Cinema" ? "Cinema" : "Default",
             MusicTheme                 = MusicTheme == "Spotify" ? "Spotify" : "Default",
@@ -1383,11 +1383,15 @@ public partial class SettingsViewModel : ViewModelBase
     private static string NormaliseGameInfoTheme(string value)
     {
         var v = (value ?? "").Trim();
+        if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         return NormaliseGamesTheme(value);
     }
+
+    private static string NormaliseKeyboardTheme(string value) =>
+        string.Equals((value ?? "").Trim(), "XBOne", StringComparison.OrdinalIgnoreCase) ? "XBOne" : NormaliseGamesTheme(value);
 
     private static string NormaliseGamesTheme(string value) =>
         string.Equals((value ?? "").Trim(), "PS5", StringComparison.OrdinalIgnoreCase) ? "PS5" : "Default";

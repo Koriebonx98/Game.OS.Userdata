@@ -48,10 +48,12 @@ public partial class LibraryViewModel : ViewModelBase
     /// <summary>On-screen keyboard style ("Default" or "PS5"); pushed from Settings.</summary>
     [ObservableProperty] private string _keyboardTheme = "Default";
     public bool IsPs5Keyboard     => string.Equals(KeyboardTheme, "PS5", System.StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultKeyboard => !IsPs5Keyboard;
+    public bool IsXbOneKeyboard   => string.Equals(KeyboardTheme, "XBOne", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsDefaultKeyboard => !IsPs5Keyboard && !IsXbOneKeyboard;
     partial void OnKeyboardThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5Keyboard));
+        OnPropertyChanged(nameof(IsXbOneKeyboard));
         OnPropertyChanged(nameof(IsDefaultKeyboard));
     }
 
