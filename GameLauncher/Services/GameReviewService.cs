@@ -130,6 +130,61 @@ public static class GameReviewService
         return true;
     }
 
+    public sealed record PendingCompatVote(string Username, string Platform, string Title, string Rating, string? TitleId);
+
+    private static readonly object PendingGate = new();
+    private static string PendingPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "compat-pending.json");
+
+    /// <summary>Votes waiting to be written to the repo's compat-queue (survive restarts / offline).</summary>
+    public static List<PendingCompatVote> LoadPendingCompatVotes()
+    {
+        lock (PendingGate)
+        {
+            try
+            {
+                if (!File.Exists(PendingPath)) return new();
+                return JsonSerializer.Deserialize<List<PendingCompatVote>>(File.ReadAllText(PendingPath), _json) ?? new();
+            }
+            catch { return new(); }
+        }
+    }
+
+    private static void SavePending(List<PendingCompatVote> list)
+    {
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(PendingPath)!);
+            File.WriteAllText(PendingPath, JsonSerializer.Serialize(list, _json));
+        }
+        catch { /* best-effort */ }
+    }
+
+    public static void AddPendingCompatVote(PendingCompatVote vote)
+    {
+        lock (PendingGate)
+        {
+            var list = LoadPendingCompatVotes();
+            list.RemoveAll(v => Same(v, vote));
+            list.Add(vote);
+            SavePending(list);
+        }
+    }
+
+    public static void RemovePendingCompatVote(PendingCompatVote vote)
+    {
+        lock (PendingGate)
+        {
+            var list = LoadPendingCompatVotes();
+            list.RemoveAll(v => Same(v, vote));
+            SavePending(list);
+        }
+    }
+
+    private static bool Same(PendingCompatVote a, PendingCompatVote b) =>
+        string.Equals(a.Username, b.Username, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(a.Platform, b.Platform, StringComparison.OrdinalIgnoreCase) &&
+        string.Equals(a.Title, b.Title, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Loads cached compatibility reports from <c>compatibility.json</c> next to reviews.json.</summary>
     public static List<Models.GameCompatibility> LoadCompatibility(string platform, string title)
     {

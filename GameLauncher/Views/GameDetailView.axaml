@@ -1447,11 +1447,18 @@
                                    Foreground="White" VerticalAlignment="Center"
                                    TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
-                    <Button Grid.Column="1"
-                            Classes="btn-secondary"
-                            Content="✕  Close"
-                            Command="{Binding CloseVlcPlayerCommand}"
-                            Padding="14,8"/>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Classes="btn-secondary" Content="↑  Share" Padding="14,8"
+                                IsVisible="{Binding HasViewerVideo}"
+                                Command="{Binding ShareCaptureCommand}"/>
+                        <Button Classes="btn-danger" Content="{Binding DeleteLabel}" Padding="14,8"
+                                IsVisible="{Binding HasViewerVideo}"
+                                Command="{Binding DeleteCaptureCommand}"/>
+                        <Button Classes="btn-secondary"
+                                Content="✕  Close"
+                                Command="{Binding CloseVlcPlayerCommand}"
+                                Padding="14,8"/>
+                    </StackPanel>
                 </Grid>
             </Border>
 
@@ -1470,6 +1477,41 @@
 
         </Grid>
 
+    </Grid>
+
+    <!-- ── Built-in capture (screenshot) viewer ── B/Esc closes, X opens Share/Delete menu ── -->
+    <Grid IsVisible="{Binding IsCaptureViewerOpen}" Background="#F2000000" ZIndex="120" x:Name="CaptureViewerOverlay">
+        <Image Source="{Binding ViewerBitmap}" Stretch="Uniform" Margin="24,64,24,48"/>
+        <Border VerticalAlignment="Top" Background="#99000000" Padding="20,12">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="{Binding ViewerTitle}" FontSize="14" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                <Button Grid.Column="1" Classes="btn-secondary" Content="✕  Close" Padding="14,8" Command="{Binding CloseViewerCommand}"/>
+            </Grid>
+        </Border>
+        <Border VerticalAlignment="Bottom" Background="#99000000" Padding="20,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Text="B  Close     X  Menu (Share / Delete)     ◀ ▶  Browse" FontSize="11" Foreground="#8b949e" VerticalAlignment="Center"/>
+                <TextBlock Grid.Column="1" Text="{Binding CaptureStatus}" FontSize="12" Foreground="#3fb950" VerticalAlignment="Center"/>
+            </Grid>
+        </Border>
+        <Border IsVisible="{Binding IsCaptureMenuOpen}" HorizontalAlignment="Right" VerticalAlignment="Center"
+                Margin="0,0,40,0" Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="10" Padding="12" MinWidth="240">
+            <StackPanel Spacing="8">
+                <Button Classes="btn-secondary" Padding="14,10" HorizontalContentAlignment="Left" Command="{Binding ShareCaptureCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="▶" Foreground="#58a6ff" IsVisible="{Binding IsShareSelected}"/>
+                        <TextBlock Text="↑  Share (copy to clipboard)"/>
+                    </StackPanel>
+                </Button>
+                <Button Classes="btn-danger" Padding="14,10" HorizontalContentAlignment="Left" Command="{Binding DeleteCaptureCommand}">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="▶" Foreground="White" IsVisible="{Binding IsDeleteSelected}"/>
+                        <TextBlock Text="{Binding DeleteLabel}"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="B  Back" FontSize="11" Foreground="#8b949e" Margin="2,4,0,0"/>
+            </StackPanel>
+        </Border>
     </Grid>
 
     </Panel>

@@ -1057,8 +1057,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 InboxVm.OpenConversationCommand.Execute(friendUsername);
         };
         DashboardVm.OnResolveCurrentGameContext = () => (
-            DetailVm.IsGameRunning ? DetailVm.Title : null,
-            DetailVm.IsGameRunning ? DetailVm.Platform : null
+            DetailVm.IsGameRunning ? DetailVm.RunningTitle : null,
+            DetailVm.IsGameRunning ? DetailVm.RunningPlatform : null
         );
         DashboardVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
         {
@@ -1190,8 +1190,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
         };
         FriendsVm.OnResolveCurrentGameContext = () => (
-            DetailVm.IsGameRunning ? DetailVm.Title : null,
-            DetailVm.IsGameRunning ? DetailVm.Platform : null
+            DetailVm.IsGameRunning ? DetailVm.RunningTitle : null,
+            DetailVm.IsGameRunning ? DetailVm.RunningPlatform : null
         );
         // Keep dashboard Friends section in sync whenever the friends list updates
         FriendsVm.OnlineFriends.CollectionChanged  += (_, _) => _PushFriendsToDashboard();
@@ -2577,10 +2577,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         QuickMenuVm.Refresh(
             currentUsername:       _profile.Username,
-            currentGameTitle:      DetailVm.IsGameRunning ? DetailVm.Title : null,
-            currentGamePlatform:   DetailVm.IsGameRunning ? DetailVm.Platform : null,
+            currentGameTitle:      DetailVm.IsGameRunning ? DetailVm.RunningTitle : null,
+            currentGamePlatform:   DetailVm.IsGameRunning ? DetailVm.RunningPlatform : null,
             sessionStartedAt:      DetailVm.IsGameRunning
-                ? PlaytimeService.GetActiveSessionStart(DetailVm.Platform, DetailVm.Title)
+                ? PlaytimeService.GetActiveSessionStart(DetailVm.RunningPlatform, DetailVm.RunningTitle)
                   ?? PlaytimeService.GetAnyActiveSessionStart()
                 : null,
             onlineFriends:         onlineFriends,
@@ -3904,8 +3904,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _presenceTimer = new Timer(_ =>
         {
             // Include the currently running game so friends always see an accurate status.
-            // DetailVm.IsGameRunning ? DetailVm.Title : null means "In Game" or "Dashboard".
-            string? currentGame = DetailVm.IsGameRunning ? DetailVm.Title : null;
+            // DetailVm.IsGameRunning ? DetailVm.RunningTitle : null means "In Game" or "Dashboard".
+            string? currentGame = DetailVm.IsGameRunning ? DetailVm.RunningTitle : null;
             Task.Run(async () =>
             {
                 try   { await _client.UpdatePresenceAsync(currentGame).ConfigureAwait(false); }

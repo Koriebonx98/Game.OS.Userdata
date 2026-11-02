@@ -38,6 +38,9 @@ public partial class GameDetailView : UserControl
         {
             vm.BrowseLaunchPathRequested  = OnBrowseLaunchPathRequested;
             vm.PlayLocalVideoRequested    = OnPlayLocalVideoRequested;
+            vm.PlayVideoFileRequested     = PlayVideoFile;
+            vm.StopVideoRequested         = CloseVlcOverlay;
+            vm.ShareCaptureRequested      = ShareCaptureAsync;
             vm.BrowseCustomSaveRequested  = OnBrowseCustomSaveRequested;
             vm.OpenControllerEditorRequested = OnOpenControllerEditorRequested;
         }
@@ -76,7 +79,8 @@ public partial class GameDetailView : UserControl
     public void HandleBack()
     {
         if (DataContext is not GameDetailViewModel vm) return;
-        if (vm.ShowSettings)             vm.CloseSettingsCommand.Execute(null);
+        if (vm.CloseCaptureViewer()) { }
+        else if (vm.ShowSettings)        vm.CloseSettingsCommand.Execute(null);
         else if (vm.IsModBrowserOpen)    vm.CloseModBrowserCommand.Execute(null);
         else if (vm.IsActionMenuOpen)    vm.CloseActionMenuCommand.Execute(null);
         else if (vm.IsVlcPlayerOpen)     CloseVlcOverlay();
@@ -254,8 +258,13 @@ public partial class GameDetailView : UserControl
 
         if (files.Count == 0) return;
         string path = files[0].Path.LocalPath;
-        if (!File.Exists(path)) return;
+        PlayVideoFile(path);
+    }
 
+    /// <summary>Plays a video file inside the built-in VLC overlay.</summary>
+    private void PlayVideoFile(string path)
+    {
+        if (!File.Exists(path)) return;
         if (DataContext is not GameDetailViewModel vm) return;
 
         // Stop any running playback before starting a new one.
@@ -291,6 +300,27 @@ public partial class GameDetailView : UserControl
             DevLogService.Log($"[GameDetailView] VLC init failed: {ex.GetType().Name}: {ex.Message}");
             DisposeVlc();
         }
+    }
+
+    /// <summary>Copies the capture file to the clipboard so it can be pasted into chats / folders.</summary>
+    private async System.Threading.Tasks.Task<string> ShareCaptureAsync(string path)
+    {
+        try
+        {
+            var top = TopLevel.GetTopLevel(this);
+            if (top?.Clipboard is not { } clipboard) return "Clipboard unavailable";
+            var file = await top.StorageProvider.TryGetFileFromPathAsync(path);
+            if (file != null)
+            {
+                var data = new DataObject();
+                data.Set(DataFormats.Files, new[] { file });
+                await clipboard.SetDataObjectAsync(data);
+                return "Copied to clipboard - paste to share";
+            }
+            await clipboard.SetTextAsync(path);
+            return "Path copied to clipboard";
+        }
+        catch (Exception ex) { return "Share failed: " + ex.Message; }
     }
 
     private void OnVlcEndReached(object? sender, EventArgs e)
