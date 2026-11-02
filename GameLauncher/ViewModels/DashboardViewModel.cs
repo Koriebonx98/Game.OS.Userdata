@@ -882,6 +882,7 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Handles a D-pad/A press while the Switch shortcut bar is focused or being entered. Returns true when consumed.</summary>
     public bool HandleSwitchBarKey(string key)
     {
+        if (key == "Return") key = "Enter"; // Key.Enter.ToString() yields "Return"
         if (!InSwitchBar)
         {
             if (key != "Down") return false;

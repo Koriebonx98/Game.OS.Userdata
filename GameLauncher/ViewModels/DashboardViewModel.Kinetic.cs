@@ -112,11 +112,9 @@ public partial class DashboardViewModel
                         Subtitle = FeaturedGame.Platform,
                         CoverUrl = FeaturedGame.CoverUrl, CoverGradient = FeaturedGame.CoverGradient ?? FeaturedGradient,
                         Glyph = "🎮",
-                        Action = () =>
-                        {
-                            if (IsFeaturedLastPlayed) ContinuePlayingCommand.Execute(null);
-                            else OpenFeaturedDetailCommand.Execute(null);
-                        },
+                        Action = () => OpenFeaturedDetailCommand.Execute(null),
+                        SecondaryAction = IsFeaturedLastPlayed ? () => ContinuePlayingCommand.Execute(null) : null,
+                        SecondaryLabel = "Play",
                     });
                 else
                     list.Add(Page(2, 0, 4, 2, "Store", "🛍", "store", "Find your next game"));
@@ -203,6 +201,7 @@ public partial class DashboardViewModel
     /// <summary>D-pad / A handling for the Kinetic dashboard (shared by keyboard and controller).</summary>
     public KineticKeyResult HandleKineticKey(string key)
     {
+        if (key == "Return") key = "Enter"; // Key.Enter.ToString() yields "Return"
         if (KineticTiles.Count == 0 && KineticTabs.All(t => !t.IsActive)) RebuildKineticTiles();
 
         // LB / RB switch tabs from anywhere on the dashboard.
