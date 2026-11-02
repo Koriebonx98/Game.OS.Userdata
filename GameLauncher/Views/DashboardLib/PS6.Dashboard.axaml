@@ -2,11 +2,22 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:views="using:GameLauncher.Views"
+             xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.DashboardLib.Ps6Dashboard"
              x:DataType="vm:DashboardViewModel">
 
     <Border Classes="dashboard-ps6-layout"
-            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}" ClipToBounds="True">
+        <Panel>
+        <!-- Backdrop: deep navy gradient, optionally the highlighted game's cover (blurred + darkened) -->
+        <Border Classes="ps6-backdrop"/>
+        <Panel IsVisible="{Binding Ps6BackdropUrl, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+               IsHitTestVisible="False">
+            <views:CoverImage ImageUrl="{Binding Ps6BackdropUrl}" Opacity="0.45">
+                <views:CoverImage.Effect><BlurEffect Radius="48"/></views:CoverImage.Effect>
+            </views:CoverImage>
+            <Border Background="#99030319"/>
+        </Panel>
         <Viewbox Stretch="Uniform">
         <Grid RowDefinitions="Auto,*,Auto" Width="1280" Height="720">
             <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="56,24,56,0">
@@ -19,27 +30,25 @@
                     <TextBlock Text="Media" Classes="ps6-header-media" VerticalAlignment="Center"
                                IsVisible="{Binding Options.ShowMedia}"/>
                 </StackPanel>
-                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="28" VerticalAlignment="Center">
-                    <Button Classes="ps6-header-icon" Command="{Binding NavigateToAllGamesCommand}" ToolTip.Tip="Search games">⌕</Button>
-                    <Button Classes="ps6-header-icon" Command="{Binding Ps6OpenSettingsCommand}" ToolTip.Tip="Settings">⚙</Button>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="20" VerticalAlignment="Center">
+                    <Button Classes="ps6-header-icon" Classes.focused="{Binding Ps6HeaderSearchFocused}"
+                            Command="{Binding NavigateToAllGamesCommand}" ToolTip.Tip="Search games">⌕</Button>
+                    <Button Classes="ps6-header-icon" Classes.focused="{Binding Ps6HeaderSettingsFocused}"
+                            Command="{Binding Ps6OpenSettingsCommand}" ToolTip.Tip="Settings">⚙</Button>
                     <TextBlock Text="{Binding SteamClockTime}" Foreground="#F3F2FF" FontSize="15" VerticalAlignment="Center"/>
                 </StackPanel>
             </Grid>
 
-            <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
-                <Border Width="540" Height="540" CornerRadius="270" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Margin="0,60,0,0" Classes="ps6-orb-large"/>
-                <Border Width="174" Height="174" CornerRadius="87" HorizontalAlignment="Center" VerticalAlignment="Center"
-                        Margin="-180,10,0,0" Classes="ps6-orb-small"/>
-                <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Disabled" Padding="24,20,24,30">
+            <Grid Grid.Row="1" RowDefinitions="Auto,*">
+                <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Hidden"
+                              VerticalScrollBarVisibility="Disabled" Padding="24,34,24,34">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                         <Button Classes="ps6-carousel-card" Classes.focused="{Binding IsStoreFocused}" Tag="store"
                                 Command="{Binding OpenFeaturedDetailCommand}">
                             <Border Classes="ps6-carousel-cover ps6-store-cover">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                                    <TextBlock Text="▣" FontSize="94" Foreground="White"/>
-                                    <TextBlock Text="STORE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="▣" FontSize="72" Foreground="White" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="STORE" FontSize="14" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
                         </Button>
@@ -59,7 +68,7 @@
                                                               SubText="{Binding Platform}"
                                                               LetterFontSize="56"
                                                               ImageCornerRadius="4"
-                                                              Height="300"/>
+                                                              Height="250"/>
                                         </Border>
                                     </Button>
                                 </DataTemplate>
@@ -69,38 +78,94 @@
                                 Command="{Binding NavigateToAllGamesCommand}">
                             <Border Classes="ps6-carousel-cover ps6-store-cover">
                                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
-                                    <TextBlock Text="▦" FontSize="84" Foreground="White"/>
-                                    <TextBlock Text="LIBRARY" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                    <TextBlock Text="▦" FontSize="64" Foreground="White" HorizontalAlignment="Center"/>
+                                    <TextBlock Text="LIBRARY" FontSize="14" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
                         </Button>
                     </StackPanel>
                 </ScrollViewer>
 
-                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,8" Spacing="8">
-                    <TextBlock Text="{Binding FocusedCardTitle}"
-                               IsVisible="{Binding HasFocusedCard}"
-                               Classes="ps6-focused-title"/>
-                    <Border Classes="ps6-platform-badge" IsVisible="{Binding HasFocusedCard}">
-                        <TextBlock Text="{Binding FocusedCardPlatform}" Foreground="#EAE8FF"
-                                   FontSize="12" FontWeight="SemiBold"/>
-                    </Border>
-                    <TextBlock Text="{Binding FocusedCardPlaytime}"
-                               IsVisible="{Binding HasFocusedCard}"
-                               Foreground="#D7D4F5" FontSize="13" HorizontalAlignment="Center"/>
-                    <TextBlock Text="{Binding StoreBriefGame.Title}"
-                               IsVisible="{Binding IsStoreFocused}"
-                               Classes="ps6-focused-title"/>
-                    <TextBlock Text="Play something unforgettable."
-                               IsVisible="{Binding IsStoreFocused}"
-                               Foreground="#D7D4F5" FontSize="14" HorizontalAlignment="Center"/>
-                    <TextBlock Text="Browse your collection"
-                               IsVisible="{Binding IsAllGamesFocused}"
-                               Classes="ps6-focused-title"/>
-                </StackPanel>
+                <!-- Highlighted game: details, achievements and related games -->
+                <Grid Grid.Row="1" ColumnDefinitions="*,*" Margin="64,0,64,0">
+                    <StackPanel Grid.Column="0" Spacing="6" VerticalAlignment="Top">
+                        <TextBlock Text="{Binding FocusedCardTitle}" IsVisible="{Binding HasFocusedCard}"
+                                   Classes="ps6-focused-title" TextTrimming="CharacterEllipsis"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" IsVisible="{Binding HasFocusedCard}">
+                            <Border Classes="ps6-platform-badge" HorizontalAlignment="Left">
+                                <TextBlock Text="{Binding FocusedCardPlatform}" Foreground="#EAE8FF"
+                                           FontSize="12" FontWeight="SemiBold"/>
+                            </Border>
+                            <TextBlock Text="{Binding FocusedCardPlaytime}" Foreground="#D7D4F5" FontSize="13"
+                                       VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding StoreBriefGame.Title}" IsVisible="{Binding IsStoreFocused}"
+                                   Classes="ps6-focused-title" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="Play something unforgettable." IsVisible="{Binding IsStoreFocused}"
+                                   Foreground="#D7D4F5" FontSize="14"/>
+                        <TextBlock Text="Browse your collection" IsVisible="{Binding IsAllGamesFocused}"
+                                   Classes="ps6-focused-title"/>
+
+                        <StackPanel IsVisible="{Binding Options.ShowAchievements}">
+                        <Border Classes="ps6-achievements-panel" Padding="16,10" Margin="0,8,0,0" MaxWidth="470"
+                                HorizontalAlignment="Left" IsVisible="{Binding !IsStoreFocused}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding FocusedCardTrophyHeader}" Foreground="#E6E6F8" FontSize="12"
+                                           FontWeight="SemiBold" Margin="0,0,0,4" TextTrimming="CharacterEllipsis"/>
+                                <TextBlock Text="{Binding Options.AchievementsWordLower, StringFormat='No {0} yet'}"
+                                           Foreground="#9E9EC0" FontSize="12"
+                                           IsVisible="{Binding !HasFocusedCardAchievements}"/>
+                                <ItemsControl ItemsSource="{Binding FocusedCardAchievements}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:Achievement">
+                                            <Grid Margin="0,2" ColumnDefinitions="24,*" Opacity="{Binding LockedOpacity}">
+                                                <Border Width="16" Height="16" CornerRadius="8" Background="#9BE7FF"
+                                                        VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                    <TextBlock Text="★" Foreground="#030319" FontSize="10"
+                                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <TextBlock Grid.Column="1" Text="{Binding Name}" Foreground="#F2F2FF" FontSize="12"
+                                                           TextTrimming="CharacterEllipsis" Margin="6,0,0,0"/>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Top" IsVisible="{Binding HasPs5Shelf}">
+                        <TextBlock Text="{Binding Ps5ShelfTitle}" Foreground="#ECECFF" FontSize="14" FontWeight="SemiBold"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding Ps5Shelf}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:DashboardViewModel+ShelfCardVm">
+                                        <Button Classes="ps6-shelf-card"
+                                                Command="{Binding $parent[UserControl].DataContext.OpenShelfGameCommand}"
+                                                CommandParameter="{Binding}">
+                                            <Border Width="90" Height="120" ClipToBounds="True" CornerRadius="6">
+                                                <views:CoverImage ImageUrl="{Binding Game.CoverUrl}"
+                                                                  FallbackText="{Binding Game.Title}"
+                                                                  FallbackGradient="{Binding Game.CoverGradient}"
+                                                                  SubText="{Binding Game.Platform}"
+                                                                  LetterFontSize="28"
+                                                                  ImageCornerRadius="6"
+                                                                  Height="120"/>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </StackPanel>
+                </Grid>
             </Grid>
 
-            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,28">
+            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,24">
                 <TextBlock Text="{Binding Ps6DockLabel}" Classes="ps6-dock-label"/>
                 <Border Classes="ps6-dock">
                     <StackPanel Orientation="Horizontal" Spacing="8">
@@ -118,5 +183,6 @@
             </StackPanel>
         </Grid>
         </Viewbox>
+        </Panel>
     </Border>
 </UserControl>

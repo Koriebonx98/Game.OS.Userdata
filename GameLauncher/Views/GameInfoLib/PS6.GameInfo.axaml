@@ -24,64 +24,84 @@
             <Setter Property="BorderBrush" Value="#9BE7FF"/>
             <Setter Property="BorderThickness" Value="3"/>
         </Style>
-        <Style Selector="Border.ps6-info-orb">
-            <Setter Property="Background">
-                <Setter.Value>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#B5799BFF" Offset="0"/>
-                        <GradientStop Color="#665775E8" Offset="0.42"/>
-                        <GradientStop Color="#002F3BCC" Offset="1"/>
-                    </RadialGradientBrush>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="BoxShadow" Value="0 0 90 18 #665D6BFF"/>
+        <Style Selector="Border.ps6-info-chip">
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="10,4"/>
+            <Setter Property="Background" Value="#CC0B0B28"/>
+            <Setter Property="BorderBrush" Value="#552A3070"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
     </UserControl.Styles>
-    <Grid ColumnDefinitions="280,*" >
-        <Border Grid.ColumnSpan="2" Width="560" Height="560" CornerRadius="280"
-                HorizontalAlignment="Center" VerticalAlignment="Center" Classes="ps6-info-orb"/>
+    <Grid ColumnDefinitions="300,*" >
+        <!-- Backdrop: navy gradient with the cover blurred behind it -->
+        <Border Grid.ColumnSpan="2" CornerRadius="8" ClipToBounds="True" IsHitTestVisible="False">
+            <Panel>
+                <Border>
+                    <Border.Background>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="0.7,1">
+                            <GradientStop Color="#030319" Offset="0"/>
+                            <GradientStop Color="#0B0B28" Offset="0.6"/>
+                            <GradientStop Color="#17143D" Offset="1"/>
+                        </LinearGradientBrush>
+                    </Border.Background>
+                </Border>
+                <views:CoverImage ImageUrl="{Binding CoverUrl}" Opacity="0.28">
+                    <views:CoverImage.Effect><BlurEffect Radius="40"/></views:CoverImage.Effect>
+                </views:CoverImage>
+                <Border Background="#88030319"/>
+            </Panel>
+        </Border>
 
         <!-- Cover image -->
-        <Border Grid.Column="0" CornerRadius="32" ClipToBounds="True"
-                Width="260" Height="340" HorizontalAlignment="Left"
-                BorderBrush="#F0EEFF" BorderThickness="2"
-                BoxShadow="0 0 32 4 #AA8FA8FF">
+        <Border Grid.Column="0" CornerRadius="8" ClipToBounds="True"
+                Width="260" Height="360" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="16,16,0,0"
+                BorderBrush="#9BE7FF" BorderThickness="2"
+                BoxShadow="0 0 30 4 #779BE7FF">
             <views:CoverImage
                 ImageUrl="{Binding CoverUrl}"
                 FallbackText="{Binding Title}"
                 FallbackGradient="{Binding CoverGradient}"
                 SubText="{Binding Genre}"
                 LetterFontSize="80"
-                ImageCornerRadius="32"
-                Width="260" Height="340"/>
+                ImageCornerRadius="6"
+                Width="260" Height="360"/>
         </Border>
 
         <!-- Info panel -->
-        <StackPanel Grid.Column="1" Margin="28,0,0,0" Spacing="10"
+        <StackPanel Grid.Column="1" Margin="28,16,16,0" Spacing="10"
                     VerticalAlignment="Top">
 
             <TextBlock Text="{Binding Title}"
-                       FontSize="38" FontWeight="Light"
+                       FontSize="34" FontWeight="Bold" LetterSpacing="1"
                        Foreground="White" TextWrapping="Wrap"/>
+            <Rectangle Height="2" HorizontalAlignment="Left" Width="320">
+                <Rectangle.Fill>
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#9BE7FF" Offset="0"/>
+                        <GradientStop Color="#004350B8" Offset="1"/>
+                    </LinearGradientBrush>
+                </Rectangle.Fill>
+            </Rectangle>
 
             <!-- Badges row -->
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
-                <Border CornerRadius="12" Padding="12,5" Background="#4A5CE0">
+                <Border Classes="ps6-info-chip" Background="#4350B8" BorderBrush="#9BE7FF">
                     <TextBlock Text="{Binding Platform}"
                                FontSize="12" FontWeight="Bold" Foreground="White"/>
                 </Border>
-                <Border CornerRadius="12" Padding="12,5" Background="#252543"
+                <Border Classes="ps6-info-chip"
                         IsVisible="{Binding Genre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="{Binding Genre}"
                                FontSize="12" Foreground="#c9d1d9"/>
                 </Border>
-                <Border CornerRadius="12" Padding="12,5" Background="#252543"
+                <Border Classes="ps6-info-chip"
                         IsVisible="{Binding ReleaseYear, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="{Binding ReleaseYear}"
                                FontSize="12" Foreground="#8b949e"/>
                 </Border>
                 <!-- Region/Language badge for ROM games -->
-                <Border CornerRadius="12" Padding="12,5" Background="#1a3a1a"
+                <Border Classes="ps6-info-chip"
                         IsVisible="{Binding HasRegions}">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <TextBlock Text="🌍" FontSize="10" VerticalAlignment="Center"/>
@@ -90,7 +110,7 @@
                     </StackPanel>
                 </Border>
                 <!-- TitleId / AppId badge — shown for ROM/emulated and Steam games -->
-                <Border CornerRadius="12" Padding="12,5" Background="#1c2128"
+                <Border Classes="ps6-info-chip"
                         IsVisible="{Binding HasDisplayTitleId}">
                     <TextBlock Text="{Binding DisplayTitleId}"
                                FontSize="11" Foreground="#8b949e"

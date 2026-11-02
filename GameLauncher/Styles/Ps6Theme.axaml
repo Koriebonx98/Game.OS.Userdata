@@ -434,33 +434,33 @@
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
     </Style>
-    <Style Selector="Border.ps6-orb-large">
+    <Style Selector="Border.ps6-backdrop">
         <Setter Property="Background">
             <Setter.Value>
-                <RadialGradientBrush>
-                    <GradientStop Color="#B5799BFF" Offset="0"/>
-                    <GradientStop Color="#665775E8" Offset="0.42"/>
-                    <GradientStop Color="#002F3BCC" Offset="1"/>
-                </RadialGradientBrush>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0.6,1">
+                    <GradientStop Color="#030319" Offset="0"/>
+                    <GradientStop Color="#0B0B28" Offset="0.55"/>
+                    <GradientStop Color="#17143D" Offset="1"/>
+                </LinearGradientBrush>
             </Setter.Value>
         </Setter>
-        <Setter Property="BoxShadow" Value="0 0 90 18 #665D6BFF"/>
     </Style>
-    <Style Selector="Border.ps6-orb-small">
-        <Setter Property="Background">
-            <Setter.Value>
-                <RadialGradientBrush>
-                    <GradientStop Color="#D2A9A0FF" Offset="0"/>
-                    <GradientStop Color="#744F5CE0" Offset="0.58"/>
-                    <GradientStop Color="#00171960" Offset="1"/>
-                </RadialGradientBrush>
-            </Setter.Value>
-        </Setter>
-        <Setter Property="BoxShadow" Value="0 0 42 8 #665D6BFF"/>
+    <Style Selector="Button.ps6-header-icon.focused">
+        <Setter Property="Foreground" Value="#9BE7FF"/>
+        <Setter Property="RenderTransform" Value="scale(1.25)"/>
+    </Style>
+    <Style Selector="Button.ps6-shelf-card">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0,0,10,0"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+    </Style>
+    <Style Selector="Button.ps6-shelf-card:pointerover Border">
+        <Setter Property="BoxShadow" Value="0 0 14 2 #CC9BE7FF"/>
     </Style>
     <Style Selector="Button.ps6-carousel-card">
-        <Setter Property="Width" Value="230"/>
-        <Setter Property="Height" Value="300"/>
+        <Setter Property="Width" Value="190"/>
+        <Setter Property="Height" Value="250"/>
         <Setter Property="Margin" Value="10,0"/>
         <Setter Property="Padding" Value="0"/>
         <Setter Property="Background" Value="Transparent"/>
@@ -473,8 +473,8 @@
         </Setter>
     </Style>
     <Style Selector="Border.ps6-carousel-cover">
-        <Setter Property="Width" Value="230"/>
-        <Setter Property="Height" Value="300"/>
+        <Setter Property="Width" Value="190"/>
+        <Setter Property="Height" Value="250"/>
         <Setter Property="CornerRadius" Value="8"/>
         <Setter Property="ClipToBounds" Value="True"/>
         <Setter Property="BorderBrush" Value="Transparent"/>
@@ -498,10 +498,10 @@
         <Setter Property="BoxShadow" Value="0 0 26 5 #D0FFFFFF"/>
     </Style>
     <Style Selector="TextBlock.ps6-focused-title">
-        <Setter Property="FontSize" Value="32"/>
+        <Setter Property="FontSize" Value="28"/>
+        <Setter Property="FontWeight" Value="SemiBold"/>
         <Setter Property="Foreground" Value="#FFFFFF"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
-        <Setter Property="TextAlignment" Value="Center"/>
+        <Setter Property="HorizontalAlignment" Value="Left"/>
     </Style>
     <Style Selector="Border.ps6-platform-badge">
         <Setter Property="Background" Value="#332E3164"/>
@@ -509,7 +509,6 @@
         <Setter Property="BorderThickness" Value="1"/>
         <Setter Property="CornerRadius" Value="7"/>
         <Setter Property="Padding" Value="8,3"/>
-        <Setter Property="HorizontalAlignment" Value="Center"/>
     </Style>
     <Style Selector="TextBlock.ps6-dock-label">
         <Setter Property="Foreground" Value="#D7D4F5"/>
