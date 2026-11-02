@@ -356,6 +356,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     }
 
     public bool IsHome        => ActivePage == "dashboard";
+    /// <summary>The PS6 dashboard fits the viewport exactly, so the page scroll bar is hidden there.</summary>
+    public Avalonia.Controls.Primitives.ScrollBarVisibility PageVerticalScrollBar =>
+        IsHome && string.Equals(SettingsVm.DesignTheme, "PS6", StringComparison.OrdinalIgnoreCase)
+            ? Avalonia.Controls.Primitives.ScrollBarVisibility.Disabled
+            : Avalonia.Controls.Primitives.ScrollBarVisibility.Auto;
     public bool IsLibrary     => ActivePage == "library";
     public bool IsStore       => ActivePage == "store";
     public bool IsProfile     => ActivePage == "profile";
@@ -391,6 +396,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     partial void OnActivePageChanged(string value)
     {
         OnPropertyChanged(nameof(IsHome));
+        OnPropertyChanged(nameof(PageVerticalScrollBar));
         OnPropertyChanged(nameof(IsLibrary));
         OnPropertyChanged(nameof(IsStore));
         OnPropertyChanged(nameof(IsProfile));
@@ -1159,6 +1165,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 MediaVm.MoviesTvTheme = SettingsVm.MoviesTvTheme;
             if (e.PropertyName == nameof(SettingsViewModel.MusicTheme))
                 MediaVm.MusicTheme = SettingsVm.MusicTheme;
+            if (e.PropertyName == nameof(SettingsViewModel.DesignTheme))
+                OnPropertyChanged(nameof(PageVerticalScrollBar));
             if (e.PropertyName == nameof(SettingsViewModel.GamesTheme))
                 { LibraryVm.GamesTheme = SettingsVm.GamesTheme; StoreVm.GamesTheme = SettingsVm.GamesTheme; }
             if (e.PropertyName == nameof(SettingsViewModel.StoreTheme))
@@ -1180,6 +1188,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             _appliedDashboardDesign = DashboardCatalog.Normalise(SettingsVm.DesignTheme);
             DashboardVm.Options.Load(_appliedDashboardDesign, LoadDashboardOptions(_appliedDashboardDesign));
+            OnPropertyChanged(nameof(PageVerticalScrollBar));
         };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         DashboardVm.StoreCatalogProvider = () => StoreVm.CatalogForRecommendations();

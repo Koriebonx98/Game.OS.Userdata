@@ -15,79 +15,89 @@
         <Style Selector="Button.ps6-lib-card">
             <Setter Property="Padding" Value="0"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Width" Value="180"/>
-            <Setter Property="Margin" Value="10,10,14,18"/>
+            <Setter Property="Width" Value="170"/>
+            <Setter Property="Margin" Value="10,10,12,16"/>
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="RenderTransformOrigin" Value="50%,50%"/>
             <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
             <Setter Property="VerticalContentAlignment" Value="Stretch"/>
             <Setter Property="Transitions">
                 <Transitions>
-                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.12"/>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14"/>
                 </Transitions>
             </Setter>
         </Style>
         <Style Selector="Button.ps6-lib-card /template/ ContentPresenter">
             <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="CornerRadius" Value="26"/>
-            <Setter Property="BorderBrush" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="3"/>
-            <Setter Property="Padding" Value="0"/>
         </Style>
         <Style Selector="Button.ps6-lib-card:pointerover /template/ ContentPresenter">
-            <Setter Property="Background" Value="#141A30"/>
+            <Setter Property="Background" Value="Transparent"/>
+        </Style>
+        <Style Selector="Border.ps6-lib-cover">
+            <Setter Property="CornerRadius" Value="6"/>
+            <Setter Property="ClipToBounds" Value="True"/>
+            <Setter Property="BorderBrush" Value="#2A3070"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Height" Value="230"/>
+        </Style>
+        <Style Selector="Button.ps6-lib-card:pointerover Border.ps6-lib-cover">
+            <Setter Property="BorderBrush" Value="#8FA8FF"/>
         </Style>
         <Style Selector="Button.ps6-lib-card.focused">
-            <Setter Property="RenderTransform" Value="scale(1.07)"/>
+            <Setter Property="RenderTransform" Value="scale(1.08)"/>
             <Setter Property="ZIndex" Value="5"/>
         </Style>
-        <Style Selector="Button.ps6-lib-card.focused /template/ ContentPresenter">
-            <Setter Property="BorderBrush" Value="#9BE7FF"/>
-            <Setter Property="Background" Value="#1E2646"/>
-        </Style>
-        <Style Selector="Border.ps6-orb-large">
-            <Setter Property="Background">
-                <Setter.Value>
-                    <RadialGradientBrush>
-                        <GradientStop Color="#B5799BFF" Offset="0"/>
-                        <GradientStop Color="#665775E8" Offset="0.42"/>
-                        <GradientStop Color="#002F3BCC" Offset="1"/>
-                    </RadialGradientBrush>
-                </Setter.Value>
-            </Setter>
-            <Setter Property="BoxShadow" Value="0 0 90 18 #665D6BFF"/>
-        </Style>
         <Style Selector="Button.ps6-lib-card.focused Border.ps6-lib-cover">
-            <Setter Property="BorderBrush" Value="#FFFFFF"/>
-            <Setter Property="BorderThickness" Value="3"/>
-            <Setter Property="BoxShadow" Value="0 0 24 4 #D0FFFFFF"/>
+            <Setter Property="BorderBrush" Value="#9BE7FF"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BoxShadow" Value="0 0 26 4 #889BE7FF"/>
+        </Style>
+        <Style Selector="Border.ps6-lib-chipbadge">
+            <Setter Property="Background" Value="#CC030319"/>
+            <Setter Property="BorderBrush" Value="#558FA8FF"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="6,2"/>
         </Style>
         <Style Selector="Button.ps6-lib-chip">
             <Setter Property="Padding" Value="16,7"/>
-            <Setter Property="CornerRadius" Value="18"/>
-            <Setter Property="Foreground" Value="#B3B3B3"/>
-            <Setter Property="Background" Value="#141A30"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Foreground" Value="#B9BCE6"/>
+            <Setter Property="Background" Value="#0B0B28"/>
+            <Setter Property="BorderBrush" Value="#2A3070"/>
+            <Setter Property="BorderThickness" Value="1"/>
         </Style>
         <Style Selector="Button.ps6-lib-chip.filter-chip-active">
-            <Setter Property="Foreground" Value="#070A14"/>
-            <Setter Property="Background" Value="#CFD9FF"/>
+            <Setter Property="Foreground" Value="#030319"/>
+            <Setter Property="Background" Value="#9BE7FF"/>
         </Style>
         <Style Selector="Button.ps6-lib-chip.filter-chip-active /template/ ContentPresenter">
-            <Setter Property="Background" Value="#CFD9FF"/>
+            <Setter Property="Background" Value="#9BE7FF"/>
+            <Setter Property="BoxShadow" Value="0 0 14 1 #889BE7FF"/>
         </Style>
     </UserControl.Styles>
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="32,24,32,0">
-        <Border Grid.RowSpan="3" Width="560" Height="560" CornerRadius="280"
-                HorizontalAlignment="Center" VerticalAlignment="Center"
-                Classes="ps6-orb-large"/>
+    <Grid>
+        <Border>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0.7,1">
+                    <GradientStop Color="#030319" Offset="0"/>
+                    <GradientStop Color="#0B0B28" Offset="0.6"/>
+                    <GradientStop Color="#17143D" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
 
+    <Grid RowDefinitions="Auto,Auto,*" Margin="40,28,40,0">
         <!-- Header + search -->
-        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,16">
-            <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Library" FontSize="30" FontWeight="Bold" Foreground="#FFFFFF"/>
-                <TextBlock Text="{Binding TotalGames, StringFormat='   {0} in your collection'}"
-                           FontSize="13" Foreground="#9E9E9E" VerticalAlignment="Bottom" Margin="0,0,0,5"/>
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto" Margin="0,0,0,6">
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="14" VerticalAlignment="Center">
+                <TextBlock Text="LIBRARY" FontSize="30" FontWeight="Bold" LetterSpacing="6" Foreground="#FFFFFF"/>
+                <Border Classes="ps6-lib-chipbadge" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding TotalGames, StringFormat='{}{0} GAMES'}"
+                               FontSize="11" FontWeight="SemiBold" Foreground="#9BE7FF"/>
+                </Border>
             </StackPanel>
             <TextBox Grid.Column="1"
                      Name="LibrarySearchBox"
@@ -95,11 +105,20 @@
                      IsTabStop="False"
                      Text="{Binding SearchText}"
                      Watermark="🔍  Search games…"
-                     Width="240" VerticalAlignment="Center"/>
+                     Width="260" VerticalAlignment="Center"/>
         </Grid>
+        <Rectangle Grid.Row="0" Height="2" VerticalAlignment="Bottom" Margin="0,0,0,-8" HorizontalAlignment="Stretch">
+            <Rectangle.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                    <GradientStop Color="#9BE7FF" Offset="0"/>
+                    <GradientStop Color="#4350B8" Offset="0.4"/>
+                    <GradientStop Color="#00030319" Offset="1"/>
+                </LinearGradientBrush>
+            </Rectangle.Fill>
+        </Rectangle>
 
         <!-- Platform dropdown + install-status chips -->
-        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="12" Margin="0,0,0,10">
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="10" Margin="0,22,0,10">
             <ComboBox ItemsSource="{Binding Platforms}"
                       SelectedItem="{Binding FilterPlatform}"
                       MinWidth="180"
@@ -108,19 +127,19 @@
                     Classes.filter-chip-active="{Binding IsInstallFilterAll}"
                     Command="{Binding SetInstallFilterCommand}"
                     CommandParameter="All">
-                <TextBlock Text="All" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock Text="ALL" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
             </Button>
             <Button Classes="ps6-lib-chip"
                     Classes.filter-chip-active="{Binding IsInstallFilterInstalled}"
                     Command="{Binding SetInstallFilterCommand}"
                     CommandParameter="Installed">
-                <TextBlock Text="Installed" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock Text="INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
             </Button>
             <Button Classes="ps6-lib-chip"
                     Classes.filter-chip-active="{Binding IsInstallFilterNotInstalled}"
                     Command="{Binding SetInstallFilterCommand}"
                     CommandParameter="Uninstalled">
-                <TextBlock Text="Not installed" FontSize="12" FontWeight="SemiBold"/>
+                <TextBlock Text="NOT INSTALLED" FontSize="11" FontWeight="Bold" LetterSpacing="2"/>
             </Button>
         </StackPanel>
 
@@ -128,7 +147,7 @@
         <ScrollViewer Grid.Row="2"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
-                      Padding="0,0,0,28">
+                      Padding="0,6,0,28">
             <ItemsControl ItemsSource="{Binding FilteredMyGames}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -142,24 +161,27 @@
                                 Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
                                 CommandParameter="{Binding}">
                             <StackPanel>
-                                <Border Height="180" CornerRadius="22" ClipToBounds="True"
-                                        Classes="ps6-lib-cover">
-                                    <views:CoverImage
-                                        ImageUrl="{Binding CoverUrl}"
-                                        FallbackText="{Binding EffectiveTitle}"
-                                        FallbackGradient="{Binding CoverGradient}"
-                                        SubText="{Binding Platform}"
-                                        LetterFontSize="56"
-                                        ImageCornerRadius="22"
-                                        Height="180"/>
+                                <Border Classes="ps6-lib-cover">
+                                    <Panel>
+                                        <views:CoverImage
+                                            ImageUrl="{Binding CoverUrl}"
+                                            FallbackText="{Binding EffectiveTitle}"
+                                            FallbackGradient="{Binding CoverGradient}"
+                                            SubText="{Binding Platform}"
+                                            LetterFontSize="56"
+                                            ImageCornerRadius="6"
+                                            Height="230"/>
+                                        <Border Classes="ps6-lib-chipbadge" HorizontalAlignment="Left"
+                                                VerticalAlignment="Bottom" Margin="8">
+                                            <TextBlock Text="{Binding Platform}" FontSize="9" FontWeight="Bold"
+                                                       Foreground="#C9D4FF"/>
+                                        </Border>
+                                    </Panel>
                                 </Border>
                                 <TextBlock Text="{Binding EffectiveTitle}"
-                                           FontSize="13" FontWeight="SemiBold" Foreground="#ECECEC"
+                                           FontSize="12" FontWeight="SemiBold" Foreground="#ECECFF"
                                            TextTrimming="CharacterEllipsis"
-                                           Margin="6,8,6,0"/>
-                                <TextBlock Text="{Binding Platform}"
-                                           FontSize="11" Foreground="#9E9E9E"
-                                           Margin="6,2,6,8"/>
+                                           Margin="2,8,2,0"/>
                             </StackPanel>
                         </Button>
                     </DataTemplate>
@@ -167,5 +189,6 @@
             </ItemsControl>
         </ScrollViewer>
 
+    </Grid>
     </Grid>
 </UserControl>

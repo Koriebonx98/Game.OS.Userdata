@@ -716,7 +716,7 @@ public partial class DashboardViewModel : ViewModelBase
 
     // ── Dashboard card focus / keyboard nav ──────────────────────────────────
     [ObservableProperty] private int _selectedCardIndex = -1;
-    [ObservableProperty] private LocalGameCardVm? _focusedCard;
+    [ObservableProperty, NotifyPropertyChangedFor(nameof(Ps6BackdropUrl))] private LocalGameCardVm? _focusedCard;
     [ObservableProperty] private string _focusedCardTitle = "";
     [ObservableProperty] private string _focusedCardPlatform = "";
     [ObservableProperty] private string _focusedCardPlaytime = "";
@@ -886,10 +886,47 @@ public partial class DashboardViewModel : ViewModelBase
         OnPropertyChanged(nameof(Ps6DockPowerSelected));
     }
 
+    /// <summary>-1 = none, 0 = search, 1 = settings: the header icons reached with Up from the games row.</summary>
+    [ObservableProperty] private int _ps6HeaderIndex = -1;
+    public bool IsPs6HeaderActive => Ps6HeaderIndex >= 0;
+    public bool Ps6HeaderSearchFocused => Ps6HeaderIndex == 0;
+    public bool Ps6HeaderSettingsFocused => Ps6HeaderIndex == 1;
+
+    partial void OnPs6HeaderIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsPs6HeaderActive));
+        OnPropertyChanged(nameof(Ps6HeaderSearchFocused));
+        OnPropertyChanged(nameof(Ps6HeaderSettingsFocused));
+    }
+
+    /// <summary>Cover of the highlighted game, used as the PS6 dashboard backdrop (empty for Store / Library tiles).</summary>
+    public string? Ps6BackdropUrl => Options.ShowCoverBackground ? FocusedCard?.CoverUrl : null;
+
+    /// <summary>PS6 vertical navigation: games row ⇄ dock (Down / Up) and games row ⇄ header (Up / Down).</summary>
     public bool HandlePs6DockKey(Avalonia.Input.Key key)
     {
+        if (IsPs6HeaderActive)
+        {
+            switch (key)
+            {
+                case Avalonia.Input.Key.Left: Ps6HeaderIndex = 0; break;
+                case Avalonia.Input.Key.Right: Ps6HeaderIndex = 1; break;
+                case Avalonia.Input.Key.Down: Ps6HeaderIndex = -1; break;
+                case Avalonia.Input.Key.Up: break;
+                case Avalonia.Input.Key.Enter:
+                case Avalonia.Input.Key.X:
+                    if (Ps6HeaderIndex == 0) NavigateToAllGames(); else Ps6OpenSettings();
+                    Ps6HeaderIndex = -1;
+                    break;
+                case Avalonia.Input.Key.Escape: Ps6HeaderIndex = -1; break;
+                default: return false;
+            }
+            return true;
+        }
+
         if (!IsPs6DockActive)
         {
+            if (key == Avalonia.Input.Key.Up) { Ps6HeaderIndex = 1; return true; }
             if (key != Avalonia.Input.Key.Down) return false;
             Ps6DockIndex = 0;
             return true;
@@ -1154,6 +1191,7 @@ public partial class DashboardViewModel : ViewModelBase
     {
         UpdateFocusedCardCore();
         RefreshPs5Shelf();
+        OnPropertyChanged(nameof(Ps6BackdropUrl));
     }
 
     private void UpdateFocusedCardCore()

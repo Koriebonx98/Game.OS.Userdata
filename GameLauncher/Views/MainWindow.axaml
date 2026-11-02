@@ -43,7 +43,7 @@
                     <!-- Main page views -->
                     <ScrollViewer x:Name="PageScroller"
                                   HorizontalScrollBarVisibility="Disabled"
-                                  VerticalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="{Binding PageVerticalScrollBar}"
                                   IsVisible="{Binding !ShowDetailPage}">
                         <Panel>
                             <Border IsVisible="{Binding IsHome}">

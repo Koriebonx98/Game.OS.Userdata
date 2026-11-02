@@ -52,6 +52,7 @@ public static class DashboardCatalog
             new("achievements", "Achievements / trophies (panel & counter)"),
             new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
             new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
+            new("coverbg", "Highlighted game cover as background"),
         },
         XbOne => new DashboardAssetDef[]
         {
@@ -184,6 +185,7 @@ public partial class DashboardOptionsVm : ObservableObject
     public bool ShowTabs         => Get("tabs");
     public bool ShowRecommended  => Get("recommended");
     public bool ShowRelated      => Get("related");
+    public bool ShowCoverBackground => Get("coverbg");
     public bool ShowNavBar       => Get("navbar");
     public bool ShowShelf        => Get("shelf");
     /// <summary>PS5 calls achievements "Trophies"; the setting switches the wording back to "Achievements".</summary>
