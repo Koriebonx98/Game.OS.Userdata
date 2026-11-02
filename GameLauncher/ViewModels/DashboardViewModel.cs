@@ -852,6 +852,98 @@ public partial class DashboardViewModel : ViewModelBase
     /// <summary>Invoked when the user navigates to a specific page (e.g. friends/inbox).</summary>
     public Action<string>? OnNavigateToPage { get; set; }
     public Action<string>? OnNavigateToMediaSection { get; set; }
+    public Action? OnOpenQuickMenu { get; set; }
+
+    private static readonly string[] Ps6DockItems =
+        { "Home", "Library", "Notifications", "Friends", "Music", "Downloads", "Profile", "Settings", "Power" };
+    [ObservableProperty] private int _ps6DockIndex = -1;
+    public bool IsPs6DockActive => Ps6DockIndex >= 0;
+    public string Ps6DockLabel => Ps6DockIndex >= 0 && Ps6DockIndex < Ps6DockItems.Length
+        ? Ps6DockItems[Ps6DockIndex]
+        : "Home";
+    public bool Ps6DockHomeSelected => Ps6DockIndex is -1 or 0;
+    public bool Ps6DockLibrarySelected => Ps6DockIndex == 1;
+    public bool Ps6DockInboxSelected => Ps6DockIndex == 2;
+    public bool Ps6DockFriendsSelected => Ps6DockIndex == 3;
+    public bool Ps6DockMusicSelected => Ps6DockIndex == 4;
+    public bool Ps6DockDownloadsSelected => Ps6DockIndex == 5;
+    public bool Ps6DockProfileSelected => Ps6DockIndex == 6;
+    public bool Ps6DockSettingsSelected => Ps6DockIndex == 7;
+    public bool Ps6DockPowerSelected => Ps6DockIndex == 8;
+
+    partial void OnPs6DockIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(IsPs6DockActive));
+        OnPropertyChanged(nameof(Ps6DockLabel));
+        OnPropertyChanged(nameof(Ps6DockHomeSelected));
+        OnPropertyChanged(nameof(Ps6DockLibrarySelected));
+        OnPropertyChanged(nameof(Ps6DockInboxSelected));
+        OnPropertyChanged(nameof(Ps6DockFriendsSelected));
+        OnPropertyChanged(nameof(Ps6DockMusicSelected));
+        OnPropertyChanged(nameof(Ps6DockDownloadsSelected));
+        OnPropertyChanged(nameof(Ps6DockProfileSelected));
+        OnPropertyChanged(nameof(Ps6DockSettingsSelected));
+        OnPropertyChanged(nameof(Ps6DockPowerSelected));
+    }
+
+    public bool HandlePs6DockKey(Avalonia.Input.Key key)
+    {
+        if (!IsPs6DockActive)
+        {
+            if (key != Avalonia.Input.Key.Down) return false;
+            Ps6DockIndex = 0;
+            return true;
+        }
+
+        switch (key)
+        {
+            case Avalonia.Input.Key.Left:
+                Ps6DockIndex = Math.Max(0, Ps6DockIndex - 1);
+                break;
+            case Avalonia.Input.Key.Right:
+                Ps6DockIndex = Math.Min(Ps6DockItems.Length - 1, Ps6DockIndex + 1);
+                break;
+            case Avalonia.Input.Key.Up:
+                Ps6DockIndex = -1;
+                break;
+            case Avalonia.Input.Key.Enter:
+                ActivatePs6DockItem();
+                break;
+            case Avalonia.Input.Key.Down:
+                break;
+            default:
+                return false;
+        }
+
+        return true;
+    }
+
+    [RelayCommand] private void Ps6DockHome() { Ps6DockIndex = -1; }
+    [RelayCommand] private void Ps6DockLibrary() { Ps6DockIndex = -1; OnNavigateToLibrary?.Invoke(); }
+    [RelayCommand] private void Ps6DockInbox() { Ps6DockIndex = -1; OnNavigateToPage?.Invoke("inbox"); }
+    [RelayCommand] private void Ps6DockFriends() { Ps6DockIndex = -1; OnNavigateToPage?.Invoke("friends"); }
+    [RelayCommand] private void Ps6DockMusic() { Ps6DockIndex = -1; OnNavigateToMediaSection?.Invoke("music"); }
+    [RelayCommand] private void Ps6DockDownloads() { Ps6DockIndex = -1; OnNavigateToPage?.Invoke("downloads"); }
+    [RelayCommand] private void Ps6DockProfile() { Ps6DockIndex = -1; OnNavigateToPage?.Invoke("profile"); }
+    [RelayCommand] private void Ps6DockSettings() { Ps6DockIndex = -1; OnNavigateToPage?.Invoke("settings"); }
+    [RelayCommand] private void Ps6DockPower() { Ps6DockIndex = -1; OnOpenQuickMenu?.Invoke(); }
+    [RelayCommand] private void Ps6OpenSettings() => OnNavigateToPage?.Invoke("settings");
+
+    private void ActivatePs6DockItem()
+    {
+        switch (Ps6DockIndex)
+        {
+            case 0: Ps6DockHome(); break;
+            case 1: Ps6DockLibrary(); break;
+            case 2: Ps6DockInbox(); break;
+            case 3: Ps6DockFriends(); break;
+            case 4: Ps6DockMusic(); break;
+            case 5: Ps6DockDownloads(); break;
+            case 6: Ps6DockProfile(); break;
+            case 7: Ps6DockSettings(); break;
+            case 8: Ps6DockPower(); break;
+        }
+    }
 
     [ObservableProperty] private bool _isStoreFocused = true;
     [ObservableProperty] private bool _isAllGamesFocused;

@@ -28,8 +28,9 @@ public partial class LibraryViewModel : ViewModelBase
     public bool IsWiiGamesLib     => string.Equals(GamesTheme, "Wii", System.StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchGamesLib  => string.Equals(GamesTheme, "Switch", System.StringComparison.OrdinalIgnoreCase);
     public bool IsSteamGamesLib   => string.Equals(GamesTheme, "SteamBPM", System.StringComparison.OrdinalIgnoreCase);
+    public bool IsPs6GamesLib     => string.Equals(GamesTheme, "PS6", System.StringComparison.OrdinalIgnoreCase);
     public bool IsXbOneGamesLib   => string.Equals(GamesTheme, "XBOne", System.StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGamesLib => !IsPs5GamesLib && !IsWiiGamesLib && !IsSwitchGamesLib && !IsSteamGamesLib && !IsXbOneGamesLib;
+    public bool IsDefaultGamesLib => !IsPs5GamesLib && !IsWiiGamesLib && !IsSwitchGamesLib && !IsSteamGamesLib && !IsXbOneGamesLib && !IsPs6GamesLib;
 
     /// <summary>Slides back to the dashboard (the Wii Games page's left arrow); wired by MainViewModel.</summary>
     public Action? OnBackToDashboard { get; set; }
@@ -42,6 +43,7 @@ public partial class LibraryViewModel : ViewModelBase
         OnPropertyChanged(nameof(IsSwitchGamesLib));
         OnPropertyChanged(nameof(IsSteamGamesLib));
         OnPropertyChanged(nameof(IsXbOneGamesLib));
+        OnPropertyChanged(nameof(IsPs6GamesLib));
         OnPropertyChanged(nameof(IsDefaultGamesLib));
     }
 

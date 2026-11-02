@@ -13,9 +13,10 @@ public sealed record DashboardAssetDef(string Key, string Label);
 /// <summary>Which assets each dashboard design offers in Settings → Design → ⚙, plus default accents.</summary>
 public static class DashboardCatalog
 {
-    public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", "Wii", "Switch", "SteamBPM", XbOne };
+    public static readonly IReadOnlyList<string> Designs = new[] { "Default", Xb360Og, Xb360Kinetic, "PS5", Ps6, "Wii", "Switch", "SteamBPM", XbOne };
 
     public const string XbOne = "XBOne";
+    public const string Ps6 = "PS6";
     public const string Xb360Og = "XB360 OG";
     public const string Xb360Kinetic = "XB360 Kinetic";
 
@@ -39,6 +40,13 @@ public static class DashboardCatalog
             new("hints", "Button hints"), new("background", "Game background"),
         },
         "PS5" => new DashboardAssetDef[]
+        {
+            new("header", "Header (Games / Media)"), new("media", "Media tab in the header"),
+            new("achievements", "Achievements / trophies (panel & counter)"),
+            new("trophyname", "Call achievements \"Trophies\" (off = \"Achievements\")"),
+            new("recommended", "Recommended games shelf (Store)"), new("related", "Related games shelf"),
+        },
+        Ps6 => new DashboardAssetDef[]
         {
             new("header", "Header (Games / Media)"), new("media", "Media tab in the header"),
             new("achievements", "Achievements / trophies (panel & counter)"),
@@ -80,6 +88,7 @@ public static class DashboardCatalog
         "Wii" => "#7cb7d6",
         "Switch" => "#00c3e3",
         "PS5" => "#0070D1",
+        Ps6 => "#8FA8FF",
         Xb360Og or Xb360Kinetic => "#1f9d1f",
         XbOne => "#107c10",
         "SteamBPM" => "#1a9fff",
@@ -183,6 +192,7 @@ public partial class DashboardOptionsVm : ObservableObject
 
     public bool IsXb360Kinetic => Design == DashboardCatalog.Xb360Kinetic;
     public bool IsXb360Og      => Design == DashboardCatalog.Xb360Og;
+    public bool IsPs6          => Design == DashboardCatalog.Ps6;
     public bool IsXbOne        => Design == DashboardCatalog.XbOne;
 }
 

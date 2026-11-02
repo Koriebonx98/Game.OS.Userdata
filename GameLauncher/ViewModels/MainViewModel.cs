@@ -1043,6 +1043,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         DashboardVm.OnContinuePlaying   = LaunchFromCard;
         DashboardVm.OnNavigateToLibrary = () => Navigate("library");
         DashboardVm.OnNavigateToPage    = Navigate;
+        DashboardVm.OnOpenQuickMenu    = () => ShowQuickMenu = true;
         DashboardVm.OnOpenSettingsSection = section =>
         {
             SettingsVm.SelectedSection = section;

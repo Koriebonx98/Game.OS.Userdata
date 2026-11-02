@@ -14,6 +14,7 @@
           Views/DashboardLib/XB360.Dashboard.axaml     (Xbox 360)
           Views/DashboardLib/XBOne.Dashboard.axaml     (Xbox One)
           Views/DashboardLib/PS5.Dashboard.axaml       (PS5)
+          Views/DashboardLib/PS6.Dashboard.axaml       (PS6)
           Views/DashboardLib/Switch.Dashboard.axaml    (Nintendo Switch)
           Views/DashboardLib/Wii.Dashboard.axaml       (Wii)
           Views/DashboardLib/SteamBPM.Dashboard.axaml  (Steam Big Picture)
@@ -27,6 +28,7 @@
         <dash:Xb360Dashboard/>
         <dash:XbOneDashboard/>
         <dash:Ps5Dashboard/>
+        <dash:Ps6Dashboard/>
         <dash:SwitchDashboard/>
         <dash:WiiDashboard/>
         <dash:SteamBpmDashboard/>

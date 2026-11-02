@@ -34,6 +34,7 @@ public partial class LibraryView : UserControl
     private Control? ActiveLib() => _vm switch
     {
         { IsPs5GamesLib: true } => this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib"),
+        { IsPs6GamesLib: true } => this.FindControl<GamesLib.Ps6GamesLib>("Ps6Lib"),
         { IsWiiGamesLib: true } => this.FindControl<GamesLib.WiiGamesLib>("WiiLib"),
         { IsSwitchGamesLib: true } => this.FindControl<GamesLib.SwitchGamesLib>("SwitchLib"),
         { IsSteamGamesLib: true } => this.FindControl<GamesLib.SteamGamesLib>("SteamLib"),
@@ -67,6 +68,8 @@ public partial class LibraryView : UserControl
     {
         if (DataContext is ViewModels.LibraryViewModel { IsPs5GamesLib: true })
             this.FindControl<GamesLib.Ps5GamesLib>("Ps5Lib")?.FocusSearchBox();
+        else if (DataContext is ViewModels.LibraryViewModel { IsPs6GamesLib: true })
+            this.FindControl<GamesLib.Ps6GamesLib>("Ps6Lib")?.FocusSearchBox();
         else if (DataContext is ViewModels.LibraryViewModel { IsWiiGamesLib: true })
             this.FindControl<GamesLib.WiiGamesLib>("WiiLib")?.FocusSearchBox();
         else if (DataContext is ViewModels.LibraryViewModel { IsSwitchGamesLib: true })

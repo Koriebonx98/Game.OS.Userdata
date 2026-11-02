@@ -7,6 +7,7 @@
              x:Class="GameLauncher.Views.QuickMenuOverlay"
              x:DataType="vm:QuickMenuViewModel"
              Classes.qm-theme-ps5="{Binding IsPs5Theme}"
+             Classes.qm-theme-ps6="{Binding IsPs6Theme}"
              Classes.qm-theme-gameos="{Binding IsGameOsTheme}"
              Classes.qm-theme-xb360="{Binding IsXb360Theme}"
              Classes.qm-theme-wii="{Binding IsWiiTheme}"
@@ -308,6 +309,7 @@
           Views/QuickMenuLib/Wii.QuickMenu.axaml      ("Wii")
           Views/QuickMenuLib/XB360.QuickMenu.axaml    ("XB360" guide)
           Views/QuickMenuLib/Hub.QuickMenu.axaml      ("PS5" hub bar)
+          Views/QuickMenuLib/PS6.QuickMenu.axaml      ("PS6" glass quick menu)
           Views/QuickMenuLib/Switch.QuickMenu.axaml   ("Switch" Quick Guide)
           Views/QuickMenuLib/Steam.QuickMenu.axaml    ("SteamBPM" Quick Guide)
           Views/QuickMenuLib/XBOne.QuickMenu.axaml    ("XBOne" guide)
@@ -320,6 +322,7 @@
         <qm:WiiQuickMenu/>
         <qm:Xb360QuickMenu/>
         <qm:HubQuickMenu/>
+        <qm:Ps6QuickMenu/>
         <qm:SwitchQuickMenu/>
         <qm:SteamQuickMenu/>
         <qm:XbOneQuickMenu/>

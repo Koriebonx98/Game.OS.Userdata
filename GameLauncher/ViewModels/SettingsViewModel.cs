@@ -173,7 +173,7 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Available Games page layouts (see Views/GamesLib).</summary>
     /// <summary>Game Info card layout ("Default" or "PS5").</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
-    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM", "XBOne" };
+    public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "PS6", "Wii", "Switch", "SteamBPM", "XBOne" };
     /// <summary>Movies &amp; TV page design.</summary>
     [ObservableProperty] private string _moviesTvTheme = "Default";
     public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Cinema" };
@@ -341,12 +341,12 @@ public partial class SettingsViewModel : ViewModelBase
 
     [ObservableProperty] private string _keyboardTheme = "Default";
     public IReadOnlyList<string> AvailableKeyboardThemes { get; } = new[] { "Default", "PS5", "XBOne" };
-    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "Wii", "Switch", "SteamBPM", "XBOne" };
+    public IReadOnlyList<string> AvailableGamesThemes { get; } = new[] { "Default", "PS5", "PS6", "Wii", "Switch", "SteamBPM", "XBOne" };
 
     /// <summary>Selected quick-menu overlay style.</summary>
     [ObservableProperty] private string _quickMenuTheme = "PS5";
     /// <summary>Available quick-menu styles.</summary>
-    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "XB360", "Wii", "Switch", "SteamBPM", "XBOne" };
+    public IReadOnlyList<string> AvailableQuickMenuThemes { get; } = new[] { "GameOS", "PS5", "PS6", "XB360", "Wii", "Switch", "SteamBPM", "XBOne" };
 
     /// <summary>
     /// Wired by MainViewModel: invoked when "Import Steam Library" is clicked.
@@ -1373,6 +1373,7 @@ public partial class SettingsViewModel : ViewModelBase
     private static string NormaliseGamesLibTheme(string value)
     {
         var v = (value ?? "").Trim();
+        if (string.Equals(v, "PS6", StringComparison.OrdinalIgnoreCase)) return "PS6";
         if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
@@ -1383,6 +1384,7 @@ public partial class SettingsViewModel : ViewModelBase
     private static string NormaliseGameInfoTheme(string value)
     {
         var v = (value ?? "").Trim();
+        if (string.Equals(v, "PS6", StringComparison.OrdinalIgnoreCase)) return "PS6";
         if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
         if (string.Equals(v, "Wii", StringComparison.OrdinalIgnoreCase)) return "Wii";
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
@@ -1405,6 +1407,7 @@ public partial class SettingsViewModel : ViewModelBase
         if (string.Equals(v, "Switch", StringComparison.OrdinalIgnoreCase)) return "Switch";
         if (string.Equals(v, "SteamBPM", StringComparison.OrdinalIgnoreCase)) return "SteamBPM";
         if (string.Equals(v, "XBOne", StringComparison.OrdinalIgnoreCase)) return "XBOne";
+        if (string.Equals(v, "PS6", StringComparison.OrdinalIgnoreCase)) return "PS6";
         return "PS5";
     }
 }
