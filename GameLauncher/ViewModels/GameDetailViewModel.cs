@@ -3787,16 +3787,18 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Game Info card layout ("Default" or "PS5"); pushed from Settings by MainViewModel.</summary>
     [ObservableProperty] private string _gameInfoTheme = "Default";
     public bool IsPs5GameInfo     => string.Equals(GameInfoTheme, "PS5", StringComparison.OrdinalIgnoreCase);
+    public bool IsPs6GameInfo     => string.Equals(GameInfoTheme, "PS6", StringComparison.OrdinalIgnoreCase);
     public bool IsSwitchGameInfo  => string.Equals(GameInfoTheme, "Switch", StringComparison.OrdinalIgnoreCase);
     public bool IsSteamGameInfo   => string.Equals(GameInfoTheme, "SteamBPM", StringComparison.OrdinalIgnoreCase);
     public bool IsXbOneGameInfo   => string.Equals(GameInfoTheme, "XBOne", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultGameInfo => !IsPs5GameInfo && !IsSwitchGameInfo && !IsSteamGameInfo && !IsXbOneGameInfo;
+    public bool IsDefaultGameInfo => !IsPs5GameInfo && !IsSwitchGameInfo && !IsSteamGameInfo && !IsXbOneGameInfo && !IsPs6GameInfo;
     partial void OnGameInfoThemeChanged(string value)
     {
         OnPropertyChanged(nameof(IsPs5GameInfo));
         OnPropertyChanged(nameof(IsSwitchGameInfo));
         OnPropertyChanged(nameof(IsSteamGameInfo));
         OnPropertyChanged(nameof(IsXbOneGameInfo));
+        OnPropertyChanged(nameof(IsPs6GameInfo));
         OnPropertyChanged(nameof(IsDefaultGameInfo));
     }
 

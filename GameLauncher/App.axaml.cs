@@ -21,6 +21,7 @@ public partial class App : Application
     private const string DefaultDesignTheme = "Default";
     private const string Xb360DesignTheme   = "XB360";
     private const string Ps5DesignTheme     = "PS5";
+    private const string Ps6DesignTheme     = "PS6";
     private const string WiiDesignTheme     = "Wii";
     private const string SwitchDesignTheme  = "Switch";
     private const string SteamBpmDesignTheme = "SteamBPM";
@@ -28,6 +29,7 @@ public partial class App : Application
     private const string XbOneThemeSource   = "avares://GameLauncher/Styles/XbOneTheme.axaml";
     private const string Xb360ThemeSource   = "avares://GameLauncher/Styles/Xb360Theme.axaml";
     private const string Ps5ThemeSource     = "avares://GameLauncher/Styles/Ps5Theme.axaml";
+    private const string Ps6ThemeSource     = "avares://GameLauncher/Styles/Ps6Theme.axaml";
     private const string WiiThemeSource     = "avares://GameLauncher/Styles/WiiTheme.axaml";
     private const string SwitchThemeSource  = "avares://GameLauncher/Styles/SwitchTheme.axaml";
     private const string SteamBpmThemeSource = "avares://GameLauncher/Styles/SteamBpmTheme.axaml";
@@ -197,6 +199,8 @@ public partial class App : Application
             normalised = XbOneDesignTheme;
         else if (string.Equals(trimmed, Ps5DesignTheme, StringComparison.OrdinalIgnoreCase))
             normalised = Ps5DesignTheme;
+        else if (string.Equals(trimmed, Ps6DesignTheme, StringComparison.OrdinalIgnoreCase))
+            normalised = Ps6DesignTheme;
         else if (string.Equals(trimmed, WiiDesignTheme, StringComparison.OrdinalIgnoreCase))
             normalised = WiiDesignTheme;
         else if (string.Equals(trimmed, SwitchDesignTheme, StringComparison.OrdinalIgnoreCase))
@@ -217,6 +221,7 @@ public partial class App : Application
             Xb360DesignTheme => Xb360ThemeSource,
             XbOneDesignTheme => XbOneThemeSource,
             Ps5DesignTheme   => Ps5ThemeSource,
+            Ps6DesignTheme   => Ps6ThemeSource,
             WiiDesignTheme   => WiiThemeSource,
             SwitchDesignTheme => SwitchThemeSource,
             SteamBpmDesignTheme => SteamBpmThemeSource,

@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.DashboardLib.Ps6Dashboard"
+             x:DataType="vm:DashboardViewModel">
+
+    <Border Classes="dashboard-ps6-layout"
+            Height="{Binding $parent[ScrollViewer].Bounds.Height}">
+        <Grid RowDefinitions="Auto,*,Auto">
+            <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="56,28">
+                <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="36" VerticalAlignment="Center">
+                    <Border Width="38" Height="38" CornerRadius="12" Background="#F4F5FF">
+                        <TextBlock Text="☺" Foreground="#17143D" FontSize="26" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <TextBlock Text="Games" Classes="ps6-header-title" VerticalAlignment="Center"/>
+                    <TextBlock Text="Media" Classes="ps6-header-media" VerticalAlignment="Center"
+                               IsVisible="{Binding Options.ShowMedia}"/>
+                </StackPanel>
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="28" VerticalAlignment="Center">
+                    <Button Classes="ps6-header-icon" Command="{Binding NavigateToAllGamesCommand}" ToolTip.Tip="Search games">⌕</Button>
+                    <Button Classes="ps6-header-icon" Command="{Binding Ps6OpenSettingsCommand}" ToolTip.Tip="Settings">⚙</Button>
+                    <TextBlock Text="{Binding SteamClockTime}" Foreground="#F3F2FF" FontSize="15" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+
+            <Grid Grid.Row="1" RowDefinitions="Auto,Auto,*">
+                <Border Width="540" Height="540" CornerRadius="270" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Margin="0,110,0,0" Classes="ps6-orb-large"/>
+                <Border Width="174" Height="174" CornerRadius="87" HorizontalAlignment="Center" VerticalAlignment="Center"
+                        Margin="-180,54,0,0" Classes="ps6-orb-small"/>
+                <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Auto"
+                              VerticalScrollBarVisibility="Disabled" Padding="24,28,24,44">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button Classes="ps6-carousel-card" Classes.focused="{Binding IsStoreFocused}" Tag="store"
+                                Command="{Binding OpenFeaturedDetailCommand}">
+                            <Border Classes="ps6-carousel-cover ps6-store-cover">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                                    <TextBlock Text="▣" FontSize="94" Foreground="White"/>
+                                    <TextBlock Text="STORE" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+                        </Button>
+                        <ItemsControl ItemsSource="{Binding Ps5RecentGames}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:LocalGameCardVm">
+                                    <Button Classes="ps6-carousel-card" Classes.focused="{Binding IsFocused}"
+                                            Command="{Binding $parent[UserControl].DataContext.OpenLocalGameDetailCommand}"
+                                            CommandParameter="{Binding}">
+                                        <Border Classes="ps6-carousel-cover">
+                                            <views:CoverImage ImageUrl="{Binding CoverUrl}"
+                                                              FallbackText="{Binding EffectiveTitle}"
+                                                              FallbackGradient="{Binding CoverGradient}"
+                                                              SubText="{Binding Platform}"
+                                                              LetterFontSize="56"
+                                                              ImageCornerRadius="4"
+                                                              Height="300"/>
+                                        </Border>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <Button Classes="ps6-carousel-card" Classes.focused="{Binding IsAllGamesFocused}" Tag="all"
+                                Command="{Binding NavigateToAllGamesCommand}">
+                            <Border Classes="ps6-carousel-cover ps6-store-cover">
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="12">
+                                    <TextBlock Text="▦" FontSize="84" Foreground="White"/>
+                                    <TextBlock Text="LIBRARY" FontSize="15" FontWeight="Bold" Foreground="White"/>
+                                </StackPanel>
+                            </Border>
+                        </Button>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <StackPanel Grid.Row="1" HorizontalAlignment="Center" Margin="0,0,0,8" Spacing="8">
+                    <TextBlock Text="{Binding FocusedCardTitle}"
+                               IsVisible="{Binding HasFocusedCard}"
+                               Classes="ps6-focused-title"/>
+                    <Border Classes="ps6-platform-badge" IsVisible="{Binding HasFocusedCard}">
+                        <TextBlock Text="{Binding FocusedCardPlatform}" Foreground="#EAE8FF"
+                                   FontSize="12" FontWeight="SemiBold"/>
+                    </Border>
+                    <TextBlock Text="{Binding FocusedCardPlaytime}"
+                               IsVisible="{Binding HasFocusedCard}"
+                               Foreground="#D7D4F5" FontSize="13" HorizontalAlignment="Center"/>
+                    <TextBlock Text="{Binding StoreBriefGame.Title}"
+                               IsVisible="{Binding IsStoreFocused}"
+                               Classes="ps6-focused-title"/>
+                    <TextBlock Text="Play something unforgettable."
+                               IsVisible="{Binding IsStoreFocused}"
+                               Foreground="#D7D4F5" FontSize="14" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Browse your collection"
+                               IsVisible="{Binding IsAllGamesFocused}"
+                               Classes="ps6-focused-title"/>
+                </StackPanel>
+            </Grid>
+
+            <StackPanel Grid.Row="2" HorizontalAlignment="Center" Margin="0,0,0,34">
+                <TextBlock Text="{Binding Ps6DockLabel}" Classes="ps6-dock-label"/>
+                <Border Classes="ps6-dock">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockHomeSelected}" Command="{Binding Ps6DockHomeCommand}" ToolTip.Tip="Home">⌂</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockLibrarySelected}" Command="{Binding Ps6DockLibraryCommand}" ToolTip.Tip="Library">▤</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockInboxSelected}" Command="{Binding Ps6DockInboxCommand}" ToolTip.Tip="Notifications">♢</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockFriendsSelected}" Command="{Binding Ps6DockFriendsCommand}" ToolTip.Tip="Friends">♟</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockMusicSelected}" Command="{Binding Ps6DockMusicCommand}" ToolTip.Tip="Music">♫</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockDownloadsSelected}" Command="{Binding Ps6DockDownloadsCommand}" ToolTip.Tip="Downloads">⇩</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockProfileSelected}" Command="{Binding Ps6DockProfileCommand}" ToolTip.Tip="Profile">◉</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockSettingsSelected}" Command="{Binding Ps6DockSettingsCommand}" ToolTip.Tip="Settings">⚙</Button>
+                        <Button Classes="ps6-dock-button" Classes.active="{Binding Ps6DockPowerSelected}" Command="{Binding Ps6DockPowerCommand}" ToolTip.Tip="Power">⏻</Button>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+    </Border>
+</UserControl>

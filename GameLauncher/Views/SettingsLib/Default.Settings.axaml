@@ -1394,7 +1394,7 @@
                                             ToolTip.Tip="Customise this design" Content="⚙" FontSize="16"
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="library"/>
                                 </StackPanel>
-                                <TextBlock Text="Layout of the Library (My Games) page. Default is the standard grid; PS5 shows PlayStation-style tiles."
+                                <TextBlock Text="Layout of the Library (My Games) page. Default is the standard grid; PS5 shows PlayStation-style tiles; PS6 uses rounded glass tiles."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 
@@ -1448,7 +1448,7 @@
                                             ToolTip.Tip="Customise this design" Content="⚙" FontSize="16"
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="gameinfo"/>
                                 </StackPanel>
-                                <TextBlock Text="Layout of the Game Info card. Default is the standard card; PS5 is a PlayStation-style hero."
+                                <TextBlock Text="Layout of the Game Info card. Default is the standard card; PS5 is a PlayStation-style hero; PS6 is the glassy next-gen hero."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 
@@ -1469,7 +1469,7 @@
                             </StackPanel>
 
                             <StackPanel Spacing="6">
-                                <TextBlock Text="Quick Menu Style"
+                                <TextBlock                                 Text="Quick Guide / Menu Style"
                                            FontSize="13" Foreground="#e6edf3"/>
                                 <StackPanel Orientation="Horizontal" Spacing="8">
                                 <ComboBox Classes="form-input"
@@ -1480,7 +1480,7 @@
                                             ToolTip.Tip="Customise this design" Content="⚙" FontSize="16"
                                             Command="{Binding ToggleOptionsPanelCommand}" CommandParameter="quickmenu"/>
                                 </StackPanel>
-                                <TextBlock Text="PS5 shows the PlayStation-style quick menu. XB360 shows Xbox 360 style. GameOS uses the default style."
+                                <TextBlock Text="PS5 shows the PlayStation-style quick menu; PS6 uses the floating quick-guide dock. XB360 shows Xbox 360 style. GameOS uses the default style."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 

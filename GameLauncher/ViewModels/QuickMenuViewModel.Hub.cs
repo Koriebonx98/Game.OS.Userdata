@@ -31,6 +31,7 @@ public partial class QuickMenuViewModel
     public bool UsesSwitchGuideLayout => IsSwitchTheme;
     public bool UsesSteamGuideLayout => IsSteamBpmTheme;
     public bool UsesXbOneGuideLayout => IsXbOneTheme;
+    public bool UsesPs6GuideLayout => IsPs6Theme;
     public bool HasHubActions => HubActions.Count > 0;
 
     private bool _rebuildingHubActions;

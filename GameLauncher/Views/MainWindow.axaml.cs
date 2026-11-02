@@ -564,10 +564,18 @@ public partial class MainWindow : Window
         // PS5/Switch dashboard navigation
         bool usesCardDashboardNavigation =
             string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(vm.SettingsVm.DesignTheme, "PS6", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigation && !vm.ShowQuickMenu && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile && !IsTextInputFocused())
         {
-            if (string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
+            bool isPs6Dashboard = string.Equals(vm.SettingsVm.DesignTheme, "PS6", StringComparison.OrdinalIgnoreCase);
+            if (isPs6Dashboard && vm.DashboardVm.HandlePs6DockKey(e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+            if (!isPs6Dashboard &&
+                string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
                 vm.DashboardVm.HandlePs5ShelfKey(e.Key))
             {
                 e.Handled = true;
@@ -1753,10 +1761,15 @@ public partial class MainWindow : Window
         // PS5 / Switch dashboard navigation
         bool usesCardDashboardNavigationController =
             string.Equals(vm.SettingsVm.DesignTheme, "PS5",    StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(vm.SettingsVm.DesignTheme, "PS6",    StringComparison.OrdinalIgnoreCase) ||
             string.Equals(vm.SettingsVm.DesignTheme, "Switch", StringComparison.OrdinalIgnoreCase);
         if (vm.IsHome && usesCardDashboardNavigationController && !vm.IsNavExpanded && !vm.ShowDetail && !vm.ShowFriendProfile)
         {
-            if (string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
+            bool isPs6Dashboard = string.Equals(vm.SettingsVm.DesignTheme, "PS6", StringComparison.OrdinalIgnoreCase);
+            if (isPs6Dashboard && vm.DashboardVm.HandlePs6DockKey(key))
+                return;
+            if (!isPs6Dashboard &&
+                string.Equals(vm.SettingsVm.DesignTheme, "PS5", StringComparison.OrdinalIgnoreCase) &&
                 vm.DashboardVm.HandlePs5ShelfKey(key))
                 return;
             switch (key)
