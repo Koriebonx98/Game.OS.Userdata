@@ -546,6 +546,7 @@ class Program
         Console.WriteLine("═══════════════════════════════════════════════════════════════");
 
         scanner.Dispose();
+        passed &= TestEmulatorMods();
         return passed ? 0 : 1;
     }
 
@@ -2710,5 +2711,91 @@ class Program
         catch { /* best-effort */ }
 
         return scriptPath;
+    }
+
+    static bool TestEmulatorMods()
+    {
+        Console.WriteLine("── Emulator mods / download categories ──");
+        bool ok = true;
+        void Check(bool cond, string msg) { Console.WriteLine($"  [{(cond ? "PASS" : "FAIL")}] {msg}"); ok &= cond; }
+
+        string root = Path.Combine(Path.GetTempPath(), "gameos-emumods-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            string plat = Path.Combine(root, "Roms", "Sony - PlayStation 2");
+            Directory.CreateDirectory(Path.Combine(plat, "Games"));
+            string pack = Path.Combine(plat, "Mods", "HD Texture packs", "Okami", "SLUS-21000");
+            Directory.CreateDirectory(Path.Combine(pack, "replacements"));
+            File.WriteAllText(Path.Combine(pack, "replacements", "a.png"), "x");
+            Directory.CreateDirectory(Path.Combine(plat, "DLC", "Okami DLC"));
+
+            Check(DownloadPathResolver.Resolve(root, "PS2", "DLC").EndsWith(Path.Combine("Sony - PlayStation 2", "DLC")), "DLC category resolves to Roms/<Platform>/DLC");
+            Check(DownloadPathResolver.Resolve(root, "PS2", "Update").EndsWith(Path.Combine("Sony - PlayStation 2", "Updates")), "Update category resolves to Updates");
+
+            var packs = EmulatorModsService.FindTexturePacks(plat, "Okami", new[] { "SLUS_21000" });
+            Check(packs.Count == 1 && packs[0].TitleId == "SLUS-21000", "texture pack detected by game name");
+            Check(EmulatorModsService.FindTexturePacks(plat, "Other", new[] { "SLUS_21000" }).Count == 1, "texture pack detected by TitleID");
+            Check(EmulatorModsService.FindTexturePacks(plat, "Other", new[] { "XXXX" }).Count == 0, "unrelated game has no packs");
+
+            string emu = Path.Combine(root, "pcsx2", "pcsx2.exe");
+            Directory.CreateDirectory(Path.GetDirectoryName(emu)!);
+            File.WriteAllText(Path.Combine(Path.GetDirectoryName(emu)!, "portable.ini"), "");
+            EmulatorModsService.EnableTexturePack(emu, packs[0]);
+            Check(File.Exists(Path.Combine(root, "pcsx2", "textures", "SLUS-21000", "replacements", "a.png")), "enable copies pack into PCSX2 textures");
+            Check(EmulatorModsService.IsTexturePackEnabled(emu, packs[0]), "pack reported enabled");
+            EmulatorModsService.DisableTexturePack(emu, packs[0]);
+            Check(!Directory.Exists(Path.Combine(root, "pcsx2", "textures", "SLUS-21000")), "disable removes copied pack");
+
+            var content = EmulatorModsService.ScanPlatformContent(plat, "Okami", Array.Empty<string>());
+            Check(content.Count == 1 && content[0].TypeName == "DLC", "DLC folder content detected");
+
+            string xe = Path.Combine(root, "xenia", "xenia.exe");
+            string toml = Path.Combine(root, "415407D2.toml");
+            Directory.CreateDirectory(Path.GetDirectoryName(xe)!);
+            File.WriteAllText(toml, "[GPU]\nx=1\n");
+            string cfg = EmulatorModsService.XeniaConfigPath(xe, "415407d2");
+            Directory.CreateDirectory(Path.GetDirectoryName(cfg)!);
+            File.WriteAllText(cfg, "user");
+            EmulatorModsService.EnableXeniaSettings(xe, "415407D2", toml);
+            Check(EmulatorModsService.IsXeniaSettingsEnabled(xe, "415407D2", toml), "Xenia settings enabled");
+            EmulatorModsService.DisableXeniaSettings(xe, "415407D2");
+            Check(File.ReadAllText(cfg) == "user", "disable restores user's config");
+
+            // zip packs: {Game}/{TitleID}.zip (wrapped in a folder) and {Game}.zip
+            string hd = Path.Combine(plat, "Mods", "HD Texture packs");
+            string src = Path.Combine(root, "src", "SLES-55555", "replacements"); Directory.CreateDirectory(src);
+            File.WriteAllText(Path.Combine(src, "b.png"), "y");
+            Directory.CreateDirectory(Path.Combine(hd, "Jak"));
+            System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(root, "src"), Path.Combine(hd, "Jak", "SLES-55555.zip"));
+            System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(root, "src"), Path.Combine(hd, "Daxter.zip"));
+            var jp = EmulatorModsService.FindTexturePacks(plat, "Jak", Array.Empty<string>());
+            Check(jp.Count == 1 && jp[0].TitleId == "SLES-55555" && jp[0].IsArchive, "zip pack {Game}/{TitleID}.zip detected");
+            EmulatorModsService.EnableTexturePack(emu, jp[0]);
+            Check(File.Exists(Path.Combine(root, "pcsx2", "textures", "SLES-55555", "replacements", "b.png")), "zip pack extracted & unwrapped into PCSX2 textures");
+            EmulatorModsService.DisableTexturePack(emu, jp[0]);
+            var dp = EmulatorModsService.FindTexturePacks(plat, "Daxter", new[] { "SLES-66666" });
+            Check(dp.Count == 1 && dp[0].TitleId == "SLES-66666" && dp[0].IsArchive, "{Game}.zip pack uses known TitleID");
+
+            // game-dir mods: UserMods and Usermaps/<MapFolder>
+            string gdir = Path.Combine(root, "bo2");
+            Directory.CreateDirectory(Path.Combine(gdir, "UserMods", "MyMod"));
+            Directory.CreateDirectory(Path.Combine(gdir, "Usermaps", "mp_cool"));
+            var inst = GameModsService.ScanInstalled(gdir, 0);
+            Check(inst.Any(m => m.Name == "MyMod" && m.TypeName == "Mod Client"), "UserMods/<folder> listed by folder name");
+            Check(inst.Any(m => m.Name == "mp_cool" && m.TypeName == "Usermaps"), "Usermaps/<folder> listed by folder name");
+
+            var gh = GameModsService.ParseGitHubReleaseUrl("https://github.com/alterware/alterware-launcher/releases");
+            Check(gh is { Owner: "alterware", Repo: "alterware-launcher" }, "GitHub releases URL parsed");
+            Check(GameModsService.ParseGitHubReleaseUrl("https://github.com/alterware/alterware-launcher") == null, "non-release GitHub URL ignored");
+            var pick = GameModsService.PickReleaseAsset(new[] { new GameModsService.GitHubAsset("a.sha256", "u1"), new GameModsService.GitHubAsset("a-linux.zip", "u2"), new GameModsService.GitHubAsset("a-windows.zip", "u3") });
+            Check(pick != null && pick.Name == (OperatingSystem.IsWindows() ? "a-windows.zip" : "a-linux.zip"), "release asset picked for this OS");
+            Check(!GameModsService.PresetNames.Contains("Player"), "Player folder no longer a mod type");
+
+            var list = EmulatorModsService.ParseListing("[{\"name\":\"415407D2.toml\",\"sha\":\"abc\",\"download_url\":\"https://x/y.toml\"},{\"name\":\"README.md\",\"sha\":\"d\",\"download_url\":\"u\"}]");
+            Check(list.Count == 1 && list[0].TitleId == "415407D2" && list[0].Sha == "abc", "GitHub listing parsed");
+        }
+        catch (Exception ex) { Check(false, "exception: " + ex.Message); }
+        finally { try { Directory.Delete(root, true); } catch { } }
+        return ok;
     }
 }

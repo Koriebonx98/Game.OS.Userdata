@@ -22,7 +22,12 @@ namespace GameLauncher.Services
         public string TypeName { get; set; } = "Mod";
         public string Source   { get; set; } = "Game folder";
         public bool   IsDirectory { get; set; }
-        public string Icon => GameModsService.PresetFor(TypeName)?.Icon ?? "🧩";
+        public string Icon => TypeName switch
+        {
+            "DLC"    => "🎁",
+            "Update" => "⬆",
+            _        => GameModsService.PresetFor(TypeName)?.Icon ?? "🧩",
+        };
         public string Subtitle => $"{TypeName} · {Source}";
     }
 
@@ -34,11 +39,10 @@ namespace GameLauncher.Services
     {
         public static readonly ModTypePreset[] Presets =
         {
-            new("Mod Client",   "🎮", new[] { "mods", "mod", "clientmods" }),
+            new("Mod Client",   "🎮", new[] { "mods", "mod", "clientmods", "usermods", "user mods", "usermod" }),
             new("Recomp",       "🛠", new[] { "recomp", "recompiled" }),
             new("Usermaps",     "🗺", new[] { "usermaps", "usermap", "custommaps" }),
             new("Texture Pack", "🖼", new[] { "texturepacks", "texture packs", "textures", "texturepack", "resourcepacks" }),
-            new("Player",       "🧍", new[] { "players", "player", "characters", "skins" }),
             new("Track",        "🏁", new[] { "tracks", "track" }),
             new("Level",        "🧱", new[] { "levels", "level", "maps" }),
         };
@@ -192,6 +196,63 @@ namespace GameLauncher.Services
             if (mod.IsDirectory) Directory.Move(mod.Path, dest);
             else File.Move(mod.Path, dest);
             return dest;
+        }
+
+        // ── GitHub releases ─────────────────────────────────────────────────
+
+        public sealed record GitHubAsset(string Name, string Url);
+
+        /// <summary>Parses "https://github.com/{owner}/{repo}/releases[/...]" into (owner, repo); null for other URLs.</summary>
+        public static (string Owner, string Repo)? ParseGitHubReleaseUrl(string? url)
+        {
+            var m = Regex.Match((url ?? "").Trim(), @"^https?://(?:www\.)?github\.com/([^/\s]+)/([^/\s?#]+)/releases(?:[/?#]|$)", RegexOptions.IgnoreCase);
+            return m.Success ? (m.Groups[1].Value, m.Groups[2].Value) : null;
+        }
+
+        /// <summary>Picks the release asset to install: skips checksums/signatures, prefers the current OS, then archives/installers.</summary>
+        public static GitHubAsset? PickReleaseAsset(IReadOnlyList<GitHubAsset> assets)
+        {
+            string[] skip = { ".sha256", ".sha512", ".md5", ".sig", ".asc", ".txt", ".json", ".yml", ".yaml", ".blockmap", ".sbom" };
+            var cands = assets.Where(a => !skip.Any(x => a.Name.EndsWith(x, StringComparison.OrdinalIgnoreCase))).ToList();
+            if (cands.Count == 0) return null;
+            string[] os = OperatingSystem.IsWindows() ? new[] { "win", "windows", ".exe", ".msi" }
+                        : OperatingSystem.IsMacOS()   ? new[] { "mac", "macos", "osx", "darwin", ".dmg" }
+                        :                               new[] { "linux", ".appimage", ".deb" };
+            string[] other = { "win", "windows", "mac", "macos", "osx", "darwin", "linux", "android", "ios" };
+            int Score(GitHubAsset a)
+            {
+                string n = a.Name.ToLowerInvariant();
+                int sc = 0;
+                if (os.Any(n.Contains)) sc += 10;
+                else if (other.Any(n.Contains)) sc -= 10;
+                if (n.EndsWith(".zip") || n.EndsWith(".7z") || n.EndsWith(".rar") || n.EndsWith(".exe") || n.EndsWith(".msi")) sc += 2;
+                return sc;
+            }
+            return cands.OrderByDescending(Score).First();
+        }
+
+        public static async Task<(string Tag, GitHubAsset? Asset)?> GetLatestReleaseAssetAsync(string owner, string repo, CancellationToken ct = default)
+        {
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            http.DefaultRequestHeaders.UserAgent.ParseAdd("GameOS-Launcher");
+            http.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            try
+            {
+                var json = await http.GetStringAsync($"https://api.github.com/repos/{owner}/{repo}/releases/latest", ct);
+                using var doc = System.Text.Json.JsonDocument.Parse(json);
+                string tag = doc.RootElement.TryGetProperty("tag_name", out var t) ? t.GetString() ?? "" : "";
+                var assets = new List<GitHubAsset>();
+                if (doc.RootElement.TryGetProperty("assets", out var arr))
+                    foreach (var a in arr.EnumerateArray())
+                        assets.Add(new GitHubAsset(a.GetProperty("name").GetString() ?? "", a.GetProperty("browser_download_url").GetString() ?? ""));
+                return (tag, PickReleaseAsset(assets));
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[Mods] GitHub release lookup failed: {ex.Message}");
+                return null;
+            }
         }
 
         // ── Steam Workshop ──────────────────────────────────────────────────

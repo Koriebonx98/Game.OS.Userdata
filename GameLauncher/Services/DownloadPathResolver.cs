@@ -6,15 +6,17 @@ namespace GameLauncher.Services
 {
     /// <summary>
     /// Works out where a finished download belongs:
-    /// <c>&lt;Root&gt;/Roms/&lt;Platform&gt;/Games|Mods|Other</c>, and for PC games <c>&lt;Root&gt;/Repacks</c>.
+    /// <c>&lt;Root&gt;/Roms/&lt;Platform&gt;/Games|Mods|DLC|Updates|Other</c>, and for PC games <c>&lt;Root&gt;/Repacks</c>.
     /// </summary>
     public static class DownloadPathResolver
     {
         public const string CategoryGame  = "Game";
         public const string CategoryMod   = "Mod";
+        public const string CategoryDlc     = "DLC";
+        public const string CategoryUpdate  = "Update";
         public const string CategoryOther = "Other";
 
-        public static readonly string[] Categories = { CategoryGame, CategoryMod, CategoryOther };
+        public static readonly string[] Categories = { CategoryGame, CategoryMod, CategoryDlc, CategoryUpdate, CategoryOther };
 
         /// <summary>Platform name → libretro-style folder used under Roms/ (matches the scanner's layout).</summary>
         public static readonly (string Name, string Folder)[] Platforms =
@@ -78,6 +80,8 @@ namespace GameLauncher.Services
                 {
                     CategoryGame => Path.Combine(root, "Repacks"),
                     CategoryMod  => Path.Combine(root, "Mods"),
+                    CategoryDlc  => Path.Combine(root, "DLC"),
+                    CategoryUpdate => Path.Combine(root, "Updates"),
                     _            => Path.Combine(root, "Other"),
                 };
             }
@@ -86,6 +90,8 @@ namespace GameLauncher.Services
             {
                 CategoryGame => "Games",
                 CategoryMod  => "Mods",
+                CategoryDlc  => "DLC",
+                CategoryUpdate => "Updates",
                 _            => "Other",
             };
             return Path.Combine(root, "Roms", PlatformFolder(root, platform), sub);
