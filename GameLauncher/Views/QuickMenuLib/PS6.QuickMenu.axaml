@@ -6,54 +6,95 @@
 
     <UserControl.Styles>
         <Style Selector="Border.ps6-dock">
-            <Setter Property="Background" Value="#EC060608"/>
-            <Setter Property="BorderBrush" Value="#8A77779C"/>
+            <Setter Property="Background" Value="#E00B0E22"/>
+            <Setter Property="BorderBrush" Value="#556B72C8"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="14"/>
-            <Setter Property="Padding" Value="14,8"/>
-            <Setter Property="BoxShadow" Value="0 0 22 2 #666A6CBA"/>
+            <Setter Property="CornerRadius" Value="30"/>
+            <Setter Property="Padding" Value="8,8"/>
+            <Setter Property="BoxShadow" Value="0 8 36 0 #99000000, 0 0 28 2 #445D6BFF"/>
         </Style>
         <Style Selector="Button.ps6-guide-button">
-            <Setter Property="Width" Value="56"/>
-            <Setter Property="Height" Value="50"/>
+            <Setter Property="Width" Value="46"/>
+            <Setter Property="Height" Value="46"/>
             <Setter Property="Padding" Value="0"/>
-            <Setter Property="FontSize" Value="22"/>
-            <Setter Property="Foreground" Value="#F3F2FF"/>
+            <Setter Property="FontSize" Value="19"/>
+            <Setter Property="Foreground" Value="#B9BCE6"/>
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="CornerRadius" Value="23"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
         </Style>
-        <Style Selector="Button.ps6-guide-button.active">
-            <Setter Property="Background" Value="#373652"/>
-            <Setter Property="BorderBrush" Value="White"/>
+        <Style Selector="Button.ps6-guide-button:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2B2F57"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+        </Style>
+        <Style Selector="Button.ps6-guide-button.active /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4350B8"/>
+            <Setter Property="BorderBrush" Value="#9BE7FF"/>
             <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="Foreground" Value="#FFFFFF"/>
         </Style>
         <Style Selector="Button.ps6-guide-action">
-            <Setter Property="Padding" Value="16,12"/>
-            <Setter Property="Margin" Value="6,0"/>
-            <Setter Property="Background" Value="#AA17172B"/>
+            <Setter Property="Padding" Value="14,12"/>
+            <Setter Property="Margin" Value="6,4"/>
+            <Setter Property="Width" Value="236"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
             <Setter Property="Foreground" Value="#F4F3FF"/>
-            <Setter Property="BorderBrush" Value="#66657D"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="MinWidth" Value="150"/>
         </Style>
-        <Style Selector="Button.ps6-guide-action.cursor">
-            <Setter Property="BorderBrush" Value="White"/>
+        <Style Selector="Button.ps6-guide-action /template/ ContentPresenter">
+            <Setter Property="Background" Value="#B3151A36"/>
+            <Setter Property="BorderBrush" Value="#3A4272"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="16"/>
+        </Style>
+        <Style Selector="Button.ps6-guide-action:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#26305F"/>
+        </Style>
+        <Style Selector="Button.ps6-guide-action.cursor /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2F3A7E"/>
+            <Setter Property="BorderBrush" Value="#9BE7FF"/>
             <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BoxShadow" Value="0 0 22 2 #669BE7FF"/>
+        </Style>
+        <Style Selector="Border.ps6-key">
+            <Setter Property="Background" Value="#262B52"/>
+            <Setter Property="BorderBrush" Value="#5B63A8"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="CornerRadius" Value="9"/>
+            <Setter Property="Padding" Value="8,2"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+        <Style Selector="Border.ps6-key > TextBlock">
+            <Setter Property="Foreground" Value="#FFFFFF"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+        </Style>
+        <Style Selector="TextBlock.ps6-hint">
+            <Setter Property="Foreground" Value="#B8B5D9"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
     </UserControl.Styles>
 
     <Grid IsVisible="{Binding UsesPs6GuideLayout}">
-        <Grid RowDefinitions="*,Auto" Margin="36,24,36,32">
+        <Border VerticalAlignment="Bottom" Height="520" IsHitTestVisible="False">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Color="#00070A14" Offset="0"/>
+                    <GradientStop Color="#EE070A14" Offset="0.75"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+        <Grid RowDefinitions="*,Auto,Auto" Margin="36,24,36,28">
             <StackPanel Grid.Row="0" VerticalAlignment="Bottom" HorizontalAlignment="Center"
-                        Margin="0,0,0,22" Spacing="8">
-                <TextBlock Text="{Binding MenuTitle}" Foreground="#FFFFFF" FontSize="18"
+                        Margin="0,0,0,20" Spacing="6">
+                <TextBlock Text="{Binding MenuTitle}" Foreground="#FFFFFF" FontSize="26" FontWeight="SemiBold"
                            HorizontalAlignment="Center"/>
-                <TextBlock Text="{Binding CurrentSessionLabel}" Foreground="#D7D4F5" FontSize="13"
-                           HorizontalAlignment="Center"/>
+                <TextBlock Text="{Binding CurrentSessionLabel}" Foreground="#9BE7FF" FontSize="13"
+                           HorizontalAlignment="Center" Margin="0,0,0,10"/>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                              MaxWidth="1100">
+                              MaxWidth="1100" HorizontalAlignment="Center">
                     <ItemsControl ItemsSource="{Binding HubActions}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
@@ -63,38 +104,51 @@
                                 <Button Classes="ps6-guide-action" Classes.cursor="{Binding IsCursor}"
                                         IsHitTestVisible="{Binding IsActionable}"
                                         Command="{Binding ActivateCommand}">
-                                    <StackPanel Spacing="3">
-                                        <TextBlock Text="{Binding Title}" FontWeight="SemiBold"
-                                                   TextTrimming="CharacterEllipsis" MaxWidth="210"/>
-                                        <TextBlock Text="{Binding Subtitle}" Foreground="#C5C2E8"
-                                                   FontSize="11" TextTrimming="CharacterEllipsis"
-                                                   IsVisible="{Binding HasSubtitle}" MaxWidth="210"/>
-                                    </StackPanel>
+                                    <Grid ColumnDefinitions="Auto,*">
+                                        <TextBlock Text="{Binding Glyph}" FontSize="24" Foreground="#9BE7FF"
+                                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" FontWeight="SemiBold" FontSize="14"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="#C5C2E8"
+                                                       FontSize="11" TextTrimming="CharacterEllipsis"
+                                                       IsVisible="{Binding HasSubtitle}"/>
+                                        </StackPanel>
+                                    </Grid>
                                 </Button>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
             </StackPanel>
-            <StackPanel Grid.Row="1" HorizontalAlignment="Center">
-                <TextBlock Text="L1 / R1  Change section     ▲ / ▼  Choose action     ✕  Select     ○  Back"
-                           Foreground="#B8B5D9" FontSize="12" HorizontalAlignment="Center" Margin="0,0,0,8"/>
-                <Border Classes="ps6-dock">
-                    <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsHomePage}" Command="{Binding SelectHomeCommand}" ToolTip.Tip="Home">⌂</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsSwitcherPage}" Command="{Binding SelectSwitcherCommand}" ToolTip.Tip="Switcher">▣</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsNotificationsPage}" Command="{Binding SelectNotificationsCommand}" ToolTip.Tip="Notifications">♢</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" ToolTip.Tip="Friends">♟</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}" ToolTip.Tip="Music">♫</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsRecentGamesPage}" Command="{Binding SelectRecentGamesCommand}" ToolTip.Tip="Recent games">▤</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}" ToolTip.Tip="Downloads">⇩</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsGuidesPage}" Command="{Binding SelectGuidesCommand}" ToolTip.Tip="Guides">⌖</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" ToolTip.Tip="Achievements">◇</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" ToolTip.Tip="Inbox">✉</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsSettingsPage}" Command="{Binding OpenSettingsPageCommand}" ToolTip.Tip="Settings">⚙</Button>
-                        <Button Classes="ps6-guide-button" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}" ToolTip.Tip="Power">⏻</Button>
-                    </StackPanel>
-                </Border>
+
+            <Border Grid.Row="1" Classes="ps6-dock" HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+<Button Classes="ps6-guide-button" Classes.active="{Binding IsHomePage}" Command="{Binding SelectHomeCommand}" ToolTip.Tip="Home">⌂</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsSwitcherPage}" Command="{Binding SelectSwitcherCommand}" ToolTip.Tip="Switcher">▣</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsNotificationsPage}" Command="{Binding SelectNotificationsCommand}" ToolTip.Tip="Notifications">♢</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsFriendsPage}" Command="{Binding SelectFriendsCommand}" ToolTip.Tip="Friends">♟</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsMediaPage}" Command="{Binding SelectMediaCommand}" ToolTip.Tip="Music">♫</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsRecentGamesPage}" Command="{Binding SelectRecentGamesCommand}" ToolTip.Tip="Recent games">▤</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsDownloadsPage}" Command="{Binding SelectDownloadsCommand}" ToolTip.Tip="Downloads">⇩</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsGuidesPage}" Command="{Binding SelectGuidesCommand}" ToolTip.Tip="Guides">⌖</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsAchievementsPage}" Command="{Binding OpenAchievementsCommand}" ToolTip.Tip="Achievements">◇</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsInboxPage}" Command="{Binding SelectInboxCommand}" ToolTip.Tip="Inbox">✉</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsSettingsPage}" Command="{Binding OpenSettingsPageCommand}" ToolTip.Tip="Settings">⚙</Button>
+                    <Button Classes="ps6-guide-button" Classes.active="{Binding IsPowerPage}" Command="{Binding SelectPowerCommand}" ToolTip.Tip="Power">⏻</Button>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="10" Margin="0,12,0,0">
+                <Border Classes="ps6-key"><TextBlock Text="L1"/></Border>
+                <Border Classes="ps6-key"><TextBlock Text="R1"/></Border>
+                <TextBlock Classes="ps6-hint" Text="Section" Margin="0,0,14,0"/>
+                <Border Classes="ps6-key"><TextBlock Text="▲▼"/></Border>
+                <TextBlock Classes="ps6-hint" Text="Action" Margin="0,0,14,0"/>
+                <Border Classes="ps6-key"><TextBlock Text="✕"/></Border>
+                <TextBlock Classes="ps6-hint" Text="Select" Margin="0,0,14,0"/>
+                <Border Classes="ps6-key"><TextBlock Text="○"/></Border>
+                <TextBlock Classes="ps6-hint" Text="Back"/>
             </StackPanel>
         </Grid>
     </Grid>

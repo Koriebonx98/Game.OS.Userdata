@@ -517,31 +517,43 @@
         <Setter Property="Margin" Value="16,0,0,6"/>
     </Style>
     <Style Selector="Border.ps6-dock">
-        <Setter Property="Background" Value="#EC060608"/>
-        <Setter Property="BorderBrush" Value="#8A77779C"/>
+        <Setter Property="Background" Value="#D80B0E22"/>
+        <Setter Property="BorderBrush" Value="#556B72C8"/>
         <Setter Property="BorderThickness" Value="1"/>
-        <Setter Property="CornerRadius" Value="14"/>
-        <Setter Property="Padding" Value="14,8"/>
-        <Setter Property="BoxShadow" Value="0 0 22 2 #666A6CBA"/>
+        <Setter Property="CornerRadius" Value="28"/>
+        <Setter Property="Padding" Value="12,8"/>
+        <Setter Property="BoxShadow" Value="0 8 36 0 #99000000, 0 0 28 2 #445D6BFF"/>
     </Style>
     <Style Selector="Button.ps6-dock-button">
-        <Setter Property="Width" Value="54"/>
+        <Setter Property="Width" Value="48"/>
         <Setter Property="Height" Value="48"/>
         <Setter Property="Padding" Value="0"/>
-        <Setter Property="FontSize" Value="22"/>
-        <Setter Property="Foreground" Value="#EAE8FF"/>
+        <Setter Property="FontSize" Value="20"/>
+        <Setter Property="Foreground" Value="#B9BCE6"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="CornerRadius" Value="24"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        <Setter Property="VerticalContentAlignment" Value="Center"/>
+    </Style>
+    <Style Selector="Button.ps6-dock-button:pointerover">
+        <Setter Property="Background" Value="#2B2F57"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.ps6-dock-button:pointerover /template/ ContentPresenter">
+        <Setter Property="Background" Value="#2B2F57"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+    </Style>
+    <Style Selector="Button.ps6-dock-button.active /template/ ContentPresenter">
+        <Setter Property="Background" Value="#4350B8"/>
+        <Setter Property="BorderBrush" Value="#9BE7FF"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
     </Style>
     <Style Selector="Button.ps6-dock-button.active">
         <Setter Property="Foreground" Value="#FFFFFF"/>
-        <Setter Property="Background" Value="#35344F"/>
-        <Setter Property="BorderBrush" Value="#FFFFFF"/>
+        <Setter Property="Background" Value="#4350B8"/>
+        <Setter Property="BorderBrush" Value="#9BE7FF"/>
         <Setter Property="BorderThickness" Value="2"/>
-    </Style>
-    <Style Selector="Button.ps6-dock-button:pointerover">
-        <Setter Property="Background" Value="#3A3960"/>
     </Style>
 
 </Styles>

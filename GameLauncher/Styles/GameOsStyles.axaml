@@ -492,6 +492,10 @@
         <Setter Property="IsVisible" Value="False"/>
     </Style>
 
+    <Style Selector="Border.dashboard-ps6-layout">
+        <Setter Property="IsVisible" Value="False"/>
+    </Style>
+
     <Style Selector="Border.dashboard-wii-layout">
         <Setter Property="IsVisible" Value="False"/>
     </Style>

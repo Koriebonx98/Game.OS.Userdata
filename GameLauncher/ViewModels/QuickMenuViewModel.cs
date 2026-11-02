@@ -24,6 +24,13 @@ public partial class QuickMenuViewModel : ViewModelBase
         "home", "switcher", "recent", "notifications", "downloads",
         "friends", "inbox", "achievements", "guides", "media", "browser", "power"
     };
+    private static readonly string[] Ps6HubOrder =
+    {
+        "home", "switcher", "notifications", "friends", "media", "recent",
+        "downloads", "guides", "achievements", "inbox", "power"
+    };
+    private static readonly string[] XbOneHubOrder =
+        { "achievements", "friends", "inbox", "home", "switcher", "downloads" };
     // XB360 two-axis navigation arrays
     // Up/Down navigates the center list; Left/Right navigates between blade tabs.
     private static readonly string[] Xb360CenterItemKeys =
@@ -1236,7 +1243,9 @@ public partial class QuickMenuViewModel : ViewModelBase
         RebuildHubActions();
     }
 
-    private string[] GetCurrentNavigationOrder() => HubOrder;
+    // LB/RB and ◀/▶ must follow the on-screen tab order of each guide layout.
+    private string[] GetCurrentNavigationOrder() =>
+        IsPs6Theme ? Ps6HubOrder : IsXbOneTheme ? XbOneHubOrder : HubOrder;
 
     private static string NormaliseQuickMenuTheme(string value)
     {
