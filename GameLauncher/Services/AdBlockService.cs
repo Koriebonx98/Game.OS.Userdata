@@ -59,6 +59,7 @@ namespace GameLauncher.Services
         private static List<string> _cosmetic = new();
         private static HashSet<string> _userHosts = new(StringComparer.OrdinalIgnoreCase);
         private static List<string> _userCosmetic = new();
+        private static List<(string Domain, string Selector)> _userSiteCosmetic = new();
         private static HashSet<string> _allow = new(StringComparer.OrdinalIgnoreCase);
         private static bool _loadedCache;
 
@@ -78,16 +79,21 @@ namespace GameLauncher.Services
         {
             var hosts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var cosmetic = new List<string>();
+            var site = new List<(string, string)>();
             foreach (var raw in (customFilters ?? "").Split('\n'))
             {
                 string line = raw.Trim();
                 if (line.Length == 0 || line.StartsWith('!') || line.StartsWith('#') && !line.StartsWith("##")) continue;
                 if (line.StartsWith("##")) { cosmetic.Add(line.Substring(2)); continue; }
+                // uBlock-style "example.com##.selector" hides an element on that site only.
+                int sep = line.IndexOf("##", StringComparison.Ordinal);
+                if (sep > 0 && IsValidHost(line.Substring(0, sep))) { site.Add((line.Substring(0, sep).ToLowerInvariant(), line.Substring(sep + 2))); continue; }
                 string? h = ParseHostRule(line);
                 if (h != null) hosts.Add(h);
             }
             _userHosts = hosts;
             _userCosmetic = cosmetic;
+            _userSiteCosmetic = site;
             _allow = new HashSet<string>((allowList ?? "").Split('\n').Select(a => a.Trim().ToLowerInvariant()).Where(a => a.Length > 0),
                 StringComparer.OrdinalIgnoreCase);
             EnsureCacheLoaded();
@@ -200,7 +206,7 @@ namespace GameLauncher.Services
             var hostList = _hosts.Concat(_userHosts).Distinct(StringComparer.OrdinalIgnoreCase).Take(6000).ToArray();
             string hostsJson = JsonSerializer.Serialize(hostList);
             // One rule per selector so a single invalid selector cannot disable the rest.
-            var selectors = CosmeticBase.Split(',').Concat(_userCosmetic).Concat(_cosmetic.Take(800)).Select(SafeSelector).Where(x => x.Length > 0);
+            var selectors = CosmeticBase.Split(',').Concat(_userCosmetic).Concat(SiteSelectors(pageHost)).Concat(_cosmetic.Take(800)).Select(SafeSelector).Where(x => x.Length > 0);
             string cssJson = JsonSerializer.Serialize(string.Join("\n", selectors.Select(x => x + "{display:none !important;visibility:hidden !important}")));
 
             var sb = new StringBuilder();
@@ -210,7 +216,7 @@ namespace GameLauncher.Services
             sb.Append("var of=window.fetch;if(of)window.fetch=function(r){var u=(r&&r.url)||r;if(bad(u))return Promise.reject(new TypeError('blocked'));return of.apply(this,arguments);};");
             sb.Append("var ox=XMLHttpRequest.prototype.open;XMLHttpRequest.prototype.open=function(m,u){if(bad(u)){this.send=function(){};return;}return ox.apply(this,arguments);};");
             sb.Append("if(navigator.sendBeacon){var ob=navigator.sendBeacon.bind(navigator);navigator.sendBeacon=function(u,d){return bad(u)?true:ob(u,d);};}");
-            sb.Append("var BP=/(\\/|\\.|_|-)(pop(under|up|ads?)|adserver|adsbygoogle|ads?\\.js|banner[_-]?ads?|advert(s|ising)?)(\\/|\\.|_|-|$)/i;function badTag(e){var u=e.src||e.href||'';if(!u)return false;if(bad(u))return true;return(e.tagName=='SCRIPT'||e.tagName=='IFRAME')&&BP.test(u.split('?')[0]);}");
+            sb.Append("window.__gosBad=function(u){return bad(u);};var BP=/(\\/|\\.|_|-)(pop(under|up|ads?)|adserver|adsbygoogle|ads?\\.js|banner[_-]?ads?|advert(s|ising)?)(\\/|\\.|_|-|$)/i;function badTag(e){var u=e.src||e.href||'';if(!u)return false;if(bad(u))return true;return(e.tagName=='SCRIPT'||e.tagName=='IFRAME')&&BP.test(u.split('?')[0]);}");
             sb.Append("function sweep(n){var l=(n||document).querySelectorAll?(n||document).querySelectorAll('script[src],iframe[src],img[src],link[href],embed[src]'):[];for(var i=0;i<l.length;i++){var e=l[i];if(badTag(e))e.remove();}}");
             sb.Append("sweep();new MutationObserver(function(ms){for(var i=0;i<ms.length;i++)for(var j=0;j<ms[i].addedNodes.length;j++){var n=ms[i].addedNodes[j];if(n.nodeType===1){if(badTag(n))n.remove();else sweep(n);}}}).observe(document.documentElement,{childList:true,subtree:true});");
             if (cosmetic)
@@ -226,6 +232,23 @@ namespace GameLauncher.Services
             }
             sb.Append("})();");
             return sb.ToString();
+        }
+
+        private static IEnumerable<string> SiteSelectors(string? pageHost)
+        {
+            if (string.IsNullOrEmpty(pageHost) || _userSiteCosmetic.Count == 0) return Array.Empty<string>();
+            string h = pageHost.ToLowerInvariant();
+            return _userSiteCosmetic.Where(r => h == r.Domain || h.EndsWith("." + r.Domain)).Select(r => r.Selector).ToList();
+        }
+
+        /// <summary>Appends a rule (hostname, "##selector" or "site##selector") to a custom-filter text unless it is already there.</summary>
+        public static string AppendRule(string customFilters, string rule)
+        {
+            rule = rule.Trim();
+            if (rule.Length == 0 || rule.Contains('\n')) return customFilters ?? "";
+            var lines = (customFilters ?? "").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+            if (!lines.Contains(rule, StringComparer.OrdinalIgnoreCase)) lines.Add(rule);
+            return string.Join("\n", lines);
         }
 
         private static string SafeSelector(string s) => s.Replace("{", "").Replace("}", "").Replace("\n", "").Trim();

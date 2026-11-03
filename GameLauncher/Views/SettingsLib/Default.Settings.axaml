@@ -929,7 +929,8 @@
                                        FontSize="14" FontWeight="Bold" Foreground="White"/>
                             <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
                                 Link your Steam account to import your owned game library.
-                                All credentials are stored locally on this device only and are never uploaded to the cloud.
+                                All credentials are stored locally on this device only, tied to the account you are signed in with
+                                (other accounts on this device have their own keys), and are never uploaded to the cloud.
                             </TextBlock>
 
                             <!-- Step 1: API key -->
@@ -987,6 +988,59 @@
                                        FontSize="12" FontWeight="SemiBold"
                                        Foreground="#8b949e" TextWrapping="Wrap"
                                        IsVisible="{Binding SteamImportStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Other store accounts (per Game.OS account) -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,20">
+                        <StackPanel Spacing="14">
+                            <TextBlock Text="🧾  Store Accounts"
+                                       FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="#8b949e">
+                                Keys and login data for other stores. They belong to the account you are signed in with and
+                                are never shared with other accounts or uploaded. Use "Log in" to sign in with the built-in browser.
+                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding StoreAccounts}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="vm:StoreAccountRowVm">
+                                        <Border Background="#0d1117" CornerRadius="8" Padding="14,12" Margin="0,0,0,10">
+                                            <StackPanel Spacing="8">
+                                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                                    <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                               Foreground="White" VerticalAlignment="Center"/>
+                                                    <Button Classes="btn-secondary" Padding="8,3" FontSize="11"
+                                                            Command="{Binding LogInCommand}">
+                                                        <TextBlock Text="🌐  Log in" FontSize="11"/>
+                                                    </Button>
+                                                </StackPanel>
+                                                <StackPanel Spacing="4" IsVisible="{Binding HasApiKey}">
+                                                    <TextBlock Text="{Binding Info.ApiKeyLabel}" FontSize="11" Foreground="#8b949e"/>
+                                                    <TextBox Classes="form-input" Text="{Binding ApiKey}" PasswordChar="•" FontSize="12"/>
+                                                </StackPanel>
+                                                <StackPanel Spacing="4" IsVisible="{Binding HasUserId}">
+                                                    <TextBlock Text="{Binding Info.UserIdLabel}" FontSize="11" Foreground="#8b949e"/>
+                                                    <TextBox Classes="form-input" Text="{Binding UserId}" FontSize="12"/>
+                                                </StackPanel>
+                                                <StackPanel Spacing="4" IsVisible="{Binding HasToken}">
+                                                    <TextBlock Text="{Binding Info.TokenLabel}" FontSize="11" Foreground="#8b949e"/>
+                                                    <TextBox Classes="form-input" Text="{Binding Token}" PasswordChar="•" FontSize="12"/>
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button Classes="btn-primary" Content="💾  Save Settings" Command="{Binding SaveCommand}"
+                                        Width="150" HorizontalAlignment="Left"/>
+                                <Button Classes="btn-success" Content="🔄  Sync libraries to Game.OS DB"
+                                        Command="{Binding SyncStoreLibrariesCommand}"
+                                        IsEnabled="{Binding !IsSyncingStores}" Padding="16,10"/>
+                            </StackPanel>
+                            <TextBlock Text="{Binding StoreSyncStatus}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"
+                                       IsVisible="{Binding StoreSyncStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            <TextBlock FontSize="10" Foreground="#484f58" TextWrapping="Wrap"
+                                       Text="Sync works for itch.io (API key), GOG (session cookie), Xbox (OpenXBL key) and Epic (bearer token). EA, Ubisoft and Battle.net have no public library API."/>
                         </StackPanel>
                     </Border>
 
@@ -1835,6 +1889,19 @@
                                     <TextBlock Text="0 = unlimited." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                                 </StackPanel>
                                 <TextBox Grid.Column="1" Classes="form-input" Width="220" Text="{Binding Downloads.SpeedLimitKBps, Mode=TwoWay}" Margin="16,0,0,0"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24">
+                        <StackPanel Spacing="16">
+                            <TextBlock Text="🔄  Auto update" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Download updates automatically" FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="On: new versions of auto-update games / mods are downloaded right away. Off: you only get a notification. Checked at start-up and every 4 hours." FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1" IsChecked="{Binding Downloads.AutoUpdateDownload}" OffContent="Notify" OnContent="Download" VerticalAlignment="Center" Margin="16,0,0,0"/>
                             </Grid>
                         </StackPanel>
                     </Border>

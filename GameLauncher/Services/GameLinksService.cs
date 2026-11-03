@@ -25,6 +25,8 @@ namespace GameLauncher.Services
         [JsonPropertyName("kind")]     public string Kind { get; set; } = KindOther;
         /// <summary>Mod type preset (see <see cref="GameModsService.Presets"/>) when <see cref="Kind"/> is Mod.</summary>
         [JsonPropertyName("modType")]  public string ModType { get; set; } = "";
+        /// <summary>Checked for new versions at start-up and every 4 hours (see <see cref="AutoUpdateService"/>).</summary>
+        [JsonPropertyName("autoUpdate")] public bool AutoUpdate { get; set; }
         [JsonPropertyName("created")]  public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
 
         [JsonIgnore] public bool IsGuideLike => Kind is KindWalkthrough or KindGuide;
@@ -113,7 +115,7 @@ namespace GameLauncher.Services
             lock (Gate) return All().FirstOrDefault(l => NormUrl(l.Url) == n);
         }
 
-        public static GameLink Add(string platform, string game, string name, string url, string kind, string modType = "")
+        public static GameLink Add(string platform, string game, string name, string url, string kind, string modType = "", bool autoUpdate = false)
         {
             GameLink link;
             lock (Gate)
@@ -124,17 +126,29 @@ namespace GameLauncher.Services
                     if (!string.IsNullOrWhiteSpace(name)) existing.Name = name.Trim();
                     existing.Kind = kind;
                     existing.ModType = modType;
+                    if (autoUpdate) existing.AutoUpdate = true;
                     link = existing;
                 }
                 else
                 {
-                    link = new GameLink { Platform = platform.Trim(), Game = game.Trim(), Name = string.IsNullOrWhiteSpace(name) ? url : name.Trim(), Url = url.Trim(), Kind = kind, ModType = modType };
+                    link = new GameLink { Platform = platform.Trim(), Game = game.Trim(), Name = string.IsNullOrWhiteSpace(name) ? url : name.Trim(), Url = url.Trim(), Kind = kind, ModType = modType, AutoUpdate = autoUpdate };
                     All().Add(link);
                 }
                 SaveGame(platform, game);
             }
             Changed?.Invoke();
             return link;
+        }
+
+        public static IReadOnlyList<GameLink> AutoUpdateLinks()
+        {
+            lock (Gate) return All().Where(l => l.AutoUpdate && l.Kind is GameLink.KindDownload or GameLink.KindMod).ToList();
+        }
+
+        public static void SetAutoUpdate(GameLink link, bool enabled)
+        {
+            lock (Gate) { link.AutoUpdate = enabled; SaveGame(link.Platform, link.Game); }
+            Changed?.Invoke();
         }
 
         public static void Remove(GameLink link)

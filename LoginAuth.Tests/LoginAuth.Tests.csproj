@@ -9,6 +9,7 @@
   <ItemGroup>
     <!-- Share the authentication source directly (no Avalonia/UI dependency needed) -->
     <Compile Include="../GameLauncher/Services/AppSettingsService.cs" />
+    <Compile Include="../GameLauncher/Services/StoreAccountsService.cs" />
     <Compile Include="../GameLauncher/Services/DevLogService.cs" />
     <Compile Include="../GameLauncher/Services/GitHubDataService.cs" />
     <Compile Include="../GameLauncher/Services/DatabaseContributionQueue.cs" />

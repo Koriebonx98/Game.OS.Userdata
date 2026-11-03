@@ -1,0 +1,177 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace GameLauncher.Services
+{
+    /// <summary>
+    /// Reads a user's owned library from a store using the credentials saved for the signed-in account and feeds it
+    /// to <see cref="StoreLibraryService"/>. Supported: itch.io (API key), GOG (session cookie), Xbox (OpenXBL key) and
+    /// Epic (bearer token). EA, Ubisoft and Battle.net have no usable public library API, so they only keep credentials.
+    /// </summary>
+    public static class StoreLibraryFetcher
+    {
+        private static readonly HttpClient Http = CreateHttp();
+
+        private static HttpClient CreateHttp()
+        {
+            var h = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            h.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 GameOS");
+            return h;
+        }
+
+        public static bool IsSupported(string store) => store is "itch.io" or "GOG" or "Xbox" or "Epic Games";
+
+        /// <summary>Fetches every supported store that has credentials and queues the games. Returns one status line per store.</summary>
+        public static async Task<List<string>> SyncAllAsync(CancellationToken ct = default)
+        {
+            var lines = new List<string>();
+            foreach (var acct in StoreAccountsService.All().Where(a => IsSupported(a.Store)))
+            {
+                try
+                {
+                    var games = await FetchAsync(acct, ct).ConfigureAwait(false);
+                    var r = StoreLibraryService.Submit(acct.Store, games);
+                    lines.Add($"{acct.Store}: {games.Count} games – {r.NewGames} new, {r.StoreMerges} store links added, {r.AlreadyComplete} already complete, {r.Duplicates} already queued");
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    DevLogService.Log($"[StoreLibrary] {acct.Store} failed: {ex.Message}");
+                    lines.Add($"{acct.Store}: failed – {ex.Message}");
+                }
+            }
+            if (lines.Count == 0) lines.Add("No store with a supported login is configured.");
+            return lines;
+        }
+
+        public static Task<List<StoreLibraryService.StoreGame>> FetchAsync(StoreAccount a, CancellationToken ct) => a.Store switch
+        {
+            "itch.io" => FetchItchAsync(a, ct),
+            "GOG" => FetchGogAsync(a, ct),
+            "Xbox" => FetchXboxAsync(a, ct),
+            "Epic Games" => FetchEpicAsync(a, ct),
+            _ => throw new NotSupportedException($"{a.Store} has no library API"),
+        };
+
+        private static async Task<JsonDocument> GetJsonAsync(HttpRequestMessage req, CancellationToken ct)
+        {
+            using var resp = await Http.SendAsync(req, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) throw new HttpRequestException($"HTTP {(int)resp.StatusCode} from {req.RequestUri?.Host}");
+            return JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+        }
+
+        private static string Str(JsonElement e, string name) =>
+            e.ValueKind == JsonValueKind.Object && e.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String ? v.GetString() ?? "" : "";
+
+        private static async Task<List<StoreLibraryService.StoreGame>> FetchItchAsync(StoreAccount a, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(a.ApiKey)) throw new InvalidOperationException("itch.io API key missing");
+            var games = new List<StoreLibraryService.StoreGame>();
+            for (int page = 1; page <= 50; page++)
+            {
+                using var doc = await GetJsonAsync(new HttpRequestMessage(HttpMethod.Get,
+                    $"https://itch.io/api/1/{Uri.EscapeDataString(a.ApiKey)}/my-owned-keys?page={page}"), ct).ConfigureAwait(false);
+                if (!doc.RootElement.TryGetProperty("owned_keys", out var keys) || keys.GetArrayLength() == 0) break;
+                foreach (var k in keys.EnumerateArray())
+                {
+                    if (!k.TryGetProperty("game", out var g)) continue;
+                    games.Add(new(g.TryGetProperty("id", out var id) ? id.ToString() : "", Str(g, "title"), Str(g, "url")));
+                }
+            }
+            return games;
+        }
+
+        private static async Task<List<StoreLibraryService.StoreGame>> FetchGogAsync(StoreAccount a, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(a.Token)) throw new InvalidOperationException("GOG session cookie missing (use 'Capture login' in the browser)");
+            var req = new HttpRequestMessage(HttpMethod.Get, "https://embed.gog.com/user/data/games");
+            req.Headers.TryAddWithoutValidation("Cookie", a.Token);
+            using var owned = await GetJsonAsync(req, ct).ConfigureAwait(false);
+            var ids = owned.RootElement.TryGetProperty("owned", out var o) ? o.EnumerateArray().Select(x => x.ToString()).ToList() : new();
+
+            var games = new List<StoreLibraryService.StoreGame>();
+            using var gate = new SemaphoreSlim(4);
+            var tasks = ids.Take(1000).Select(async id =>
+            {
+                await gate.WaitAsync(ct).ConfigureAwait(false);
+                try
+                {
+                    using var p = await GetJsonAsync(new HttpRequestMessage(HttpMethod.Get, $"https://api.gog.com/products/{id}"), ct).ConfigureAwait(false);
+                    string title = Str(p.RootElement, "title");
+                    string url = p.RootElement.TryGetProperty("links", out var l) ? Str(l, "product_card") : "";
+                    if (title.Length > 0) lock (games) games.Add(new(id, title, url));
+                }
+                catch (OperationCanceledException) { throw; }
+                catch { /* delisted products return 404 */ }
+                finally { gate.Release(); }
+            });
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+            return games;
+        }
+
+        private static async Task<List<StoreLibraryService.StoreGame>> FetchXboxAsync(StoreAccount a, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(a.ApiKey)) throw new InvalidOperationException("OpenXBL API key missing");
+            var req = new HttpRequestMessage(HttpMethod.Get, "https://xbl.io/api/v2/player/titleHistory");
+            req.Headers.TryAddWithoutValidation("X-Authorization", a.ApiKey);
+            using var doc = await GetJsonAsync(req, ct).ConfigureAwait(false);
+            var games = new List<StoreLibraryService.StoreGame>();
+            if (doc.RootElement.TryGetProperty("titles", out var titles))
+                foreach (var t in titles.EnumerateArray())
+                {
+                    string name = Str(t, "name");
+                    // Only titles that run on PC belong in the PC games list.
+                    bool pc = t.TryGetProperty("devices", out var d) && d.EnumerateArray().Any(x => (x.GetString() ?? "").Equals("PC", StringComparison.OrdinalIgnoreCase));
+                    if (name.Length > 0 && pc) games.Add(new(Str(t, "titleId"), name));
+                }
+            return games;
+        }
+
+        private static async Task<List<StoreLibraryService.StoreGame>> FetchEpicAsync(StoreAccount a, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(a.Token)) throw new InvalidOperationException("Epic bearer token missing");
+            var items = new List<(string CatalogId, string Ns)>();
+            string cursor = "";
+            for (int page = 0; page < 40; page++)
+            {
+                string url = "https://library-service.live.use1a.on.epicgames.com/library/api/public/items?includeMetadata=true&platform=Windows"
+                             + (cursor.Length > 0 ? "&cursor=" + Uri.EscapeDataString(cursor) : "");
+                var req = new HttpRequestMessage(HttpMethod.Get, url);
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", a.Token);
+                using var doc = await GetJsonAsync(req, ct).ConfigureAwait(false);
+                if (doc.RootElement.TryGetProperty("records", out var recs))
+                    foreach (var r in recs.EnumerateArray())
+                    {
+                        string ns = Str(r, "namespace");
+                        if (ns == "ue") continue; // Unreal Engine marketplace assets, not games
+                        items.Add((Str(r, "catalogItemId"), ns));
+                    }
+                cursor = doc.RootElement.TryGetProperty("responseMetadata", out var m) ? Str(m, "nextCursor") : "";
+                if (cursor.Length == 0) break;
+            }
+
+            var games = new List<StoreLibraryService.StoreGame>();
+            foreach (var chunk in items.Where(i => i.CatalogId.Length > 0).Chunk(50))
+            {
+                var req = new HttpRequestMessage(HttpMethod.Get,
+                    "https://catalog-public-service-prod06.ol.epicgames.com/catalog/api/shared/bulk/items?country=US&locale=en-US&" +
+                    string.Join("&", chunk.Select(c => "id=" + Uri.EscapeDataString(c.CatalogId))));
+                req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", a.Token);
+                using var doc = await GetJsonAsync(req, ct).ConfigureAwait(false);
+                foreach (var p in doc.RootElement.EnumerateObject())
+                {
+                    string title = Str(p.Value, "title");
+                    var cats = p.Value.TryGetProperty("categories", out var c) ? c.EnumerateArray().Select(x => Str(x, "path")).ToList() : new();
+                    if (title.Length > 0 && cats.Any(x => x is "games" or "applications")) games.Add(new(p.Name, title));
+                }
+            }
+            return games;
+        }
+    }
+}
