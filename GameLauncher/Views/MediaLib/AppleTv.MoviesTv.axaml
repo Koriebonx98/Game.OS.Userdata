@@ -1,0 +1,178 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             xmlns:lib="using:GameLauncher.Views.MediaLib"
+             x:Class="GameLauncher.Views.MediaLib.AppleTvMoviesTv"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Apple TV Movies & TV: pure black canvas, centred pill nav, rounded hero card and rounded poster shelves. -->
+    <UserControl.Styles>
+        <Style Selector="Button.atv-nav">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#8e8e93"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="16,7"/>
+            <Setter Property="CornerRadius" Value="18"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.atv-nav:pointerover"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.atv-nav.active"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.atv-nav.active /template/ ContentPresenter"><Setter Property="Background" Value="#3a3a3c"/></Style>
+        <Style Selector="Button.atv-play">
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="Black"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Padding" Value="26,11"/>
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.atv-play:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#e5e5ea"/>
+            <Setter Property="Foreground" Value="Black"/>
+        </Style>
+        <Style Selector="Button.atv-glass">
+            <Setter Property="Background" Value="#66ffffff"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="15"/>
+            <Setter Property="Padding" Value="20,11"/>
+            <Setter Property="CornerRadius" Value="22"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.atv-card">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,18,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="RenderTransform" Value="scale(1)"/>
+            <Setter Property="Transitions">
+                <Transitions><TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.18"/></Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.atv-card:pointerover, Button.atv-card:focus">
+            <Setter Property="RenderTransform" Value="scale(1.06)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="#000000" RowDefinitions="Auto,*">
+
+        <Grid Grid.Row="0" ColumnDefinitions="Auto,*,Auto" Margin="32,14,32,8">
+            <TextBlock Text=" tv+" Foreground="White" FontSize="22" FontWeight="Bold" VerticalAlignment="Center"/>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center">
+                <Button Classes="atv-nav media-nav active" Classes.focused="{Binding IsTabMoviesFocused}"
+                        Command="{Binding SelectMoviesCommand}" Content="Watch Now"/>
+                <Button Classes="atv-nav" Command="{Binding PlayLocalVideoCommand}" Content="Play File"/>
+                <Button Classes="atv-nav" Command="{Binding RefreshMediaLibraryCommand}" Content="Refresh"/>
+            </StackPanel>
+            <lib:MediaFilterBar Grid.Column="2" IsVisible="{Binding !HasNoActiveItems}"/>
+        </Grid>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoActiveItems}">
+                    <TextBlock Text="Nothing to watch yet" Foreground="White" FontSize="28" FontWeight="Bold"/>
+                    <TextBlock Text="Add files to a Movies or TV Shows folder on any drive, then press Refresh."
+                               Foreground="#8e8e93" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoResults}">
+                    <TextBlock Text="No titles match" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                    <TextBlock Text="Try a different search, or clear the filters." Foreground="#8e8e93" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Rounded hero card -->
+                <Border Margin="32,8,32,22" Height="400" CornerRadius="18" ClipToBounds="True"
+                        IsVisible="{Binding HasSelectedItem}" BoxShadow="0 18 50 0 #99000000">
+                    <Grid>
+                        <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
+                                          FallbackGradient="{Binding SelectedItem.Gradient}"
+                                          LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                          LetterFontSize="200" ImageCornerRadius="18"/>
+                        <Border VerticalAlignment="Bottom" Height="260">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                    <GradientStop Offset="0" Color="Transparent"/>
+                                    <GradientStop Offset="1" Color="#EE000000"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
+                        <StackPanel VerticalAlignment="Bottom" HorizontalAlignment="Center" Spacing="10" Margin="30,0,30,30" MaxWidth="640">
+                            <TextBlock Text="{Binding DetailKindLabel}" Foreground="#d1d1d6" FontSize="12" FontWeight="SemiBold"
+                                       LetterSpacing="2" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedItem.DisplayTitle}" Foreground="White" FontSize="40" FontWeight="Bold"
+                                       TextWrapping="Wrap" TextAlignment="Center" HorizontalAlignment="Center"/>
+                            <TextBlock Text="{Binding SelectedItem.InfoLine}" Foreground="#d1d1d6" FontSize="13" HorizontalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding SelectedItem.Overview}" Foreground="#e5e5ea" FontSize="14" TextWrapping="Wrap"
+                                       TextAlignment="Center" MaxLines="2" TextTrimming="CharacterEllipsis"
+                                       IsVisible="{Binding SelectedItem.HasOverview}"/>
+                            <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center" Margin="0,6,0,0">
+                                <Button Classes="atv-play" Command="{Binding PlaySelectedMediaCommand}">▶  Play</Button>
+                                <Button Classes="atv-glass" Command="{Binding ToggleFavouriteCommand}"
+                                        CommandParameter="{Binding SelectedItem}">＋  Up Next</Button>
+                                <Button Classes="atv-glass" Command="{Binding OpenMediaItemCommand}"
+                                        CommandParameter="{Binding SelectedItem}">ⓘ</Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <!-- Shelves -->
+                <ItemsControl ItemsSource="{Binding ActiveGroups}" Margin="0,0,0,40">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="40,6,0,14" Spacing="8">
+                                <TextBlock Text="{Binding Title}" Foreground="White" FontSize="21" FontWeight="Bold"
+                                           IsVisible="{Binding ShowHeader}"/>
+                                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,8,0,12">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Classes="atv-card media-nav" Classes.focused="{Binding IsFocused}" Width="300"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenMediaItemCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <StackPanel Spacing="8">
+                                                        <Border Height="170" CornerRadius="14" ClipToBounds="True"
+                                                                BoxShadow="0 6 18 0 #66000000">
+                                                            <Grid>
+                                                                <views:CoverImage FallbackText="{Binding TileText}"
+                                                                                  FallbackGradient="{Binding Gradient}"
+                                                                                  LocalCachePath="{Binding CoverPath}"
+                                                                                  LetterFontSize="70" ImageCornerRadius="14" Height="170"/>
+                                                                <Border Background="#99000000" CornerRadius="10" Padding="7,2" Margin="10"
+                                                                        HorizontalAlignment="Right" VerticalAlignment="Top"
+                                                                        IsVisible="{Binding Watched}">
+                                                                    <TextBlock Text="✓" Foreground="White" FontSize="11"/>
+                                                                </Border>
+                                                                <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1"
+                                                                             Value="{Binding ProgressFraction}" IsVisible="{Binding HasProgress}"
+                                                                             Foreground="White" Background="#66000000"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding TileText}" Foreground="White" FontSize="13"
+                                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="4,0"/>
+                                                        <TextBlock Text="{Binding InfoLine}" Foreground="#8e8e93" FontSize="11"
+                                                                   TextTrimming="CharacterEllipsis" Margin="4,-6,4,0"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

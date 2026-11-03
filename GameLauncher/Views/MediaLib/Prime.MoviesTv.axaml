@@ -1,0 +1,195 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             xmlns:lib="using:GameLauncher.Views.MediaLib"
+             x:Class="GameLauncher.Views.MediaLib.PrimeMoviesTv"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Prime Movies & TV: navy canvas, blue accent, top nav, hero with "Watch now" and wide-tile carousels. -->
+    <UserControl.Styles>
+        <Style Selector="Button.prime-nav">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#a8b3bd"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,8"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.prime-nav:pointerover"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.prime-nav.active"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.prime-watch">
+            <Setter Property="Background" Value="#1a98ff"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Padding" Value="26,12"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.prime-watch:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#4db3ff"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.prime-circle">
+            <Setter Property="Background" Value="#CC33373d"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Padding" Value="16,11"/>
+            <Setter Property="CornerRadius" Value="4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.prime-tile">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="CornerRadius" Value="8"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,12,0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.prime-tile:pointerover /template/ ContentPresenter, Button.prime-tile:focus /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="White"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="#0f171e" RowDefinitions="Auto,*">
+
+        <!-- Top navigation -->
+        <Border Grid.Row="0" Padding="32,12" Background="#0f171e">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <StackPanel Orientation="Horizontal" Spacing="18" VerticalAlignment="Center">
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="prime video" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                        <Border Height="3" Background="#1a98ff" CornerRadius="2" Margin="0,-2,60,0"/>
+                    </StackPanel>
+                    <Button Classes="prime-nav media-nav active" Classes.focused="{Binding IsTabMoviesFocused}"
+                            Command="{Binding SelectMoviesCommand}" Content="Home"/>
+                    <Button Classes="prime-nav" Command="{Binding PlayLocalVideoCommand}" Content="📂 Play File"/>
+                    <Button Classes="prime-nav" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳ Refresh"/>
+                </StackPanel>
+                <lib:MediaFilterBar Grid.Column="2" IsVisible="{Binding !HasNoActiveItems}"/>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoActiveItems}">
+                    <TextBlock Text="Nothing to watch yet" Foreground="White" FontSize="28" FontWeight="Bold"/>
+                    <TextBlock Text="Add files to a Movies or TV Shows folder on any drive, then press Refresh."
+                               Foreground="#a8b3bd" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Margin="40,60" Spacing="10" IsVisible="{Binding HasNoResults}">
+                    <TextBlock Text="No titles match" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                    <TextBlock Text="Try a different search, or clear the filters." Foreground="#a8b3bd" FontSize="14"/>
+                </StackPanel>
+
+                <!-- Hero -->
+                <Grid Height="400" IsVisible="{Binding HasSelectedItem}">
+                    <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
+                                      FallbackGradient="{Binding SelectedItem.Gradient}"
+                                      LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                      LetterFontSize="200" ImageCornerRadius="0"/>
+                    <Border>
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                <GradientStop Offset="0" Color="#F20f171e"/>
+                                <GradientStop Offset="0.55" Color="#990f171e"/>
+                                <GradientStop Offset="1" Color="#330f171e"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border VerticalAlignment="Bottom" Height="140">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                <GradientStop Offset="0" Color="Transparent"/>
+                                <GradientStop Offset="1" Color="#0f171e"/>
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <StackPanel Margin="40,0,0,44" VerticalAlignment="Bottom" HorizontalAlignment="Left" Spacing="12" MaxWidth="600">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Border Background="#1a98ff" CornerRadius="3" Padding="7,2">
+                                <TextBlock Text="✓ prime" Foreground="White" FontSize="12" FontWeight="Bold"/>
+                            </Border>
+                            <TextBlock Text="{Binding DetailKindLabel}" Foreground="#a8b3bd" FontSize="12" FontWeight="Bold"
+                                       VerticalAlignment="Center" LetterSpacing="1"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedItem.DisplayTitle}" Foreground="White" FontSize="38" FontWeight="Bold" TextWrapping="Wrap"/>
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock Text="{Binding SelectedItem.ScoreLabel}" Foreground="#f5c518" FontSize="14" FontWeight="Bold"/>
+                            <TextBlock Text="{Binding SelectedItem.InfoLine}" Foreground="#c9d1d9" FontSize="14"/>
+                        </StackPanel>
+                        <TextBlock Text="{Binding SelectedItem.Overview}" Foreground="#e6edf3" FontSize="14" TextWrapping="Wrap"
+                                   MaxLines="3" TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedItem.HasOverview}"/>
+                        <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,6,0,0">
+                            <Button Classes="prime-watch" Command="{Binding PlaySelectedMediaCommand}">▶  Watch now</Button>
+                            <Button Classes="prime-circle" Command="{Binding ToggleFavouriteCommand}"
+                                    CommandParameter="{Binding SelectedItem}" ToolTip.Tip="Add to Watchlist">＋</Button>
+                            <Button Classes="prime-circle" Command="{Binding OpenMediaItemCommand}"
+                                    CommandParameter="{Binding SelectedItem}" ToolTip.Tip="More details">ⓘ</Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Carousels -->
+                <ItemsControl ItemsSource="{Binding ActiveGroups}" Margin="0,0,0,40">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Margin="40,6,0,12" Spacing="8">
+                                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding ShowHeader}">
+                                    <TextBlock Text="{Binding Title}" Foreground="White" FontSize="19" FontWeight="Bold"/>
+                                    <TextBlock Text="›" Foreground="#1a98ff" FontSize="20" FontWeight="Bold" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                                    <ItemsControl ItemsSource="{Binding Items}" Margin="0,4,0,8">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Classes="prime-tile media-nav" Classes.focused="{Binding IsFocused}" Width="256"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenMediaItemCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <StackPanel Spacing="6">
+                                                        <Border Height="144" CornerRadius="6" ClipToBounds="True">
+                                                            <Grid>
+                                                                <views:CoverImage FallbackText="{Binding TileText}"
+                                                                                  FallbackGradient="{Binding Gradient}"
+                                                                                  LocalCachePath="{Binding CoverPath}"
+                                                                                  LetterFontSize="60" ImageCornerRadius="6" Height="144"/>
+                                                                <Border Background="#CC0f171e" CornerRadius="3" Padding="6,2" Margin="8"
+                                                                        HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                                    <TextBlock Text="✓ prime" Foreground="#1a98ff" FontSize="10" FontWeight="Bold"/>
+                                                                </Border>
+                                                                <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6">
+                                                                    <Border Background="#CC000000" CornerRadius="3" Padding="5,1" IsVisible="{Binding Favourite}">
+                                                                        <TextBlock Text="＋" Foreground="#1a98ff" FontSize="11"/>
+                                                                    </Border>
+                                                                    <Border Background="#CC000000" CornerRadius="3" Padding="5,1" IsVisible="{Binding Watched}">
+                                                                        <TextBlock Text="✓" Foreground="#46d369" FontSize="11"/>
+                                                                    </Border>
+                                                                </StackPanel>
+                                                                <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1"
+                                                                             Value="{Binding ProgressFraction}" IsVisible="{Binding HasProgress}"
+                                                                             Foreground="#1a98ff" Background="#66000000"/>
+                                                            </Grid>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding TileText}" Foreground="#e6edf3" FontSize="12"
+                                                                   FontWeight="SemiBold" TextTrimming="CharacterEllipsis" Margin="2,0"/>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

@@ -1459,7 +1459,7 @@
                                           ItemsSource="{Binding AvailableMoviesTvThemes}"
                                           SelectedItem="{Binding MoviesTvTheme}"
                                           Width="220"/>
-                                <TextBlock Text="Movies &amp; TV page design. Default is a console-style browser; Cinema is a dark streaming-style layout with a hero banner and rows."
+                                <TextBlock Text="Movies &amp; TV page design. Default is a console-style browser; Cinema, Prime, AppleTV and Kodi mimic those apps (hero banner, rows, sidebar menus)."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 
@@ -1470,7 +1470,7 @@
                                           ItemsSource="{Binding AvailableMusicThemes}"
                                           SelectedItem="{Binding MusicTheme}"
                                           Width="220"/>
-                                <TextBlock Text="Music page design. Default is a console-style player; Spotify mimics the Spotify look."
+                                <TextBlock Text="Music page design. Default is a console-style player; Spotify, iTunes and VLC mimic those players."
                                            FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
                             </StackPanel>
 

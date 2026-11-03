@@ -10,17 +10,22 @@
     <Panel>
         <!--
             Media page. The layouts live in separate files chosen by Settings -> Design:
-              Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Cinema.MoviesTv.axaml ("Cinema")
+              Views/MediaLib/Default.MoviesTv.axaml  ("Default")   Views/MediaLib/Cinema.MoviesTv.axaml ("Cinema"), Prime / AppleTv / Kodi .MoviesTv.axaml
               Views/MediaLib/Default.Music.axaml     ("Default")   Views/MediaLib/Spotify.Music.axaml    ("Spotify")
         -->
         <Panel IsVisible="{Binding !IsVlcFullView}">
             <Panel IsVisible="{Binding IsVideoSection}">
                 <lib:DefaultMoviesTv IsVisible="{Binding IsDefaultMoviesTv}"/>
                 <lib:CinemaMoviesTv IsVisible="{Binding IsCinemaMoviesTv}"/>
+                <lib:PrimeMoviesTv IsVisible="{Binding IsPrimeMoviesTv}"/>
+                <lib:AppleTvMoviesTv IsVisible="{Binding IsAppleTvMoviesTv}"/>
+                <lib:KodiMoviesTv IsVisible="{Binding IsKodiMoviesTv}"/>
             </Panel>
             <Panel IsVisible="{Binding IsMusicSelected}">
                 <lib:DefaultMusic IsVisible="{Binding IsDefaultMusic}"/>
                 <lib:SpotifyMusic IsVisible="{Binding IsSpotifyMusic}"/>
+                <lib:ItunesMusic IsVisible="{Binding IsItunesMusic}"/>
+                <lib:VlcMusic IsVisible="{Binding IsVlcMusic}"/>
             </Panel>
         </Panel>
 
@@ -115,78 +120,187 @@
         </Border>
 
         <!-- Movie / TV show info page -->
-        <Border Background="#f20d1117" IsVisible="{Binding IsDetailOpen}" ZIndex="40" Padding="56,36">
-            <Grid ColumnDefinitions="300,*" ColumnSpacing="44">
-                <Border VerticalAlignment="Top" CornerRadius="12" ClipToBounds="True" BorderBrush="#30363d" BorderThickness="1"
-                        BoxShadow="0 12 40 0 #99000000" Height="450">
-                    <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
-                                      FallbackGradient="{Binding SelectedItem.Gradient}"
-                                      LocalCachePath="{Binding SelectedItem.CoverPath}"
-                                      LetterFontSize="120" ImageCornerRadius="12" Height="450"/>
-                </Border>
-                <Grid Grid.Column="1" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*,Auto" RowSpacing="12">
-                    <TextBlock Text="{Binding DetailKindLabel}" FontSize="12" Foreground="#58a6ff" FontWeight="Bold" LetterSpacing="2"/>
-                    <TextBlock Grid.Row="1" Text="{Binding SelectedItem.DisplayTitle}" FontSize="40" FontWeight="Black" TextWrapping="Wrap"/>
-
-                    <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="14">
-                        <Border Background="#1f6f3a" CornerRadius="6" Padding="10,4" IsVisible="{Binding SelectedItem.HasScore}" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding SelectedItem.ScoreLabel}" Foreground="White" FontWeight="Bold" FontSize="14"/>
+        <Border IsVisible="{Binding IsDetailOpen}" ZIndex="40" Background="#F20D1117">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel>
+                    <Grid Height="530" MinHeight="460">
+                        <views:CoverImage FallbackText="{Binding DetailTitle}"
+                                          FallbackGradient="{Binding SelectedItem.Gradient}"
+                                          LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                          LetterFontSize="180" ImageCornerRadius="0">
+                            <views:CoverImage.Effect>
+                                <BlurEffect Radius="48"/>
+                            </views:CoverImage.Effect>
+                        </views:CoverImage>
+                        <Border Background="#CC0D1117"/>
+                        <Border>
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                    <GradientStop Offset="0" Color="#F20D1117"/>
+                                    <GradientStop Offset="0.62" Color="#990D1117"/>
+                                    <GradientStop Offset="1" Color="#660D1117"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
                         </Border>
-                        <TextBlock Text="{Binding SelectedItem.FactsLine}" FontSize="14" Foreground="#c9d1d9" VerticalAlignment="Center"/>
-                    </StackPanel>
+                        <Border VerticalAlignment="Bottom" Height="150">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                    <GradientStop Offset="0" Color="Transparent"/>
+                                    <GradientStop Offset="1" Color="#0D1117"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                        </Border>
 
-                    <ItemsControl Grid.Row="3" ItemsSource="{Binding SelectedItem.GenreList}" IsVisible="{Binding SelectedItem.HasGenres}">
-                        <ItemsControl.ItemsPanel><ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate></ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate x:DataType="x:String">
-                                <Border Background="#21262d" BorderBrush="#30363d" BorderThickness="1" CornerRadius="14" Padding="12,4" Margin="0,0,8,6">
-                                    <TextBlock Text="{Binding}" FontSize="12" Foreground="#c9d1d9"/>
-                                </Border>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                        <Grid Margin="56,24" ColumnDefinitions="*,270" ColumnSpacing="48">
+                            <Button HorizontalAlignment="Right" VerticalAlignment="Top" Grid.ColumnSpan="2"
+                                    Classes="btn-secondary" Command="{Binding CloseDetailCommand}"
+                                    Padding="8,4">✕</Button>
+                            <StackPanel VerticalAlignment="Center" Spacing="14" MaxWidth="760">
+                                <TextBlock Text="{Binding DetailKindLabel}" FontSize="13" Foreground="#f5c518"
+                                           FontWeight="Bold" LetterSpacing="2"/>
+                                <TextBlock Text="{Binding DetailTitle}" FontSize="42" FontWeight="Black"
+                                           Foreground="White" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Spacing="14">
+                                    <Border Background="#1f6f3a" CornerRadius="5" Padding="9,4"
+                                            IsVisible="{Binding SelectedItem.HasScore}" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding SelectedItem.ScoreLabel}" Foreground="White"
+                                                   FontWeight="Bold" FontSize="14"/>
+                                    </Border>
+                                    <TextBlock Text="{Binding SelectedItem.FactsLine}" FontSize="14"
+                                               Foreground="#e5e5e5" VerticalAlignment="Center"/>
+                                    <TextBlock Text="{Binding DetailEpisodeLabel}" FontSize="14"
+                                               Foreground="#e5e5e5" VerticalAlignment="Center"
+                                               IsVisible="{Binding SelectedItem.IsTv}"/>
+                                </StackPanel>
+                                <ItemsControl ItemsSource="{Binding SelectedItem.GenreList}"
+                                              IsVisible="{Binding SelectedItem.HasGenres}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="x:String">
+                                            <Border Background="#66212127" BorderBrush="#66FFFFFF" BorderThickness="1"
+                                                    CornerRadius="14" Padding="12,4" Margin="0,0,8,6">
+                                                <TextBlock Text="{Binding}" FontSize="12" Foreground="#e5e5e5"/>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Text="{Binding SelectedItem.Overview}" FontSize="15" LineHeight="22"
+                                           Foreground="#f0f0f0" TextWrapping="Wrap" MaxWidth="760"
+                                           MaxLines="4" TextTrimming="CharacterEllipsis"
+                                           IsVisible="{Binding SelectedItem.HasOverview}"/>
+                                <TextBlock Text="Looking up info…" FontSize="13" Foreground="#b3b3b3"
+                                           IsVisible="{Binding !SelectedItem.HasOverview}"/>
+                                <TextBlock FontSize="12" Foreground="#b3b3b3">
+                                    <Run Text="{Binding SelectedItem.PlayCountLabel}"/><Run Text="  ·  "/>
+                                    <Run Text="{Binding SelectedItem.LastPlayedLabel}"/><Run Text="  ·  "/>
+                                    <Run Text="{Binding SelectedItem.WatchTimeLabel}"/><Run Text="  ·  "/>
+                                    <Run Text="{Binding DetailAddedLabel}"/>
+                                </TextBlock>
+                                <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
+                                    <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsDetailPlayFocused}"
+                                            Padding="26,12" FontSize="15" FontWeight="Bold"
+                                            Command="{Binding PlayDetailCommand}">▶  Play</Button>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailListFocused}"
+                                            Padding="16,10" Command="{Binding ToggleFavouriteCommand}"
+                                            CommandParameter="{Binding SelectedItem}">♥  My List</Button>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailWatchedFocused}"
+                                            Padding="16,10" Command="{Binding ToggleWatchedCommand}"
+                                            CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailInfoFocused}"
+                                            Padding="16,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailBackFocused}"
+                                            Padding="16,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="Your rating" Foreground="#b3b3b3" VerticalAlignment="Center"
+                                               Margin="0,0,8,0"/>
+                                    <Button Classes="btn-secondary" Padding="7,2" Command="{Binding RateItemCommand}"
+                                            CommandParameter="1" Content="★"/>
+                                    <Button Classes="btn-secondary" Padding="7,2" Command="{Binding RateItemCommand}"
+                                            CommandParameter="2" Content="★★"/>
+                                    <Button Classes="btn-secondary" Padding="7,2" Command="{Binding RateItemCommand}"
+                                            CommandParameter="3" Content="★★★"/>
+                                    <Button Classes="btn-secondary" Padding="7,2" Command="{Binding RateItemCommand}"
+                                            CommandParameter="4" Content="★★★★"/>
+                                    <Button Classes="btn-secondary" Padding="7,2" Command="{Binding RateItemCommand}"
+                                            CommandParameter="5" Content="★★★★★"/>
+                                    <TextBlock Text="{Binding SelectedItem.RatingStars}" Foreground="#f5c518"
+                                               FontSize="16" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <Border Grid.Column="1" Width="270" Height="400" CornerRadius="12"
+                                    ClipToBounds="True" BorderBrush="#55FFFFFF" BorderThickness="1"
+                                    VerticalAlignment="Center" BoxShadow="0 12 40 0 #99000000">
+                                <views:CoverImage FallbackText="{Binding DetailTitle}"
+                                                  FallbackGradient="{Binding SelectedItem.Gradient}"
+                                                  LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                                  LetterFontSize="100" ImageCornerRadius="12"/>
+                            </Border>
+                        </Grid>
+                    </Grid>
 
-                    <StackPanel Grid.Row="4" Spacing="10">
-                        <TextBlock Text="{Binding SelectedItem.Overview}" FontSize="15" LineHeight="22" Foreground="#c9d1d9" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left"
-                                   MaxLines="6" TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedItem.HasOverview}"/>
-                        <TextBlock Text="Looking up info…" FontSize="13" Foreground="#8b949e" IsVisible="{Binding !SelectedItem.HasOverview}"/>
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="Your rating" Foreground="#8b949e" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="1" Content="★"/>
-                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="2" Content="★★"/>
-                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="3" Content="★★★"/>
-                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="4" Content="★★★★"/>
-                            <Button Classes="btn-secondary" Padding="8,2" Command="{Binding RateItemCommand}" CommandParameter="5" Content="★★★★★"/>
-                            <TextBlock Text="{Binding SelectedItem.RatingStars}" Foreground="#f5c518" FontSize="16" VerticalAlignment="Center" Margin="12,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock FontSize="12" Foreground="#8b949e">
-                            <Run Text="{Binding SelectedItem.PlayCountLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItem.LastPlayedLabel}"/><Run Text="  ·  "/><Run Text="{Binding SelectedItem.WatchTimeLabel}"/><Run Text="  ·  "/><Run Text="{Binding DetailAddedLabel}"/>
-                        </TextBlock>
-                    </StackPanel>
-                    <StackPanel Grid.Row="5" Orientation="Horizontal" Spacing="10" Margin="0,6,0,6">
-                        <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsDetailPlayFocused}" Padding="28,12" FontSize="15" FontWeight="Bold" Command="{Binding PlayDetailCommand}">▶  Play</Button>
-                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailListFocused}" Padding="18,10" Command="{Binding ToggleFavouriteCommand}" CommandParameter="{Binding SelectedItem}">♥  My List</Button>
-                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailWatchedFocused}" Padding="18,10" Command="{Binding ToggleWatchedCommand}" CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
-                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailInfoFocused}" Padding="18,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
-                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailBackFocused}" Padding="18,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
-                    </StackPanel>
-                    <StackPanel Grid.Row="6" Spacing="8" IsVisible="{Binding HasDetailRelated}">
-                        <TextBlock Text="{Binding DetailRelatedTitle}" Classes="section-header"/>
-                        <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel Margin="56,0,56,36" Spacing="12"
+                                IsVisible="{Binding SelectedItem.IsTv}">
+                        <TextBlock Text="{Binding DetailRelatedTitle}" Classes="section-header"
+                                   IsVisible="{Binding HasDetailRelated}"/>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
+                                      IsVisible="{Binding HasDetailRelated}">
                             <ItemsControl ItemsSource="{Binding DetailRelated}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate>
-                                        <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsFocused}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
-                                                Margin="0,0,0,4" Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
-                                                CommandParameter="{Binding}" Content="{Binding ListTitle}"/>
+                                        <Button Classes="media-nav" Classes.focused="{Binding IsFocused}"
+                                                Background="Transparent" BorderThickness="0" Padding="0"
+                                                Margin="0,0,14,0" Width="224"
+                                                Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Spacing="7">
+                                                <Border Height="126" CornerRadius="7" ClipToBounds="True">
+                                                    <Grid>
+                                                        <views:CoverImage FallbackText="{Binding ListTitle}"
+                                                                          FallbackGradient="{Binding Gradient}"
+                                                                          LocalCachePath="{Binding CoverPath}"
+                                                                          LetterFontSize="48" ImageCornerRadius="7"/>
+                                                        <Border VerticalAlignment="Bottom" Height="54">
+                                                            <Border.Background>
+                                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                                                    <GradientStop Offset="0" Color="Transparent"/>
+                                                                    <GradientStop Offset="1" Color="#DD000000"/>
+                                                                </LinearGradientBrush>
+                                                            </Border.Background>
+                                                        </Border>
+                                                        <TextBlock Text="{Binding EpisodeLabel}" HorizontalAlignment="Left"
+                                                                   VerticalAlignment="Bottom" Margin="9,0,9,8"
+                                                                   Foreground="White" FontSize="12" FontWeight="Bold"
+                                                                   TextTrimming="CharacterEllipsis"/>
+                                                        <Border Background="#CC000000" CornerRadius="9" Padding="5,1"
+                                                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                                                IsVisible="{Binding Watched}">
+                                                            <TextBlock Text="✓" Foreground="#46d369" FontSize="11"/>
+                                                        </Border>
+                                                        <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0"
+                                                                     Maximum="1" Value="{Binding ProgressFraction}"
+                                                                     IsVisible="{Binding HasProgress}" Foreground="#E50914"/>
+                                                    </Grid>
+                                                </Border>
+                                                <TextBlock Text="{Binding ListTitle}" Foreground="White" FontSize="13"
+                                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
+                                        </Button>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
                         </ScrollViewer>
                     </StackPanel>
-                    <TextBlock Grid.Row="7" Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  Start menu  ·  Right stick volume  ·  B close" FontSize="11" Foreground="#484f58"/>
-                </Grid>
-            </Grid>
+                    <TextBlock Margin="56,0,56,20"
+                               Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  Start menu  ·  Right stick volume  ·  B close"
+                               FontSize="11" Foreground="#484f58"/>
+                </StackPanel>
+            </ScrollViewer>
         </Border>
 
         <!-- Full-screen now playing (music) -->

@@ -218,10 +218,27 @@ public partial class SettingsViewModel : ViewModelBase
     public IReadOnlyList<string> AvailableGameInfoThemes { get; } = new[] { "Default", "PS5", "PS6", "Wii", "Switch", "SteamBPM", "XBOne" };
     /// <summary>Movies &amp; TV page design.</summary>
     [ObservableProperty] private string _moviesTvTheme = "Default";
-    public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Cinema" };
+    public IReadOnlyList<string> AvailableMoviesTvThemes { get; } = new[] { "Default", "Cinema", "Prime", "AppleTV", "Kodi" };
+    private static string NormaliseMoviesTvTheme(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "cinema" or "netflix" => "Cinema",
+        "prime" => "Prime",
+        "appletv" or "apple tv" => "AppleTV",
+        "kodi" => "Kodi",
+        _ => "Default",
+    };
+
+    private static string NormaliseMusicTheme(string? value) => value?.Trim().ToLowerInvariant() switch
+    {
+        "spotify" => "Spotify",
+        "itunes" => "iTunes",
+        "vlc" => "VLC",
+        _ => "Default",
+    };
+
     /// <summary>Music page design.</summary>
     [ObservableProperty] private string _musicTheme = "Default";
-    public IReadOnlyList<string> AvailableMusicThemes { get; } = new[] { "Default", "Spotify" };
+    public IReadOnlyList<string> AvailableMusicThemes { get; } = new[] { "Default", "Spotify", "iTunes", "VLC" };
     // ── Settings → Media ──
     [ObservableProperty] private int  _mediaSkipSeconds = 10;
 
@@ -1022,8 +1039,8 @@ public partial class SettingsViewModel : ViewModelBase
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
         KeyboardTheme              = NormaliseKeyboardTheme(appSettings.KeyboardTheme);
         StoreTheme                 = NormaliseStoreTheme(appSettings.StoreTheme);
-        MoviesTvTheme              = appSettings.MoviesTvTheme?.Trim() is { } t && (t.Equals("Cinema", StringComparison.OrdinalIgnoreCase) || t.Equals("Netflix", StringComparison.OrdinalIgnoreCase)) ? "Cinema" : "Default";
-        MusicTheme                 = string.Equals(appSettings.MusicTheme?.Trim(), "Spotify", StringComparison.OrdinalIgnoreCase) ? "Spotify" : "Default";
+        MoviesTvTheme              = NormaliseMoviesTvTheme(appSettings.MoviesTvTheme);
+        MusicTheme                 = NormaliseMusicTheme(appSettings.MusicTheme);
         MediaSkipSeconds           = appSettings.MediaSkipSeconds > 0 ? appSettings.MediaSkipSeconds : 10;
         GameMetadataProvider       = AvailableMetadataProviders.Contains(appSettings.GameMetadataProvider) ? appSettings.GameMetadataProvider : "Games.Database";
         RomMetadataProvider        = AvailableMetadataProviders.Contains(appSettings.RomMetadataProvider) ? appSettings.RomMetadataProvider : "Games.Database";
@@ -1268,8 +1285,8 @@ public partial class SettingsViewModel : ViewModelBase
             GamesTheme                 = NormaliseGamesLibTheme(GamesTheme),
             KeyboardTheme              = NormaliseKeyboardTheme(KeyboardTheme),
             StoreTheme                 = NormaliseStoreTheme(StoreTheme),
-            MoviesTvTheme              = MoviesTvTheme == "Cinema" ? "Cinema" : "Default",
-            MusicTheme                 = MusicTheme == "Spotify" ? "Spotify" : "Default",
+            MoviesTvTheme              = NormaliseMoviesTvTheme(MoviesTvTheme),
+            MusicTheme                 = NormaliseMusicTheme(MusicTheme),
             MediaSkipSeconds           = MediaSkipSeconds > 0 ? MediaSkipSeconds : 10,
             GameMetadataProvider       = GameMetadataProvider,
             RomMetadataProvider        = RomMetadataProvider,
