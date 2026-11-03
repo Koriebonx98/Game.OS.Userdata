@@ -174,6 +174,12 @@ public partial class BrowserView : UserControl
                 Dispatcher.UIThread.Post(() => _vm.StatusText = $"🛡 Blocked {new Uri(url).Host}");
                 return;
             }
+            if (IsUnexpectedRedirect(tab, url))
+            {
+                e.Cancel = true;
+                Dispatcher.UIThread.Post(() => ShowRedirectPrompt(tab, url));
+                return;
+            }
             Dispatcher.UIThread.Post(() => { tab.IsLoading = true; _vm.UpdateTab(tab, url, null); });
         }
         catch { /* never throw into the web view */ }
@@ -221,6 +227,28 @@ public partial class BrowserView : UserControl
     }
 
     private readonly HashSet<string> _probeBypass = new();
+    private bool _devMode;
+    private readonly HashSet<string> _redirectAllowed = new(StringComparer.OrdinalIgnoreCase);
+
+    private bool IsUnexpectedRedirect(BrowserTabVm tab, string url)
+    {
+        if (!_devMode || !Uri.TryCreate(url, UriKind.Absolute, out var to) || (to.Scheme != "http" && to.Scheme != "https")) return false;
+        if (_redirectAllowed.Contains(to.Host)) return false;
+        return !Uri.TryCreate(tab.Url, UriKind.Absolute, out var from) || !string.Equals(from.Host, to.Host, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async void ShowRedirectPrompt(BrowserTabVm tab, string url)
+    {
+        if (!_webViews.TryGetValue(tab.Id, out var wv) || !Uri.TryCreate(url, UriKind.Absolute, out var u)) return;
+        string uj = JsonSerializer.Serialize(url), hj = JsonSerializer.Serialize(u.Host);
+        string js = "(function(){var u=" + uj + ",h=" + hj + ";if(!window.__gos)return;var p=document.createElement('div');" +
+            "p.style.cssText='position:fixed;z-index:2147483647;top:50%;left:50%;transform:translate(-50%,-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:16px;border:1px solid #f85149;border-radius:10px;max-width:460px;word-break:break-all';" +
+            "var m=document.createElement('div');m.style.marginBottom='12px';m.textContent='This page tried to redirect to '+u+'. Was this intended?';p.appendChild(m);" +
+            "function b(l,f){var x=document.createElement('button');x.textContent=l;x.style.cssText='margin:4px 6px 0 0;padding:6px 12px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;cursor:pointer';x.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();p.remove();f();});p.appendChild(x);}" +
+            "b('Yes, allow',function(){__gos.push({t:'redirYes',u:u,h:h});});b('No, block '+h,function(){__gos.push({t:'redirNo',h:h});});" +
+            "document.documentElement.appendChild(p);})();";
+        try { await wv.ExecuteScriptAsync(js); } catch { }
+    }
 
     private async Task ProbeAndRouteAsync(BrowserTabVm tab, string url)
     {
@@ -262,6 +290,8 @@ public partial class BrowserView : UserControl
                 Dispatcher.UIThread.Post(() => StartDownload(from, url));
             else if (_vm.Settings.InterceptDownloads && DownloadManagerService.LooksLikeDownloadEndpoint(url))
                 Dispatcher.UIThread.Post(() => _ = ProbeAndRouteAsync(from, url));
+            else if (IsUnexpectedRedirect(from, url))
+                Dispatcher.UIThread.Post(() => ShowRedirectPrompt(from, url));
             else if (!(_vm.Settings.BlockPopups && _vm.Settings.AdBlockEnabled && AdBlockService.ShouldBlock(url, null)))
                 Dispatcher.UIThread.Post(() => _vm.NewTab(url));
         }
@@ -469,6 +499,9 @@ public partial class BrowserView : UserControl
                 }
                 else if (t == "hide" && el.TryGetProperty("s", out var sel) && el.TryGetProperty("h", out var hh)) AddBlockRule($"{hh.GetString()}##{sel.GetString()}");
                 else if (t == "block" && u.Length == 0 && el.TryGetProperty("h", out var bh)) AddBlockRule(bh.GetString() ?? "");
+                else if (t == "dev") _devMode = el.TryGetProperty("on", out var on) && on.GetBoolean();
+                else if (t == "redirYes" && u.Length > 0 && el.TryGetProperty("h", out var yh)) { _redirectAllowed.Add(yh.GetString() ?? ""); _vm.Go(u); }
+                else if (t == "redirNo" && el.TryGetProperty("h", out var nh)) AddBlockRule(nh.GetString() ?? "");
                 else if (t == "probe" && u.Length > 0 && _vm.ActiveTab != null) _ = ProbeAndRouteAsync(_vm.ActiveTab, u);
             }
         }
@@ -524,12 +557,13 @@ document.addEventListener('click',function(ev){var a=ev.target&&ev.target.closes
 var pk=null;
 function selOf(e){if(e.id&&document.querySelectorAll('#'+CSS.escape(e.id)).length==1)return '#'+CSS.escape(e.id);var parts=[],n=e;while(n&&n.nodeType==1&&n!==document.body&&parts.length<5){var p=n.tagName.toLowerCase();if(n.id){parts.unshift('#'+CSS.escape(n.id));break;}var cl=(n.getAttribute('class')||'').split(/\s+/).filter(function(c){return c&&/^[A-Za-z_-][\w-]*$/.test(c);}).slice(0,2);if(cl.length)p+='.'+cl.join('.');else if(n.parentElement){var same=[].filter.call(n.parentElement.children,function(c){return c.tagName==n.tagName;});if(same.length>1)p+=':nth-of-type('+(same.indexOf(n)+1)+')';}parts.unshift(p);var sel=parts.join(' > ');try{if(document.querySelectorAll(sel).length==1)return sel;}catch(x){}n=n.parentElement;}return parts.join(' > ');}
 function extHost(e){var l=e.closest&&e.closest('a[href]');var u=(l&&l.href)||e.src||'';try{var h=new URL(u,location.href).hostname;return h&&h!==location.hostname?h:'';}catch(x){return '';}}
-function pickOff(){if(!pk)return;document.removeEventListener('mouseover',pk.over,true);document.removeEventListener('click',pk.click,true);pk.box.remove();if(pk.panel)pk.panel.remove();pk=null;}
+function pickOff(){if(!pk)return;document.removeEventListener('mouseover',pk.over,true);document.removeEventListener('contextmenu',pk.click,true);document.removeEventListener('keydown',pk.key,true);pk.box.remove();pk.bar.remove();if(pk.panel)pk.panel.remove();pk=null;q.push({t:'dev',on:false});}
 function pickOn(){if(pk){pickOff();return;}
  var box=document.createElement('div');box.style.cssText='position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #f85149;background:rgba(248,81,73,.18);display:none';document.documentElement.appendChild(box);
- var bar=document.createElement('div');bar.style.cssText='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:8px 14px;border:1px solid #f85149;border-radius:8px';bar.textContent='Element blocker: click an element to hide it (F12 to exit)';document.documentElement.appendChild(bar);
+ var bar=document.createElement('div');bar.style.cssText='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:8px 14px;border:1px solid #f85149;border-radius:8px';bar.textContent='Dev mode: right-click / press X on an element to hide it. Redirects will ask for confirmation. (F12 to exit)';document.documentElement.appendChild(bar);
  pk={box:box,bar:bar,target:null,panel:null};
  pk.over=function(ev){if(pk.panel||ev.target===cur||(pk.bar&&pk.bar.contains(ev.target)))return;var t=ev.target;pk.target=t;var r=t.getBoundingClientRect();box.style.display='block';box.style.left=r.left+'px';box.style.top=r.top+'px';box.style.width=r.width+'px';box.style.height=r.height+'px';};
+ pk.key=function(ev){if(ev.key==='x'||ev.key==='X'){if(isInput(ev.target)||pk.panel)return;ev.preventDefault();pk.click({target:pk.target,preventDefault:function(){},stopImmediatePropagation:function(){}});}};
  pk.click=function(ev){if(pk.panel&&pk.panel.contains(ev.target))return;ev.preventDefault();ev.stopImmediatePropagation();if(pk.panel)return;var t=pk.target||ev.target;if(!t||t===document.documentElement||t===document.body)return;
   var sel=selOf(t),host=extHost(t),panel=document.createElement('div');pk.panel=panel;
   panel.style.cssText='position:fixed;z-index:2147483647;top:50%;left:50%;transform:translate(-50%,-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:16px;border:1px solid #30363d;border-radius:10px;max-width:420px';
@@ -539,10 +573,11 @@ function pickOn(){if(pk){pickOff();return;}
   if(host)btn('Hide + block redirect domain',function(){q.push({t:'hide',s:sel,h:location.hostname});q.push({t:'block',h:host});try{t.style.setProperty('display','none','important');}catch(x){}pickOff();});
   btn('Cancel',function(){panel.remove();pk.panel=null;});
   document.documentElement.appendChild(panel);};
- document.addEventListener('mouseover',pk.over,true);document.addEventListener('click',pk.click,true);}
+ document.addEventListener('mouseover',pk.over,true);document.addEventListener('contextmenu',pk.click,true);document.addEventListener('keydown',pk.key,true);q.push({t:'dev',on:true});}
 document.addEventListener('keydown',function(ev){if(ev.key==='F12'){ev.preventDefault();pickOn();}},true);
 window.__gos={
  pick:pickOn,
+ push:function(o){q.push(o);},
  resolve:function(){var as=[].slice.call(document.querySelectorAll('a[href]'));
   function isBad(u){return window.__gosBad?window.__gosBad(u):false;}
   var PROV=['buzzheavier.com','gofile.io','pixeldrain.com','1fichier.com','mediafire.com','mega.nz','mega.io','datanodes.to','vikingfile.com','fuckingfast.co','krakenfiles.com','qiwi.gg','megaup.net','workupload.com','rootz.so','send.cm','uploadhaven.com','filepress.me','akirabox.com','bowfile.com','1cloudfile.com','ranoz.gg','gdrive.google.com','drive.google.com'];
@@ -565,7 +600,7 @@ window.__gos={
  click:function(){if(menu){var e0=under();var act=e0&&e0.__act;closeMenu();if(act)act();return '';}
   var e=under();if(!e)return '';fire(e,'mousedown',0);if(isInput(e)){var t=e.closest('input,textarea,select,[contenteditable]');t.focus();inp=t;fire(e,'mouseup',0);fire(e,'click',0);return 'input';}
   fire(e,'mouseup',0);if(e.click)e.click();else fire(e,'click',0);return '';},
- right:function(){closeMenu();var e=under();if(!e)return '';fire(e,'contextmenu',2);var a=e.closest('a[href]');
+ right:function(){closeMenu();var e=under();if(!e)return '';fire(e,'contextmenu',2);if(pk)return '';var a=e.closest('a[href]');
   menu=document.createElement('div');menu.style.cssText='position:fixed;z-index:2147483647;background:#161b22;border:1px solid #30363d;border-radius:8px;padding:6px 0;box-shadow:0 8px 24px rgba(0,0,0,.5);left:'+Math.min(x,innerWidth-200)+'px;top:'+Math.min(y,innerHeight-220)+'px';
   if(a){addItem(menu,'Open link in new tab',function(){q.push({t:'tab',u:a.href});});addItem(menu,'Download link',function(){q.push({t:'dl',u:a.href});});addItem(menu,'Copy link address',function(){var i=document.createElement('textarea');i.value=a.href;document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();});}
   if(e.tagName=='IMG'&&e.src)addItem(menu,'Open image in new tab',function(){q.push({t:'tab',u:e.src});});

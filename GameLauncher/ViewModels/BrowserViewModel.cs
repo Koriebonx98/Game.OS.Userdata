@@ -98,6 +98,7 @@ public partial class BrowserViewModel : ViewModelBase
         Settings = s;
         AdBlockOn = s.AdBlockEnabled;
         AdBlockService.Configure(s.CustomFilters, s.AllowList);
+        if (s.AdBlockEnabled) AdBlockService.UpdateIfStale(TimeSpan.FromDays(3));
     }
 
     public void EnsureTab()
