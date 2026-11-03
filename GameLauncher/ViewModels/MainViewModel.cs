@@ -464,6 +464,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         _client       = new GameOsClient();
         _sessionCache = new SessionCacheService();
         Services.DatabaseContributionQueue.Start();
+        Services.AutoUpdateService.UpdateFound += (link, _) =>
+            Services.NotificationService.ShowDownloadNotification("Update found", $"{link.Game}: {link.Name} – download queued");
+        Services.AutoUpdateService.UpdateAvailable += (link, _) =>
+            Services.NotificationService.ShowDownloadNotification("Update available", $"{link.Game}: {link.Name} – open the saved link to download it");
+        Services.AutoUpdateService.ManualUpdateNeeded += (link, _) =>
+            Services.NotificationService.ShowDownloadNotification("Update available", $"{link.Game}: {link.Name} – open it in the browser and use “Auto-find download link”");
+        Services.AutoUpdateService.Start();
 
         LoginVm        = new LoginViewModel(_client, _sessionCache, _offlineCache);
         DashboardVm    = new DashboardViewModel();
@@ -550,6 +557,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             LaunchFromCard(card);
         };
         QuickMenuVm.SettingsVm = SettingsVm;
+        SettingsVm.OpenInBrowserAction = url => OpenBrowserForGame(null, null, url);
+        SettingsVm.LoadStoreAccounts();
+        Services.StoreAccountsService.Captured += () => Avalonia.Threading.Dispatcher.UIThread.Post(SettingsVm.LoadStoreAccounts);
         QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle, null, QuickMenuVm.IsPlayingGame);
         QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url, QuickMenuVm.IsPlayingGame);
         DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
@@ -1466,6 +1476,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // so playtime records are stored per-account, not per-device.
         PlaytimeService.SetCurrentUser(profile.Username);
         MediaStatsService.SetCurrentUser(profile.Username);
+        Services.StoreAccountsService.SetCurrentUser(profile.Username);
+        SettingsVm.LoadStoreAccounts();
 
         // Attach the logged-in username to the detail view-model so review submissions
         // are correctly attributed to the right user.
@@ -3784,6 +3796,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         PlaytimeService.ClearCurrentUser();
         MediaVm.EndAllSessions();
         MediaStatsService.SetCurrentUser(null);
+        Services.StoreAccountsService.SetCurrentUser(null);
+        SettingsVm.LoadStoreAccounts();
 
         // Clear the saved token so the next launch shows the login form
         // (equivalent to the web calling localStorage.removeItem('gameOSUser'))

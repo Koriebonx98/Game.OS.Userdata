@@ -969,6 +969,8 @@ namespace GameLauncher.Models
     {
         /// <summary>Library root (contains Roms/ and Repacks/). Empty = auto-detect.</summary>
         [JsonPropertyName("rootFolder")]        public string RootFolder { get; set; } = "";
+        /// <summary>true = download new versions of auto-update links automatically; false = only notify.</summary>
+        [JsonPropertyName("autoUpdateDownload")] public bool AutoUpdateDownload { get; set; } = false;
         [JsonPropertyName("autoExtract")]       public bool   AutoExtract { get; set; } = true;
         [JsonPropertyName("deleteArchiveAfterExtract")] public bool DeleteArchiveAfterExtract { get; set; } = false;
         [JsonPropertyName("maxConcurrent")]     public int    MaxConcurrent { get; set; } = 3;

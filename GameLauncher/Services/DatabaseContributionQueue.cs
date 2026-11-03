@@ -26,7 +26,7 @@ namespace GameLauncher.Services
 
         public class Item
         {
-            /// <summary>"file" (create-only JSON file) or "steamgame".</summary>
+            /// <summary>"file" (create-only JSON file), "steamgame", "storegame" or "rom".</summary>
             public string Kind { get; set; } = "file";
             public string Key { get; set; } = "";
             public string Path { get; set; } = "";
@@ -37,6 +37,9 @@ namespace GameLauncher.Services
             /// <summary>Platform name for "rom" items (e.g. "PS2").</summary>
             public string Platform { get; set; } = "";
             public string? TitleId { get; set; }
+            /// <summary>Store name ("Epic Games", "GOG" …) and its game id for "storegame" items.</summary>
+            public string? Store { get; set; }
+            public string? StoreId { get; set; }
             /// <summary>Online proof for "rom" items: description and source page URL.</summary>
             public string? Description { get; set; }
             public string? SourceUrl { get; set; }
@@ -131,6 +134,46 @@ namespace GameLauncher.Services
             }
         }
 
+        private static readonly System.Text.RegularExpressions.Regex EditionNoise = new(
+            @"\b(game of the year|goty|definitive|complete|deluxe|ultimate|premium|gold|standard|digital|collector'?s?|anniversary|remastered|remaster|enhanced|director'?s cut|legendary|special|launch|day one|edition|bundle)\b|[™®©]",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>Lower-case alphanumeric title with edition words ("Deluxe Edition", "GOTY" …) removed, so editions of one game are not queued twice.</summary>
+        public static string NormalizeTitle(string? title)
+        {
+            string t = EditionNoise.Replace(title ?? "", " ");
+            return new string(t.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        }
+
+        /// <summary>
+        /// Queues a PC game owned on another store (Epic, GOG, Xbox …). The workflow that processes the queue
+        /// adds missing games and merges the store URL into games that already exist; locally the same game +
+        /// store is never queued twice (editions are ignored).
+        /// </summary>
+        public static bool EnqueueStoreGame(string store, string? storeId, string title, string? storeUrl, Dictionary<string, object?>? meta = null)
+        {
+            string norm = NormalizeTitle(title);
+            if (string.IsNullOrWhiteSpace(store) || norm.Length == 0) return false;
+            string key = "storegame:" + store.ToLowerInvariant() + ":" + norm;
+            lock (_lock)
+            {
+                var items = Items();
+                if (items.Count >= MaxQueueSize) return false;
+                var existing = items.FirstOrDefault(i => i.Key == key);
+                if (existing != null)
+                {
+                    bool changed = false;
+                    if (string.IsNullOrEmpty(existing.SourceUrl) && !string.IsNullOrEmpty(storeUrl)) { existing.SourceUrl = storeUrl; changed = true; }
+                    if (existing.Meta == null && meta != null) { existing.Meta = meta; changed = true; }
+                    if (changed) Save();
+                    return changed;
+                }
+                items.Add(new Item { Kind = "storegame", Key = key, Platform = "PC", Name = title.Trim(), Store = store, StoreId = storeId, SourceUrl = storeUrl, Meta = meta });
+                Save();
+                return true;
+            }
+        }
+
         public static int Count { get { lock (_lock) return Items().Count; } }
 
         /// <summary>Starts the periodic background flush (idempotent).</summary>
@@ -193,6 +236,19 @@ namespace GameLauncher.Services
                     done.AddRange(fresh.Where(g => handled.Contains(g.Key)));
                 }
                 catch (Exception ex) { DevLogService.Log($"[DbQueue] Steam games batch failed: {ex.Message}"); }
+            }
+
+            var storeGames = snapshot.Where(i => i.Kind == "storegame").ToList();
+            if (storeGames.Count > 0)
+            {
+                try
+                {
+                    var handled = await svc.SubmitGamesToQueueAsync(storeGames.Select(g => new GitHubDataService.QueuedGame(
+                        g.Key, "PC", g.Name, null, g.Description, g.SourceUrl, g.Store, g.StoreId, 0, g.Meta)).ToList(), ct)
+                        .ConfigureAwait(false);
+                    done.AddRange(storeGames.Where(g => handled.Contains(g.Key)));
+                }
+                catch (Exception ex) { DevLogService.Log($"[DbQueue] Store games batch failed: {ex.Message}"); }
             }
 
             var roms = snapshot.Where(i => i.Kind == "rom").ToList();

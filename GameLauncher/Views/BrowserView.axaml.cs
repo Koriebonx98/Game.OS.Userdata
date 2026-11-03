@@ -27,6 +27,8 @@ public partial class BrowserView : UserControl
     private double _cx = 200, _cy = 200, _sentX = -1, _sentY = -1;
     private double _menuAccum, _kbAccumX, _kbAccumY;
     private int _tick;
+    private DateTime _resolveUntil;
+    private string _lastGo = "";
     private bool _scriptBusy;
     private double _pendingScroll;
     private string _pageScript = "";
@@ -54,6 +56,9 @@ public partial class BrowserView : UserControl
         _vm.GoForwardRequested += () => Run("history.forward()");
         _vm.ReloadRequested += () => Run("location.reload()");
         _vm.FocusAddressRequested += FocusAddress;
+        _vm.AutoResolveRequested += () => { _resolveUntil = DateTime.UtcNow.AddMinutes(3); _lastGo = ""; _vm.StatusText = "Looking for the real download link…"; };
+        _vm.CaptureLoginRequested += store => _ = CaptureLoginAsync(store);
+        _vm.ElementBlockerRequested += () => Run("window.__gos&&__gos.pick()");
         _vm.PropertyChanged += OnVmPropertyChanged;
         _vm.Keyboard.PropertyChanged += (_, e) => { if (e.PropertyName == nameof(OnScreenKeyboardViewModel.IsOpen)) UpdateVisibility(); };
         foreach (var t in _vm.Tabs) OnTabAdded(t);
@@ -405,7 +410,8 @@ public partial class BrowserView : UserControl
         else if (_tick % 30 == 0)
         {
             // Keeps the cursor + ad blocker alive across client-side navigations and collects queued context-menu actions.
-            script = _pageScript + ";window.__gos?__gos.drain():'[]'";
+            bool resolving = DateTime.UtcNow < _resolveUntil;
+            script = _pageScript + (resolving ? ";window.__gos&&__gos.resolve();" : ";") + "window.__gos?__gos.drain():'[]'";
         }
         if (script == null) return;
 
@@ -429,11 +435,42 @@ public partial class BrowserView : UserControl
                 string t = el.GetProperty("t").GetString() ?? "";
                 string u = el.TryGetProperty("u", out var uu) ? uu.GetString() ?? "" : "";
                 if (t == "tab" && u.Length > 0) _vm.NewTab(u);
-                else if (t == "dl" && u.Length > 0 && _vm.ActiveTab != null) StartDownload(_vm.ActiveTab, u);
+                else if (t == "go" && u.Length > 0 && u != _lastGo) { _lastGo = u; _vm.Go(u); }
+                else if (t == "dl" && u.Length > 0 && _vm.ActiveTab != null)
+                {
+                    if (DateTime.UtcNow < _resolveUntil) { _resolveUntil = default; _vm.StatusText = "Download link found"; }
+                    StartDownload(_vm.ActiveTab, u);
+                }
+                else if (t == "hide" && el.TryGetProperty("s", out var sel) && el.TryGetProperty("h", out var hh)) AddBlockRule($"{hh.GetString()}##{sel.GetString()}");
+                else if (t == "block" && u.Length == 0 && el.TryGetProperty("h", out var bh)) AddBlockRule(bh.GetString() ?? "");
                 else if (t == "probe" && u.Length > 0 && _vm.ActiveTab != null) _ = ProbeAndRouteAsync(_vm.ActiveTab, u);
             }
         }
         catch { }
+    }
+
+    private async Task CaptureLoginAsync(StoreInfo store)
+    {
+        var w = Active;
+        if (w == null || _vm == null) return;
+        string cookie = "";
+        try { cookie = Unquote(await w.ExecuteScriptAsync("document.cookie")) ?? ""; } catch { }
+        if (string.IsNullOrWhiteSpace(cookie)) { _vm.StatusText = $"No {store.Name} login found on this page — sign in first"; return; }
+        StoreAccountsService.CaptureToken(store.Name, cookie);
+        _vm.StatusText = $"{store.Name} login saved for this account";
+    }
+
+    /// <summary>Persists a rule created with the F12 element blocker and applies it right away.</summary>
+    private void AddBlockRule(string rule)
+    {
+        if (_vm == null || string.IsNullOrWhiteSpace(rule)) return;
+        var settings = AppSettingsService.Load();
+        settings.Browser.CustomFilters = AdBlockService.AppendRule(settings.Browser.CustomFilters, rule);
+        AppSettingsService.Save(settings);
+        _vm.Settings.CustomFilters = settings.Browser.CustomFilters;
+        AdBlockService.Configure(_vm.Settings.CustomFilters, _vm.Settings.AllowList);
+        UpdatePageScript();
+        _vm.StatusText = $"Blocked: {rule}";
     }
 
     // Cursor + virtual-mouse runtime injected into every page.
@@ -451,7 +488,45 @@ function addItem(m,label,fn){var d=document.createElement('div');d.textContent=l
 document.addEventListener('click',function(ev){var a=ev.target&&ev.target.closest?ev.target.closest('a[href]'):null;if(!a||!/^https?:/i.test(a.href))return;
  if(a.hasAttribute('download')){ev.preventDefault();ev.stopImmediatePropagation();q.push({t:'dl',u:a.href});}
  else if(/\/download|\/dl(\/|$)|[?&]download=/i.test(a.href)&&new URL(a.href).origin!==location.origin){ev.preventDefault();ev.stopImmediatePropagation();q.push({t:'probe',u:a.href});}},true);
+var pk=null;
+function selOf(e){if(e.id&&document.querySelectorAll('#'+CSS.escape(e.id)).length==1)return '#'+CSS.escape(e.id);var parts=[],n=e;while(n&&n.nodeType==1&&n!==document.body&&parts.length<5){var p=n.tagName.toLowerCase();if(n.id){parts.unshift('#'+CSS.escape(n.id));break;}var cl=(n.getAttribute('class')||'').split(/\s+/).filter(function(c){return c&&/^[A-Za-z_-][\w-]*$/.test(c);}).slice(0,2);if(cl.length)p+='.'+cl.join('.');else if(n.parentElement){var same=[].filter.call(n.parentElement.children,function(c){return c.tagName==n.tagName;});if(same.length>1)p+=':nth-of-type('+(same.indexOf(n)+1)+')';}parts.unshift(p);var sel=parts.join(' > ');try{if(document.querySelectorAll(sel).length==1)return sel;}catch(x){}n=n.parentElement;}return parts.join(' > ');}
+function extHost(e){var l=e.closest&&e.closest('a[href]');var u=(l&&l.href)||e.src||'';try{var h=new URL(u,location.href).hostname;return h&&h!==location.hostname?h:'';}catch(x){return '';}}
+function pickOff(){if(!pk)return;document.removeEventListener('mouseover',pk.over,true);document.removeEventListener('click',pk.click,true);pk.box.remove();if(pk.panel)pk.panel.remove();pk=null;}
+function pickOn(){if(pk){pickOff();return;}
+ var box=document.createElement('div');box.style.cssText='position:fixed;z-index:2147483646;pointer-events:none;border:2px solid #f85149;background:rgba(248,81,73,.18);display:none';document.documentElement.appendChild(box);
+ var bar=document.createElement('div');bar.style.cssText='position:fixed;z-index:2147483647;top:8px;left:50%;transform:translateX(-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:8px 14px;border:1px solid #f85149;border-radius:8px';bar.textContent='Element blocker: click an element to hide it (F12 to exit)';document.documentElement.appendChild(bar);
+ pk={box:box,bar:bar,target:null,panel:null};
+ pk.over=function(ev){if(pk.panel||ev.target===cur||(pk.bar&&pk.bar.contains(ev.target)))return;var t=ev.target;pk.target=t;var r=t.getBoundingClientRect();box.style.display='block';box.style.left=r.left+'px';box.style.top=r.top+'px';box.style.width=r.width+'px';box.style.height=r.height+'px';};
+ pk.click=function(ev){if(pk.panel&&pk.panel.contains(ev.target))return;ev.preventDefault();ev.stopImmediatePropagation();if(pk.panel)return;var t=pk.target||ev.target;if(!t||t===document.documentElement||t===document.body)return;
+  var sel=selOf(t),host=extHost(t),panel=document.createElement('div');pk.panel=panel;
+  panel.style.cssText='position:fixed;z-index:2147483647;top:50%;left:50%;transform:translate(-50%,-50%);background:#161b22;color:#e6edf3;font:13px sans-serif;padding:16px;border:1px solid #30363d;border-radius:10px;max-width:420px';
+  var msg=document.createElement('div');msg.style.marginBottom='12px';msg.textContent='Hide this element on '+location.hostname+'?  '+sel+(host?'   (links to '+host+')':'');panel.appendChild(msg);
+  function btn(label,fn){var b=document.createElement('button');b.textContent=label;b.style.cssText='margin:4px 6px 0 0;padding:6px 12px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;cursor:pointer';b.addEventListener('click',function(e){e.preventDefault();e.stopPropagation();fn();});panel.appendChild(b);}
+  btn('Hide element',function(){q.push({t:'hide',s:sel,h:location.hostname});try{t.style.setProperty('display','none','important');}catch(x){}pickOff();});
+  if(host)btn('Hide + block redirect domain',function(){q.push({t:'hide',s:sel,h:location.hostname});q.push({t:'block',h:host});try{t.style.setProperty('display','none','important');}catch(x){}pickOff();});
+  btn('Cancel',function(){panel.remove();pk.panel=null;});
+  document.documentElement.appendChild(panel);};
+ document.addEventListener('mouseover',pk.over,true);document.addEventListener('click',pk.click,true);}
+document.addEventListener('keydown',function(ev){if(ev.key==='F12'){ev.preventDefault();pickOn();}},true);
 window.__gos={
+ pick:pickOn,
+ resolve:function(){var as=[].slice.call(document.querySelectorAll('a[href]'));
+  function isBad(u){return window.__gosBad?window.__gosBad(u):false;}
+  var PROV=['buzzheavier.com','gofile.io','pixeldrain.com','1fichier.com','mediafire.com','mega.nz','mega.io','datanodes.to','vikingfile.com','fuckingfast.co','krakenfiles.com','qiwi.gg','megaup.net','workupload.com','rootz.so','send.cm','uploadhaven.com','filepress.me','akirabox.com','bowfile.com','1cloudfile.com','ranoz.gg','gdrive.google.com','drive.google.com'];
+  function isProv(h){h=(h||'').toLowerCase();return PROV.some(function(p){return h===p||h.endsWith('.'+p);});}
+  function vis(e){var r=e.getBoundingClientRect();return r.width>4&&r.height>4&&getComputedStyle(e).visibility!='hidden';}
+  for(var i=0;i<as.length;i++)if(/^magnet:/i.test(as[i].href)){q.push({t:'dl',u:as[i].href});return 'magnet';}
+  for(i=0;i<as.length;i++){var u;try{u=new URL(as[i].href);}catch(x){continue;}if(!/^https?:$/.test(u.protocol))continue;
+   if(/\.(zip|rar|7z|exe|iso|torrent|msi)$/i.test(u.pathname)&&!isBad(u.href)&&(isProv(u.hostname)||u.hostname===location.hostname)){q.push({t:'dl',u:u.href});return 'file';}}
+  if(!isProv(location.hostname)){for(i=0;i<as.length;i++){try{u=new URL(as[i].href);}catch(x){continue;}if(/^https?:$/.test(u.protocol)&&isProv(u.hostname)&&!isBad(u.href)){q.push({t:'go',u:u.href});return 'go';}}return 'none';}
+  window.__gosClicked=window.__gosClicked||new WeakSet();
+  var bs=[].slice.call(document.querySelectorAll('a,button,[role=button],input[type=submit]'));
+  for(i=0;i<bs.length;i++){var b=bs[i],t=(b.innerText||b.value||'').trim();
+   if(t.length<40&&/^(free |slow |fast |direct )?(download|get link|continue|start download|generate link|create download link)\b/i.test(t)&&vis(b)&&!window.__gosClicked.has(b)){
+    if(b.tagName=='A'&&/^https?:/i.test(b.href)){var hh=new URL(b.href).hostname;if(hh!==location.hostname&&!isProv(hh))continue;}
+    window.__gosClicked.add(b);b.click();return 'click';}}
+  return 'wait';},
+
  move:function(nx,ny){x=nx;y=ny;cur.style.display='block';cur.style.transform='translate('+x+'px,'+y+'px)';var e=under();if(e&&e!==last){if(last)fire(last,'mouseout',0);fire(e,'mouseover',0);last=e;}if(e)fire(e,'mousemove',0);
   if(menu){for(var i=0;i<menu.children.length;i++){var c=menu.children[i],r=c.getBoundingClientRect();c.style.background=(x>=r.left&&x<=r.right&&y>=r.top&&y<=r.bottom)?'#1f6feb':'transparent';}}},
  click:function(){if(menu){var e0=under();var act=e0&&e0.__act;closeMenu();if(act)act();return '';}

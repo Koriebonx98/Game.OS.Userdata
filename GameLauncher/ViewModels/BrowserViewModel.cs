@@ -8,7 +8,7 @@ using GameLauncher.Services;
 
 namespace GameLauncher.ViewModels;
 
-public enum BrowserMenuKind { ReturnToGame, Resume, NewTab, CloseTab, Downloads, AddFavourite, Favourite, Exit, SaveLink, SearchWeb, GameLink }
+public enum BrowserMenuKind { ReturnToGame, Resume, NewTab, CloseTab, Downloads, AddFavourite, Favourite, Exit, SaveLink, SearchWeb, GameLink, ElementBlocker, CaptureLogin, AutoResolve }
 
 public sealed class BrowserMenuEntry
 {
@@ -17,6 +17,8 @@ public sealed class BrowserMenuEntry
     public BrowserFavourite? Favourite { get; init; }
     public GameLink? Link { get; init; }
     public string Kind2 { get; init; } = "";
+    public bool AutoUpdate { get; init; }
+    public StoreInfo? Store { get; init; }
 }
 
 public partial class BrowserTabVm : ObservableObject
@@ -86,6 +88,9 @@ public partial class BrowserViewModel : ViewModelBase
     public event Action? ExitRequested;
     /// <summary>The user chose Downloads in the browser menu.</summary>
     public event Action? OpenDownloadsRequested;
+    public event Action? ElementBlockerRequested;
+    public event Action<StoreInfo>? CaptureLoginRequested;
+    public event Action? AutoResolveRequested;
     public event Action<string, string, string>? DownloadRequested;
 
     public void ApplySettings(BrowserSettings s)
@@ -249,6 +254,10 @@ public partial class BrowserViewModel : ViewModelBase
         MenuEntries.Add(new() { Label = "➕  New tab", Kind = BrowserMenuKind.NewTab });
         MenuEntries.Add(new() { Label = "✕  Close this tab", Kind = BrowserMenuKind.CloseTab });
         MenuEntries.Add(new() { Label = "⬇  Downloads", Kind = BrowserMenuKind.Downloads });
+        MenuEntries.Add(new() { Label = "🎯  Element blocker (F12) – hide ads / block redirects", Kind = BrowserMenuKind.ElementBlocker });
+        MenuEntries.Add(new() { Label = "⚡  Auto-find download link on this page (skips ads / fake links)", Kind = BrowserMenuKind.AutoResolve });
+        if (ActiveTab != null && Uri.TryCreate(ActiveTab.Url, UriKind.Absolute, out var pageUri) && StoreAccountsService.FindByHost(pageUri.Host) is { } store)
+            MenuEntries.Add(new() { Label = $"🔐  Save my {store.Name} login for this account", Kind = BrowserMenuKind.CaptureLogin, Store = store });
         bool isFav = ActiveTab != null && Settings.Favourites.Any(f => string.Equals(f.Url, ActiveTab.Url, StringComparison.OrdinalIgnoreCase));
         MenuEntries.Add(new() { Label = isFav ? "★  Remove this page from favourites" : "☆  Add this page to favourites", Kind = BrowserMenuKind.AddFavourite });
         foreach (var f in Settings.Favourites)
@@ -259,6 +268,7 @@ public partial class BrowserViewModel : ViewModelBase
             if (hasPage)
             {
                 MenuEntries.Add(new() { Label = $"⬇  Save page as download link for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindDownload });
+                MenuEntries.Add(new() { Label = $"🔄  Save page as auto-updating download for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindDownload, AutoUpdate = true });
                 MenuEntries.Add(new() { Label = $"📖  Save page as walkthrough for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindWalkthrough });
                 MenuEntries.Add(new() { Label = $"📘  Save page as guide for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindGuide });
                 MenuEntries.Add(new() { Label = $"🧩  Save page as mod for {ContextGame}", Kind = BrowserMenuKind.SaveLink, Kind2 = GameLink.KindMod });
@@ -294,8 +304,11 @@ public partial class BrowserViewModel : ViewModelBase
             case BrowserMenuKind.AddFavourite: ToggleFavourite(); break;
             case BrowserMenuKind.Favourite when entry.Favourite != null:
                 IsMenuOpen = false; Go(entry.Favourite.Url); break;
+            case BrowserMenuKind.ElementBlocker: IsMenuOpen = false; ElementBlockerRequested?.Invoke(); break;
+            case BrowserMenuKind.AutoResolve: IsMenuOpen = false; AutoResolveRequested?.Invoke(); break;
+            case BrowserMenuKind.CaptureLogin when entry.Store != null: IsMenuOpen = false; CaptureLoginRequested?.Invoke(entry.Store); break;
             case BrowserMenuKind.Exit: ExitBrowser(); break;
-            case BrowserMenuKind.SaveLink: IsMenuOpen = false; BeginSaveLink(entry.Kind2); break;
+            case BrowserMenuKind.SaveLink: IsMenuOpen = false; BeginSaveLink(entry.Kind2, entry.AutoUpdate); break;
             case BrowserMenuKind.SearchWeb:
             {
                 IsMenuOpen = false;
@@ -309,7 +322,7 @@ public partial class BrowserViewModel : ViewModelBase
     }
 
     /// <summary>Lets the user name the current page (on-screen keyboard) and stores it in Urls.json for the current game.</summary>
-    private void BeginSaveLink(string kind)
+    private void BeginSaveLink(string kind, bool autoUpdate = false)
     {
         if (ActiveTab == null || !HasContext) return;
         string url = ActiveTab.Url;
@@ -317,8 +330,8 @@ public partial class BrowserViewModel : ViewModelBase
         string initial = string.IsNullOrWhiteSpace(ActiveTab.Title) ? "" : ActiveTab.Title.Trim();
         void Save(string name)
         {
-            var link = GameLinksService.Add(platform, game, name, url, kind);
-            StatusText = $"Saved “{link.Name}” ({kind}) for {game}";
+            var link = GameLinksService.Add(platform, game, name, url, kind, "", autoUpdate);
+            StatusText = $"Saved “{link.Name}” ({kind}{(autoUpdate ? ", auto-update" : "")}) for {game}";
         }
         Keyboard.Open(initial, $"Name this {kind.ToLowerInvariant()} link — Go / Y saves", _ => { }, Save);
     }

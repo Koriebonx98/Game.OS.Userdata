@@ -2574,6 +2574,29 @@ namespace GameLauncher.Services
             return submitted;
         }
 
+        public enum DbPresence { Unknown, Missing, MissingStore, Complete }
+
+        /// <summary>
+        /// Checks the cached PC games database (editions ignored): <see cref="DbPresence.Complete"/> when the game already
+        /// lists this store's URL, <see cref="DbPresence.MissingStore"/> when it exists without it, <see cref="DbPresence.Missing"/>
+        /// when absent and <see cref="DbPresence.Unknown"/> when the database has not been loaded yet.
+        /// </summary>
+        public static DbPresence CheckPcGame(string title, string storeUrlHost)
+        {
+            string norm = DatabaseContributionQueue.NormalizeTitle(title);
+            lock (_dbMemoryCache)
+            {
+                if (!_dbMemoryCache.TryGetValue("PC", out var cached) || cached.Count == 0) return DbPresence.Unknown;
+                var hit = cached.FirstOrDefault(g =>
+                    DatabaseContributionQueue.NormalizeTitle(g.Title) == norm ||
+                    (g.AlternateNames?.Any(a => DatabaseContributionQueue.NormalizeTitle(a) == norm) ?? false));
+                if (hit == null) return DbPresence.Missing;
+                bool hasStore = !string.IsNullOrEmpty(storeUrlHost) &&
+                    (hit.StorePageUrl ?? "").Contains(storeUrlHost, StringComparison.OrdinalIgnoreCase);
+                return hasStore ? DbPresence.Complete : DbPresence.MissingStore;
+            }
+        }
+
         /// <summary>Drops Steam games already present in the cached PC database.</summary>
         public IReadOnlyList<SteamOwnedGame> FilterKnownSteamGames(IReadOnlyList<SteamOwnedGame> games)
         {

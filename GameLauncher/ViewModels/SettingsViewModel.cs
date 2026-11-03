@@ -136,6 +136,48 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _theGamesDbApiKey = "";
     [ObservableProperty] private string _igdbClientId = "";
     [ObservableProperty] private string _igdbClientSecret = "";
+    /// <summary>Per-account credentials for the other stores (Epic, GOG, Xbox …); Steam has its own card.</summary>
+    public ObservableCollection<StoreAccountRowVm> StoreAccounts { get; } = new();
+    /// <summary>Opens a URL in the built-in browser (wired by MainViewModel).</summary>
+    public Action<string>? OpenInBrowserAction { get; set; }
+
+    /// <summary>Reloads the Steam fields and store rows for the signed-in account (call on login / logout).</summary>
+    public void LoadStoreAccounts()
+    {
+        var settings = AppSettingsService.Load();
+        SteamApiKey = settings.SteamApiKey;
+        SteamUserId = settings.SteamUserId;
+        StoreAccounts.Clear();
+        foreach (var info in StoreAccountsService.Stores.Where(i => i.Name != "Steam"))
+        {
+            var a = StoreAccountsService.Get(info.Name);
+            StoreAccounts.Add(new StoreAccountRowVm(info) { ApiKey = a.ApiKey, UserId = a.UserId, Token = a.Token, OpenLogin = url => OpenInBrowserAction?.Invoke(url) });
+        }
+    }
+
+    [ObservableProperty] private bool _isSyncingStores;
+    [ObservableProperty] private string _storeSyncStatus = "";
+
+    /// <summary>Reads the owned libraries of all configured stores and queues them for the Game.OS games database.</summary>
+    [RelayCommand]
+    private async Task SyncStoreLibraries()
+    {
+        if (IsSyncingStores) return;
+        Save();
+        IsSyncingStores = true;
+        StoreSyncStatus = "Syncing store libraries…";
+        try { StoreSyncStatus = string.Join("\n", await StoreLibraryFetcher.SyncAllAsync()); }
+        catch (Exception ex) { StoreSyncStatus = $"❌ Sync failed: {ex.Message}"; }
+        finally { IsSyncingStores = false; }
+    }
+
+    private void SaveStoreAccounts()
+    {
+        if (StoreAccountsService.CurrentUser == null) return;
+        foreach (var row in StoreAccounts)
+            StoreAccountsService.Set(row.Info.Name, row.ApiKey, row.UserId, row.Token);
+    }
+
     /// <summary>Steam 64-bit User ID (SteamID64) for fetching the owned games library.</summary>
     [ObservableProperty] private string _steamUserId = "";
     /// <summary>True while a Steam library import is in progress.</summary>
@@ -1162,6 +1204,7 @@ public partial class SettingsViewModel : ViewModelBase
     [RelayCommand]
     private void Save()
     {
+        SaveStoreAccounts();
         foreach (var group in EmulatorGroups)
         {
             var list = group.Emulators.Select(row => new EmulatorSettings
@@ -1416,6 +1459,24 @@ public partial class SettingsViewModel : ViewModelBase
 /// View-model for a platform group in the emulator settings grid.
 /// Contains 1-N <see cref="EmulatorRowVm"/> entries that can be added or removed.
 /// </summary>
+public partial class StoreAccountRowVm : ViewModelBase
+{
+    public StoreInfo Info { get; }
+    public Action<string>? OpenLogin { get; set; }
+    [ObservableProperty] private string _apiKey = "";
+    [ObservableProperty] private string _userId = "";
+    [ObservableProperty] private string _token = "";
+
+    public StoreAccountRowVm(StoreInfo info) { Info = info; }
+
+    public string Title => $"{Info.Icon}  {Info.Name}";
+    public bool HasApiKey => Info.ApiKeyLabel.Length > 0;
+    public bool HasUserId => Info.UserIdLabel.Length > 0;
+    public bool HasToken => Info.TokenLabel.Length > 0;
+
+    [RelayCommand] private void LogIn() => OpenLogin?.Invoke(Info.LoginUrl);
+}
+
 public partial class EmulatorPlatformGroupVm : ViewModelBase
 {
     private readonly SettingsViewModel _parent;
