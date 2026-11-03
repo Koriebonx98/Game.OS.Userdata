@@ -568,7 +568,13 @@ namespace GameLauncher
             await _github!.SendMessageAsync(_username, toUsername, text, ct);
         }
 
+        /// <summary>Visible conversation: hidden system messages (mod shares) are filtered out.</summary>
         public async Task<List<Message>> GetMessagesAsync(
+            string withUsername, CancellationToken ct = default)
+            => new List<Message>(System.Linq.Enumerable.Where(await GetRawMessagesAsync(withUsername, ct), m => !Services.ModShareService.IsShareMessage(m.Text)));
+
+        /// <summary>All messages including hidden system ones.</summary>
+        public async Task<List<Message>> GetRawMessagesAsync(
             string withUsername, CancellationToken ct = default)
         {
             if (_username == null) return new List<Message>();

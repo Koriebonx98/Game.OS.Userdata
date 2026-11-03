@@ -2732,6 +2732,50 @@ class Program
             Check(DownloadPathResolver.Resolve(root, "PS2", "DLC").EndsWith(Path.Combine("Sony - PlayStation 2", "DLC")), "DLC category resolves to Roms/<Platform>/DLC");
             Check(DownloadPathResolver.Resolve(root, "PS2", "Update").EndsWith(Path.Combine("Sony - PlayStation 2", "Updates")), "Update category resolves to Updates");
             Check(DownloadPathResolver.Resolve(root, "Switch", DownloadPathResolver.CategoryMod) == Path.Combine(root, "Roms", "Nintendo - Switch", "Mods"), "Switch mod downloads resolve to Roms/Nintendo - Switch/Mods");
+            Check(DownloadPathResolver.Resolve(root, "Switch", DownloadPathResolver.CategoryMod, "Mario Kart 8 Deluxe", "Drivers", "Toad")
+                == Path.Combine(root, "Roms", "Nintendo - Switch", "Mods", "Mario Kart 8 Deluxe", "Drivers", "Toad"),
+                "Switch repo mods resolve under game/category/subject folders");
+
+            string switchMods = DownloadPathResolver.Resolve(root, "Switch", DownloadPathResolver.CategoryMod);
+            string toadMods = Path.Combine(switchMods, "Mario Kart 8 Deluxe", "Drivers", "Toad");
+            Directory.CreateDirectory(toadMods);
+            File.WriteAllText(Path.Combine(toadMods, "toad_pit_crew_dx_v1_1.zip"), "archive");
+            string enabledMod = Path.Combine(toadMods, "enabled_driver");
+            Directory.CreateDirectory(Path.Combine(enabledMod, "romfs"));
+            File.WriteAllText(Path.Combine(enabledMod, "romfs", "driver.bin"), "mod");
+            var switchEntries = EmulatorModsService.ScanSwitchContent(switchMods, "Mario Kart™ 8 Deluxe");
+            Check(switchEntries.Count == 2 && switchEntries.Any(m => m.Name == "toad_pit_crew_dx_v1_1.zip" && !m.Enabled)
+                && switchEntries.Any(m => m.Name == "enabled_driver" && m.Enabled)
+                && switchEntries.All(m => m.CanToggle && !m.Path.EndsWith("romfs")),
+                "Switch mod browser finds individual archives and extracted mods");
+            File.WriteAllText(Path.Combine(toadMods, "Toad.png"), "png");
+            Check(EmulatorModsService.ScanSwitchContent(switchMods, "Mario Kart 8 Deluxe").All(m => m.IconPath != null),
+                "Switch mods pick up the Toad.png icon saved beside them");
+
+            string ryuDir = Path.Combine(root, "ryujinx");
+            string modsJson = Path.Combine(ryuDir, "games", "0100152000022000", "mods.json");
+            string zipMod = Path.Combine(toadMods, "toad_pit_crew_dx_v1_1.zip");
+            File.Delete(zipMod);
+            using (var z = System.IO.Compression.ZipFile.Open(zipMod, System.IO.Compression.ZipArchiveMode.Create))
+                System.IO.Compression.ZipFileExtensions.CreateEntryFromFile(z, Path.Combine(enabledMod, "romfs", "driver.bin"), "Toad/romfs/driver.bin");
+            RyujinxModService.SetModEnabled(modsJson, zipMod, true);
+            Check(RyujinxModService.IsModEnabled(modsJson, zipMod)
+                && File.Exists(Path.Combine(ryuDir, "mods", "contents", "0100152000022000", "toad_pit_crew_dx_v1_1", "romfs", "driver.bin")),
+                "enabling a Switch mod extracts it and registers it in mods.json");
+            RyujinxModService.SetModEnabled(modsJson, zipMod, false);
+            Check(!RyujinxModService.IsModEnabled(modsJson, zipMod), "disabling a Switch mod updates mods.json");
+
+            string dlcJson = RyujinxModService.GetDlcJsonPath(modsJson);
+            string nsp = Path.Combine(root, "dlc.nsp");
+            File.WriteAllText(dlcJson, "[{\"path\":" + System.Text.Json.JsonSerializer.Serialize(nsp) + ",\"dlc_nca_list\":[{\"path\":\"a.nca\",\"title_id\":1,\"is_enabled\":true}]}]");
+            Check(RyujinxModService.GetDlcEnabled(dlcJson, nsp) == true && RyujinxModService.SetDlcEnabled(dlcJson, nsp, false)
+                && RyujinxModService.GetDlcEnabled(dlcJson, nsp) == false
+                && !RyujinxModService.SetDlcEnabled(dlcJson, Path.Combine(root, "x.nsp"), true),
+                "dlc.json entries can be enabled/disabled");
+
+            Check(EmulatorModsService.ScanPlatformContent(Path.Combine(root, "Roms", "Nintendo - Switch"),
+                "Mario Kart 8 Deluxe", Array.Empty<string>(), includeMods: false).Count == 0,
+                "Switch game parent folder is not exposed as a single toggleable mod");
 
             var packs = EmulatorModsService.FindTexturePacks(plat, "Okami", new[] { "SLUS_21000" });
             Check(packs.Count == 1 && packs[0].TitleId == "SLUS-21000", "texture pack detected by game name");

@@ -24,9 +24,19 @@ namespace GameLauncher.Services
         public bool   IsDirectory { get; set; }
         /// <summary>True for entries in a mod folder that can be switched between archive (disabled) and extracted folder (enabled).</summary>
         public bool   CanToggle { get; set; }
-        public bool   Enabled => IsDirectory;
+        /// <summary>Explicit state for entries managed through an emulator config (Ryujinx mods.json / dlc.json).</summary>
+        public bool?  EnabledOverride { get; set; }
+        /// <summary>"Mod" or "DLC" for Switch library entries that are enabled through Ryujinx; null otherwise.</summary>
+        public string? RyujinxKind { get; set; }
+        /// <summary>Local image (e.g. Toad.png) saved next to the mod when it was downloaded.</summary>
+        public string? IconPath { get; set; }
+        public bool   HasIcon => !string.IsNullOrEmpty(IconPath);
+        public bool   NoIcon => !HasIcon;
+        public bool   Enabled => EnabledOverride ?? IsDirectory;
         public string ToggleLabel => Enabled ? "Disable" : "Enable";
-        public string StatusLabel => Enabled ? "✓ Enabled" : "✗ Disabled (archived)";
+        public string StatusLabel => EnabledOverride.HasValue
+            ? (Enabled ? "✓ Enabled" : "✗ Disabled")
+            : (Enabled ? "✓ Enabled" : "✗ Disabled (archived)");
         public string Icon => TypeName switch
         {
             "DLC"    => "🎁",

@@ -1189,9 +1189,34 @@ public partial class GameDetailViewModel : ViewModelBase
     private void AddPlatformContent()
     {
         var dir = PlatformDirForCurrentGame();
-        if (dir == null) return;
-        foreach (var m in EmulatorModsService.ScanPlatformContent(dir, Title, ResolveKnownTitleIdsForCurrentGame()))
-            InstalledMods.Add(m);
+        if (dir != null)
+            foreach (var m in EmulatorModsService.ScanPlatformContent(dir, Title, ResolveKnownTitleIdsForCurrentGame(), includeMods: !IsSwitch, includeDlc: !IsSwitch))
+                InstalledMods.Add(m);
+
+        if (IsSwitch)
+        {
+            string root = DownloadPathResolver.ResolveRoot(AppSettingsService.Load().Downloads.RootFolder);
+            string? dlcJson = _ryujinxModsJsonPath == null ? null : Services.RyujinxModService.GetDlcJsonPath(_ryujinxModsJsonPath);
+            foreach (var (kind, category, sub) in new[] { ("Mod", DownloadPathResolver.CategoryMod, "Mods"), ("DLC", DownloadPathResolver.CategoryDlc, "DLC") })
+            {
+                var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (dir != null) dirs.Add(Path.Combine(dir, sub));
+                dirs.Add(DownloadPathResolver.Resolve(root, "Switch", category));
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (string d in dirs)
+                    foreach (var mod in EmulatorModsService.ScanSwitchContent(d, Title, kind))
+                    {
+                        if (!seen.Add(mod.Path)) continue;
+                        if (_ryujinxModsJsonPath != null)
+                        {
+                            if (kind == "Mod") mod.EnabledOverride = Services.RyujinxModService.IsModEnabled(_ryujinxModsJsonPath, mod.Path);
+                            else mod.EnabledOverride = dlcJson == null ? null : Services.RyujinxModService.GetDlcEnabled(dlcJson, mod.Path);
+                        }
+                        else mod.EnabledOverride = false;
+                        InstalledMods.Add(mod);
+                    }
+            }
+        }
     }
 
     private async System.Threading.Tasks.Task RefreshEmulatorModsAsync()
@@ -1378,6 +1403,36 @@ public partial class GameDetailViewModel : ViewModelBase
     private async System.Threading.Tasks.Task ToggleInstalledMod(InstalledMod? mod)
     {
         if (mod == null || !mod.CanToggle) return;
+        if (mod.RyujinxKind != null)
+        {
+            if (_ryujinxModsJsonPath == null)
+            {
+                ModsStatus = "Ryujinx / TitleID not found — configure Ryujinx for Switch and make sure the game has a TitleID.";
+                return;
+            }
+            try
+            {
+                bool on = !mod.Enabled;
+                string jsonPath = _ryujinxModsJsonPath;
+                if (mod.RyujinxKind == "DLC")
+                {
+                    bool ok = await System.Threading.Tasks.Task.Run(() =>
+                        Services.RyujinxModService.SetDlcEnabled(Services.RyujinxModService.GetDlcJsonPath(jsonPath), mod.Path, on));
+                    ModsStatus = ok ? (on ? "✓  DLC enabled in Ryujinx." : "✓  DLC disabled in Ryujinx.")
+                                    : "This DLC is not registered with Ryujinx yet — add it once via Ryujinx ▸ Manage DLC, then toggle it here.";
+                }
+                else
+                {
+                    ModsStatus = on ? $"Adding {mod.Name} to Ryujinx…" : $"Disabling {mod.Name}…";
+                    await System.Threading.Tasks.Task.Run(() => Services.RyujinxModService.SetModEnabled(jsonPath, mod.Path, on));
+                    ModsStatus = on ? "✓  Mod enabled in Ryujinx." : "✓  Mod disabled in Ryujinx.";
+                    LoadSwitchMods();
+                }
+            }
+            catch (Exception ex) { ModsStatus = "Failed: " + ex.Message; }
+            RefreshInstalledMods();
+            return;
+        }
         try
         {
             bool enable = !mod.Enabled;
@@ -1467,6 +1522,110 @@ public partial class GameDetailViewModel : ViewModelBase
     /// <summary>Opens a URL in the built-in browser, tied to this game (platform, title, url).</summary>
     public Action<string, string, string>? OnOpenUrlInBrowser { get; set; }
 
+    // ── Share mods with friends ───────────────────────────────────────────────
+    /// <summary>Set by MainViewModel: returns the logged-in user's friends.</summary>
+    public Func<System.Threading.Tasks.Task<System.Collections.Generic.List<string>>>? GetFriendsForShare { get; set; }
+    /// <summary>Set by MainViewModel: sends a (hidden) message to a friend.</summary>
+    public Func<string, string, System.Threading.Tasks.Task>? SendHiddenMessage { get; set; }
+
+    public System.Collections.ObjectModel.ObservableCollection<string> ShareFriends { get; } = new();
+    [ObservableProperty] private bool   _isSharePickerOpen;
+    [ObservableProperty] private bool   _isShareBusy;
+    [ObservableProperty] private string _shareStatus = "";
+    [ObservableProperty] private string _shareTitle = "";
+    private Func<System.Threading.Tasks.Task<Services.ModSharePayload>>? _sharePayloadFactory;
+
+    private async System.Threading.Tasks.Task OpenSharePicker(string title, Func<System.Threading.Tasks.Task<Services.ModSharePayload>> factory)
+    {
+        ShareFriends.Clear();
+        ShareStatus = "";
+        ShareTitle = title;
+        _sharePayloadFactory = factory;
+        IsSharePickerOpen = true;
+        try
+        {
+            var friends = GetFriendsForShare == null ? new() : await GetFriendsForShare();
+            foreach (var f in friends.OrderBy(f => f, StringComparer.OrdinalIgnoreCase)) ShareFriends.Add(f);
+            if (ShareFriends.Count == 0) ShareStatus = "No friends to share with yet (sign in and add friends first).";
+        }
+        catch (Exception ex) { ShareStatus = "Could not load friends: " + ex.Message; }
+    }
+
+    /// <summary>Browse list: shares the mod URL; the friend can Accept (adds the link for this game) or Decline.</summary>
+    [RelayCommand]
+    private System.Threading.Tasks.Task ShareBrowsedMod(GameModEntry? mod)
+    {
+        if (mod == null || string.IsNullOrWhiteSpace(mod.Url)) return System.Threading.Tasks.Task.CompletedTask;
+        return OpenSharePicker("Share “" + mod.Name + "”", () => System.Threading.Tasks.Task.FromResult(new Services.ModSharePayload
+        {
+            Kind = "link", Name = mod.Name, Url = mod.Url, Platform = Platform, Game = Title, ModType = "Mod",
+        }));
+    }
+
+    /// <summary>Installed list: seeds the mod files as a torrent and shares the magnet.</summary>
+    [RelayCommand]
+    private System.Threading.Tasks.Task ShareInstalledMod(InstalledMod? mod)
+    {
+        if (mod == null) return System.Threading.Tasks.Task.CompletedTask;
+        return OpenSharePicker("Share “" + mod.Name + "” (files)", async () =>
+        {
+            string magnet = await Services.DownloadManagerService.Instance.SeedPathAsync(mod.Path);
+            return new Services.ModSharePayload
+            {
+                Kind = "torrent", Name = mod.Name, Url = magnet, Platform = Platform, Game = Title, ModType = mod.TypeName ?? "Mod",
+                Folders = ModShareFolders(mod.Path),
+            };
+        });
+    }
+
+    /// <summary>Subfolders between Mods/{Game}/ and the mod, so the receiver stores it in the same layout.</summary>
+    private List<string> ModShareFolders(string path)
+    {
+        string game = PlatformHelper.StripSpecialSymbols(Title);
+        var parts = (Path.GetDirectoryName(path) ?? "").Split(new[] { '\\', '/' }, StringSplitOptions.RemoveEmptyEntries).ToList();
+        int i = parts.FindLastIndex(x => string.Equals(x, game, StringComparison.OrdinalIgnoreCase));
+        return i < 0 ? new List<string>() : parts.Skip(i + 1).ToList();
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task SendShareToFriend(string? friend)
+    {
+        if (string.IsNullOrEmpty(friend) || _sharePayloadFactory == null || SendHiddenMessage == null || IsShareBusy) return;
+        IsShareBusy = true;
+        try
+        {
+            ShareStatus = "Preparing…";
+            var payload = await _sharePayloadFactory();
+            await SendHiddenMessage(friend, Services.ModShareService.Encode(payload));
+            ShareStatus = payload.IsTorrent
+                ? $"✓ Sent to {friend}. Keep the launcher open while they download."
+                : $"✓ Sent to {friend}.";
+        }
+        catch (Exception ex) { ShareStatus = "Share failed: " + ex.Message; }
+        finally { IsShareBusy = false; }
+    }
+
+    [RelayCommand] private void CloseSharePicker() => IsSharePickerOpen = false;
+
+    /// <summary>Saves the repo icon (e.g. Toad.png) beside the downloaded mod so the Installed list shows the same image.</summary>
+    private static async System.Threading.Tasks.Task SaveSwitchModIconAsync(GameModEntry mod, string gameFolder)
+    {
+        if (string.IsNullOrEmpty(mod.IconUrl) || mod.InstallFolders.Count == 0) return;
+        try
+        {
+            string root = DownloadPathResolver.ResolveRoot(AppSettingsService.Load().Downloads.RootFolder);
+            string dir = DownloadPathResolver.Resolve(root, "Switch", DownloadPathResolver.CategoryMod,
+                new[] { gameFolder }.Concat(mod.InstallFolders).ToArray());
+            string file = Path.Combine(dir, mod.InstallFolders[^1] + ".png");
+            if (File.Exists(file)) return;
+            using var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+            var bytes = await http.GetByteArrayAsync(mod.IconUrl);
+            Directory.CreateDirectory(dir);
+            await File.WriteAllBytesAsync(file, bytes);
+        }
+        catch { /* icon is optional */ }
+    }
+
     [RelayCommand]
     private async System.Threading.Tasks.Task OpenModUrl(GameModEntry? mod)
     {
@@ -1476,8 +1635,11 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mod.IsSwitchRepoMod && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath))
         {
             string file = mod.Name + System.IO.Path.GetExtension(u.AbsolutePath);
-            Services.DownloadManagerService.Instance.Add(u.AbsoluteUri, file, Services.DownloadPathResolver.CategoryMod, "Switch", game: Title);
-            ModsStatus = $"⬇ Downloading {file} to Roms/Nintendo - Switch/Mods — see Downloads.";
+            string gameFolder = PlatformHelper.StripSpecialSymbols(Title);
+            Services.DownloadManagerService.Instance.Add(u.AbsoluteUri, file, Services.DownloadPathResolver.CategoryMod, "Switch",
+                game: Title, autoExtract: false, subfolders: new[] { gameFolder }.Concat(mod.InstallFolders).ToArray());
+            ModsStatus = $"⬇ Downloading {file} to Roms/Nintendo - Switch/Mods/{string.Join("/", new[] { gameFolder }.Concat(mod.InstallFolders))} — see Downloads.";
+            _ = SaveSwitchModIconAsync(mod, gameFolder);
             return;
         }
 
@@ -5731,6 +5893,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 Genres = new[] { "Game OS", m.Group, m.Subject }.Where(g => g.Length > 0).Distinct().ToList(),
                 IconUrl = m.IconUrl,
                 Group = m.Group,
+                InstallFolders = m.Path.Split('/').Skip(1).SkipLast(1).ToList(),
                 IsSwitchRepoMod = true,
             }).ToList();
             RebuildBrowseMods();

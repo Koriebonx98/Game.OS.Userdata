@@ -308,7 +308,11 @@
                                     <DataTemplate x:DataType="svc:InstalledMod">
                                         <Border Background="#21262d" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
                                             <Grid ColumnDefinitions="Auto,*,Auto">
-                                                <TextBlock Grid.Column="0" Text="{Binding Icon}" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                <Panel Grid.Column="0" Width="36" Height="36" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Icon}" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               IsVisible="{Binding NoIcon}"/>
+                                                    <views:CoverImage LocalCachePath="{Binding IconPath}" IsVisible="{Binding HasIcon}" ImageCornerRadius="6"/>
+                                                </Panel>
                                                 <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" Foreground="White" TextTrimming="CharacterEllipsis"/>
                                                     <TextBlock Text="{Binding Subtitle}" FontSize="10" Foreground="#6e7681"/>
@@ -322,6 +326,9 @@
                                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
                                                             <MenuItem Header="📂  Open location"
                                                                       Command="{Binding $parent[UserControl].DataContext.OpenInstalledModCommand}"
+                                                                      CommandParameter="{Binding}"/>
+                                                            <MenuItem Header="📨  Share…"
+                                                                      Command="{Binding $parent[UserControl].DataContext.ShareInstalledModCommand}"
                                                                       CommandParameter="{Binding}"/>
                                                             <MenuItem Header="📦  Move to…"
                                                                       Command="{Binding $parent[UserControl].DataContext.MoveInstalledModCommand}"
@@ -444,6 +451,9 @@
                                                         IsVisible="{Binding !IsSwitchRepoMod}"
                                                         Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
                                                         CommandParameter="{Binding}"/>
+                                                <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="📨  Share"
+                                                        Command="{Binding $parent[UserControl].DataContext.ShareBrowsedModCommand}"
+                                                        CommandParameter="{Binding}"/>
                                             </StackPanel>
                                         </Border>
                                     </StackPanel>
@@ -455,6 +465,32 @@
                     </DockPanel>
                 </Panel>
             </DockPanel>
+        </Border>
+    </Border>
+
+    <!-- Share a mod with a friend -->
+    <Border IsVisible="{Binding IsSharePickerOpen}" Background="#CC000000">
+        <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="16" Padding="18"
+                Width="420" MaxHeight="480" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <StackPanel Spacing="10">
+                <TextBlock Text="{Binding ShareTitle}" FontSize="15" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
+                <TextBlock Text="Choose a friend to send it to:" FontSize="12" Foreground="#8b949e"/>
+                <ScrollViewer MaxHeight="240">
+                    <ItemsControl ItemsSource="{Binding ShareFriends}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                        Margin="0,0,0,4" Content="{Binding}"
+                                        Command="{Binding $parent[UserControl].DataContext.SendShareToFriendCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+                <TextBlock Text="{Binding ShareStatus}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"
+                           IsVisible="{Binding ShareStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <Button Classes="btn-secondary" Content="Close" HorizontalAlignment="Right" Command="{Binding CloseSharePickerCommand}"/>
+            </StackPanel>
         </Border>
     </Border>
 

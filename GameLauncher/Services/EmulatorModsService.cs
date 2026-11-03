@@ -370,7 +370,7 @@ namespace GameLauncher.Services
         /// Entries in <c>{platformDir}/{Mods|DLC|Updates}</c> that belong to the game (name contains the title or a TitleID,
         /// or sits in a folder named after them). The HD texture pack folder is handled separately.
         /// </summary>
-        public static List<InstalledMod> ScanPlatformContent(string? platformDir, string gameName, IEnumerable<string> knownTitleIds)
+        public static List<InstalledMod> ScanPlatformContent(string? platformDir, string gameName, IEnumerable<string> knownTitleIds, bool includeMods = true, bool includeDlc = true)
         {
             var result = new List<InstalledMod>();
             if (string.IsNullOrWhiteSpace(platformDir) || !Directory.Exists(platformDir)) return result;
@@ -384,6 +384,7 @@ namespace GameLauncher.Services
 
             foreach (var (folder, type) in ContentFolders)
             {
+                if ((type == "Mod" && !includeMods) || (type == "DLC" && !includeDlc)) continue;
                 string dir = Path.Combine(platformDir, folder);
                 if (!Directory.Exists(dir)) continue;
                 try
@@ -400,6 +401,78 @@ namespace GameLauncher.Services
                 catch { /* best-effort */ }
             }
             return result;
+        }
+
+        private static readonly string[] SwitchDlcExts = { ".nsp", ".xci" };
+        private static readonly string[] RyujinxContentDirs = { "romfs", "exefs", "cheats" };
+
+        /// <summary>
+        /// Finds individual Switch mods (<paramref name="typeName"/> "Mod": archives or extracted folders under
+        /// <c>Mods/{Game}/{Category}/{Subject}/</c>) or DLC ("DLC": .nsp/.xci under <c>DLC/{Game}/…</c>).
+        /// An image named after the subject folder (e.g. Toad.png) is attached as the icon.
+        /// </summary>
+        public static List<InstalledMod> ScanSwitchContent(string? contentDir, string gameName, string typeName = "Mod")
+        {
+            var result = new List<InstalledMod>();
+            if (string.IsNullOrWhiteSpace(contentDir) || !Directory.Exists(contentDir)) return result;
+            string gameKey = NormalizeId(gameName);
+            if (gameKey.Length == 0) return result;
+            bool dlc = typeName == "DLC";
+
+            try
+            {
+                foreach (string gameDir in Directory.EnumerateDirectories(contentDir))
+                {
+                    if (NormalizeId(Path.GetFileName(gameDir)) != gameKey) continue;
+                    Walk(gameDir, "", 0);
+                }
+            }
+            catch { /* best-effort */ }
+            return result.OrderBy(m => m.Source, StringComparer.OrdinalIgnoreCase)
+                         .ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+            void Walk(string folder, string source, int depth)
+            {
+                try
+                {
+                    string subject = Path.GetFileName(folder);
+                    foreach (string entry in Directory.EnumerateFileSystemEntries(folder))
+                    {
+                        bool isDirectory = Directory.Exists(entry);
+                        string name = Path.GetFileName(entry);
+                        if (isDirectory)
+                        {
+                            bool isMod = !dlc && depth >= 2 && !RyujinxContentDirs.Contains(name, StringComparer.OrdinalIgnoreCase)
+                                         && Directory.EnumerateFileSystemEntries(entry).Any();
+                            if (isMod) Add(entry, true, folder, source);
+                            else if (depth < 2) Walk(entry, source.Length == 0 ? name : source + " › " + name, depth + 1);
+                            continue;
+                        }
+                        bool ok = dlc ? SwitchDlcExts.Contains(Path.GetExtension(name), StringComparer.OrdinalIgnoreCase)
+                                      : GameModsService.CanToggleEntry(entry);
+                        if (ok) Add(entry, false, folder, source);
+                    }
+                }
+                catch { /* best-effort */ }
+            }
+
+            void Add(string entry, bool isDirectory, string folder, string source)
+            {
+                string subject = Path.GetFileName(folder);
+                string? icon = new[] { Path.Combine(folder, subject + ".png"), Path.ChangeExtension(entry, ".png") }
+                    .FirstOrDefault(File.Exists);
+                result.Add(new InstalledMod
+                {
+                    Name = Path.GetFileName(entry),
+                    Path = entry,
+                    TypeName = typeName,
+                    Source = source.Length == 0 ? typeName : source,
+                    IsDirectory = isDirectory,
+                    CanToggle = true,
+                    RyujinxKind = typeName,
+                    IconPath = icon,
+                });
+            }
         }
     }
 }

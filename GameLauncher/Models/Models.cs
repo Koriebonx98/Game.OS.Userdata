@@ -1095,6 +1095,8 @@ namespace GameLauncher.Models
         public bool IsSwitchRepoMod { get; set; }
         /// <summary>Filter bucket for the Browse tab (e.g. "Drivers", "Tracks").</summary>
         public string Group { get; set; } = "";
+        /// <summary>Relative category/subject folders used when installing a Switch repository mod.</summary>
+        public List<string> InstallFolders { get; set; } = new();
         public string GenresLabel => Genres.Count == 0 ? "" : string.Join(" · ", Genres);
     }
 
