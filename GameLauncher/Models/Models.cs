@@ -1088,6 +1088,13 @@ namespace GameLauncher.Models
         }
         public string ExpandArrow => IsExpanded ? "▴" : "▾";
         public List<string> Genres { get; set; } = new();
+        /// <summary>Optional icon (e.g. the player's png in the Switch mods repo).</summary>
+        public string? IconUrl { get; set; }
+        public bool HasIcon => !string.IsNullOrEmpty(IconUrl);
+        public bool NoIcon => !HasIcon;
+        public bool IsSwitchRepoMod { get; set; }
+        /// <summary>Filter bucket for the Browse tab (e.g. "Drivers", "Tracks").</summary>
+        public string Group { get; set; } = "";
         public string GenresLabel => Genres.Count == 0 ? "" : string.Join(" · ", Genres);
     }
 

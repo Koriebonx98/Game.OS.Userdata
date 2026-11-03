@@ -1061,6 +1061,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private List<GameModEntry> _dbMods = new();
     private List<GameModEntry> _browseMods = new();
     private List<GameModEntry> _switchRepoMods = new();
+    private List<string> _switchRepoModTypes = new();
     private int _switchRepoGeneration;
     [ObservableProperty] private bool   _isModBrowserOpen;
     [ObservableProperty] private bool   _isModsInstalledTab = true;
@@ -1098,10 +1099,26 @@ public partial class GameDetailViewModel : ViewModelBase
                 Genres = string.IsNullOrWhiteSpace(l.ModType) ? new List<string> { "My link" } : new List<string> { "My link", l.ModType },
             });
         _browseMods = mine.Concat(_switchRepoMods).Concat(_dbMods).ToList();
+        var groups = _switchRepoModTypes.Concat(_browseMods.Select(m => m.Group)).Where(g => g.Length > 0)
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList();
+        ModFilters.Clear();
+        if (IsSwitch)
+        {
+            ModFilters.Add("All");
+            foreach (var g in groups) ModFilters.Add(g);
+        }
+        if (!ModFilters.Contains(SelectedModFilter)) SelectedModFilter = "All";
+        OnPropertyChanged(nameof(HasModFilters));
         RefreshModList();
     }
     [ObservableProperty] private string _modSearchText = "";
     public ObservableCollection<GameModEntry> FilteredMods { get; } = new();
+    /// <summary>Category chips for the Browse tab ("All", "Drivers", "Tracks"…).</summary>
+    public ObservableCollection<string> ModFilters { get; } = new();
+    public bool HasModFilters => ModFilters.Count > 0;
+    [ObservableProperty] private string _selectedModFilter = "All";
+    partial void OnSelectedModFilterChanged(string value) => RefreshModList();
+    [RelayCommand] private void SelectModFilter(string? f) => SelectedModFilter = string.IsNullOrEmpty(f) ? "All" : f;
     public bool HasDbMods => _browseMods.Count > 0;
     public bool NoModsFound => FilteredMods.Count == 0;
 
@@ -1111,9 +1128,10 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         var term = (ModSearchText ?? "").Trim();
         FilteredMods.Clear();
-        foreach (var m in _browseMods.Where(m => term.Length == 0
+        string filter = SelectedModFilter ?? "All";
+        foreach (var m in _browseMods.Where(m => (filter == "All" || string.Equals(m.Group, filter, StringComparison.OrdinalIgnoreCase)) && (term.Length == 0
                      || m.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                     || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase))))
+                     || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase)))))
             FilteredMods.Add(m);
         OnPropertyChanged(nameof(HasDbMods));
         OnPropertyChanged(nameof(NoModsFound));
@@ -1455,13 +1473,11 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mod == null || !Uri.TryCreate(mod.Url, UriKind.Absolute, out var u) ||
             (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps)) return;
 
-        if (IsSwitch && mod.Genres.Contains("Game OS") && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath)
-            && await InstallSwitchRepoModAsync(mod)) return;
-        if (IsSwitch && mod.Genres.Contains("Game OS") && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath))
+        if (mod.IsSwitchRepoMod && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath))
         {
             string file = mod.Name + System.IO.Path.GetExtension(u.AbsolutePath);
             Services.DownloadManagerService.Instance.Add(u.AbsoluteUri, file, Services.DownloadPathResolver.CategoryMod, "Switch", game: Title);
-            ModsStatus = $"⬇ Downloading {file} — see Downloads (set the Ryujinx path in Settings to auto-install).";
+            ModsStatus = $"⬇ Downloading {file} to Roms/Nintendo - Switch/Mods — see Downloads.";
             return;
         }
 
@@ -5690,7 +5706,12 @@ public partial class GameDetailViewModel : ViewModelBase
         int gen = ++_switchRepoGeneration;
         if (!IsSwitch || string.IsNullOrEmpty(Title))
         {
-            if (_switchRepoMods.Count > 0) { _switchRepoMods = new(); RebuildBrowseMods(); }
+            if (_switchRepoMods.Count > 0 || _switchRepoModTypes.Count > 0)
+            {
+                _switchRepoMods = new();
+                _switchRepoModTypes = new();
+                RebuildBrowseMods();
+            }
             return;
         }
         string title = Title;
@@ -5699,38 +5720,22 @@ public partial class GameDetailViewModel : ViewModelBase
         try
         {
             var mods = await Services.SwitchModRepoService.GetModsAsync(title, tid);
+            var modTypes = await Services.SwitchModRepoService.GetModTypesAsync(title, tid);
             if (gen != _switchRepoGeneration) return;
+            _switchRepoModTypes = modTypes;
             _switchRepoMods = mods.Select(m => new GameModEntry
             {
                 Name = m.Name,
                 Url = m.DownloadUrl,
-                Description = (m.Category.Length > 0 ? m.Category + " · " : "") + "Game OS Switch mods database — click to install.",
-                Genres = m.Category.Length > 0 ? new List<string> { "Game OS", m.Category } : new List<string> { "Game OS" },
+                Description = (m.Category.Length > 0 ? m.Category + " · " : "") + "Game OS Switch mods database.",
+                Genres = new[] { "Game OS", m.Group, m.Subject }.Where(g => g.Length > 0).Distinct().ToList(),
+                IconUrl = m.IconUrl,
+                Group = m.Group,
+                IsSwitchRepoMod = true,
             }).ToList();
             RebuildBrowseMods();
         }
         catch { /* best-effort */ }
-    }
-
-    /// <summary>Downloads a repo mod and extracts it into Ryujinx's mods folder, registering it as enabled in mods.json.</summary>
-    private async System.Threading.Tasks.Task<bool> InstallSwitchRepoModAsync(GameModEntry mod)
-    {
-        string? modsJson = _ryujinxModsJsonPath;
-        if (string.IsNullOrEmpty(modsJson)) return false;
-        try
-        {
-            ModsStatus = $"Installing {mod.Name}…";
-            string dir = await Services.SwitchModRepoService.InstallAsync(
-                mod.Url, mod.Name, Services.RyujinxModService.GetModsContentDir(modsJson));
-            var list = Services.RyujinxModService.LoadMods(modsJson);
-            list.RemoveAll(m => string.Equals(m.Path, dir, StringComparison.OrdinalIgnoreCase));
-            list.Add(new GameLauncher.Models.RyujinxMod { Name = mod.Name, Path = dir, Enabled = true });
-            Services.RyujinxModService.SaveMods(modsJson, list);
-            ModsStatus = $"✓  Installed {mod.Name} (enabled in Ryujinx).";
-            LoadSwitchMods();
-        }
-        catch (Exception ex) { ModsStatus = "Failed to install: " + ex.Message; }
-        return true;
     }
 
     /// <summary>Toggles the enabled state of a Ryujinx mod and persists the change to <c>mods.json</c>.</summary>
