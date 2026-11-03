@@ -38,14 +38,10 @@ namespace GameLauncher.Services
     /// Mod sharing between friends. Shares travel as hidden chat messages: the text starts with an invisible
     /// marker so the UI can filter them out of conversations while the system still reads them.
     /// </summary>
-    public static class ModShareService
+    public static partial class ModShareService
     {
-        public const string Marker = "\u2063\u2063GOSMOD1:";
         private static readonly object Gate = new();
         private static readonly string HandledFile = Path.Combine(UserDataService.DataRoot, "ModSharesHandled.json");
-
-        public static bool IsShareMessage(string? text) =>
-            text != null && text.StartsWith(Marker, StringComparison.Ordinal);
 
         public static string Encode(ModSharePayload p) => Marker + JsonSerializer.Serialize(p);
 
