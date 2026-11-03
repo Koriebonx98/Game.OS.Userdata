@@ -190,8 +190,34 @@ public partial class BrowserView : UserControl
             title = Unquote(title);
             await Dispatcher.UIThread.InvokeAsync(() => _vm?.UpdateTab(tab, url, string.IsNullOrWhiteSpace(title) ? new Uri(url).Host : title));
             await InjectAsync(wv);
+            if (url.StartsWith("https://www.epicgames.com/id/api/redirect", StringComparison.OrdinalIgnoreCase))
+                await CaptureEpicCodeAsync(wv);
         }
         catch { /* page may have navigated away */ }
+    }
+
+    private const string EpicRedirectUrl = "https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code";
+
+    private async Task CaptureEpicCodeAsync(WebView wv)
+    {
+        if (_vm == null) return;
+        string? body = Unquote(await wv.ExecuteScriptAsync("document.body ? document.body.innerText : ''"));
+        string code = StoreLibraryFetcher.ParseEpicRedirectCode(body);
+        if (code.Length == 0)
+        {
+            _vm.StatusText = "Epic: not signed in – log in, then choose 'Capture login' again";
+            _vm.Go("https://www.epicgames.com/id/login");
+            return;
+        }
+        var acct = StoreAccountsService.Get("Epic Games");
+        StoreAccountsService.Set("Epic Games", acct.ApiKey, acct.UserId, code);
+        StoreAccountsService.CaptureToken("Epic Games", code);
+        _vm.StatusText = "Epic Games login saved – syncing library…";
+        _ = Task.Run(async () =>
+        {
+            var lines = await StoreLibraryFetcher.SyncAllAsync();
+            Dispatcher.UIThread.Post(() => _vm.StatusText = lines.FirstOrDefault(l => l.StartsWith("Epic")) ?? "Epic sync done");
+        });
     }
 
     private readonly HashSet<string> _probeBypass = new();
@@ -453,6 +479,13 @@ public partial class BrowserView : UserControl
     {
         var w = Active;
         if (w == null || _vm == null) return;
+        if (store.Name == "Epic Games")
+        {
+            // Epic needs an OAuth code, not cookies: the redirect page returns it as JSON for a signed-in session.
+            _vm.StatusText = "Requesting Epic authorization…";
+            _vm.Go(EpicRedirectUrl);
+            return;
+        }
         string cookie = "";
         try { cookie = Unquote(await w.ExecuteScriptAsync("document.cookie")) ?? ""; } catch { }
         if (string.IsNullOrWhiteSpace(cookie)) { _vm.StatusText = $"No {store.Name} login found on this page — sign in first"; return; }

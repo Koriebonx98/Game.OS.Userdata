@@ -149,22 +149,46 @@ namespace GameLauncher.Services
             }
             if (token.Contains('=') || token.Contains(';'))
                 throw new InvalidOperationException("Epic needs an authorization code, not browser cookies. Sign in to Epic, open https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code and paste the authorizationCode into the token field");
-            if (token.Length != 32 || !token.All(Uri.IsHexDigit)) return token;
+            bool isRefresh = token.StartsWith(EpicRefreshPrefix, StringComparison.Ordinal);
+            if (!isRefresh && (token.Length != 32 || !token.All(Uri.IsHexDigit))) return token;
 
+            var form = isRefresh
+                ? new Dictionary<string, string> { ["grant_type"] = "refresh_token", ["refresh_token"] = token[EpicRefreshPrefix.Length..], ["token_type"] = "eg1" }
+                : new Dictionary<string, string> { ["grant_type"] = "authorization_code", ["code"] = token, ["token_type"] = "eg1" };
             var req = new HttpRequestMessage(HttpMethod.Post, "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
             {
-                Content = new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    ["grant_type"] = "authorization_code", ["code"] = token, ["token_type"] = "eg1",
-                }),
+                Content = new FormUrlEncodedContent(form),
             };
             req.Headers.Authorization = new AuthenticationHeaderValue("Basic",
                 Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes("34a02cf8f4414e29b15921876da36f9a:daafbccc737745039dffe53d94fc76cf")));
             using var resp = await Http.SendAsync(req, ct).ConfigureAwait(false);
             if (!resp.IsSuccessStatusCode)
-                throw new HttpRequestException($"Epic code rejected (HTTP {(int)resp.StatusCode}) – codes are single-use and expire in minutes; get a fresh one");
+                throw new HttpRequestException(isRefresh
+                    ? $"Epic login expired (HTTP {(int)resp.StatusCode}) – sign in to Epic again in the built-in browser and use 'Capture login'"
+                    : $"Epic code rejected (HTTP {(int)resp.StatusCode}) – codes are single-use and expire in minutes; get a fresh one");
             using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            // Keep the refresh token so later syncs don't need a new single-use code.
+            string refresh = Str(doc.RootElement, "refresh_token");
+            if (refresh.Length > 0)
+            {
+                var acct = StoreAccountsService.Get("Epic Games");
+                StoreAccountsService.Set("Epic Games", acct.ApiKey, acct.UserId, EpicRefreshPrefix + refresh);
+            }
             return Str(doc.RootElement, "access_token");
+        }
+
+        public const string EpicRefreshPrefix = "epicrt:";
+
+        /// <summary>Extracts the authorizationCode from the JSON served by epicgames.com/id/api/redirect, or "" if absent.</summary>
+        public static string ParseEpicRedirectCode(string? text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "";
+            try
+            {
+                using var d = JsonDocument.Parse(text.Trim());
+                return Str(d.RootElement, "authorizationCode");
+            }
+            catch { return ""; }
         }
 
         private static async Task<List<StoreLibraryService.StoreGame>> FetchEpicAsync(StoreAccount a, CancellationToken ct)
