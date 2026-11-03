@@ -414,6 +414,99 @@ public partial class FriendsViewModel : ViewModelBase
         MessageError = "";
     }
 
+    // ── Controller navigation + on-screen keyboard ────────────────────────────
+    public OnScreenKeyboardViewModel Keyboard { get; } = new();
+    private object? _focused;
+    [ObservableProperty] private string _controllerHint = "↑/↓ select · A message/accept · X invite/decline · Y profile · Start add friend";
+
+    private List<SelectableItem> FocusList() =>
+        PendingRequests.Cast<SelectableItem>().Concat(OnlineFriends).Concat(OfflineFriends).ToList();
+
+    private void SetFocus(SelectableItem? item)
+    {
+        foreach (var i in FocusList()) i.IsSelected = ReferenceEquals(i, item);
+        _focused = item;
+    }
+
+    private void MoveFocus(int delta)
+    {
+        var list = FocusList();
+        if (list.Count == 0) return;
+        int idx = _focused == null ? -1 : list.FindIndex(i => ReferenceEquals(i, _focused));
+        idx = Math.Clamp((idx < 0 ? (delta > 0 ? -1 : list.Count) : idx) + delta, 0, list.Count - 1);
+        SetFocus(list[idx]);
+    }
+
+    /// <summary>Controller handling for the Friends page. Returns true when the key was consumed.</summary>
+    public bool HandleKey(string name)
+    {
+        if (Keyboard.IsOpen) return Keyboard.HandleKey(name);
+        if (ShowConversation)
+        {
+            switch (name)
+            {
+                case "A": OpenMessageKeyboard(); break;
+                case "X": SendMessageCommand.Execute(null); break;
+                case "B": CloseConversationCommand.Execute(null); break;
+            }
+            return true;
+        }
+        switch (name)
+        {
+            case "Up": MoveFocus(-1); return true;
+            case "Down": MoveFocus(1); return true;
+            case "Start": OpenAddFriendKeyboard(); return true;
+        }
+        if (_focused is FriendRequestDisplay req)
+        {
+            if (name == "A") { AcceptRequestCommand.Execute(req); return true; }
+            if (name == "X") { DeclineRequestCommand.Execute(req); return true; }
+        }
+        else if (_focused is FriendEntry f)
+        {
+            if (name == "A") { OpenConversationCommand.Execute(f.Username); return true; }
+            if (name == "Y") { ViewFriendProfileCommand.Execute(f.Username); return true; }
+            if (name == "X") { _ = InviteFriendWithConnection(f.Username, f.IpAddresses.FirstOrDefault()?.TypeLabel ?? "Crossplay"); return true; }
+        }
+        return false;
+    }
+
+    public void OpenMessageKeyboard() =>
+        Keyboard.Open(NewMessageText, $"Message {ConversationFriend}", t => NewMessageText = t,
+                      _ => SendMessageCommand.Execute(null));
+
+    [RelayCommand]
+    public void OpenAddFriendKeyboard() =>
+        Keyboard.Open("", "Add friend — username", _ => { },
+                      t => { if (!string.IsNullOrWhiteSpace(t)) _ = SendFriendRequestAsync(t.Trim()); });
+
+    private async Task SendFriendRequestAsync(string username)
+    {
+        if (_client == null) { InviteStatusMessage = "Sign in to add friends."; return; }
+        try
+        {
+            await _client.SendFriendRequestAsync(username);
+            InviteStatusMessage = $"Friend request sent to {username}.";
+        }
+        catch (Exception ex) { InviteStatusMessage = $"Could not send request: {ex.Message}"; }
+    }
+
+    [RelayCommand]
+    private async Task AcceptRequest(FriendRequestDisplay? req)
+    {
+        if (req == null || _client == null) return;
+        try { await _client.AcceptFriendRequestAsync(req.FromUsername); _focused = null; await LoadAsync(); }
+        catch (Exception ex) { InviteStatusMessage = $"Could not accept: {ex.Message}"; }
+    }
+
+    [RelayCommand]
+    private async Task DeclineRequest(FriendRequestDisplay? req)
+    {
+        if (req == null || _client == null) return;
+        try { await _client.DeclineFriendRequestAsync(req.FromUsername); _focused = null; await LoadAsync(); }
+        catch (Exception ex) { InviteStatusMessage = $"Could not decline: {ex.Message}"; }
+    }
+
     // ── Friend list loading ───────────────────────────────────────────────────
 
     private async Task LoadAsync()

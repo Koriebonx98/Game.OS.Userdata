@@ -663,6 +663,16 @@ public partial class MainWindow : Window
             }
         }
 
+        // Friends / Inbox controller navigation
+        if ((vm.IsFriends || vm.IsInbox) && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded && !IsTextInputFocused())
+        {
+            if (HandleSocialKey(vm, e.Key))
+            {
+                e.Handled = true;
+                return;
+            }
+        }
+
         // Store controller navigation
         if (vm.IsStore && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
@@ -912,6 +922,24 @@ public partial class MainWindow : Window
             case Key.X:     vm.MediaVm.FilterMediaFocus(); return true;
         }
         return false;
+    }
+
+    private static bool HandleSocialKey(MainViewModel vm, Key key)
+    {
+        string name = key switch
+        {
+            Key.Left => "Left", Key.Right => "Right", Key.Up => "Up", Key.Down => "Down",
+            Key.Enter => "A", Key.X => "X", Key.Y => "Y", Key.Apps => "Start", Key.Escape or Key.BrowserBack => "B",
+            _ => "",
+        };
+        bool friends = vm.IsFriends;
+        bool overlayOpen = friends
+            ? vm.FriendsVm.Keyboard.IsOpen || vm.FriendsVm.ShowConversation
+            : vm.InboxVm.Keyboard.IsOpen || vm.InboxVm.ShowConversation;
+        if (name.Length == 0) return overlayOpen;
+        // Left/Right and B (with nothing open) fall through to global navigation.
+        if (!overlayOpen && name is "Left" or "Right" or "B") return false;
+        return friends ? vm.FriendsVm.HandleKey(name) : vm.InboxVm.HandleKey(name);
     }
 
     private static bool HandleDownloadsKey(MainViewModel vm, Key key)
@@ -1834,6 +1862,13 @@ public partial class MainWindow : Window
         if (vm.IsDownloads && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
         {
             if (HandleDownloadsKey(vm, key))
+                return;
+        }
+
+        // Friends / Inbox controller navigation
+        if ((vm.IsFriends || vm.IsInbox) && !vm.ShowDetail && !vm.ShowFriendProfile && !vm.IsNavExpanded)
+        {
+            if (HandleSocialKey(vm, key))
                 return;
         }
 

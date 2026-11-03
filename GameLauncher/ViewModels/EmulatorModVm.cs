@@ -17,6 +17,8 @@ public partial class EmulatorModVm : ViewModelBase
     public string SourcePath { get; set; } = "";
     public EmulatorModsService.TexturePack? Pack { get; set; }
     public bool IsXenia => Kind == "Xenia";
+    public bool IsXeniaPatch => Kind == "XeniaPatch";
+    public bool HasSettingsButton => IsXenia || IsXeniaPatch;
     /// <summary>Filter category shown in the Installed tab chips.</summary>
     public string TypeName => Kind switch { "Xenia" => "Settings", "XeniaPatch" => "Patch", _ => "Texture Pack" };
 

@@ -837,6 +837,99 @@ namespace GameLauncher.Services
             return data?.Invites ?? new();
         }
 
+        // ── Shared swarm / LFG rooms ──────────────────────────────────────────
+
+        public async Task SwarmHeartbeatAsync(CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.PostAsJsonAsync("/api/swarm/heartbeat", new { }, ct);
+            resp.EnsureSuccessStatusCode();
+        }
+
+        public async Task<string> CreateLfgAsync(string game, string platform, string kind, string endpoint,
+                                                 int maxPlayers, CancellationToken ct = default, bool vpn = false)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.PostAsJsonAsync("/api/lfg", new { game, platform, kind, endpoint, maxPlayers, vpn }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorResponse>(_jsonOpts, ct);
+                throw new GameOsException((int)resp.StatusCode, err?.Message ?? "Failed to create room.");
+            }
+            var data = await resp.Content.ReadFromJsonAsync<LfgCreateResponse>(_jsonOpts, ct);
+            return data?.RoomId ?? "";
+        }
+
+        public async Task<List<LfgRoom>> ListLfgAsync(string game, string platform, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.GetAsync(
+                $"/api/lfg?game={Uri.EscapeDataString(game)}&platform={Uri.EscapeDataString(platform)}", ct);
+            resp.EnsureSuccessStatusCode();
+            var data = await resp.Content.ReadFromJsonAsync<LfgListResponse>(_jsonOpts, ct);
+            return data?.Rooms ?? new();
+        }
+
+        public async Task<LfgJoinResult> JoinLfgAsync(string roomId, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.PostAsJsonAsync("/api/lfg/join", new { roomId }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorResponse>(_jsonOpts, ct);
+                throw new GameOsException((int)resp.StatusCode, err?.Message ?? "Failed to join room.");
+            }
+            return await resp.Content.ReadFromJsonAsync<LfgJoinResult>(_jsonOpts, ct) ?? new LfgJoinResult();
+        }
+
+        public async Task LfgHeartbeatAsync(string roomId, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.PostAsJsonAsync("/api/lfg/heartbeat", new { roomId }, ct);
+            resp.EnsureSuccessStatusCode();
+        }
+
+        public async Task CloseLfgAsync(string roomId, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.DeleteAsync($"/api/lfg/{Uri.EscapeDataString(roomId)}", ct);
+            resp.EnsureSuccessStatusCode();
+        }
+
+        public sealed class LfgJoinResult
+        {
+            [JsonPropertyName("endpoint")] public string Endpoint { get; set; } = "";
+            [JsonPropertyName("host")]     public string Host     { get; set; } = "";
+            [JsonPropertyName("game")]     public string Game     { get; set; } = "";
+            [JsonPropertyName("platform")] public string Platform { get; set; } = "";
+            [JsonPropertyName("vpn")]      public bool   Vpn      { get; set; }
+        }
+
+        public sealed class VpnSession
+        {
+            [JsonPropertyName("token")]     public string Token     { get; set; } = "";
+            [JsonPropertyName("relayHost")] public string RelayHost { get; set; } = "";
+            [JsonPropertyName("relayPort")] public int    RelayPort { get; set; }
+            [JsonPropertyName("subnet")]    public int    Subnet    { get; set; }
+            [JsonPropertyName("vip")]       public int    Vip       { get; set; }
+            [JsonPropertyName("ip")]        public string Ip        { get; set; } = "";
+        }
+
+        public async Task<VpnSession> GetVpnSessionAsync(string roomId, CancellationToken ct = default)
+        {
+            EnsureAuthenticated();
+            using var resp = await _http.PostAsJsonAsync("/api/vpn/session", new { roomId }, ct);
+            if (!resp.IsSuccessStatusCode)
+            {
+                var err = await resp.Content.ReadFromJsonAsync<ErrorResponse>(_jsonOpts, ct);
+                throw new GameOsException((int)resp.StatusCode, err?.Message ?? "Virtual network unavailable.");
+            }
+            return await resp.Content.ReadFromJsonAsync<VpnSession>(_jsonOpts, ct) ?? new VpnSession();
+        }
+
+        private sealed class LfgCreateResponse { [JsonPropertyName("roomId")] public string? RoomId { get; set; } }
+        private sealed class LfgListResponse   { [JsonPropertyName("rooms")]  public List<LfgRoom>? Rooms { get; set; } }
+
         public async Task RespondInviteAsync(string inviteId, string response, CancellationToken ct = default)
         {
             EnsureAuthenticated();

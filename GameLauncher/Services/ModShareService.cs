@@ -24,7 +24,7 @@ namespace GameLauncher.Services
     }
 
     /// <summary>A received share waiting for Accept / Decline.</summary>
-    public class PendingModShare
+    public class PendingModShare : GameLauncher.Models.SelectableItem
     {
         public string Id { get; set; } = "";
         public string From { get; set; } = "";

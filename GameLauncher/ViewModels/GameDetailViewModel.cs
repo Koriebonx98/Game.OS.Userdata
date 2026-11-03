@@ -1191,6 +1191,13 @@ public partial class GameDetailViewModel : ViewModelBase
     partial void OnInstalledSearchTextChanged(string value) => ApplyInstalledFilter();
     partial void OnSelectedInstalledFilterChanged(string value) => ApplyInstalledFilter();
     [RelayCommand] private void SelectInstalledFilter(string? f) => SelectedInstalledFilter = string.IsNullOrEmpty(f) ? "All" : f;
+    /// <summary>Group chips for installed Switch mods ("Drivers", "Tracks"…) taken from the first Source folder segment.</summary>
+    public ObservableCollection<string> InstalledGroups { get; } = new();
+    public bool HasInstalledGroups => InstalledGroups.Count > 2;
+    [ObservableProperty] private string _selectedInstalledGroup = "All";
+    partial void OnSelectedInstalledGroupChanged(string value) => ApplyInstalledFilter();
+    [RelayCommand] private void SelectInstalledGroup(string? f) => SelectedInstalledGroup = string.IsNullOrEmpty(f) ? "All" : f;
+    private static string GroupOf(InstalledMod m) => (m.Source ?? "").Split(" › ")[0].Trim();
     public bool NoInstalledMatches => InstalledMods.Count + EmulatorMods.Count > 0 && FilteredInstalledMods.Count + FilteredEmulatorMods.Count == 0;
     public bool HasAnyInstalled => InstalledMods.Count + EmulatorMods.Count > 0;
 
@@ -1207,6 +1214,18 @@ public partial class GameDetailViewModel : ViewModelBase
         }
         if (!InstalledFilters.Contains(SelectedInstalledFilter)) { SelectedInstalledFilter = "All"; return; }
 
+        var groups = InstalledMods.Where(m => m.RyujinxKind == "Mod" && m.Source != m.TypeName).Select(GroupOf)
+            .Where(g => g.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(g => g, StringComparer.OrdinalIgnoreCase).ToList();
+        if (!InstalledGroups.Skip(1).SequenceEqual(groups))
+        {
+            InstalledGroups.Clear();
+            InstalledGroups.Add("All");
+            foreach (var g in groups) InstalledGroups.Add(g);
+            OnPropertyChanged(nameof(HasInstalledGroups));
+        }
+        if (!InstalledGroups.Contains(SelectedInstalledGroup)) { SelectedInstalledGroup = "All"; return; }
+
         string term = (InstalledSearchText ?? "").Trim();
         bool Ok(string name, string type, string extra) =>
             (SelectedInstalledFilter == "All" || string.Equals(type, SelectedInstalledFilter, StringComparison.OrdinalIgnoreCase))
@@ -1214,7 +1233,9 @@ public partial class GameDetailViewModel : ViewModelBase
                 || type.Contains(term, StringComparison.OrdinalIgnoreCase) || extra.Contains(term, StringComparison.OrdinalIgnoreCase));
 
         FilteredInstalledMods.Clear();
-        foreach (var m in InstalledMods.Where(m => Ok(m.Name, m.TypeName, m.Source ?? ""))) FilteredInstalledMods.Add(m);
+        foreach (var m in InstalledMods.Where(m => Ok(m.Name, m.TypeName, m.Source ?? "")
+                     && (SelectedInstalledGroup == "All" || string.Equals(GroupOf(m), SelectedInstalledGroup, StringComparison.OrdinalIgnoreCase))))
+            FilteredInstalledMods.Add(m);
         FilteredEmulatorMods.Clear();
         foreach (var m in EmulatorMods.Where(m => Ok(m.Name, m.TypeName, m.Description))) FilteredEmulatorMods.Add(m);
         OnPropertyChanged(nameof(HasInstalledMods));
@@ -1294,7 +1315,7 @@ public partial class GameDetailViewModel : ViewModelBase
                     EmulatorMods.Add(new EmulatorModVm
                     {
                         Name = $"Patch: {pname}",
-                        Description = $"Xenia patch file ({Path.GetFileName(patch)}) · enabling turns on all of its patches.",
+                        Description = $"Xenia patch file ({Path.GetFileName(patch)}) · use ⚙ Settings to switch individual patches.",
                         Icon = "🩹", Kind = "XeniaPatch", EmulatorPath = emu, TitleId = pid, SourcePath = patch,
                         Enabled = EmulatorModsService.IsXeniaPatchEnabled(patch),
                     });
@@ -1340,9 +1361,34 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void OpenXeniaSettings(EmulatorModVm? mod)
     {
-        if (mod == null || !mod.IsXenia) return;
+        if (mod == null || !mod.HasSettingsButton) return;
         try
         {
+            if (mod.IsXeniaPatch)
+            {
+                if (!File.Exists(mod.SourcePath)) { EmulatorModsStatus = "Patch file not found."; return; }
+                _xeniaEditMod = mod;
+                var list = new List<XeniaSettingVm>();
+                string lastName = "";
+                foreach (var t in EmulatorModsService.ParseToml(File.ReadAllText(mod.SourcePath)))
+                {
+                    if (t.Key == "name") { lastName = t.Value.Trim('"'); continue; }
+                    if (t.Key != "is_enabled") continue;
+                    list.Add(new XeniaSettingVm
+                    {
+                        Section = t.Section, Key = t.Key, Line = t.Line, IsBool = true,
+                        OriginalValue = t.Value, Value = t.Value,
+                        DisplayName = lastName.Length > 0 ? lastName : $"Patch {list.Count + 1}",
+                    });
+                }
+                _allXeniaSettings = list;
+                XeniaFilter = "";
+                ApplyXeniaFilter();
+                XeniaEditorTitle = $"Xenia patches · {mod.TitleId}";
+                XeniaEditorStatus = list.Count == 0 ? "This patch file has no patches." : "";
+                ShowXeniaEditor = true;
+                return;
+            }
             string cfg = EmulatorModsService.EnsureXeniaConfigForEditing(mod.EmulatorPath, mod.TitleId, mod.SourcePath);
             if (!File.Exists(cfg)) { EmulatorModsStatus = "No Xenia config found for this game."; return; }
             _xeniaEditMod = mod;
@@ -1368,6 +1414,17 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mod == null) return;
         try
         {
+            if (mod.IsXeniaPatch)
+            {
+                var edits = _allXeniaSettings.Where(s => s.IsChanged)
+                    .Select(s => new EmulatorModsService.TomlSetting(s.Section, s.Key, s.Value, s.Line)).ToList();
+                if (edits.Count > 0)
+                    File.WriteAllText(mod.SourcePath, EmulatorModsService.ApplyToml(File.ReadAllText(mod.SourcePath), edits));
+                mod.Enabled = EmulatorModsService.IsXeniaPatchEnabled(mod.SourcePath);
+                EmulatorModsStatus = $"✓  Saved {edits.Count} patch change(s).";
+                ShowXeniaEditor = false;
+                return;
+            }
             string cfg = EmulatorModsService.XeniaConfigPath(mod.EmulatorPath, mod.TitleId);
             var changed = _allXeniaSettings.Where(s => s.IsChanged)
                 .Select(s => new EmulatorModsService.TomlSetting(s.Section, s.Key, s.Value, s.Line)).ToList();
@@ -4239,6 +4296,88 @@ public partial class GameDetailViewModel : ViewModelBase
         RefreshInstalledMods();
         IsModBrowserOpen = true;
     }
+    // ── Groups / LFG (shared swarm) ────────────────────────────────────────────
+    /// <summary>Set by the shell once the user is signed in.</summary>
+    public LfgService? Lfg { get; set; }
+    public ObservableCollection<LfgRoom> LfgRooms { get; } = new();
+    [ObservableProperty] private bool   _isLfgOpen;
+    [ObservableProperty] private bool   _isLfgBusy;
+    [ObservableProperty] private string _lfgStatus = "";
+    public bool IsLfgHosting => Lfg?.IsHosting == true;
+    public bool IsLfgNotHosting => !IsLfgHosting;
+    public bool NoLfgRooms => LfgRooms.Count == 0;
+    public string LfgHeader => $"👥  GROUPS & LFG · {Title} ({Platform})";
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task MenuOpenLfg()
+    {
+        IsActionMenuOpen = false;
+        IsLfgOpen = true;
+        await RefreshLfg();
+    }
+
+    [RelayCommand] private void CloseLfg() => IsLfgOpen = false;
+
+    private void NotifyLfgState()
+    {
+        OnPropertyChanged(nameof(IsLfgHosting));
+        OnPropertyChanged(nameof(IsLfgNotHosting));
+        OnPropertyChanged(nameof(NoLfgRooms));
+        OnPropertyChanged(nameof(LfgHeader));
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task RefreshLfg()
+    {
+        LfgRooms.Clear();
+        if (Lfg == null || !Lfg.IsAvailable) { LfgStatus = "Groups & LFG need a Game.OS account connected to the backend."; NotifyLfgState(); return; }
+        IsLfgBusy = true;
+        LfgStatus = "";
+        var rooms = await Lfg.ListAsync(Title, Platform);
+        foreach (var r in rooms) LfgRooms.Add(r);
+        IsLfgBusy = false;
+        NotifyLfgState();
+    }
+
+    private async System.Threading.Tasks.Task StartRoomAsync(bool group)
+    {
+        if (Lfg == null || !Lfg.IsAvailable) { LfgStatus = "Sign in to the Game.OS backend to use Groups & LFG."; return; }
+        try
+        {
+            IsLfgBusy = true;
+            await Lfg.HostAsync(Title, Platform, group);
+            LfgStatus = (group ? "✓ Group is live." : "✓ Looking for players…") + " " + Lfg.ConnectionInfo + ".";
+        }
+        catch (Exception ex) { LfgStatus = "Could not start: " + ex.Message; }
+        IsLfgBusy = false;
+        await RefreshLfg();
+    }
+
+    [RelayCommand] private System.Threading.Tasks.Task StartLfg()   => StartRoomAsync(false);
+    [RelayCommand] private System.Threading.Tasks.Task StartGroup() => StartRoomAsync(true);
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task StopLfg()
+    {
+        Lfg?.StopHosting();
+        LfgStatus = "Room closed.";
+        await RefreshLfg();
+    }
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task JoinLfg(LfgRoom? room)
+    {
+        if (room == null || Lfg == null) return;
+        try
+        {
+            IsLfgBusy = true;
+            string host = await Lfg.JoinAsync(room);
+            LfgStatus = $"✓ Joined {host}'s room. Launch the game — their temporary connection is saved for you.";
+        }
+        catch (Exception ex) { LfgStatus = "Could not join: " + ex.Message; }
+        IsLfgBusy = false;
+    }
+
     [RelayCommand] private void MenuLaunchViaSteam()
     {
         IsActionMenuOpen = false;
