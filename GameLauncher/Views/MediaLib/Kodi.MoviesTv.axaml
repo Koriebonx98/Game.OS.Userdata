@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             xmlns:lib="using:GameLauncher.Views.MediaLib"
+             x:Class="GameLauncher.Views.MediaLib.KodiMoviesTv"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- Kodi (Estuary-style) Movies & TV: selected title's fanart behind a left menu, an info block and a poster wall. -->
+    <UserControl.Styles>
+        <Style Selector="Button.kodi-menu">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#c5d3df"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="18,11"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.kodi-menu:pointerover /template/ ContentPresenter, Button.kodi-menu:focus /template/ ContentPresenter">
+            <Setter Property="Background" Value="#2a6f9e"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.kodi-menu.active /template/ ContentPresenter"><Setter Property="Background" Value="#17a2d8"/></Style>
+        <Style Selector="Button.kodi-menu.active"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="Button.kodi-poster">
+            <Setter Property="Background" Value="#33000000"/>
+            <Setter Property="BorderThickness" Value="3"/>
+            <Setter Property="BorderBrush" Value="Transparent"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="Margin" Value="0,0,12,14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.kodi-poster:pointerover /template/ ContentPresenter, Button.kodi-poster:focus /template/ ContentPresenter">
+            <Setter Property="BorderBrush" Value="#17a2d8"/>
+        </Style>
+        <Style Selector="Button.kodi-play">
+            <Setter Property="Background" Value="#17a2d8"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Padding" Value="22,9"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.kodi-play:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3cc0ef"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid Background="#0a1620">
+        <!-- Fanart of the highlighted title -->
+        <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}" FallbackGradient="{Binding SelectedItem.Gradient}"
+                          LocalCachePath="{Binding SelectedItem.CoverPath}" LetterFontSize="260" ImageCornerRadius="0" Opacity="0.35"/>
+        <Border Background="#CC0a1620"/>
+
+        <Grid ColumnDefinitions="250,*" RowDefinitions="Auto,*">
+            <!-- Header -->
+            <Border Grid.ColumnSpan="2" Background="#99000000" Padding="22,10">
+                <Grid ColumnDefinitions="Auto,*,Auto">
+                    <StackPanel Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                        <TextBlock Text="◈" Foreground="#17a2d8" FontSize="26" FontWeight="Bold"/>
+                        <TextBlock Text="Movies &amp; TV" Foreground="White" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Grid.Column="1" Text="{Binding ActiveSectionSummary}" Foreground="#8aa0b2" FontSize="13"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    <lib:MediaFilterBar Grid.Column="2" IsVisible="{Binding !HasNoActiveItems}"/>
+                </Grid>
+            </Border>
+
+            <!-- Left menu -->
+            <Border Grid.Row="1" Background="#BB0d2231" Padding="0,14">
+                <StackPanel Spacing="2">
+                    <Button Classes="kodi-menu media-nav active" Classes.focused="{Binding IsTabMoviesFocused}"
+                            Command="{Binding SelectMoviesCommand}" Content="🎬  Movies &amp; TV Shows"/>
+                    <Button Classes="kodi-menu" Command="{Binding PlayLocalVideoCommand}" Content="📂  Play File…"/>
+                    <Button Classes="kodi-menu" Command="{Binding RefreshMediaLibraryCommand}" Content="⟳  Update Library"/>
+                    <Border Height="1" Background="#2a4258" Margin="16,12"/>
+                    <!-- Highlighted title info -->
+                    <StackPanel Margin="18,0" Spacing="6" IsVisible="{Binding HasSelectedItem}">
+                        <Border Width="150" Height="220" CornerRadius="2" ClipToBounds="True" HorizontalAlignment="Left"
+                                BoxShadow="0 8 24 0 #99000000">
+                            <views:CoverImage FallbackText="{Binding SelectedItem.DisplayTitle}"
+                                              FallbackGradient="{Binding SelectedItem.Gradient}"
+                                              LocalCachePath="{Binding SelectedItem.CoverPath}"
+                                              LetterFontSize="80" ImageCornerRadius="2"/>
+                        </Border>
+                        <TextBlock Text="{Binding SelectedItem.DisplayTitle}" Foreground="White" FontSize="15" FontWeight="Bold"
+                                   TextWrapping="Wrap" MaxLines="3" TextTrimming="CharacterEllipsis"/>
+                        <TextBlock Text="{Binding SelectedItem.InfoLine}" Foreground="#8aa0b2" FontSize="11" TextWrapping="Wrap"/>
+                        <TextBlock Text="{Binding SelectedItem.RatingStars}" Foreground="#f5c518" FontSize="13"
+                                   IsVisible="{Binding SelectedItem.HasRating}"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Right: info + poster wall -->
+            <Grid Grid.Row="1" Grid.Column="1" RowDefinitions="Auto,*" Margin="26,18,10,0">
+                <StackPanel Spacing="8" Margin="0,0,0,12" IsVisible="{Binding HasSelectedItem}" MaxWidth="900" HorizontalAlignment="Left">
+                    <TextBlock Text="{Binding SelectedItem.Overview}" Foreground="#dce6ee" FontSize="14" TextWrapping="Wrap"
+                               MaxLines="3" TextTrimming="CharacterEllipsis" IsVisible="{Binding SelectedItem.HasOverview}"/>
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button Classes="kodi-play" Command="{Binding PlaySelectedMediaCommand}">▶  Play</Button>
+                        <Button Classes="kodi-play" Background="#2a4258" Command="{Binding OpenMediaItemCommand}"
+                                CommandParameter="{Binding SelectedItem}">Information</Button>
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Margin="0,30" Spacing="10" IsVisible="{Binding HasNoActiveItems}">
+                    <TextBlock Text="Your library is empty" Foreground="White" FontSize="24" FontWeight="Bold"/>
+                    <TextBlock Text="Add files to a Movies or TV Shows folder on any drive, then choose Update Library."
+                               Foreground="#8aa0b2" FontSize="14" TextWrapping="Wrap"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Margin="0,30" Spacing="10" IsVisible="{Binding HasNoResults}">
+                    <TextBlock Text="No titles match" Foreground="White" FontSize="22" FontWeight="Bold"/>
+                    <TextBlock Text="Try a different search, or clear the filters." Foreground="#8aa0b2" FontSize="14"/>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto"
+                              IsVisible="{Binding !HasNoActiveItems}">
+                    <ItemsControl ItemsSource="{Binding ActiveGroups}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Margin="0,0,0,8">
+                                    <TextBlock Text="{Binding Title}" Foreground="#17a2d8" FontSize="16" FontWeight="SemiBold"
+                                               Margin="0,4,0,8" IsVisible="{Binding ShowHeader}"/>
+                                    <ItemsControl ItemsSource="{Binding Items}">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Button Classes="kodi-poster media-nav" Classes.focused="{Binding IsFocused}" Width="150"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenMediaItemCommand}"
+                                                        CommandParameter="{Binding}">
+                                                    <StackPanel>
+                                                        <Grid Height="215">
+                                                            <views:CoverImage FallbackText="{Binding TileText}"
+                                                                              FallbackGradient="{Binding Gradient}"
+                                                                              LocalCachePath="{Binding CoverPath}"
+                                                                              LetterFontSize="64" ImageCornerRadius="0" Height="215"/>
+                                                            <Border Background="#CC17a2d8" Padding="6,1" HorizontalAlignment="Right"
+                                                                    VerticalAlignment="Top" IsVisible="{Binding Watched}">
+                                                                <TextBlock Text="✓" Foreground="White" FontSize="12" FontWeight="Bold"/>
+                                                            </Border>
+                                                            <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0" Maximum="1"
+                                                                         Value="{Binding ProgressFraction}" IsVisible="{Binding HasProgress}"
+                                                                         Foreground="#17a2d8" Background="#66000000"/>
+                                                        </Grid>
+                                                        <Border Background="#CC000000" Padding="6,4">
+                                                            <TextBlock Text="{Binding TileText}" Foreground="White" FontSize="11"
+                                                                       TextTrimming="CharacterEllipsis"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Button>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

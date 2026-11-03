@@ -1,0 +1,198 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
+             x:Class="GameLauncher.Views.MediaLib.ItunesMusic"
+             x:DataType="vm:MediaViewModel">
+
+    <!-- iTunes-style Music: LCD player strip on top, "Library" source list on the left, striped song list. -->
+    <UserControl.Styles>
+        <Style Selector="Button.it-ctl">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#4a4a4f"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Padding" Value="8,4"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.it-ctl:pointerover"><Setter Property="Foreground" Value="#fb5c74"/></Style>
+        <Style Selector="Button.it-ctl:pointerover /template/ ContentPresenter"><Setter Property="Background" Value="Transparent"/></Style>
+        <Style Selector="Button.it-source">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#2b2b30"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,6"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Left"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.it-source:pointerover /template/ ContentPresenter, Button.it-source.focused /template/ ContentPresenter">
+            <Setter Property="Background" Value="#fb5c74"/>
+            <Setter Property="Foreground" Value="White"/>
+        </Style>
+        <Style Selector="Button.it-tab">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="#6e6e73"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="12,5"/>
+            <Setter Property="CornerRadius" Value="5"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.it-tab.on /template/ ContentPresenter"><Setter Property="Background" Value="#d9d9de"/></Style>
+        <Style Selector="Button.it-tab.on"><Setter Property="Foreground" Value="#1d1d1f"/></Style>
+        <Style Selector="Button.it-tab.focused /template/ ContentPresenter"><Setter Property="Background" Value="#fb5c74"/></Style>
+        <Style Selector="Button.it-row">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="14,6"/>
+            <Setter Property="HorizontalAlignment" Value="Stretch"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Cursor" Value="Hand"/>
+        </Style>
+        <Style Selector="Button.it-row:pointerover /template/ ContentPresenter, Button.it-row.focused /template/ ContentPresenter">
+            <Setter Property="Background" Value="#fb5c74"/>
+        </Style>
+        <Style Selector="Button.it-row:pointerover TextBlock, Button.it-row.focused TextBlock"><Setter Property="Foreground" Value="White"/></Style>
+        <Style Selector="ProgressBar.it-progress">
+            <Setter Property="Foreground" Value="#6e6e73"/>
+            <Setter Property="Background" Value="#c5c9b8"/>
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="Auto,*" Background="#ffffff">
+
+        <!-- Top toolbar with LCD -->
+        <Border Grid.Row="0" Padding="16,10">
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Offset="0" Color="#f1f1f4"/>
+                    <GradientStop Offset="1" Color="#d6d6db"/>
+                </LinearGradientBrush>
+            </Border.Background>
+            <Grid ColumnDefinitions="Auto,*,260" ColumnSpacing="20">
+                <StackPanel Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                    <Button Classes="it-ctl" Command="{Binding PreviousTrackCommand}" Content="⏮"/>
+                    <Button Classes="it-ctl" FontSize="26" Command="{Binding TogglePlayPauseCommand}" Content="{Binding PlayPauseGlyph}"/>
+                    <Button Classes="it-ctl" Command="{Binding NextTrackCommand}" Content="⏭"/>
+                    <Button Classes="it-ctl" Command="{Binding StopMusicCommand}" Content="⏹"/>
+                </StackPanel>
+
+                <Border Grid.Column="1" MaxWidth="560" CornerRadius="6" Padding="10,6" BorderBrush="#a9aca0" BorderThickness="1" Background="#e4e8d8">
+                    <Grid ColumnDefinitions="Auto,*" ColumnSpacing="12">
+                        <Border Width="44" Height="44" CornerRadius="3" ClipToBounds="True" Background="#c9cdbd">
+                            <views:CoverImage FallbackText="{Binding NowPlaying.DisplayTitle}" FallbackGradient="{Binding NowPlaying.Gradient}"
+                                              LocalCachePath="{Binding NowPlaying.CoverPath}" LetterFontSize="18" ImageCornerRadius="3"
+                                              Width="44" Height="44" IsVisible="{Binding HasNowPlaying}"/>
+                        </Border>
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="1">
+                            <TextBlock Text="{Binding NowPlayingTitle}" Foreground="#1d1d1f" FontSize="13" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" TextTrimming="CharacterEllipsis"/>
+                            <TextBlock Text="{Binding NowPlayingGroup}" Foreground="#55574f" FontSize="11" HorizontalAlignment="Center"/>
+                            <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                <TextBlock Text="{Binding PositionLabel}" Foreground="#55574f" FontSize="10" VerticalAlignment="Center"/>
+                                <ProgressBar Grid.Column="1" Classes="it-progress" Minimum="0" Maximum="100"
+                                             Value="{Binding ProgressPercent}" Height="4"/>
+                                <TextBlock Grid.Column="2" Text="{Binding DurationLabel}" Foreground="#55574f" FontSize="10" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <Button Classes="it-ctl" Command="{Binding ToggleShuffleCommand}" Content="🔀" ToolTip.Tip="Shuffle"/>
+                    <Button Classes="it-ctl" Command="{Binding ToggleRepeatCommand}" Content="🔁" ToolTip.Tip="Repeat"/>
+                    <TextBlock Text="🔊" Foreground="#4a4a4f" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding VolumeLabel}" Foreground="#4a4a4f" FontSize="11" VerticalAlignment="Center" Margin="4,0"/>
+                    <Button Classes="it-ctl" Command="{Binding OpenNowPlayingFullScreenCommand}" Content="⛶" ToolTip.Tip="Full screen (Y)"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="1" ColumnDefinitions="230,*">
+            <!-- Source list -->
+            <Border Background="#e9e9ee" BorderBrush="#cfcfd4" BorderThickness="0,0,1,0" Padding="10,12">
+                <Grid RowDefinitions="Auto,Auto,*,Auto">
+                    <TextBlock Text="LIBRARY" Foreground="#8e8e93" FontSize="11" FontWeight="Bold" Margin="8,0,0,6"/>
+                    <StackPanel Grid.Row="1" Spacing="2" Margin="0,0,0,10">
+                        <Button Classes="it-tab media-nav" Classes.on="{Binding IsMusicArtistsMode}"
+                                Classes.focused="{Binding IsMusicTabArtistsFocused}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Command="{Binding SelectMusicTabCommand}" CommandParameter="artists">🎤  Artists</Button>
+                        <Button Classes="it-tab media-nav" Classes.on="{Binding IsMusicPlaylistMode}"
+                                Classes.focused="{Binding IsMusicTabPlaylistsFocused}" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Command="{Binding SelectMusicTabCommand}" CommandParameter="playlists">📜  Playlists</Button>
+                    </StackPanel>
+                    <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                        <ItemsControl ItemsSource="{Binding MusicEntries}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MediaViewModel+MusicEntry">
+                                    <Button Classes="it-source media-nav" Classes.focused="{Binding IsFocused}"
+                                            Command="{Binding $parent[UserControl].DataContext.SelectMusicEntryByClickCommand}"
+                                            CommandParameter="{Binding}">
+                                        <TextBlock Text="{Binding Title}" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    <StackPanel Grid.Row="3" Spacing="4" Margin="0,8,0,0">
+                        <Button Classes="it-tab media-nav" Classes.focused="{Binding IsMusicSearchFocused}"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding OpenMusicSearchCommand}">
+                            <TextBlock Text="{Binding MusicSearchLabel}" TextTrimming="CharacterEllipsis"/>
+                        </Button>
+                        <Button Classes="it-tab" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                Command="{Binding RefreshMediaLibraryCommand}">⟳  Refresh Library</Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Songs -->
+            <Grid Grid.Column="1" RowDefinitions="Auto,Auto,*">
+                <StackPanel Margin="22,18,22,10" Spacing="2">
+                    <TextBlock Text="{Binding MusicContentTitle}" Foreground="#1d1d1f" FontSize="26" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding MusicContentSubtitle}" Foreground="#8e8e93" FontSize="12"/>
+                </StackPanel>
+                <Border Grid.Row="1" Background="#f5f5f7" BorderBrush="#d9d9de" BorderThickness="0,1" Padding="14,5">
+                    <Grid ColumnDefinitions="36,*,Auto" ColumnSpacing="12">
+                        <TextBlock Text=""/>
+                        <TextBlock Grid.Column="1" Text="Name" Foreground="#6e6e73" FontSize="11" FontWeight="SemiBold"/>
+                        <TextBlock Grid.Column="2" Text="Time / Info" Foreground="#6e6e73" FontSize="11" FontWeight="SemiBold"/>
+                    </Grid>
+                </Border>
+
+                <StackPanel Grid.Row="2" Spacing="8" Margin="0,40" HorizontalAlignment="Center" IsVisible="{Binding HasNoMusicRows}">
+                    <TextBlock Text="🎵" FontSize="40" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Your library is empty" Foreground="#1d1d1f" FontSize="18" FontWeight="SemiBold" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Add songs to a Music folder on any drive (Artist/Album/Song), then refresh."
+                               Foreground="#6e6e73" FontSize="13" TextWrapping="Wrap" TextAlignment="Center" MaxWidth="420"/>
+                </StackPanel>
+
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" IsVisible="{Binding !HasNoMusicRows}">
+                    <ItemsControl ItemsSource="{Binding MusicRows}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:MediaViewModel+MusicRow">
+                                <Button Classes="it-row media-nav" Classes.focused="{Binding IsFocused}"
+                                        Command="{Binding $parent[UserControl].DataContext.PlayMusicRowCommand}"
+                                        CommandParameter="{Binding}">
+                                    <Grid ColumnDefinitions="36,*,Auto" ColumnSpacing="12">
+                                        <Border Width="34" Height="34" CornerRadius="3" ClipToBounds="True">
+                                            <views:CoverImage FallbackText="{Binding Title}"
+                                                              FallbackGradient="{Binding Gradient}" LocalCachePath="{Binding CoverPath}"
+                                                              LetterFontSize="15" ImageCornerRadius="3" Width="34" Height="34"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding Title}" Foreground="#1d1d1f" FontSize="13" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Subtitle}" Foreground="#8e8e93" FontSize="11" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding Detail}" Foreground="#6e6e73" FontSize="12" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

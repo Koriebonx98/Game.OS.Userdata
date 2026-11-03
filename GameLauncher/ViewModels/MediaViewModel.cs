@@ -337,21 +337,34 @@ public partial class MediaViewModel : ObservableObject
     public ReadOnlyObservableCollection<MediaLibraryItem> Music { get; }
 
     // ── Themes (Settings → Design) ────────────────────────────────────────────
-    /// <summary>Movies &amp; TV page design: "Default" or "Cinema".</summary>
+    /// <summary>Movies &amp; TV page design: "Default", "Cinema", "Prime", "AppleTV" or "Kodi".</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsCinemaMoviesTv))]
+    [NotifyPropertyChangedFor(nameof(IsPrimeMoviesTv))]
+    [NotifyPropertyChangedFor(nameof(IsAppleTvMoviesTv))]
+    [NotifyPropertyChangedFor(nameof(IsKodiMoviesTv))]
     [NotifyPropertyChangedFor(nameof(IsDefaultMoviesTv))]
     private string _moviesTvTheme = "Default";
-    /// <summary>Music page design: "Default" or "Spotify".</summary>
+    /// <summary>Music page design: "Default", "Spotify", "iTunes" or "VLC".</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSpotifyMusic))]
+    [NotifyPropertyChangedFor(nameof(IsItunesMusic))]
+    [NotifyPropertyChangedFor(nameof(IsVlcMusic))]
     [NotifyPropertyChangedFor(nameof(IsDefaultMusic))]
     private string _musicTheme = "Default";
 
-    public bool IsCinemaMoviesTv  => string.Equals(MoviesTvTheme, "Cinema", StringComparison.OrdinalIgnoreCase) || string.Equals(MoviesTvTheme, "Netflix", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultMoviesTv  => !IsCinemaMoviesTv;
-    public bool IsSpotifyMusic     => string.Equals(MusicTheme, "Spotify", StringComparison.OrdinalIgnoreCase);
-    public bool IsDefaultMusic     => !IsSpotifyMusic;
+    private bool MoviesThemeIs(string name) => string.Equals(MoviesTvTheme, name, StringComparison.OrdinalIgnoreCase);
+    private bool MusicThemeIs(string name) => string.Equals(MusicTheme, name, StringComparison.OrdinalIgnoreCase);
+
+    public bool IsCinemaMoviesTv  => MoviesThemeIs("Cinema") || MoviesThemeIs("Netflix");
+    public bool IsPrimeMoviesTv   => MoviesThemeIs("Prime");
+    public bool IsAppleTvMoviesTv => MoviesThemeIs("AppleTV") || MoviesThemeIs("Apple TV");
+    public bool IsKodiMoviesTv    => MoviesThemeIs("Kodi");
+    public bool IsDefaultMoviesTv => !IsCinemaMoviesTv && !IsPrimeMoviesTv && !IsAppleTvMoviesTv && !IsKodiMoviesTv;
+    public bool IsSpotifyMusic    => MusicThemeIs("Spotify");
+    public bool IsItunesMusic     => MusicThemeIs("iTunes");
+    public bool IsVlcMusic        => MusicThemeIs("VLC");
+    public bool IsDefaultMusic    => !IsSpotifyMusic && !IsItunesMusic && !IsVlcMusic;
     public bool IsVideoSection     => SelectedMediaSection != "music";
     public bool IsMusicPage        => SelectedMediaSection == "music";
 
@@ -765,7 +778,11 @@ public partial class MediaViewModel : ObservableObject
     private string KindOf(MediaLibraryItem item) =>
         item.MediaType == "music" ? "music" : item.IsTv ? "tv" : "movie";
 
-    private static readonly string[] CategoryFolderNames = { "Movies", "Films", "TV Shows", "TV", "Series", "Shows", "TV Series", "Music", "Songs" };
+    /// <summary>Folders searched on every drive (and the user profile) for the Movies / TV Shows / Music category folders.</summary>
+    private static readonly string[] MediaParentFolderNames =
+        { "Media", "Media Library", "Videos", "Video", "Entertainment", "Downloads", "Plex", "Jellyfin", "Kodi" };
+
+    private static readonly string[] CategoryFolderNames = { "Movies", "Films", "TV Shows", "TV", "Series", "Shows", "TV Series", "Television", "Movie", "Music", "Songs", "Audio" };
 
     /// <summary>What to search online for: the show folder for TV, the file name for movies.</summary>
     private string LookupName(MediaLibraryItem item) =>
@@ -986,6 +1003,8 @@ public partial class MediaViewModel : ObservableObject
         OnPropertyChanged(nameof(HasDetailRelated));
         OnPropertyChanged(nameof(DetailAddedLabel));
         OnPropertyChanged(nameof(DetailKindLabel));
+        OnPropertyChanged(nameof(DetailTitle));
+        OnPropertyChanged(nameof(DetailEpisodeLabel));
     }
 
     /// <summary>Other files of the same show / folder (episodes for TV shows).</summary>
@@ -994,10 +1013,22 @@ public partial class MediaViewModel : ObservableObject
             ? Array.Empty<MediaLibraryItem>()
             : ActiveItems.Where(i => string.Equals(i.Group, SelectedItem.Group, StringComparison.OrdinalIgnoreCase))
                          .OrderBy(i => i.Season).ThenBy(i => i.Episode).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase).ToList();
-    public bool HasDetailRelated => DetailRelated.Count > 1;
+    public bool HasDetailRelated => SelectedItem?.IsTv == true ? DetailRelated.Count > 0 : DetailRelated.Count > 1;
     public string DetailRelatedTitle => SelectedItem?.IsTv == true ? $"Episodes · {SelectedItem?.Group}" : $"More in {SelectedItem?.Group}";
     public string DetailAddedLabel => SelectedItem == null || string.IsNullOrEmpty(SelectedItem.AddedLabel) ? "" : $"Added {SelectedItem.AddedLabel}";
     public string DetailKindLabel => SelectedItem?.IsTv == true ? "TV SHOW" : "MOVIE";
+    public string DetailTitle => SelectedItem?.IsTv == true && SelectedItem.Group.Length > 0
+        ? SelectedItem.Group
+        : SelectedItem?.DisplayTitle ?? "";
+    public string DetailEpisodeLabel => SelectedItem is not { IsTv: true } item
+        ? ""
+        : item.Season > 0 && item.Episode > 0
+            ? $"Season {item.Season} · Episode {item.Episode}"
+            : item.Season > 0
+                ? $"Season {item.Season}"
+                : item.Episode > 0
+                    ? $"Episode {item.Episode}"
+                    : "";
 
     /// <summary>Click / A on a poster: music plays, movies and TV shows open their info page (unless disabled in settings).</summary>
     [RelayCommand]
@@ -1580,18 +1611,22 @@ public partial class MediaViewModel : ObservableObject
         _music.Clear();
 
         var knownPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var roots = GameScannerService.GetDriveRoots()
-            .Where(root => !string.IsNullOrWhiteSpace(root))
+        var roots = GameScannerService.GetDriveRoots().ToList();
+        // The user's own folders (Videos, Music, Downloads) live under the profile, not at a drive root.
+        string profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+        if (!string.IsNullOrEmpty(profile)) roots.Add(profile);
+        roots = roots.Where(root => !string.IsNullOrWhiteSpace(root) && Directory.Exists(root))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
+        DevLogService.Log($"[Media] Scanning {roots.Count} root(s): {string.Join(", ", roots)}");
 
         foreach (var driveRoot in roots)
         {
             try
             {
-                TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies", "Films");
-                TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music", "Songs");
-                TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows", "TV", "Series", "Shows", "TV Series");
+                TryCollectMediaCategory(driveRoot, _movies, VideoExtensions, knownPaths, "Movies", "Films", "Movie");
+                TryCollectMediaCategory(driveRoot, _music, AudioExtensions, knownPaths, "Music", "Songs", "Audio");
+                TryCollectMediaCategory(driveRoot, _tvShows, VideoExtensions, knownPaths, "TV Shows", "TV", "Series", "Shows", "TV Series", "Television");
             }
             catch (Exception ex) { DevLogService.Log($"[Media] Scan of '{driveRoot}' failed: {ex.Message}"); }
         }
@@ -1624,7 +1659,9 @@ public partial class MediaViewModel : ObservableObject
     {
         // Category folders are accepted under <drive>/Media/ and directly on the drive (<drive>/Movies, ...).
         var categoryDirs = new List<string>();
-        foreach (var parent in new[] { Path.Combine(driveRoot, "Media"), driveRoot })
+        var parents = new List<string> { driveRoot };
+        foreach (var name in MediaParentFolderNames) parents.Add(Path.Combine(driveRoot, name));
+        foreach (var parent in parents)
         {
             if (!Directory.Exists(parent)) continue;
             try
