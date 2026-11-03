@@ -16,6 +16,7 @@
     <Compile Include="../GameLauncher/Models/Models.cs" />
     <Compile Include="../GameLauncher/Services/RomPathHelper.cs" />
     <Compile Include="../GameLauncher/Services/AppSettingsService.cs" />
+    <Compile Include="../GameLauncher/Services/StoreAccountsService.cs" />
     <Compile Include="../GameLauncher/Services/DevLogService.cs" />
     <Compile Include="../GameLauncher/Services/SwitchTranslateService.cs" />
     <Compile Include="../GameLauncher/Services/SwitchAchievementDetectorService.cs" />
