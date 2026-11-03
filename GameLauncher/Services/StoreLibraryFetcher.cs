@@ -126,16 +126,50 @@ namespace GameLauncher.Services
                 foreach (var t in titles.EnumerateArray())
                 {
                     string name = Str(t, "name");
-                    // Only titles that run on PC belong in the PC games list.
-                    bool pc = t.TryGetProperty("devices", out var d) && d.EnumerateArray().Any(x => (x.GetString() ?? "").Equals("PC", StringComparison.OrdinalIgnoreCase));
-                    if (name.Length > 0 && pc) games.Add(new(Str(t, "titleId"), name));
+                    string type = Str(t, "type");
+                    if (name.Length > 0 && (type.Length == 0 || type.Equals("Game", StringComparison.OrdinalIgnoreCase)))
+                        games.Add(new(Str(t, "titleId"), name));
                 }
             return games;
         }
 
+        /// <summary>
+        /// Epic's library API needs an OAuth bearer token, not website cookies. Accepts a 32-char authorization code
+        /// (from https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&amp;responseType=code)
+        /// which is exchanged for an access token, or an existing bearer/JWT token which is used as-is.
+        /// </summary>
+        private static async Task<string> GetEpicBearerAsync(string token, CancellationToken ct)
+        {
+            token = token.Trim('"', '{', '}');
+            if (token.Contains("authorizationCode", StringComparison.OrdinalIgnoreCase))
+            {
+                try { using var d = JsonDocument.Parse(token.StartsWith("{") ? token : "{" + token + "}"); token = Str(d.RootElement, "authorizationCode"); } catch { }
+            }
+            if (token.Contains('=') || token.Contains(';'))
+                throw new InvalidOperationException("Epic needs an authorization code, not browser cookies. Sign in to Epic, open https://www.epicgames.com/id/api/redirect?clientId=34a02cf8f4414e29b15921876da36f9a&responseType=code and paste the authorizationCode into the token field");
+            if (token.Length != 32 || !token.All(Uri.IsHexDigit)) return token;
+
+            var req = new HttpRequestMessage(HttpMethod.Post, "https://account-public-service-prod03.ol.epicgames.com/account/api/oauth/token")
+            {
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    ["grant_type"] = "authorization_code", ["code"] = token, ["token_type"] = "eg1",
+                }),
+            };
+            req.Headers.Authorization = new AuthenticationHeaderValue("Basic",
+                Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes("34a02cf8f4414e29b15921876da36f9a:daafbccc737745039dffe53d94fc76cf")));
+            using var resp = await Http.SendAsync(req, ct).ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode)
+                throw new HttpRequestException($"Epic code rejected (HTTP {(int)resp.StatusCode}) – codes are single-use and expire in minutes; get a fresh one");
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false));
+            return Str(doc.RootElement, "access_token");
+        }
+
         private static async Task<List<StoreLibraryService.StoreGame>> FetchEpicAsync(StoreAccount a, CancellationToken ct)
         {
-            if (string.IsNullOrWhiteSpace(a.Token)) throw new InvalidOperationException("Epic bearer token missing");
+            if (string.IsNullOrWhiteSpace(a.Token)) throw new InvalidOperationException("Epic authorization code missing");
+            string bearer = await GetEpicBearerAsync(a.Token.Trim(), ct).ConfigureAwait(false);
+            a = new StoreAccount { Store = a.Store, ApiKey = a.ApiKey, UserId = a.UserId, Token = bearer };
             var items = new List<(string CatalogId, string Ns)>();
             string cursor = "";
             for (int page = 0; page < 40; page++)
