@@ -236,6 +236,58 @@ namespace GameLauncher.Services
             if (File.Exists(bak)) File.Move(bak, cfg);
         }
 
+        // ── Xenia patches ($EmuDir/Patches/{TitleID} - {GameName}.patch.toml) ──
+
+        /// <summary>Patch files in Xenia's <c>patches</c> folder whose name starts with one of the title IDs.</summary>
+        public static List<string> FindXeniaPatches(string xeniaExePath, IEnumerable<string> titleIds)
+        {
+            var result = new List<string>();
+            string? emuDir = Path.GetDirectoryName(xeniaExePath);
+            if (string.IsNullOrEmpty(emuDir) || !Directory.Exists(emuDir)) return result;
+            var ids = titleIds.Where(IsXeniaTitleId).Select(i => i.ToUpperInvariant()).ToList();
+            if (ids.Count == 0) return result;
+            try
+            {
+                foreach (string dir in Directory.EnumerateDirectories(emuDir)
+                             .Where(d => Path.GetFileName(d).Equals("patches", StringComparison.OrdinalIgnoreCase)))
+                    foreach (string f in Directory.EnumerateFiles(dir))
+                    {
+                        string name = Path.GetFileName(f);
+                        string ext = Path.GetExtension(name);
+                        if (!ext.Equals(".toml", StringComparison.OrdinalIgnoreCase) && !ext.Equals(".patch", StringComparison.OrdinalIgnoreCase)) continue;
+                        if (ids.Any(id => name.StartsWith(id, StringComparison.OrdinalIgnoreCase))) result.Add(f);
+                    }
+            }
+            catch { /* best-effort */ }
+            return result.OrderBy(f => f, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>Title ID and display name from <c>{TitleID} - {GameName}.patch[.toml]</c>.</summary>
+        public static (string TitleId, string Name) ParsePatchFileName(string path)
+        {
+            string name = Path.GetFileName(path);
+            foreach (var suffix in new[] { ".toml", ".patch" })
+                if (name.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)) name = name[..^suffix.Length];
+            int dash = name.IndexOf(" - ", StringComparison.Ordinal);
+            return dash > 0 ? (name[..dash].Trim().ToUpperInvariant(), name[(dash + 3)..].Trim()) : (name.Length >= 8 ? name[..8].ToUpperInvariant() : name, name);
+        }
+
+        /// <summary>A patch file counts as enabled when any of its <c>is_enabled</c> entries is true.</summary>
+        public static bool IsXeniaPatchEnabled(string patchPath)
+        {
+            try { return ParseToml(File.ReadAllText(patchPath)).Any(s => s.Key == "is_enabled" && s.Value == "true"); }
+            catch { return false; }
+        }
+
+        /// <summary>Sets every <c>is_enabled</c> entry of the patch file, keeping comments and layout.</summary>
+        public static void SetXeniaPatchEnabled(string patchPath, bool enabled)
+        {
+            string text = File.ReadAllText(patchPath);
+            var changed = ParseToml(text).Where(s => s.Key == "is_enabled")
+                .Select(s => s with { Value = enabled ? "true" : "false" });
+            File.WriteAllText(patchPath, ApplyToml(text, changed));
+        }
+
         // ── PS2 HD texture packs ──────────────────────────────────────────────
 
         /// <summary>A texture pack; <see cref="SourcePath"/> is a folder or an archive (.zip/.rar/.7z…).</summary>
@@ -403,6 +455,37 @@ namespace GameLauncher.Services
             return result;
         }
 
+        private static readonly string[] IconExts = { ".png", ".jpg", ".jpeg", ".webp" };
+
+        /// <summary>
+        /// Player/track icon for a Switch mod: <c>{Subject}/{Subject}.png</c>, <c>{Category}/{Subject}.png</c>,
+        /// a png named like the mod, an icon.png, inside a folder mod, or the only image in the subject folder.
+        /// </summary>
+        private static string? FindModIcon(string entry, bool isDirectory, string folder)
+        {
+            string subject = Path.GetFileName(folder);
+            string entryName = isDirectory ? Path.GetFileName(entry) : Path.GetFileNameWithoutExtension(entry);
+            var names = new List<(string Dir, string Name)>
+            {
+                (folder, subject), (folder, entryName), (folder, "icon"),
+            };
+            if (Path.GetDirectoryName(folder) is { Length: > 0 } category) names.Add((category, subject));
+            if (isDirectory) { names.Add((entry, entryName)); names.Add((entry, "icon")); }
+            foreach (var (dir, name) in names)
+                foreach (var ext in IconExts)
+                {
+                    string p = Path.Combine(dir, name + ext);
+                    if (File.Exists(p)) return p;
+                }
+            try
+            {
+                var imgs = Directory.EnumerateFiles(folder).Where(f => IconExts.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase)).Take(2).ToList();
+                if (imgs.Count == 1) return imgs[0];
+            }
+            catch { }
+            return null;
+        }
+
         private static readonly string[] SwitchDlcExts = { ".nsp", ".xci" };
         private static readonly string[] RyujinxContentDirs = { "romfs", "exefs", "cheats" };
 
@@ -458,9 +541,7 @@ namespace GameLauncher.Services
 
             void Add(string entry, bool isDirectory, string folder, string source)
             {
-                string subject = Path.GetFileName(folder);
-                string? icon = new[] { Path.Combine(folder, subject + ".png"), Path.ChangeExtension(entry, ".png") }
-                    .FirstOrDefault(File.Exists);
+                string? icon = FindModIcon(entry, isDirectory, folder);
                 result.Add(new InstalledMod
                 {
                     Name = Path.GetFileName(entry),
