@@ -90,6 +90,11 @@ public partial class BrowserViewModel : ViewModelBase
     public event Action? OpenDownloadsRequested;
     public event Action? ElementBlockerRequested;
     public event Action<StoreInfo>? CaptureLoginRequested;
+    /// <summary>Set while the browser was opened from Settings to sign in to a store; the login is captured automatically.</summary>
+    public StoreInfo? LoginStore { get; set; }
+    /// <summary>Raised after an automatic login capture so the app can return to Settings.</summary>
+    public event Action? LoginCaptured;
+    public void NotifyLoginCaptured() { LoginStore = null; LoginCaptured?.Invoke(); }
     public event Action? AutoResolveRequested;
     public event Action<string, string, string>? DownloadRequested;
 

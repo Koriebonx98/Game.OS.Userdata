@@ -485,7 +485,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         BrowserVm      = new BrowserViewModel();
         DownloadsVm    = new DownloadsViewModel();
         BrowserVm.Downloads = DownloadsVm;
-        BrowserVm.ExitRequested += () => Navigate("dashboard");
+        BrowserVm.ExitRequested += () => { BrowserVm.LoginStore = null; Navigate("dashboard"); };
         BrowserVm.ReturnToGameRequested += () =>
         {
             if (IsBrowserOverlay)
@@ -557,7 +557,12 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             LaunchFromCard(card);
         };
         QuickMenuVm.SettingsVm = SettingsVm;
-        SettingsVm.OpenInBrowserAction = url => OpenBrowserForGame(null, null, url);
+        SettingsVm.OpenInBrowserAction = url =>
+        {
+            BrowserVm.LoginStore = Services.StoreAccountsService.Stores.FirstOrDefault(s => s.LoginUrl == url);
+            OpenBrowserForGame(null, null, url);
+        };
+        BrowserVm.LoginCaptured += () => Avalonia.Threading.Dispatcher.UIThread.Post(() => Navigate("settings"));
         SettingsVm.LoadStoreAccounts();
         Services.StoreAccountsService.Captured += () =>
         {

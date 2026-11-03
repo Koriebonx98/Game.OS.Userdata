@@ -190,8 +190,26 @@ public partial class BrowserView : UserControl
             title = Unquote(title);
             await Dispatcher.UIThread.InvokeAsync(() => _vm?.UpdateTab(tab, url, string.IsNullOrWhiteSpace(title) ? new Uri(url).Host : title));
             await InjectAsync(wv);
+            await TryAutoCaptureLoginAsync(wv, url);
         }
         catch { /* page may have navigated away */ }
+    }
+
+    /// <summary>Playnite-style: once the user is past the store's sign-in page, grab the cookies and return to Settings.</summary>
+    private async Task TryAutoCaptureLoginAsync(WebView wv, string url)
+    {
+        var store = _vm?.LoginStore;
+        if (store == null || !Uri.TryCreate(url, UriKind.Absolute, out var uri)) return;
+        string host = uri.Host.ToLowerInvariant();
+        string[] roots = { store.StoreUrlHost, new Uri(store.LoginUrl).Host };
+        static string Root(string h) { var p = h.Split('.'); return p.Length <= 2 ? h : string.Join(".", p[^2..]); }
+        if (!roots.Any(r => Root(r.ToLowerInvariant()) == Root(host))) return;
+        string pathQ = (uri.AbsolutePath + uri.Query).ToLowerInvariant();
+        if (new[] { "login", "signin", "sign-in", "logon", "/auth", "oauth", "authorize" }.Any(pathQ.Contains)) return;
+        string cookie = Unquote(await wv.ExecuteScriptAsync("document.cookie")) ?? "";
+        if (string.IsNullOrWhiteSpace(cookie)) return;
+        StoreAccountsService.CaptureToken(store.Name, cookie);
+        await Dispatcher.UIThread.InvokeAsync(() => _vm?.NotifyLoginCaptured());
     }
 
     private readonly HashSet<string> _probeBypass = new();
