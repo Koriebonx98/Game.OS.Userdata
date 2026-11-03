@@ -328,6 +328,7 @@ public partial class MediaView : UserControl
                 if (_mediaPlayer != null) _mediaPlayer.Volume = vm.Volume;
                 long resume = vm.TakeResumeMs();
                 if (resume > 0) ResumeWhenReady(resume);
+                ApplySubtitlePreference(vm.SubtitlesEnabled, vm.SubtitleLanguage);
             }, DispatcherPriority.Background);
         }
         catch (Exception ex)
@@ -335,6 +336,37 @@ public partial class MediaView : UserControl
             DevLogService.Log($"[MediaView] VLC init failed: {ex.GetType().Name}: {ex.Message}");
             DisposeVlc();
         }
+    }
+
+    private DispatcherTimer? _subtitleTimer;
+
+    /// <summary>Once the tracks are known: turns subtitles off, or picks the preferred language when the file has it.</summary>
+    private void ApplySubtitlePreference(bool enabled, string language)
+    {
+        _subtitleTimer?.Stop();
+        int tries = 0;
+        var t = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _subtitleTimer = t;
+        t.Tick += (_, _) =>
+        {
+            try
+            {
+                var p = _mediaPlayer;
+                if (p == null || ++tries > 16) { t.Stop(); return; }
+                if (!p.IsPlaying) return;
+                var tracks = p.SpuDescription;
+                if (tracks == null || tracks.Length == 0) return;
+                if (!enabled) { p.SetSpu(-1); t.Stop(); return; }
+                if (language != "Auto")
+                {
+                    var match = tracks.FirstOrDefault(x => x.Id >= 0 && x.Name.Contains(language, StringComparison.OrdinalIgnoreCase));
+                    if (match.Name != null) p.SetSpu(match.Id);
+                }
+                t.Stop();
+            }
+            catch (Exception ex) { DevLogService.Log($"[MediaView] subtitle selection failed: {ex.Message}"); t.Stop(); }
+        };
+        t.Start();
     }
 
     // VLC only accepts a seek once playback has actually started, so retry for a couple of seconds.
@@ -393,6 +425,8 @@ public partial class MediaView : UserControl
         _videoTimer.Stop();
         _resumeTimer?.Stop();
         _resumeTimer = null;
+        _subtitleTimer?.Stop();
+        _subtitleTimer = null;
         // The video surface must let go of the player first, or it touches a disposed player on the next layout / resize.
         if (VlcOverlayVideoView != null) VlcOverlayVideoView.MediaPlayer = null;
         if (_mediaPlayer != null)

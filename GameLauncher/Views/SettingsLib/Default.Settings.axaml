@@ -383,6 +383,12 @@
                                                   IsChecked="{Binding StreamAudioEnabled}"
                                                   VerticalAlignment="Center"/>
                                     </Grid>
+
+                                    <StackPanel Spacing="4">
+                                        <TextBlock Text="Public broadcast relay (Start Broadcasting / Watch Party)" FontSize="11" Foreground="#8b949e"/>
+                                        <TextBox Text="{Binding StreamRelayUrl}" Watermark="https://your-stream-relay.example.com"/>
+                                        <TextBox Text="{Binding StreamRelayKey}" PasswordChar="•" Watermark="Relay admin key (if the relay requires one)"/>
+                                    </StackPanel>
                                     <TextBlock Text="Save Settings to apply stream quality changes. Audio capture is supported on Windows."
                                                TextWrapping="Wrap" FontSize="11" Foreground="#8b949e"/>
 
@@ -1275,6 +1281,12 @@
                             <CheckBox IsChecked="{Binding AutoPlayNextEpisode}" Content="Play the next episode automatically"/>
                             <CheckBox IsChecked="{Binding SkipWatchedEpisodes}" Content="Skip already-watched episodes when auto-playing"/>
                             <CheckBox IsChecked="{Binding ResumePlayback}" Content="Resume where you left off"/>
+                            <CheckBox IsChecked="{Binding SubtitlesEnabled}" Content="Show subtitles when available"/>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="Preferred subtitle language" FontSize="13" Foreground="#e6edf3"/>
+                                <ComboBox Classes="form-input" ItemsSource="{Binding AvailableSubtitleLanguages}"
+                                          SelectedItem="{Binding SubtitleLanguage}" Width="220"/>
+                            </StackPanel>
                             <StackPanel Spacing="6">
                                 <TextBlock Text="Mark as watched at (%)" FontSize="13" Foreground="#e6edf3"/>
                                 <ComboBox Classes="form-input" ItemsSource="{Binding AvailableWatchedPercents}"

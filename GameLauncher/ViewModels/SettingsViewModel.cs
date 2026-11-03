@@ -30,6 +30,8 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Result of copying a stream connection value.</summary>
     [ObservableProperty] private string _streamCopyStatus = "";
     [ObservableProperty] private int _streamFrameRate = 20;
+    [ObservableProperty] private string _streamRelayUrl = "";
+    [ObservableProperty] private string _streamRelayKey = "";
     [ObservableProperty] private int _streamMaxWidth = 1280;
     [ObservableProperty] private int _streamJpegQuality = 60;
     [ObservableProperty] private bool _streamAudioEnabled = true;
@@ -281,6 +283,9 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _resumePlayback = true;
     [ObservableProperty] private int _markWatchedPercent = 90;
     [ObservableProperty] private bool _skipWatchedEpisodes = true;
+    [ObservableProperty] private bool _subtitlesEnabled = true;
+    [ObservableProperty] private string _subtitleLanguage = "Auto";
+    public IReadOnlyList<string> AvailableSubtitleLanguages { get; } = MediaViewModel.SubtitleLanguages;
     private static string PickSource(string? chosen, string? legacy, IReadOnlyList<string> allowed)
     {
         foreach (var c in new[] { chosen, legacy })
@@ -1034,6 +1039,8 @@ public partial class SettingsViewModel : ViewModelBase
         StreamMaxWidth = StreamHostService.ClampMaxWidth(appSettings.StreamMaxWidth);
         StreamJpegQuality = StreamHostService.ClampJpegQuality(appSettings.StreamJpegQuality);
         StreamAudioEnabled = appSettings.StreamAudioEnabled;
+        StreamRelayUrl = appSettings.StreamRelayUrl;
+        StreamRelayKey = appSettings.StreamRelayKey;
         ShowFirstRunSetupBanner      = !appSettings.HasCompletedFirstRunSetup;
         DesignTheme                = NormaliseDesignTheme(appSettings.DesignTheme);
         GamesTheme                 = NormaliseGamesLibTheme(appSettings.GamesTheme);
@@ -1064,6 +1071,8 @@ public partial class SettingsViewModel : ViewModelBase
         ResumePlayback             = appSettings.ResumePlayback;
         MarkWatchedPercent         = appSettings.MarkWatchedPercent is >= 50 and <= 100 ? appSettings.MarkWatchedPercent : 90;
         SkipWatchedEpisodes        = appSettings.SkipWatchedEpisodes;
+        SubtitlesEnabled           = appSettings.SubtitlesEnabled;
+        SubtitleLanguage           = MediaViewModel.SubtitleLanguages.Contains(appSettings.SubtitleLanguage) ? appSettings.SubtitleLanguage : "Auto";
         GameInfoTheme              = NormaliseGameInfoTheme(appSettings.GameInfoTheme);
         QuickMenuTheme             = NormaliseQuickMenuTheme(appSettings.QuickMenuTheme);
         foreach (var kv in appSettings.DashboardOptions)
@@ -1252,6 +1261,8 @@ public partial class SettingsViewModel : ViewModelBase
             StreamMaxWidth       = StreamHostService.ClampMaxWidth(StreamMaxWidth),
             StreamJpegQuality    = StreamHostService.ClampJpegQuality(StreamJpegQuality),
             StreamAudioEnabled   = StreamAudioEnabled,
+            StreamRelayUrl       = (StreamRelayUrl ?? "").Trim(),
+            StreamRelayKey       = (StreamRelayKey ?? "").Trim(),
             ShowIntroVideo        = ShowIntroVideo,
             IntroVideoPath        = IntroVideoPath,
             MediaLocation         = MediaLocation,
@@ -1309,6 +1320,8 @@ public partial class SettingsViewModel : ViewModelBase
             ResumePlayback             = ResumePlayback,
             MarkWatchedPercent         = MarkWatchedPercent is >= 50 and <= 100 ? MarkWatchedPercent : 90,
             SkipWatchedEpisodes        = SkipWatchedEpisodes,
+            SubtitlesEnabled           = SubtitlesEnabled,
+            SubtitleLanguage           = SubtitleLanguage,
             GameInfoTheme              = NormaliseGameInfoTheme(GameInfoTheme),
             DashboardOptions           = CloneDashboardOptions(),
             QuickMenuTheme             = NormaliseQuickMenuTheme(QuickMenuTheme),

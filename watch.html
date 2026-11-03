@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game OS – Watch</title>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#000000">
+    <script src="pwa.js"></script>
+    <style>
+        html, body { margin: 0; height: 100%; background: #000; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; }
+        #stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; }
+        canvas { max-width: 100%; max-height: 100%; background: #000; }
+        #bar { position: fixed; left: 0; right: 0; top: 0; padding: max(10px, env(safe-area-inset-top)) 14px 10px;
+               display: flex; gap: 10px; align-items: center; background: linear-gradient(#000c, #0000); z-index: 2; }
+        #title { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .pill { background: #dc2626; color: #fff; border-radius: 999px; padding: 2px 10px; font-size: 12px; font-weight: 700; }
+        .pill.off { background: #475569; }
+        button, a.btn { background: #ffffff22; color: #fff; border: 0; border-radius: 8px; padding: 8px 12px; font-size: 14px; text-decoration: none; }
+        #msg { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+               padding: 24px; font-size: 18px; z-index: 1; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="bar">
+        <a class="btn" href="javascript:history.back()">←</a>
+        <span id="title">Loading…</span>
+        <span id="live" class="pill off">OFFLINE</span>
+        <button id="unmute" style="display:none">🔊 Tap for sound</button>
+    </div>
+    <div id="stage"><canvas id="screen" width="1280" height="720"></canvas></div>
+    <div id="msg">Connecting…</div>
+
+    <script src="script.js"></script>
+    <script>
+    // Viewer for Game OS broadcasts and watch parties. Works in iOS Safari: frames arrive over a
+    // WebSocket and are drawn to a canvas; audio is played with WebAudio after a user tap.
+    (function () {
+        const params = new URLSearchParams(location.search);
+        const canvas = document.getElementById('screen');
+        const ctx = canvas.getContext('2d');
+        const msg = document.getElementById('msg');
+        const titleEl = document.getElementById('title');
+        const liveEl = document.getElementById('live');
+        const unmute = document.getElementById('unmute');
+        const MIN_WATCH_MS = 60000;
+
+        let audioCtx = null, audioFmt = null, nextTime = 0, ws = null, watchTimer = null, recorded = false;
+        let party = null; // {title, mediaType, season, episode} when this is a watch party
+
+        function show(text) { msg.textContent = text; msg.style.display = text ? 'flex' : 'none'; }
+        function setLive(on) { liveEl.textContent = on ? '● LIVE' : 'OFFLINE'; liveEl.className = 'pill' + (on ? '' : ' off'); }
+
+        async function resolveTarget() {
+            const room = params.get('room'), relay = params.get('relay');
+            if (room && relay && /^https?:\/\//i.test(relay)) {
+                party = {
+                    title: params.get('title') || '',
+                    mediaType: params.get('type') || '',
+                    season: params.get('season') || '',
+                    episode: params.get('episode') || ''
+                };
+                return { relayUrl: relay, roomId: room, title: party.title };
+            }
+            const user = params.get('user');
+            if (!user) return null;
+            const b = await getLiveBroadcast(user);
+            return b ? { relayUrl: b.relayUrl, roomId: b.roomId, title: `${user} – ${b.title || 'Live'}` } : null;
+        }
+
+        function connect(target) {
+            titleEl.textContent = target.title || 'Live stream';
+            const base = target.relayUrl.replace(/\/+$/, '').replace(/^http/i, 'ws');
+            ws = new WebSocket(`${base}/view/${encodeURIComponent(target.roomId)}`);
+            ws.binaryType = 'arraybuffer';
+            ws.onopen = () => show('Waiting for video…');
+            ws.onmessage = async ev => {
+                if (typeof ev.data === 'string') return onJson(JSON.parse(ev.data));
+                const u8 = new Uint8Array(ev.data);
+                if (u8[0] === 1) drawFrame(u8.subarray(1));
+                else if (u8[0] === 2) playAudio(ev.data.slice(1));
+            };
+            ws.onclose = () => { setLive(false); show('The stream has ended.'); stopWatchTimer(); };
+            ws.onerror = () => show('Could not connect to the stream.');
+        }
+
+        function onJson(m) {
+            if (m.type === 'audio-format') { audioFmt = m; unmute.style.display = ''; }
+            else if (m.type === 'ended') { setLive(false); show('The stream has ended.'); }
+            else if (m.type === 'meta' && m.title && !params.get('title')) titleEl.textContent = m.title;
+        }
+
+        async function drawFrame(bytes) {
+            try {
+                const bmp = await createImageBitmap(new Blob([bytes], { type: 'image/jpeg' }));
+                if (canvas.width !== bmp.width || canvas.height !== bmp.height) { canvas.width = bmp.width; canvas.height = bmp.height; }
+                ctx.drawImage(bmp, 0, 0);
+                if (bmp.close) bmp.close();
+                if (!watchTimer) { setLive(true); show(''); startWatchTimer(); }
+            } catch (_) { /* skip bad frame */ }
+        }
+
+        unmute.onclick = () => {
+            audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+            audioCtx.resume();
+            nextTime = 0;
+            unmute.style.display = 'none';
+        };
+
+        function playAudio(buf) {
+            if (!audioCtx || audioCtx.state !== 'running' || !audioFmt) return;
+            const ch = audioFmt.channels, f32 = audioFmt.format === 'float32';
+            const samples = f32 ? new Float32Array(buf) : new Int16Array(buf);
+            const frames = Math.floor(samples.length / ch);
+            if (!frames) return;
+            const ab = audioCtx.createBuffer(ch, frames, audioFmt.sampleRate);
+            for (let c = 0; c < ch; c++) {
+                const out = ab.getChannelData(c);
+                for (let i = 0; i < frames; i++) out[i] = f32 ? samples[i * ch + c] : samples[i * ch + c] / 32768;
+            }
+            const src = audioCtx.createBufferSource();
+            src.buffer = ab; src.connect(audioCtx.destination);
+            const now = audioCtx.currentTime;
+            if (nextTime < now || nextTime - now > 0.6) nextTime = now + 0.08; // resync when late / too far ahead
+            src.start(nextTime);
+            nextTime += ab.duration;
+        }
+
+        // Watch parties: after a minute of real playback the title counts as watched on this account.
+        function startWatchTimer() {
+            if (!party || !party.title || recorded) return;
+            watchTimer = setTimeout(async () => {
+                recorded = await recordWatchedMedia({
+                    title: party.title, mediaType: party.mediaType || undefined,
+                    season: party.season || undefined, episode: party.episode || undefined
+                });
+            }, MIN_WATCH_MS);
+        }
+        function stopWatchTimer() { if (watchTimer) { clearTimeout(watchTimer); watchTimer = null; } }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            requireLogin();
+            await initializeMode();
+            const target = await resolveTarget();
+            if (!target) { titleEl.textContent = 'Not live'; show('This user is not streaming right now.'); return; }
+            connect(target);
+        });
+        window.addEventListener('beforeunload', () => { try { ws && ws.close(); } catch (_) { } });
+    })();
+    </script>
+</body>
+</html>

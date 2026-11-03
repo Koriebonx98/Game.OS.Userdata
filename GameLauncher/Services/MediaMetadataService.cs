@@ -30,6 +30,16 @@ namespace GameLauncher.Services
         public bool Found { get; set; }
     }
 
+    /// <summary>One possible match for a title, shown in the "pick the correct one" list.</summary>
+    public sealed class MediaCandidate
+    {
+        public MediaMetadata Meta { get; set; } = new();
+        public string PosterUrl { get; set; } = "";
+        /// <summary>Provider id used to fetch the full record when the pick is confirmed.</summary>
+        public string Id { get; set; } = "";
+        public string Label => Meta.Title + (Meta.Year > 0 ? $" ({Meta.Year})" : "") + (Meta.Source.Length > 0 ? $"  ·  {Meta.Source}" : "");
+    }
+
     /// <summary>
     /// Looks up movie / TV / music info online (TVmaze for TV shows, the iTunes Search API for movies and songs –
     /// neither needs an API key) and caches the JSON plus poster under <c>Data\MediaCache\</c>, shared by all users.
@@ -123,6 +133,151 @@ namespace GameLauncher.Services
                 DevLogService.Log($"[MediaMetadata] Lookup '{q}' failed: {ex.Message}");
                 return cached is { Found: true } ? cached : null;
             }
+        }
+
+        /// <summary>Several possible matches for a title, so the user can pick the right one (like Kodi's scraper dialog).</summary>
+        public static async Task<List<MediaCandidate>> SearchAsync(string kind, string query)
+        {
+            var list = new List<MediaCandidate>();
+            string q = CleanQuery(query, out int year);
+            if (q.Length == 0 || kind == "music") return list;
+            foreach (var source in SourcesFor(kind))
+            {
+                try
+                {
+                    var found = source switch
+                    {
+                        "TMDB" => await SearchTmdbAsync(kind, q, year),
+                        "TVmaze" => await SearchTvmazeAsync(q),
+                        "Cinemeta" => await SearchCinemetaAsync(kind, q),
+                        "iTunes" => await SearchItunesAsync(q),
+                        _ => new List<MediaCandidate>(),
+                    };
+                    foreach (var c in found)
+                        if (!list.Any(x => x.Meta.Title.Equals(c.Meta.Title, StringComparison.OrdinalIgnoreCase) && x.Meta.Year == c.Meta.Year))
+                            list.Add(c);
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException or IOException)
+                {
+                    DevLogService.Log($"[MediaMetadata] {source} search '{q}' failed: {ex.Message}");
+                }
+                if (list.Count >= 12) break;
+            }
+            return list.Take(12).ToList();
+        }
+
+        /// <summary>Stores the chosen match as the info for <paramref name="title"/>, so later lookups return it from the cache.</summary>
+        public static async Task<MediaMetadata> ConfirmAsync(string kind, string title, MediaCandidate pick)
+        {
+            string q = CleanQuery(title, out int year);
+            string keyBase = KeyFor(kind, q, year);
+            var meta = pick.Meta;
+            if (pick.Meta.Source == "Cinemeta" && pick.Id.Length > 0)
+            {
+                try
+                {
+                    string type = kind == "tv" ? "series" : "movie";
+                    using var full = JsonDocument.Parse(await Http.GetStringAsync($"https://v3-cinemeta.strem.io/meta/{type}/{Uri.EscapeDataString(pick.Id)}.json"));
+                    if (full.RootElement.TryGetProperty("meta", out var r) && r.ValueKind == JsonValueKind.Object)
+                    {
+                        if (Str(r, "description").Length > 0) meta.Overview = Str(r, "description");
+                        var rt = Regex.Match(Str(r, "runtime"), @"\d+");
+                        if (rt.Success) meta.RuntimeMinutes = int.Parse(rt.Value);
+                    }
+                }
+                catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException) { /* the search hit is enough */ }
+            }
+            meta.PosterFile = await DownloadPosterAsync(pick.PosterUrl, keyBase);
+            meta.Found = true;
+            meta.FetchedUtc = DateTime.UtcNow;
+            Save(keyBase + ".json", meta);
+            return meta;
+        }
+
+        private static async Task<List<MediaCandidate>> SearchCinemetaAsync(string kind, string query)
+        {
+            var list = new List<MediaCandidate>();
+            string type = kind == "tv" ? "series" : "movie";
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync($"https://v3-cinemeta.strem.io/catalog/{type}/top/search={Uri.EscapeDataString(query)}.json"));
+            if (!doc.RootElement.TryGetProperty("metas", out var metas) || metas.ValueKind != JsonValueKind.Array) return list;
+            foreach (var r in metas.EnumerateArray().Take(10))
+            {
+                var m = new MediaMetadata { Source = "Cinemeta", Title = Str(r, "name"), Year = YearOf(r), Overview = Str(r, "description") };
+                if (r.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array)
+                    m.Genres = g.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList();
+                if (double.TryParse(Str(r, "imdbRating"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var score)) m.Score = Math.Round(score, 1);
+                var rt = Regex.Match(Str(r, "runtime"), @"\d+");
+                if (rt.Success) m.RuntimeMinutes = int.Parse(rt.Value);
+                if (m.Title.Length == 0) continue;
+                list.Add(new MediaCandidate { Meta = m, PosterUrl = Str(r, "poster"), Id = Str(r, "imdb_id").Length > 0 ? Str(r, "imdb_id") : Str(r, "id") });
+            }
+            return list;
+        }
+
+        private static async Task<List<MediaCandidate>> SearchTvmazeAsync(string query)
+        {
+            var list = new List<MediaCandidate>();
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync($"https://api.tvmaze.com/search/shows?q={Uri.EscapeDataString(query)}"));
+            if (doc.RootElement.ValueKind != JsonValueKind.Array) return list;
+            foreach (var hit in doc.RootElement.EnumerateArray().Take(10))
+            {
+                if (!hit.TryGetProperty("show", out var r)) continue;
+                var m = new MediaMetadata { Source = "TVmaze", Title = Str(r, "name"), Overview = StripHtml(Str(r, "summary")) };
+                if (DateTime.TryParse(Str(r, "premiered"), out var d)) m.Year = d.Year;
+                if (r.TryGetProperty("genres", out var g) && g.ValueKind == JsonValueKind.Array)
+                    m.Genres = g.EnumerateArray().Select(x => x.GetString() ?? "").Where(x => x.Length > 0).ToList();
+                if (r.TryGetProperty("rating", out var rating) && rating.TryGetProperty("average", out var avg) && avg.ValueKind == JsonValueKind.Number) m.Score = avg.GetDouble();
+                if (r.TryGetProperty("runtime", out var rt) && rt.ValueKind == JsonValueKind.Number) m.RuntimeMinutes = rt.GetInt32();
+                string poster = r.TryGetProperty("image", out var img) && img.ValueKind == JsonValueKind.Object
+                    ? (Str(img, "original").Length > 0 ? Str(img, "original") : Str(img, "medium")) : "";
+                list.Add(new MediaCandidate { Meta = m, PosterUrl = poster });
+            }
+            return list;
+        }
+
+        private static async Task<List<MediaCandidate>> SearchTmdbAsync(string kind, string query, int year)
+        {
+            var list = new List<MediaCandidate>();
+            bool tv = kind == "tv", bearer = TmdbApiKey.StartsWith("eyJ", StringComparison.Ordinal);
+            string url = $"https://api.themoviedb.org/3/search/{(tv ? "tv" : "movie")}?query={Uri.EscapeDataString(query)}"
+                         + (bearer ? "" : $"&api_key={Uri.EscapeDataString(TmdbApiKey)}");
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            if (bearer) req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", TmdbApiKey);
+            using var resp = await Http.SendAsync(req);
+            resp.EnsureSuccessStatusCode();
+            using var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array) return list;
+            foreach (var r in results.EnumerateArray().Take(10))
+            {
+                var m = new MediaMetadata { Source = "TMDB", Title = Str(r, tv ? "name" : "title"), Overview = Str(r, "overview") };
+                if (DateTime.TryParse(Str(r, tv ? "first_air_date" : "release_date"), out var d)) m.Year = d.Year;
+                if (r.TryGetProperty("vote_average", out var va) && va.ValueKind == JsonValueKind.Number) m.Score = Math.Round(va.GetDouble(), 1);
+                string poster = Str(r, "poster_path");
+                list.Add(new MediaCandidate { Meta = m, PosterUrl = poster.Length > 0 ? "https://image.tmdb.org/t/p/w500" + poster : "" });
+            }
+            return list;
+        }
+
+        private static async Task<List<MediaCandidate>> SearchItunesAsync(string query)
+        {
+            var list = new List<MediaCandidate>();
+            using var doc = JsonDocument.Parse(await Http.GetStringAsync($"https://itunes.apple.com/search?term={Uri.EscapeDataString(query)}&media=movie&entity=movie&limit=10"));
+            if (!doc.RootElement.TryGetProperty("results", out var results) || results.ValueKind != JsonValueKind.Array) return list;
+            foreach (var r in results.EnumerateArray())
+            {
+                var m = new MediaMetadata
+                {
+                    Source = "iTunes", Title = Str(r, "trackName"),
+                    Overview = Str(r, "longDescription").Length > 0 ? Str(r, "longDescription") : Str(r, "shortDescription"),
+                    Certification = Str(r, "contentAdvisoryRating"),
+                };
+                if (DateTime.TryParse(Str(r, "releaseDate"), out var d)) m.Year = d.Year;
+                if (Str(r, "primaryGenreName") is { Length: > 0 } genre) m.Genres.Add(genre);
+                if (r.TryGetProperty("trackTimeMillis", out var ms) && ms.ValueKind == JsonValueKind.Number) m.RuntimeMinutes = (int)(ms.GetInt64() / 60000);
+                string art = Str(r, "artworkUrl100");
+                if (m.Title.Length > 0) list.Add(new MediaCandidate { Meta = m, PosterUrl = art.Length > 0 ? Regex.Replace(art, @"/\d+x\d+bb", "/600x600bb") : "" });
+            }
+            return list;
         }
 
         // ── Sources ──────────────────────────────────────────────────────────────

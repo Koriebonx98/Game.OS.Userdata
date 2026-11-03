@@ -348,7 +348,9 @@ public sealed partial class MediaViewModel
             case "Enter":
                 if (_menuIdx >= 0 && _menuIdx < MusicMenuEntries.Count) { var a = MusicMenuEntries[_menuIdx].Action; CloseMusicMenu(); a(); }
                 return true;
-            case "Escape": case "Y": case "Menu": CloseMusicMenu(); return true;
+            case "Escape": case "Y": case "Menu":
+                if (TryCancelPartyOnBack()) return true;
+                CloseMusicMenu(); return true;
         }
         for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == _menuIdx;
         MediaFocusChanged?.Invoke();

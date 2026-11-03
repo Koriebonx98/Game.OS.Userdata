@@ -499,6 +499,13 @@ namespace GameLauncher
             await _github!.UpdatePresenceAsync(_username, ct);
         }
 
+        /// <summary>Publishes or clears the public live-broadcast marker on this account (GitHub data mode).</summary>
+        public async Task SetBroadcastAsync(Models.BroadcastInfo? info, CancellationToken ct = default)
+        {
+            if (_username == null || _github == null) return;
+            await _github.SetBroadcastAsync(_username, info, ct);
+        }
+
         public async Task<string?> GetPresenceAsync(
             string username, CancellationToken ct = default)
         {
@@ -664,7 +671,20 @@ namespace GameLauncher
         {
             if (_backend != null)
                 await _backend.RespondInviteAsync(inviteId, response, ct);
+            else if (_github != null && _username != null)
+                await _github.RespondInviteAsync(_username, inviteId, response, ct);
         }
+
+        /// <summary>Sends a watch-party invite (GitHub data mode). Returns the invite id used to poll for the response.</summary>
+        public async Task<string> SendWatchInviteAsync(string toUsername, GameInvite watch, CancellationToken ct = default)
+        {
+            if (_github == null || _username == null)
+                throw new GameOsException(400, "Watch parties need a signed-in Game OS account.");
+            return await _github.SendInviteAsync(_username, toUsername, watch.GameName, "", "Watch Party", ct, watch);
+        }
+
+        public Task<string?> GetInviteStatusAsync(string toUsername, string inviteId, CancellationToken ct = default) =>
+            _github != null ? _github.GetInviteStatusAsync(toUsername, inviteId, ct) : Task.FromResult<string?>(null);
 
         public async Task<int> SyncExophaseAchievementsAsync(
             string exophaseUrl,

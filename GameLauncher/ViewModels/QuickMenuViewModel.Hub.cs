@@ -90,7 +90,15 @@ public partial class QuickMenuViewModel
         else
             yield return Act("🎥", "Record Screen", () => CaptureAfterDismiss(() => { Services.CaptureService.StartRecording(cp, ct); return null; }), "Saved to your Media folder", "record");
         yield return Act("⌨", "On-Screen Keyboard", OpenGameOsKeyboard, "Types into your game / app", "keyboard");
+        if (Services.StreamHostService.IsBroadcasting)
+            yield return Act("⏹", "Stop Streaming", () => { OnDismiss?.Invoke(); _ = OnStopBroadcast?.Invoke(); }, "Ends your public broadcast", "broadcast");
+        else if (OnStartBroadcast != null)
+            yield return Act("📡", "Start Broadcasting", () => { OnDismiss?.Invoke(); _ = OnStartBroadcast(); }, "Anyone on your profile can watch", "broadcast");
     }
+
+    /// <summary>Wired by MainViewModel: starts / stops the public relay broadcast of this screen.</summary>
+    public Func<System.Threading.Tasks.Task>? OnStartBroadcast { get; set; }
+    public Func<System.Threading.Tasks.Task>? OnStopBroadcast { get; set; }
 
     /// <summary>Game OS's own controller-driven keyboard (never the Windows one); keys are typed into whatever is behind the guide.</summary>
     public OnScreenKeyboardViewModel Keyboard { get; } = new();
