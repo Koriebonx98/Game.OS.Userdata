@@ -1070,7 +1070,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public double BrowseTabOpacity => IsModsInstalledTab ? 0.55 : 1.0;
     /// <summary>PS2 recomp lives in Mods → Installed and only exists for PS2 games.</summary>
     public bool ShowRecompInMods => IsPs2;
-    public bool NoInstalledMods => !IsSwitch && !IsPs2 && !HasInstalledMods && !HasEmulatorMods;
+    public bool NoInstalledMods => !IsSwitch && !IsPs2 && InstalledMods.Count == 0 && EmulatorMods.Count == 0;
     partial void OnIsModsInstalledTabChanged(bool value)
     {
         OnPropertyChanged(nameof(IsModsBrowseTab));
@@ -1149,7 +1149,7 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _modsStatus = "";
     [ObservableProperty] private string _workshopInput = "";
     [ObservableProperty] private bool   _isWorkshopBusy;
-    public bool HasInstalledMods => InstalledMods.Count > 0;
+    public bool HasInstalledMods => FilteredInstalledMods.Count > 0;
     public bool HasWorkshop => _steamAppId > 0 && string.Equals(Platform, "PC", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Folder used to look for mod sub-folders: the install folder, the saved exe's folder, or the Steam library copy.</summary>
@@ -1170,6 +1170,7 @@ public partial class GameDetailViewModel : ViewModelBase
         DetectedModFolders = folders.Count == 0 ? "" :
             "Detected mod folders: " + string.Join(", ", folders.Select(f => $"{Path.GetFileName(f.Path)} ({f.Type.Name})"));
         AddPlatformContent();
+        ApplyInstalledFilter();
         OnPropertyChanged(nameof(HasInstalledMods));
         OnPropertyChanged(nameof(HasWorkshop));
         OnPropertyChanged(nameof(NoInstalledMods));
@@ -1178,7 +1179,50 @@ public partial class GameDetailViewModel : ViewModelBase
 
     // ── Emulator-level mods: Xenia optimized settings, PS2 HD texture packs ─────
     public ObservableCollection<EmulatorModVm> EmulatorMods { get; } = new();
-    public bool HasEmulatorMods => EmulatorMods.Count > 0;
+    public bool HasEmulatorMods => FilteredEmulatorMods.Count > 0;
+
+    // Installed tab search + type chips ("All", "Usermaps", "DLC", "Patch"…)
+    public ObservableCollection<InstalledMod> FilteredInstalledMods { get; } = new();
+    public ObservableCollection<EmulatorModVm> FilteredEmulatorMods { get; } = new();
+    public ObservableCollection<string> InstalledFilters { get; } = new();
+    public bool HasInstalledFilters => InstalledFilters.Count > 2;
+    [ObservableProperty] private string _installedSearchText = "";
+    [ObservableProperty] private string _selectedInstalledFilter = "All";
+    partial void OnInstalledSearchTextChanged(string value) => ApplyInstalledFilter();
+    partial void OnSelectedInstalledFilterChanged(string value) => ApplyInstalledFilter();
+    [RelayCommand] private void SelectInstalledFilter(string? f) => SelectedInstalledFilter = string.IsNullOrEmpty(f) ? "All" : f;
+    public bool NoInstalledMatches => InstalledMods.Count + EmulatorMods.Count > 0 && FilteredInstalledMods.Count + FilteredEmulatorMods.Count == 0;
+    public bool HasAnyInstalled => InstalledMods.Count + EmulatorMods.Count > 0;
+
+    private void ApplyInstalledFilter()
+    {
+        var types = InstalledMods.Select(m => m.TypeName).Concat(EmulatorMods.Select(m => m.TypeName))
+            .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(t => t, StringComparer.OrdinalIgnoreCase).ToList();
+        if (!InstalledFilters.Skip(1).SequenceEqual(types))
+        {
+            InstalledFilters.Clear();
+            InstalledFilters.Add("All");
+            foreach (var t in types) InstalledFilters.Add(t);
+            OnPropertyChanged(nameof(HasInstalledFilters));
+        }
+        if (!InstalledFilters.Contains(SelectedInstalledFilter)) { SelectedInstalledFilter = "All"; return; }
+
+        string term = (InstalledSearchText ?? "").Trim();
+        bool Ok(string name, string type, string extra) =>
+            (SelectedInstalledFilter == "All" || string.Equals(type, SelectedInstalledFilter, StringComparison.OrdinalIgnoreCase))
+            && (term.Length == 0 || name.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || type.Contains(term, StringComparison.OrdinalIgnoreCase) || extra.Contains(term, StringComparison.OrdinalIgnoreCase));
+
+        FilteredInstalledMods.Clear();
+        foreach (var m in InstalledMods.Where(m => Ok(m.Name, m.TypeName, m.Source ?? ""))) FilteredInstalledMods.Add(m);
+        FilteredEmulatorMods.Clear();
+        foreach (var m in EmulatorMods.Where(m => Ok(m.Name, m.TypeName, m.Description))) FilteredEmulatorMods.Add(m);
+        OnPropertyChanged(nameof(HasInstalledMods));
+        OnPropertyChanged(nameof(HasEmulatorMods));
+        OnPropertyChanged(nameof(NoInstalledMods));
+        OnPropertyChanged(nameof(NoInstalledMatches));
+        OnPropertyChanged(nameof(HasAnyInstalled));
+    }
     [ObservableProperty] private string _emulatorModsStatus = "";
     private int _emulatorModsGeneration;
 
@@ -1224,8 +1268,7 @@ public partial class GameDetailViewModel : ViewModelBase
         int gen = ++_emulatorModsGeneration;
         EmulatorMods.Clear();
         EmulatorModsStatus = "";
-        OnPropertyChanged(nameof(HasEmulatorMods));
-        OnPropertyChanged(nameof(NoInstalledMods));
+        ApplyInstalledFilter();
         try
         {
             if (string.Equals(Platform, "Xbox 360", StringComparison.OrdinalIgnoreCase))
@@ -1245,6 +1288,17 @@ public partial class GameDetailViewModel : ViewModelBase
                         Enabled = EmulatorModsService.IsXeniaSettingsEnabled(emu, id, toml),
                     });
                 }
+                foreach (var patch in EmulatorModsService.FindXeniaPatches(emu, ResolveKnownTitleIdsForCurrentGame()))
+                {
+                    var (pid, pname) = EmulatorModsService.ParsePatchFileName(patch);
+                    EmulatorMods.Add(new EmulatorModVm
+                    {
+                        Name = $"Patch: {pname}",
+                        Description = $"Xenia patch file ({Path.GetFileName(patch)}) · enabling turns on all of its patches.",
+                        Icon = "🩹", Kind = "XeniaPatch", EmulatorPath = emu, TitleId = pid, SourcePath = patch,
+                        Enabled = EmulatorModsService.IsXeniaPatchEnabled(patch),
+                    });
+                }
             }
             else if (IsPs2)
             {
@@ -1262,8 +1316,7 @@ public partial class GameDetailViewModel : ViewModelBase
             }
         }
         catch (Exception ex) { EmulatorModsStatus = "Could not load emulator mods: " + ex.Message; }
-        OnPropertyChanged(nameof(HasEmulatorMods));
-        OnPropertyChanged(nameof(NoInstalledMods));
+        ApplyInstalledFilter();
     }
 
     // ── Xenia settings editor (per-title config toml: switches for booleans, text for the rest) ──
@@ -1344,6 +1397,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 if (enable) EmulatorModsService.EnableXeniaSettings(mod.EmulatorPath, mod.TitleId, mod.SourcePath);
                 else EmulatorModsService.DisableXeniaSettings(mod.EmulatorPath, mod.TitleId);
             }
+            else if (mod.Kind == "XeniaPatch") EmulatorModsService.SetXeniaPatchEnabled(mod.SourcePath, enable);
             else if (mod.Pack != null)
             {
                 EmulatorModsStatus = enable ? "Installing texture pack…" : "Removing…";

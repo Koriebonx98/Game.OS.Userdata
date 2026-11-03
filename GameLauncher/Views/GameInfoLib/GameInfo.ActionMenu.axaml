@@ -83,7 +83,25 @@
                     <!-- Installed: what is already set up for this game -->
                     <ScrollViewer VerticalScrollBarVisibility="Hidden" IsVisible="{Binding IsModsInstalledTab}">
                         <StackPanel Spacing="6">
-                        <!-- Installed: Ryujinx mod manager (Switch only) -->
+                        <!-- Installed: search + type filters -->
+                        <StackPanel IsVisible="{Binding HasAnyInstalled}" Spacing="6" Margin="0,0,0,6">
+                            <TextBox Classes="form-input" Text="{Binding InstalledSearchText}" Watermark="🔍  Search installed…"/>
+                            <ItemsControl ItemsSource="{Binding InstalledFilters}" IsVisible="{Binding HasInstalledFilters}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <Button Classes="btn-secondary" Margin="0,0,6,6" Padding="12,4" Content="{Binding}"
+                                                Command="{Binding $parent[UserControl].DataContext.SelectInstalledFilterCommand}"
+                                                CommandParameter="{Binding}"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="No installed items match your search." Foreground="#8b949e" Margin="4,4"
+                                       IsVisible="{Binding NoInstalledMatches}"/>
+                        </StackPanel>
+
                         <StackPanel IsVisible="{Binding IsSwitch}" Spacing="10" Margin="0,0,0,10">
                             <TextBlock Text="RYUJINX MODS" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
                             <TextBlock Text="Enable or disable mods for this game in Ryujinx."
@@ -235,7 +253,7 @@
                         <!-- Installed: emulator-level mods (Xenia optimized settings / PS2 HD texture packs) -->
                         <StackPanel IsVisible="{Binding HasEmulatorMods}" Spacing="6" Margin="0,0,0,10">
                             <TextBlock Text="EMULATOR MODS" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
-                            <ItemsControl ItemsSource="{Binding EmulatorMods}">
+                            <ItemsControl ItemsSource="{Binding FilteredEmulatorMods}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:EmulatorModVm">
                                         <Border Background="#21262d" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
@@ -303,7 +321,7 @@
                         <StackPanel IsVisible="{Binding HasInstalledMods}" Spacing="6" Margin="0,0,0,10">
                             <TextBlock Text="INSTALLED MODS" FontSize="11" FontWeight="Bold" Foreground="#8b949e" Margin="4,0,0,0"/>
                             <TextBlock Text="{Binding DetectedModFolders}" FontSize="11" Foreground="#6e7681" TextWrapping="Wrap" Margin="4,0,0,0"/>
-                            <ItemsControl ItemsSource="{Binding InstalledMods}">
+                            <ItemsControl ItemsSource="{Binding FilteredInstalledMods}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="svc:InstalledMod">
                                         <Border Background="#21262d" CornerRadius="8" Padding="12,8" Margin="0,0,0,6">
