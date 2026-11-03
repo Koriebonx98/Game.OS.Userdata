@@ -7,65 +7,67 @@
              x:DataType="vm:InboxViewModel"
              Background="#0d1117">
 
-    <Grid RowDefinitions="*,Auto">
+    <Grid RowDefinitions="*,Auto,Auto">
 
         <ScrollViewer Grid.Row="0"
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="32,28,32,28" Spacing="0">
+            <StackPanel Margin="40,32,40,28" Spacing="0">
 
-                <TextBlock Text="Inbox" Classes="page-title"/>
-                <TextBlock Text="Messages and game invites only."
-                           Classes="page-subtitle" Margin="0,0,0,6"/>
-                <TextBlock Text="↑/↓ select · A open/accept · X decline · Y profile · B back" FontSize="11"
-                           Foreground="#6e7681" Margin="0,0,0,16"/>
+                <StackPanel Spacing="8" Margin="0,0,0,22">
+                    <TextBlock Text="INBOX" Classes="con-title"/>
+                    <TextBlock Text="Messages, game invites and shared mods." Classes="page-subtitle"/>
+                </StackPanel>
 
                 <TextBlock Text="Loading inbox…"
                            Foreground="#8b949e" FontSize="13" Margin="0,0,0,16"
                            IsVisible="{Binding IsLoading}"/>
 
-                <Border Background="#3d1a1a" CornerRadius="6" Padding="14,10"
+                <Border Background="#3d1a1a" CornerRadius="10" Padding="14,10"
                         Margin="0,0,0,16"
                         IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                    <TextBlock Text="{Binding ErrorMessage}"
-                               Foreground="#f85149" FontSize="13"/>
+                    <TextBlock Text="{Binding ErrorMessage}" Foreground="#f85149" FontSize="13"/>
                 </Border>
 
-                <StackPanel IsVisible="{Binding HasPendingInvites}" Margin="0,0,0,24">
-                    <TextBlock Text="Game Invites" Classes="section-header" Margin="0,0,0,8"/>
+                <!-- ── Game invites ── -->
+                <StackPanel IsVisible="{Binding HasPendingInvites}" Margin="0,0,0,18">
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                        <TextBlock Text="GAME INVITES" Classes="con-section"/>
+                        <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+                    </Grid>
                     <ItemsControl ItemsSource="{Binding PendingInvites}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:GameInvite">
-                                <Border Background="#161b22" CornerRadius="10" Padding="16,12" Margin="0,0,0,8" BorderBrush="Transparent" BorderThickness="2"
-                                        Classes.sel="{Binding IsSelected}">
-                                    <Border.Styles>
-                                        <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                                    <Grid ColumnDefinitions="*,Auto,Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Text="{Binding GameName}"
-                                                       FontSize="14" FontWeight="Bold" Foreground="White"/>
-                                            <TextBlock FontSize="12" Foreground="#8b949e">
-                                                <Run Text="{Binding From}"/>
-                                                <Run Text=" invited you to play "/>
-                                                <Run Text="{Binding GameName}"/>
-                                                <Run Text=" "/>
-                                                <Run Text="{Binding Platform}"/>
-                                                <Run Text=" "/>
-                                                <Run Text="{Binding ConnectionType}"/>
+                                <Border Classes="con-tile" Classes.sel="{Binding IsSelected}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsSelected}">
+                                    <Grid ColumnDefinitions="68,*,Auto,Auto">
+                                        <Border Classes="con-avatar" Background="#8957e5">
+                                            <TextBlock Text="🎮" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                            <TextBlock Text="{Binding GameName}" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                                            <TextBlock FontSize="12" Foreground="#8b949e" TextWrapping="Wrap">
+                                                <Run Text="{Binding From}" Foreground="#58a6ff" FontWeight="SemiBold"/>
+                                                <Run Text=" invited you"/>
+                                                <Run Text="{Binding Platform, StringFormat=' · {0}'}"/>
+                                                <Run Text="{Binding ConnectionType, StringFormat=' · {0}'}"/>
                                             </TextBlock>
                                         </StackPanel>
-                                        <Button Grid.Column="1" Classes="btn-success"
-                                                Padding="12,7" Margin="0,0,8,0"
+                                        <Button Grid.Column="2" Classes="con-act" Margin="0,0,8,0"
                                                 Command="{Binding $parent[UserControl].DataContext.AcceptInviteCommand}"
                                                 CommandParameter="{Binding}">
-                                            ✓ Accept
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn a"><TextBlock Text="A"/></Border>
+                                                <TextBlock Text="Accept"/>
+                                            </StackPanel>
                                         </Button>
-                                        <Button Grid.Column="2" Classes="btn-secondary"
-                                                Padding="12,7"
+                                        <Button Grid.Column="3" Classes="con-act"
                                                 Command="{Binding $parent[UserControl].DataContext.DeclineInviteCommand}"
                                                 CommandParameter="{Binding}">
-                                            ✕ Decline
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn x"><TextBlock Text="X"/></Border>
+                                                <TextBlock Text="Decline"/>
+                                            </StackPanel>
                                         </Button>
                                     </Grid>
                                 </Border>
@@ -74,29 +76,43 @@
                     </ItemsControl>
                 </StackPanel>
 
-                <StackPanel IsVisible="{Binding HasPendingModShares}" Margin="0,0,0,24">
-                    <TextBlock Text="Shared Mods" Classes="section-header" Margin="0,0,0,8"/>
-                    <TextBlock Text="{Binding ModShareStatus}" FontSize="12" Foreground="#8b949e" Margin="0,0,0,6"
+                <!-- ── Shared mods ── -->
+                <StackPanel IsVisible="{Binding HasPendingModShares}" Margin="0,0,0,18">
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                        <TextBlock Text="SHARED MODS" Classes="con-section"/>
+                        <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+                    </Grid>
+                    <TextBlock Text="{Binding ModShareStatus}" FontSize="12" Foreground="#8b949e" Margin="0,0,0,8"
                                IsVisible="{Binding ModShareStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                     <ItemsControl ItemsSource="{Binding PendingModShares}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="svc:PendingModShare">
-                                <Border Background="#161b22" CornerRadius="10" Padding="16,12" Margin="0,0,0,8" BorderBrush="Transparent" BorderThickness="2"
-                                        Classes.sel="{Binding IsSelected}">
-                                    <Border.Styles>
-                                        <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                                    <Grid ColumnDefinitions="*,Auto,Auto">
-                                        <StackPanel Grid.Column="0" Spacing="4">
-                                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                <Border Classes="con-tile" Classes.sel="{Binding IsSelected}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsSelected}">
+                                    <Grid ColumnDefinitions="68,*,Auto,Auto">
+                                        <Border Classes="con-avatar" Background="#238636">
+                                            <TextBlock Text="🧩" FontSize="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                                            <TextBlock Text="{Binding Title}" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
                                             <TextBlock Text="{Binding Detail}" FontSize="12" Foreground="#8b949e" TextWrapping="Wrap"/>
                                         </StackPanel>
-                                        <Button Grid.Column="1" Classes="btn-success" Padding="12,7" Margin="0,0,8,0"
+                                        <Button Grid.Column="2" Classes="con-act" Margin="0,0,8,0"
                                                 Command="{Binding $parent[UserControl].DataContext.AcceptModShareCommand}"
-                                                CommandParameter="{Binding}">✓ Accept</Button>
-                                        <Button Grid.Column="2" Classes="btn-secondary" Padding="12,7"
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn a"><TextBlock Text="A"/></Border>
+                                                <TextBlock Text="Accept"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button Grid.Column="3" Classes="con-act"
                                                 Command="{Binding $parent[UserControl].DataContext.DeclineModShareCommand}"
-                                                CommandParameter="{Binding}">✕ Decline</Button>
+                                                CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn x"><TextBlock Text="X"/></Border>
+                                                <TextBlock Text="Decline"/>
+                                            </StackPanel>
+                                        </Button>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -104,42 +120,44 @@
                     </ItemsControl>
                 </StackPanel>
 
+                <!-- ── Messages ── -->
                 <StackPanel IsVisible="{Binding HasConversations}">
-                    <TextBlock Text="Messages" Classes="section-header" Margin="0,0,0,8"/>
+                    <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                        <TextBlock Text="MESSAGES" Classes="con-section"/>
+                        <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+                    </Grid>
                     <ItemsControl ItemsSource="{Binding Conversations}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:InboxConversationVm">
-                                <Border Background="#161b22" CornerRadius="10" Padding="16,12" Margin="0,0,0,8" BorderBrush="Transparent" BorderThickness="2"
-                                        Classes.sel="{Binding IsSelected}">
-                                    <Border.Styles>
-                                        <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                                    <Grid ColumnDefinitions="*,Auto,Auto">
-                                        <Button Grid.Column="0"
-                                                Background="Transparent"
-                                                BorderThickness="0"
-                                                HorizontalAlignment="Stretch"
-                                                HorizontalContentAlignment="Left"
+                                <Border Classes="con-tile" Classes.sel="{Binding IsSelected}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsSelected}">
+                                    <Grid ColumnDefinitions="68,*,Auto,Auto,Auto">
+                                        <Border Classes="con-avatar">
+                                            <TextBlock Text="💬" FontSize="22" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3" Margin="0,0,12,0">
+                                            <TextBlock Text="{Binding FriendUsername}" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                                            <TextBlock Text="{Binding LastMessage}" FontSize="12" Foreground="#8b949e"
+                                                       MaxLines="2" TextWrapping="Wrap" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding LastMessageAt}" FontSize="11" Foreground="#6e7681"
+                                                   VerticalAlignment="Center" Margin="0,0,14,0"/>
+                                        <Button Grid.Column="3" Classes="con-act" Margin="0,0,8,0"
                                                 Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
                                                 CommandParameter="{Binding FriendUsername}">
-                                            <StackPanel Spacing="4">
-                                                <TextBlock Text="{Binding FriendUsername}"
-                                                           FontSize="14" FontWeight="Bold" Foreground="White"/>
-                                                <TextBlock Text="{Binding LastMessage}"
-                                                           FontSize="12" Foreground="#8b949e"
-                                                           MaxLines="2" TextWrapping="Wrap"/>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn a"><TextBlock Text="A"/></Border>
+                                                <TextBlock Text="Open"/>
                                             </StackPanel>
                                         </Button>
-                                        <Button Grid.Column="1" Classes="btn-secondary"
-                                                Padding="10,7" Margin="8,0,8,0"
+                                        <Button Grid.Column="4" Classes="con-act"
                                                 Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
                                                 CommandParameter="{Binding FriendUsername}">
-                                            👤 Profile
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <Border Classes="con-btn y"><TextBlock Text="Y"/></Border>
+                                                <TextBlock Text="Profile"/>
+                                            </StackPanel>
                                         </Button>
-                                        <TextBlock Grid.Column="2"
-                                                   Text="{Binding LastMessageAt}"
-                                                   FontSize="11" Foreground="#484f58"
-                                                   VerticalAlignment="Center"/>
                                     </Grid>
                                 </Border>
                             </DataTemplate>
@@ -148,8 +166,8 @@
                 </StackPanel>
 
                 <TextBlock Text="No messages or invites yet."
-                           Foreground="#8b949e" FontSize="13" HorizontalAlignment="Center"
-                           Margin="0,32,0,0"
+                           Foreground="#8b949e" FontSize="14" HorizontalAlignment="Center"
+                           Margin="0,40,0,0"
                            IsVisible="{Binding HasEmptyInbox}"/>
 
             </StackPanel>
@@ -189,7 +207,7 @@
                         <ItemsControl ItemsSource="{Binding ConversationMessages}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:Message">
-                                    <Border CornerRadius="10" Padding="10,7" Margin="0,2">
+                                    <Border CornerRadius="12" Padding="12,8" Background="#1c2430" Margin="0,2">
                                         <StackPanel Spacing="2">
                                             <TextBlock Text="{Binding From}"
                                                        FontSize="11" FontWeight="Bold"
@@ -228,6 +246,16 @@
             </Grid>
         </Border>
 
-    <views:OnScreenKeyboardView Grid.RowSpan="2" DataContext="{Binding Keyboard}"/>
+        <Border Grid.Row="2" Classes="con-bar">
+            <StackPanel Orientation="Horizontal" Spacing="26">
+                <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn s"><TextBlock Text="↕"/></Border><TextBlock Classes="con-bar-text" Text="Select"/></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn a"><TextBlock Text="A"/></Border><TextBlock Classes="con-bar-text" Text="Open / Accept"/></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn x"><TextBlock Text="X"/></Border><TextBlock Classes="con-bar-text" Text="Decline"/></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn y"><TextBlock Text="Y"/></Border><TextBlock Classes="con-bar-text" Text="Profile"/></StackPanel>
+                <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn b"><TextBlock Text="B"/></Border><TextBlock Classes="con-bar-text" Text="Back"/></StackPanel>
+            </StackPanel>
+        </Border>
+
+    <views:OnScreenKeyboardView Grid.RowSpan="3" DataContext="{Binding Keyboard}"/>
     </Grid>
 </UserControl>

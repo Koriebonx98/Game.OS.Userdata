@@ -130,7 +130,7 @@ namespace GameLauncher.Services
         /// <summary>Creates a room on the Game.OS virtual LAN; this PC hosts at 10.77.N.1. Returns false to fall back to UPnP.</summary>
         private async Task<bool> TryHostOverVirtualNetworkAsync(string game, string platform, bool group, int maxPlayers)
         {
-            if (!VirtualNetworkService.IsSupported) return false;
+            if (!VirtualNetworkService.IsSupported || !_client.IsBackendMode) return false;
             string? id = null;
             try
             {

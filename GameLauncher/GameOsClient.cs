@@ -618,32 +618,47 @@ namespace GameLauncher
             throw new GameOsException(400, "No connection available to send invites.");
         }
 
-        // ── Shared swarm / LFG (backend mode only) ─────────────────────────────
-        public bool SupportsSwarm => _backend != null && _username != null;
+        // ── Shared swarm / LFG (backend or GitHub-direct) ──────────────────────
+        public bool SupportsSwarm => _username != null && (_backend != null || _github != null);
 
         public Task SwarmHeartbeatAsync(CancellationToken ct = default) =>
             _backend != null ? _backend.SwarmHeartbeatAsync(ct) : Task.CompletedTask;
 
-        public Task<string> CreateLfgAsync(string game, string platform, string kind, string endpoint, int maxPlayers, CancellationToken ct = default, bool vpn = false) =>
-            _backend != null ? _backend.CreateLfgAsync(game, platform, kind, endpoint, maxPlayers, ct, vpn)
-                             : throw new GameOsException(400, "LFG needs the Game.OS backend.");
+        public Task<string> CreateLfgAsync(string game, string platform, string kind, string endpoint, int maxPlayers, CancellationToken ct = default, bool vpn = false)
+        {
+            if (_backend != null) return _backend.CreateLfgAsync(game, platform, kind, endpoint, maxPlayers, ct, vpn);
+            if (_github != null && _username != null && !vpn)
+                return _github.CreateLfgRoomAsync(_username, game, platform, kind, endpoint, maxPlayers, ct);
+            throw new GameOsException(400, "Sign in to use Groups & LFG.");
+        }
 
         public Task<List<LfgRoom>> ListLfgAsync(string game, string platform, CancellationToken ct = default) =>
-            _backend != null ? _backend.ListLfgAsync(game, platform, ct) : Task.FromResult(new List<LfgRoom>());
+            _backend != null ? _backend.ListLfgAsync(game, platform, ct)
+          : _github  != null ? _github.ListLfgRoomsAsync(game, platform, ct)
+                             : Task.FromResult(new List<LfgRoom>());
 
-        public Task<BackendApiService.LfgJoinResult> JoinLfgAsync(string roomId, CancellationToken ct = default) =>
-            _backend != null ? _backend.JoinLfgAsync(roomId, ct)
-                             : throw new GameOsException(400, "LFG needs the Game.OS backend.");
+        public async Task<BackendApiService.LfgJoinResult> JoinLfgAsync(string roomId, CancellationToken ct = default)
+        {
+            if (_backend != null) return await _backend.JoinLfgAsync(roomId, ct);
+            if (_github != null && _username != null)
+            {
+                var r = await _github.JoinLfgRoomAsync(_username, roomId, ct);
+                return new BackendApiService.LfgJoinResult { Endpoint = r.Endpoint, Host = r.Host, Game = r.Game, Platform = r.Platform };
+            }
+            throw new GameOsException(400, "Sign in to use Groups & LFG.");
+        }
 
         public Task<BackendApiService.VpnSession> GetVpnSessionAsync(string roomId, CancellationToken ct = default) =>
             _backend != null ? _backend.GetVpnSessionAsync(roomId, ct)
                              : throw new GameOsException(400, "Virtual network needs the Game.OS backend.");
 
         public Task LfgHeartbeatAsync(string roomId, CancellationToken ct = default) =>
-            _backend != null ? _backend.LfgHeartbeatAsync(roomId, ct) : Task.CompletedTask;
+            _backend != null ? _backend.LfgHeartbeatAsync(roomId, ct)
+          : _github  != null ? _github.LfgRoomHeartbeatAsync(roomId, ct) : Task.CompletedTask;
 
         public Task CloseLfgAsync(string roomId, CancellationToken ct = default) =>
-            _backend != null ? _backend.CloseLfgAsync(roomId, ct) : Task.CompletedTask;
+            _backend != null ? _backend.CloseLfgAsync(roomId, ct)
+          : _github  != null ? _github.CloseLfgRoomAsync(roomId, ct) : Task.CompletedTask;
 
         public async Task RespondInviteAsync(string inviteId, string response, CancellationToken ct = default)
         {

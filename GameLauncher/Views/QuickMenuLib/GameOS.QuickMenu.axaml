@@ -51,6 +51,29 @@
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
                 <Rectangle Height="1" Fill="#30363d"/>
+                <Button Classes="btn-secondary" Command="{Binding AddFriendCommand}"
+                        HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
+                    <TextBlock Text="➕  Add Friend" FontWeight="SemiBold" Foreground="#e6edf3" FontSize="13"/>
+                </Button>
+                <TextBlock Text="INVITE FRIENDS" FontSize="10" FontWeight="Bold" Foreground="#8b949e"/>
+                <ItemsControl ItemsSource="{Binding QuickFriends}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:FriendPresenceVm">
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="{Binding Username}" Foreground="#e6edf3" FontSize="12" FontWeight="SemiBold"/>
+                                    <TextBlock Text="{Binding StatusLabel}" Foreground="#8b949e" FontSize="10" TextTrimming="CharacterEllipsis"/>
+                                </StackPanel>
+                                <Button Grid.Column="1" Classes="btn-secondary" Padding="10,4" FontSize="11"
+                                        Command="{Binding $parent[UserControl].DataContext.InviteFriendCommand}"
+                                        CommandParameter="{Binding Username}">🎮 Invite</Button>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Text="{Binding InviteStatusMessage}" FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                           IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <Rectangle Height="1" Fill="#30363d"/>
                 <!-- Exit game shortcut when playing -->
                 <Button Classes="btn-primary"
                         IsVisible="{Binding IsPlayingGame}"

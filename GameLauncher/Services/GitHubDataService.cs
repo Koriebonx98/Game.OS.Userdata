@@ -1243,6 +1243,94 @@ namespace GameLauncher.Services
             return invites ?? new List<GameInvite>();
         }
 
+        // ── LFG / group rooms (GitHub-direct mode) ────────────────────────────
+
+        private const string LfgRoomsKey = "lfg/rooms.json";
+        private static readonly TimeSpan LfgRoomTtl = TimeSpan.FromMinutes(3);
+
+        public sealed class LfgRoomRecord
+        {
+            public string RoomId { get; set; } = "";
+            public string Host { get; set; } = "";
+            public string Game { get; set; } = "";
+            public string Platform { get; set; } = "";
+            public string Kind { get; set; } = "lfg";
+            public string Endpoint { get; set; } = "";
+            public int MaxPlayers { get; set; } = 4;
+            public List<string> Members { get; set; } = new();
+            public string LastSeen { get; set; } = "";
+        }
+
+        private static bool LfgAlive(LfgRoomRecord r) =>
+            DateTimeOffset.TryParse(r.LastSeen, out var t) && DateTimeOffset.UtcNow - t < LfgRoomTtl;
+
+        private async Task<(List<LfgRoomRecord> Rooms, string? Sha)> ReadLfgRoomsAsync(CancellationToken ct)
+        {
+            var (rooms, sha) = await ReadFileAsync<List<LfgRoomRecord>>(LfgRoomsKey, ct);
+            return ((rooms ?? new()).Where(LfgAlive).ToList(), sha);
+        }
+
+        public async Task<string> CreateLfgRoomAsync(string host, string game, string platform, string kind,
+            string endpoint, int maxPlayers, CancellationToken ct = default)
+        {
+            var (rooms, sha) = await ReadLfgRoomsAsync(ct);
+            rooms.RemoveAll(r => string.Equals(r.Host, host, StringComparison.OrdinalIgnoreCase));
+            var id = Guid.NewGuid().ToString("N")[..12];
+            rooms.Add(new LfgRoomRecord
+            {
+                RoomId = id, Host = host, Game = game, Platform = platform,
+                Kind = kind == "group" ? "group" : "lfg", Endpoint = endpoint,
+                MaxPlayers = Math.Clamp(maxPlayers, 2, 16), Members = new() { host },
+                LastSeen = DateTimeOffset.UtcNow.ToString("o"),
+            });
+            await WriteFileAsync(LfgRoomsKey, rooms, $"LFG room by {host}", sha, ct);
+            return id;
+        }
+
+        public async Task<List<LfgRoom>> ListLfgRoomsAsync(string game, string platform, CancellationToken ct = default)
+        {
+            var (rooms, _) = await ReadLfgRoomsAsync(ct);
+            return rooms
+                .Where(r => string.Equals(r.Game, game, StringComparison.OrdinalIgnoreCase)
+                         && string.Equals(r.Platform, platform, StringComparison.OrdinalIgnoreCase))
+                .Select(r => new LfgRoom
+                {
+                    RoomId = r.RoomId, Host = r.Host, Game = r.Game, Platform = r.Platform,
+                    Kind = r.Kind, MaxPlayers = r.MaxPlayers, Members = r.Members,
+                }).ToList();
+        }
+
+        public async Task<(string Endpoint, string Host, string Game, string Platform)> JoinLfgRoomAsync(
+            string user, string roomId, CancellationToken ct = default)
+        {
+            var (rooms, sha) = await ReadLfgRoomsAsync(ct);
+            var room = rooms.FirstOrDefault(r => r.RoomId == roomId)
+                ?? throw new GameOsException(404, "Room is no longer available.");
+            if (!room.Members.Contains(user, StringComparer.OrdinalIgnoreCase))
+            {
+                if (room.Members.Count >= room.MaxPlayers) throw new GameOsException(409, "Room is full.");
+                room.Members.Add(user);
+                await WriteFileAsync(LfgRoomsKey, rooms, $"{user} joined LFG room", sha, ct);
+            }
+            return (room.Endpoint, room.Host, room.Game, room.Platform);
+        }
+
+        public async Task LfgRoomHeartbeatAsync(string roomId, CancellationToken ct = default)
+        {
+            var (rooms, sha) = await ReadLfgRoomsAsync(ct);
+            var room = rooms.FirstOrDefault(r => r.RoomId == roomId);
+            if (room == null) return;
+            room.LastSeen = DateTimeOffset.UtcNow.ToString("o");
+            await WriteFileAsync(LfgRoomsKey, rooms, "LFG heartbeat", sha, ct);
+        }
+
+        public async Task CloseLfgRoomAsync(string roomId, CancellationToken ct = default)
+        {
+            var (rooms, sha) = await ReadLfgRoomsAsync(ct);
+            if (rooms.RemoveAll(r => r.RoomId == roomId) > 0)
+                await WriteFileAsync(LfgRoomsKey, rooms, "Close LFG room", sha, ct);
+        }
+
         public async Task SendFriendRequestAsync(
             string from, string to, CancellationToken ct = default)
         {

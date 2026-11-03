@@ -4330,7 +4330,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private async System.Threading.Tasks.Task RefreshLfg()
     {
         LfgRooms.Clear();
-        if (Lfg == null || !Lfg.IsAvailable) { LfgStatus = "Groups & LFG need a Game.OS account connected to the backend."; NotifyLfgState(); return; }
+        if (Lfg == null || !Lfg.IsAvailable) { LfgStatus = "Sign in to your Game.OS account to use Groups & LFG."; NotifyLfgState(); return; }
         IsLfgBusy = true;
         LfgStatus = "";
         var rooms = await Lfg.ListAsync(Title, Platform);

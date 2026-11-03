@@ -204,6 +204,7 @@ public partial class QuickMenuViewModel : ViewModelBase
     public Func<string, Task<System.Collections.Generic.IReadOnlyList<Message>>>? OnLoadConversation { get; set; }
     public Func<string, string, Task<bool>>? OnSendMessage { get; set; }
     public Func<string, string, string, string, Task<bool>>? OnInviteFriend { get; set; }
+    public Func<string, Task<bool>>? OnSendFriendRequest { get; set; }
     public Action<string>? OnNavigatePage { get; set; }
     public Action<LocalGameCardVm>? OnLaunchRecentGame { get; set; }
     public Action? OnOpenBrowser { get; set; }
@@ -1003,6 +1004,23 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnOpenMusicPage?.Invoke();
         OnRequestLauncherForeground?.Invoke();
         OnDismiss?.Invoke();
+    }
+
+    [RelayCommand]
+    private void AddFriend() =>
+        Keyboard.Open("", "Add friend — username", _ => { },
+                      t => { if (!string.IsNullOrWhiteSpace(t)) _ = SendFriendRequestAsync(t.Trim()); });
+
+    private async Task SendFriendRequestAsync(string username)
+    {
+        if (OnSendFriendRequest == null) { InviteStatusMessage = "Sign in to add friends."; return; }
+        try
+        {
+            InviteStatusMessage = await OnSendFriendRequest(username)
+                ? $"Friend request sent to {username}."
+                : "Friend request was not sent.";
+        }
+        catch (Exception ex) { InviteStatusMessage = $"Could not send request: {ex.Message}"; }
     }
 
     [RelayCommand]
