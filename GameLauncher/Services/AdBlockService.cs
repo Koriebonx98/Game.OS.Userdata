@@ -23,6 +23,10 @@ namespace GameLauncher.Services
             "https://easylist.to/easylist/easylist.txt",
             "https://easylist.to/easylist/easyprivacy.txt",
             "https://pgl.yoyo.org/adservers/serverlist.php?hostformat=nohtml&showintro=0",
+            "https://ublockorigin.github.io/uAssets/filters/filters.txt",
+            "https://ublockorigin.github.io/uAssets/filters/badware.txt",
+            "https://ublockorigin.github.io/uAssets/filters/resource-abuse.txt",
+            "https://ublockorigin.github.io/uAssets/filters/unbreak.txt",
         };
 
         private static readonly string CacheDir = Path.Combine(
@@ -169,6 +173,18 @@ namespace GameLauncher.Services
             _loadedCache = false;
             EnsureCacheLoaded();
             return RuleCount;
+        }
+
+        /// <summary>Refreshes the cached lists in the background when they are missing or older than <paramref name="maxAge"/>; results are saved to disk automatically.</summary>
+        public static void UpdateIfStale(TimeSpan maxAge)
+        {
+            try
+            {
+                var files = Directory.Exists(CacheDir) ? Directory.GetFiles(CacheDir, "list*.txt") : Array.Empty<string>();
+                if (files.Length >= FilterListUrls.Length && files.All(f => DateTime.UtcNow - File.GetLastWriteTimeUtc(f) < maxAge)) return;
+                _ = Task.Run(() => UpdateListsAsync());
+            }
+            catch { }
         }
 
         private static void EnsureCacheLoaded()
