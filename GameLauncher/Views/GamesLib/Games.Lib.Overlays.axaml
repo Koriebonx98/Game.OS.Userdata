@@ -81,9 +81,9 @@
                     Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
                     CornerRadius="14" Padding="14">
                 <DockPanel>
-                    <TextBlock DockPanel.Dock="Top" Text="Filters" FontSize="18" FontWeight="Bold"
+                    <TextBlock DockPanel.Dock="Top" Text="{Binding FilterMenuTitle}" FontSize="18" FontWeight="Bold"
                                Foreground="White" Margin="4,0,0,10"/>
-                    <TextBlock DockPanel.Dock="Bottom" Text="A Select    B Close" FontSize="11"
+                    <TextBlock DockPanel.Dock="Bottom" Text="A Toggle / Select    B Close" FontSize="11"
                                Foreground="#8b949e" Margin="4,10,0,0"/>
                     <ScrollViewer>
                         <ItemsControl x:Name="FilterList" ItemsSource="{Binding FilterMenuItems}">
@@ -93,7 +93,7 @@
                                         <Grid ColumnDefinitions="*,Auto">
                                             <TextBlock Text="{Binding Label}" FontSize="14"
                                                       />
-                                            <TextBlock Grid.Column="1" Text="✓" IsVisible="{Binding IsActive}"
+                                            <TextBlock Grid.Column="1" Text="{Binding Mark}"
                                                        Foreground="#3fb950" FontWeight="Bold"/>
                                         </Grid>
                                     </Border>

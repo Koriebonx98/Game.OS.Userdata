@@ -36,6 +36,8 @@ namespace GameLauncher.Services
                 try
                 {
                     var games = await FetchAsync(acct, ct).ConfigureAwait(false);
+                    OwnedStoreGamesService.ReplaceStore(StoreAccountsService.CurrentUser, acct.Store,
+                        games.Select(g => new OwnedStoreGame { Store = acct.Store, Id = g.Id, Title = g.Title, LaunchId = g.LaunchId, Url = g.Url }));
                     var r = StoreLibraryService.Submit(acct.Store, games);
                     lines.Add($"{acct.Store}: {games.Count} games – {r.NewGames} new, {r.StoreMerges} store links added, {r.AlreadyComplete} already complete, {r.Duplicates} already queued");
                 }
@@ -171,6 +173,7 @@ namespace GameLauncher.Services
             string bearer = await GetEpicBearerAsync(a.Token.Trim(), ct).ConfigureAwait(false);
             a = new StoreAccount { Store = a.Store, ApiKey = a.ApiKey, UserId = a.UserId, Token = bearer };
             var items = new List<(string CatalogId, string Ns)>();
+            var appNames = new Dictionary<string, string>();
             string cursor = "";
             for (int page = 0; page < 40; page++)
             {
@@ -184,7 +187,9 @@ namespace GameLauncher.Services
                     {
                         string ns = Str(r, "namespace");
                         if (ns == "ue") continue; // Unreal Engine marketplace assets, not games
-                        items.Add((Str(r, "catalogItemId"), ns));
+                        string cid = Str(r, "catalogItemId");
+                        items.Add((cid, ns));
+                        if (cid.Length > 0 && Str(r, "appName").Length > 0) appNames[cid] = Str(r, "appName");
                     }
                 cursor = doc.RootElement.TryGetProperty("responseMetadata", out var m) ? Str(m, "nextCursor") : "";
                 if (cursor.Length == 0) break;
@@ -202,7 +207,7 @@ namespace GameLauncher.Services
                 {
                     string title = Str(p.Value, "title");
                     var cats = p.Value.TryGetProperty("categories", out var c) ? c.EnumerateArray().Select(x => Str(x, "path")).ToList() : new();
-                    if (title.Length > 0 && cats.Any(x => x is "games" or "applications")) games.Add(new(p.Name, title));
+                    if (title.Length > 0 && cats.Any(x => x is "games" or "applications")) games.Add(new(p.Name, title, null, null, appNames.GetValueOrDefault(p.Name)));
                 }
             }
             return games;

@@ -236,16 +236,22 @@
                         <TextBlock Text="Choose install source"
                                   FontSize="14" FontWeight="Bold" Foreground="White"/>
                         <StackPanel Orientation="Horizontal" Spacing="8">
-                           <Button Classes="btn-secondary"
+                           <Button IsVisible="{Binding IsRepack}" Classes="btn-secondary"
                                    Padding="16,10"
                                    Command="{Binding ChooseRepackInstallSourceCommand}">
                                Repack/zip
                            </Button>
-                           <Button Classes="btn-secondary"
+                           <Button IsVisible="{Binding IsSteamInstallable}" Classes="btn-secondary"
                                    Padding="16,10"
                                    Command="{Binding ChooseSteamInstallSourceCommand}">
                                Steam
                            </Button>
+<Button Classes="btn-secondary" Padding="16,10" IsVisible="{Binding HasEpicInstall}"
+        Command="{Binding ChooseEpicInstallSourceCommand}">Epic</Button>
+<TextBox Width="200" Watermark="Download URL" Text="{Binding DownloadUrl}" VerticalAlignment="Center"/>
+<Button Classes="btn-secondary" Padding="16,10"
+        Command="{Binding ChooseUrlInstallSourceCommand}">URL</Button>
+
                            <Button Classes="btn-secondary"
                                    Padding="12,10"
                                    Command="{Binding CancelInstallSourceCommand}">
@@ -289,7 +295,7 @@
                         IsVisible="{Binding ShowStandaloneSteamInstall}">
                 <Button Classes="btn-success"
                         Padding="24,12"
-                        Command="{Binding InstallViaSteamCommand}">
+                        Command="{Binding InstallGameCommand}">
                     <StackPanel Orientation="Horizontal" Spacing="8">
                         <TextBlock Text="🎮" FontSize="16" VerticalAlignment="Center"/>
                         <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
@@ -298,7 +304,38 @@
                 </Button>
                 <TextBlock Text="Opens the Steam client to download and install this game."
                            FontSize="11" Foreground="#8b949e"/>
-            </StackPanel>
+            <Border IsVisible="{Binding ShowInstallSourcePicker}"
+                        Background="#161b22" CornerRadius="10"
+                        Padding="16,14" Margin="0,4,0,0">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Choose install source"
+                                  FontSize="14" FontWeight="Bold" Foreground="White"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                           <Button IsVisible="{Binding IsRepack}" Classes="btn-secondary"
+                                   Padding="16,10"
+                                   Command="{Binding ChooseRepackInstallSourceCommand}">
+                               Repack/zip
+                           </Button>
+                           <Button IsVisible="{Binding IsSteamInstallable}" Classes="btn-secondary"
+                                   Padding="16,10"
+                                   Command="{Binding ChooseSteamInstallSourceCommand}">
+                               Steam
+                           </Button>
+<Button Classes="btn-secondary" Padding="16,10" IsVisible="{Binding HasEpicInstall}"
+        Command="{Binding ChooseEpicInstallSourceCommand}">Epic</Button>
+<TextBox Width="200" Watermark="Download URL" Text="{Binding DownloadUrl}" VerticalAlignment="Center"/>
+<Button Classes="btn-secondary" Padding="16,10"
+        Command="{Binding ChooseUrlInstallSourceCommand}">URL</Button>
+
+                           <Button Classes="btn-secondary"
+                                   Padding="12,10"
+                                   Command="{Binding CancelInstallSourceCommand}">
+                               Cancel
+                           </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+</StackPanel>
 
             <!-- ── Cloud-only placeholder (game in library but not installed locally) ── -->
             <StackPanel Margin="0,16,0,0" Spacing="8"
@@ -306,7 +343,7 @@
                 <StackPanel Orientation="Horizontal" Spacing="10">
                     <Button Classes="btn-secondary"
                             Padding="24,12"
-                            IsEnabled="False">
+                            Command="{Binding InstallGameCommand}">
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <TextBlock Text="⬇" FontSize="16" VerticalAlignment="Center"/>
                             <TextBlock Text="Install" FontSize="15" FontWeight="Bold"
@@ -316,7 +353,38 @@
                 </StackPanel>
                 <TextBlock Text="This game is in your library but not installed on this device."
                            FontSize="11" Foreground="#8b949e"/>
-            </StackPanel>
+            <Border IsVisible="{Binding ShowInstallSourcePicker}"
+                        Background="#161b22" CornerRadius="10"
+                        Padding="16,14" Margin="0,4,0,0">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Choose install source"
+                                  FontSize="14" FontWeight="Bold" Foreground="White"/>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                           <Button IsVisible="{Binding IsRepack}" Classes="btn-secondary"
+                                   Padding="16,10"
+                                   Command="{Binding ChooseRepackInstallSourceCommand}">
+                               Repack/zip
+                           </Button>
+                           <Button IsVisible="{Binding IsSteamInstallable}" Classes="btn-secondary"
+                                   Padding="16,10"
+                                   Command="{Binding ChooseSteamInstallSourceCommand}">
+                               Steam
+                           </Button>
+<Button Classes="btn-secondary" Padding="16,10" IsVisible="{Binding HasEpicInstall}"
+        Command="{Binding ChooseEpicInstallSourceCommand}">Epic</Button>
+<TextBox Width="200" Watermark="Download URL" Text="{Binding DownloadUrl}" VerticalAlignment="Center"/>
+<Button Classes="btn-secondary" Padding="16,10"
+        Command="{Binding ChooseUrlInstallSourceCommand}">URL</Button>
+
+                           <Button Classes="btn-secondary"
+                                   Padding="12,10"
+                                   Command="{Binding CancelInstallSourceCommand}">
+                               Cancel
+                           </Button>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+</StackPanel>
 
             <!-- ── Repack available badge (shown when game installed AND repack exists) ── -->
             <Border IsVisible="{Binding HasMatchingRepack}"

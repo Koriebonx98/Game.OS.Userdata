@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using CommunityToolkit.Mvvm.ComponentModel;
 using GameLauncher.Models;
 
@@ -24,6 +26,9 @@ public partial class LocalGameCardVm : ViewModelBase
     public string EffectiveTitle => DisplayTitle ?? Title;
 
     partial void OnDisplayTitleChanged(string? value) => OnPropertyChanged(nameof(EffectiveTitle));
+
+    /// <summary>Stores this game is owned on or installed from (Steam, Epic Games, Repack …), used by the store filter.</summary>
+    public HashSet<string> Stores { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>Platform tag used by the platform filter ("PC", "PS3", "Switch", etc.).</summary>
     public string Platform { get; init; } = "";
