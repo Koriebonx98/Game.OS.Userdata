@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:models="using:GameLauncher.Models"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:svc="using:GameLauncher.Services"
              x:Class="GameLauncher.Views.GameInfoLib.GameInfoActionMenu"
              x:DataType="vm:GameDetailViewModel">
@@ -378,6 +379,18 @@
                     </StackPanel>
                     <TextBox DockPanel.Dock="Top" Classes="form-input" Text="{Binding ModSearchText}"
                              Watermark="🔍  Search mods…" Margin="0,0,0,8"/>
+                    <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding ModFilters}" IsVisible="{Binding HasModFilters}" Margin="0,0,0,8">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel/></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <Button Classes="btn-secondary" Margin="0,0,6,6" Padding="12,4" Content="{Binding}"
+                                        Command="{Binding $parent[UserControl].DataContext.SelectModFilterCommand}"
+                                        CommandParameter="{Binding}"/>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <TextBlock DockPanel.Dock="Top" Text="No mods or saved links for this game yet. Add links from 🌐 Browser (kind: Mod)."
                                Foreground="#8b949e" Margin="4,8" TextWrapping="Wrap"
                                IsVisible="{Binding NoModsFound}"/>
@@ -392,7 +405,12 @@
                                                 Command="{Binding $parent[UserControl].DataContext.ToggleModDetailCommand}"
                                                 CommandParameter="{Binding}">
                                             <Grid ColumnDefinitions="Auto,*,Auto">
-                                                <TextBlock Grid.Column="0" Text="🧩" FontSize="18" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                                                <Panel Grid.Column="0" Width="40" Height="40" Margin="0,0,10,0" VerticalAlignment="Center">
+                                                    <TextBlock Text="🧩" FontSize="18" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                               IsVisible="{Binding NoIcon}"/>
+                                                    <views:CoverImage ImageUrl="{Binding IconUrl}" IsVisible="{Binding HasIcon}"
+                                                                      ImageCornerRadius="8"/>
+                                                </Panel>
                                                 <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" Foreground="White"
                                                                TextTrimming="CharacterEllipsis"/>
@@ -418,7 +436,12 @@
                                             <StackPanel Spacing="8">
                                                 <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold" Foreground="White" TextWrapping="Wrap"/>
                                                 <TextBlock Text="{Binding DisplayDescription}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                                                <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="⬇  Download"
+                                                        IsVisible="{Binding IsSwitchRepoMod}"
+                                                        Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
+                                                        CommandParameter="{Binding}"/>
                                                 <Button Classes="btn-secondary" HorizontalAlignment="Left" Content="↗  Open in browser"
+                                                        IsVisible="{Binding !IsSwitchRepoMod}"
                                                         Command="{Binding $parent[UserControl].DataContext.OpenModUrlCommand}"
                                                         CommandParameter="{Binding}"/>
                                             </StackPanel>

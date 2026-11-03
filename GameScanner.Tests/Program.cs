@@ -2731,6 +2731,7 @@ class Program
 
             Check(DownloadPathResolver.Resolve(root, "PS2", "DLC").EndsWith(Path.Combine("Sony - PlayStation 2", "DLC")), "DLC category resolves to Roms/<Platform>/DLC");
             Check(DownloadPathResolver.Resolve(root, "PS2", "Update").EndsWith(Path.Combine("Sony - PlayStation 2", "Updates")), "Update category resolves to Updates");
+            Check(DownloadPathResolver.Resolve(root, "Switch", DownloadPathResolver.CategoryMod) == Path.Combine(root, "Roms", "Nintendo - Switch", "Mods"), "Switch mod downloads resolve to Roms/Nintendo - Switch/Mods");
 
             var packs = EmulatorModsService.FindTexturePacks(plat, "Okami", new[] { "SLUS_21000" });
             Check(packs.Count == 1 && packs[0].TitleId == "SLUS-21000", "texture pack detected by game name");
@@ -2804,9 +2805,11 @@ class Program
             Check(edited == "# hi\n[GPU]\nvsync = false # note\nres = 4\n", "toml edit preserves comments");
 
             // Game OS Switch mods repo layout
-            string tree = "{\"tree\":[{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/burgertoad_v1.zip\",\"type\":\"blob\"},{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/Toad.txt\",\"type\":\"blob\"},{\"path\":\"Other/x.zip\",\"type\":\"blob\"}]}";
+            string tree = "{\"tree\":[{\"path\":\"Mario Kart 8 Deluxe/Drivers\",\"type\":\"tree\"},{\"path\":\"Mario Kart 8 Deluxe/Tracks\",\"type\":\"tree\"},{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/burgertoad_v1.zip\",\"type\":\"blob\"},{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/Toad.txt\",\"type\":\"blob\"},{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad.png\",\"type\":\"blob\"},{\"path\":\"Other/x.zip\",\"type\":\"blob\"}]}";
             var rm = SwitchModRepoService.ParseTree(tree, "Mario Kart 8 Deluxe", null);
             Check(rm.Count == 1 && rm[0].Name == "burgertoad_v1" && rm[0].Category == "Drivers › Toad" && rm[0].DownloadUrl.Contains("Mario%20Kart%208%20Deluxe"), "switch repo archive mods parsed");
+            Check(rm[0].Group == "Drivers" && rm[0].Subject == "Toad" && rm[0].IconUrl?.EndsWith("Drivers/Toad.png") == true, "switch repo mod icon + group");
+            Check(SwitchModRepoService.ParseModTypes(tree, "Mario Kart 8 Deluxe", null).SequenceEqual(new[] { "Drivers", "Tracks" }), "switch repo mod types include empty folders");
             Check(RyujinxModService.GetModsContentDir(Path.Combine("r", "portable", "games", "0100", "mods.json")) == Path.Combine("r", "portable", "mods", "contents", "0100"), "ryujinx mods content dir");
 
             var gh = GameModsService.ParseGitHubReleaseUrl("https://github.com/alterware/alterware-launcher/releases");
