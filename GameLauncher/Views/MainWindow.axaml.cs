@@ -959,6 +959,7 @@ public partial class MainWindow : Window
                 case Key.Down:  lib.MoveFilterMenu(1);  break;
                 case Key.Enter: lib.ApplyFilterMenuSelection(); break;
                 case Key.X:
+                case Key.F6:
                 case Key.Escape:
                 case Key.BrowserBack: lib.CloseFilterMenu(); break;
                 default: return true;
@@ -972,6 +973,7 @@ public partial class MainWindow : Window
         {
             case Key.Y:        lib.OpenKeyboard();           return true;
             case Key.X:        lib.OpenFilterMenu();         return true;
+            case Key.F6:       lib.OpenPlatformMenu();       return true;
             case Key.Left:
                 // Wii Games page: Left off the first column slides back to the Wii dashboard
                 if (lib.IsWiiGamesLib && (lib.FocusedGameIndex < 0 ||
@@ -1418,6 +1420,7 @@ public partial class MainWindow : Window
         _xinput.OnBack    = () => HandleControllerKey(Key.Escape);
         _xinput.OnLb      = () => HandleControllerKey(Key.PageUp);
         _xinput.OnRb      = () => HandleControllerKey(Key.PageDown);
+        _xinput.OnRightStickClick = () => HandleControllerKey(Key.F6);
         // Triggers never switch pages; they only rewind / fast-forward while a video or music player is open.
         _xinput.OnLt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(-1));
         _xinput.OnRt      = () => Avalonia.Threading.Dispatcher.UIThread.Post(() => _boundVm?.MediaVm.TransportJump(1));

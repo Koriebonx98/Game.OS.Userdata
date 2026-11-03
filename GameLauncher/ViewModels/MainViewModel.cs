@@ -559,7 +559,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.SettingsVm = SettingsVm;
         SettingsVm.OpenInBrowserAction = url => OpenBrowserForGame(null, null, url);
         SettingsVm.LoadStoreAccounts();
-        Services.StoreAccountsService.Captured += () => Avalonia.Threading.Dispatcher.UIThread.Post(SettingsVm.LoadStoreAccounts);
+        Services.StoreAccountsService.Captured += () =>
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(SettingsVm.LoadStoreAccounts);
+            // A store login was just captured: pull its library into Games.
+            _ = Task.Run(async () => { try { await Services.StoreLibraryFetcher.SyncAllAsync(); } catch { } });
+        };
+        Services.OwnedStoreGamesService.Changed += () => Task.Run(MergeOwnedStoreGames);
         QuickMenuVm.OnOpenBrowser = () => OpenBrowserForGame(QuickMenuVm.CurrentGamePlatform, QuickMenuVm.CurrentGameTitle, null, QuickMenuVm.IsPlayingGame);
         QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url, QuickMenuVm.IsPlayingGame);
         DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
@@ -1688,6 +1694,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             try { return await _client.LinkSteamIdAsync(steamId).ConfigureAwait(false); }
             catch { return null; /* non-critical — link errors shown inline */ }
         };
+
+        _ = Task.Run(MergeOwnedStoreGames);
 
         // Load cached Steam games from the previous session into the library immediately
         _ = Task.Run(() =>
@@ -5040,11 +5048,85 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch { /* best-effort — heal failure must not block periodic sync */ }
     }
 
+        // ── Store library merge ───────────────────────────────────────────────
+        /// <summary>Adds games owned on Epic/GOG/Xbox/… to the Games section, skipping titles already present (e.g. from Steam).</summary>
+        private void MergeOwnedStoreGames()
+        {
+            var user = _profile?.Username;
+            if (string.IsNullOrEmpty(user)) return;
+            var owned = Services.OwnedStoreGamesService.All(user);
+            if (owned.Count == 0) return;
+            var newGames = new List<Models.Game>();
+            lock (_library)
+            {
+                var known = new System.Collections.Generic.HashSet<string>(
+                    _library.Select(g => Services.OwnedStoreGamesService.Normalize(g.Title)));
+                foreach (var og in owned)
+                {
+                    string key = Services.OwnedStoreGamesService.Normalize(og.Title);
+                    if (key.Length == 0 || !known.Add(key)) continue;
+                    var game = new Models.Game
+                    {
+                        Platform = "PC", Title = og.Title, TitleId = og.Id,
+                        AddedAt = DateTime.UtcNow.ToString("O"),
+                    };
+                    _library.Add(game);
+                    newGames.Add(game);
+                }
+            }
+            int added = newGames.Count;
+            if (added == 0)
+            {
+                // Library may already hold the titles; still refresh so store tags/filters pick up new ownership.
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library));
+                return;
+            }
+            DevLogService.Log($"[Store Merge] Added {added} store games to library.");
+            _ = SyncStoreGamesToCloudAsync(user, newGames);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                LibraryVm.Load(_library);
+                ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
+            });
+        }
+
+
     /// <summary>
     /// Ensures the user's full Steam owned-game list is mirrored to cloud
     /// <c>games.json</c> so all devices share the same Steam library baseline.
     /// Existing entries are skipped; only missing titles are added.
     /// </summary>
+    /// <summary>Uploads newly merged store games to the Game OS account (queued offline when the backend is unreachable).</summary>
+    private async Task SyncStoreGamesToCloudAsync(string username, List<Models.Game> games)
+    {
+        try
+        {
+            bool online = await _client.CheckHealthAsync().ConfigureAwait(false);
+            if (!online)
+            {
+                foreach (var g in games) _pendingChanges.EnqueueAddGame(username, g);
+                return;
+            }
+            var cloudTitles = new HashSet<string>(
+                (await _client.GetGamesAsync().ConfigureAwait(false))
+                    .Where(g => string.Equals(g.Platform, "PC", StringComparison.OrdinalIgnoreCase))
+                    .Select(g => Services.OwnedStoreGamesService.Normalize(g.Title)));
+            int added = 0;
+            foreach (var g in games)
+            {
+                if (!cloudTitles.Add(Services.OwnedStoreGamesService.Normalize(g.Title))) continue;
+                try { await _client.AddGameAsync(g).ConfigureAwait(false); added++; }
+                catch { _pendingChanges.EnqueueAddGame(username, g); }
+            }
+            if (added > 0)
+            {
+                DevLogService.Log($"[Store Sync] Added {added} store game(s) to cloud games.json.");
+                _ = _client.WriteSyncSignalAsync();
+            }
+        }
+        catch { /* best-effort — cloud sync must not block the local merge */ }
+    }
+
     private async Task SyncSteamOwnedGamesToCloudAsync(List<Services.SteamOwnedGame> steamGames)
     {
         if (steamGames.Count == 0) return;

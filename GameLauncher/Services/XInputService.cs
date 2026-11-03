@@ -22,6 +22,7 @@ internal sealed class XInputService
     private const ushort BackMask      = 0x0020;
     private const ushort LbMask        = 0x0100;
     private const ushort RbMask        = 0x0200;
+    private const ushort RightThumbMask = 0x0080;
     /// <summary>Guide/Home/Xbox button — bit 0x0400 in the extended XInputGetStateEx state.</summary>
     private const ushort GuideMask     = 0x0400;
     private const ushort ButtonAMask   = 0x1000;
@@ -53,6 +54,8 @@ internal sealed class XInputService
     public Action? OnButtonX { get; set; }
     /// <summary>Y button (triangle / tertiary action on PlayStation).</summary>
     public Action? OnButtonY { get; set; }
+    /// <summary>Right stick pressed in (R3).</summary>
+    public Action? OnRightStickClick { get; set; }
     /// <summary>Back / Select / View button.</summary>
     public Action? OnBack { get; set; }
     /// <summary>Left Bumper / L1 — previous tab or page.</summary>
@@ -213,6 +216,7 @@ internal sealed class XInputService
         Fire(b, BackMask,      ref _latchedButtons, OnBack);
         Fire(b, LbMask,        ref _latchedButtons, OnLb);
         Fire(b, RbMask,        ref _latchedButtons, OnRb);
+        Fire(b, RightThumbMask, ref _latchedButtons, OnRightStickClick);
         // Start passes through to games untouched: the IsBlocked check above already returns early
         // whenever a game or another app has the controller.
         Fire(b, StartMask,     ref _latchedButtons, OnStart);

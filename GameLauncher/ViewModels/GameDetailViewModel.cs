@@ -404,7 +404,75 @@ public partial class GameDetailViewModel : ViewModelBase
     /// entry available alongside other exe options in the settings panel.
     /// </summary>
     [ObservableProperty] private bool   _hasSteamLaunchOption;
-    public bool ShowStandaloneSteamInstall => IsSteamInstallable && !IsRepack;
+    public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall) && !IsRepack;
+
+    /// <summary>Epic Games library owns this title (Epic can install it).</summary>
+    [NotifyPropertyChangedFor(nameof(ShowStandaloneSteamInstall))]
+    [ObservableProperty] private bool   _hasEpicInstall;
+    [ObservableProperty] private string _epicInstallUrl = "";
+    /// <summary>User-added download link for this game, saved per account.</summary>
+    [ObservableProperty] private string _downloadUrl = "";
+
+    private bool _skipSourcePicker;
+    private int InstallSourceCount => (IsRepack ? 1 : 0) + (IsSteamInstallable ? 1 : 0) + (HasEpicInstall ? 1 : 0)
+                                      + (string.IsNullOrWhiteSpace(DownloadUrl) ? 0 : 1);
+
+    /// <summary>Resolves Epic ownership and the saved download link for the current title.</summary>
+    private void ResolveStoreInstallSources(string title)
+    {
+        var owned = OwnedStoreGamesService.FindOwned(_currentUsername, title);
+        var epic = owned.FirstOrDefault(o => o.Store == "Epic Games");
+        HasEpicInstall = epic != null && !IsInstalled;
+        EpicInstallUrl = epic == null ? "" :
+            !string.IsNullOrEmpty(epic.LaunchId) ? $"com.epicgames.launcher://apps/{Uri.EscapeDataString(epic.LaunchId)}?action=install"
+            : $"https://store.epicgames.com/en-US/browse?q={Uri.EscapeDataString(title)}";
+        DownloadUrl = OwnedStoreGamesService.GetDownloadUrl(_currentUsername, title) ?? "";
+        if (HasEpicInstall) IsCloudOnly = false;
+    }
+
+    /// <summary>Single Install entry point: one source launches directly, several (or none yet) ask the user.</summary>
+    [RelayCommand]
+    private void InstallGame()
+    {
+        if (InstallSourceCount == 1)
+        {
+            if (HasEpicInstall) { InstallViaEpic(); return; }
+            if (IsSteamInstallable) { InstallViaSteam(); return; }
+            if (IsRepack) { _skipSourcePicker = true; try { InstallRepack(); } finally { _skipSourcePicker = false; } return; }
+            OpenDownloadUrl(); return;
+        }
+        ShowInstallSourcePicker = true;
+    }
+
+    [RelayCommand]
+    private void InstallViaEpic()
+    {
+        if (string.IsNullOrEmpty(EpicInstallUrl)) return;
+        ShowInstallSourcePicker = false;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = EpicInstallUrl, UseShellExecute = true }); }
+        catch { /* best-effort */ }
+    }
+
+    [RelayCommand]
+    private void ChooseEpicInstallSource() => InstallViaEpic();
+
+    /// <summary>Saves the typed download link for this game and opens it.</summary>
+    [RelayCommand]
+    private void ChooseUrlInstallSource()
+    {
+        var url = (DownloadUrl ?? "").Trim();
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var u) || (u.Scheme != "http" && u.Scheme != "https")) return;
+        OwnedStoreGamesService.SetDownloadUrl(_currentUsername, Title, url);
+        DownloadUrl = url;
+        OpenDownloadUrl();
+    }
+
+    private void OpenDownloadUrl()
+    {
+        ShowInstallSourcePicker = false;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = DownloadUrl, UseShellExecute = true }); }
+        catch { /* best-effort */ }
+    }
 
     /// <summary>Cached reference to the current LocalRom (if any), used to expose AdditionalPaths in settings.</summary>
     private LocalRom? _currentLocalRom;
@@ -3563,7 +3631,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private void InstallRepack()
     {
         if (!IsRepack || string.IsNullOrEmpty(RepackPath)) return;
-        if (IsSteamInstallable)
+        if (!_skipSourcePicker && InstallSourceCount > 1)
         {
             ShowInstallSourcePicker = true;
             return;
@@ -3609,10 +3677,9 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowInstallSourcePicker = false;
 
         // Re-run the actual repack install flow without re-opening the source picker.
-        bool steamInstallable = IsSteamInstallable;
-        IsSteamInstallable = false;
+        _skipSourcePicker = true;
         try { InstallRepack(); }
-        finally { IsSteamInstallable = steamInstallable; }
+        finally { _skipSourcePicker = false; }
     }
 
     [RelayCommand]
@@ -3922,6 +3989,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        HasEpicInstall = false;
+        DownloadUrl = "";
         LudusaviSyncStatus  = "";
         IsLudusaviSyncing   = false;
         IsLudusaviRestoring = false;
@@ -3966,6 +4035,7 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSteamLaunchOption = _steamAppId > 0;
         // Recalculate IsCloudOnly after Steam check (Steam-installable games are not "cloud only")
         if (IsSteamInstallable) IsCloudOnly = false;
+        ResolveStoreInstallSources(game.Title);
         RefreshDisplayTitleId();
         LoadReviews();
         LoadControllerProfiles();
@@ -3987,6 +4057,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        HasEpicInstall = false;
+        DownloadUrl = "";
         LudusaviSyncStatus  = "";
         IsLudusaviSyncing   = false;
         IsLudusaviRestoring = false;
@@ -4044,6 +4116,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        HasEpicInstall = false;
+        DownloadUrl = "";
         LudusaviSyncStatus  = "";
         IsLudusaviSyncing   = false;
         IsLudusaviRestoring = false;
@@ -4133,6 +4207,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowSettings    = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        HasEpicInstall = false;
+        DownloadUrl = "";
         LudusaviSyncStatus  = "";
         IsLudusaviSyncing   = false;
         IsLudusaviRestoring = false;
@@ -4196,6 +4272,8 @@ public partial class GameDetailViewModel : ViewModelBase
         ShowModsPanel   = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
+        HasEpicInstall = false;
+        DownloadUrl = "";
         LudusaviSyncStatus  = "";
         IsLudusaviSyncing   = false;
         IsLudusaviRestoring = false;

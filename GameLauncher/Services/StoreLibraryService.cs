@@ -9,7 +9,7 @@ namespace GameLauncher.Services
     /// </summary>
     public static class StoreLibraryService
     {
-        public sealed record StoreGame(string Id, string Title, string? Url = null, Dictionary<string, object?>? Meta = null);
+        public sealed record StoreGame(string Id, string Title, string? Url = null, Dictionary<string, object?>? Meta = null, string? LaunchId = null);
 
         public sealed record SubmitResult(int AlreadyComplete, int StoreMerges, int NewGames, int Duplicates);
 

@@ -205,6 +205,9 @@ public partial class LibraryViewModel : ViewModelBase
         var filterPlatformSnap = FilterPlatform;
         var searchTextSnap     = SearchText;
         var installStatusSnap  = FilterInstallStatus;
+        var storesSnap         = SelectedStores.ToList();
+        var platformsSnap      = SelectedPlatforms.ToList();
+        string? userSnap       = StoreAccountsService.CurrentUser;
 
         System.Threading.Tasks.Task.Run(() =>
         {
@@ -212,13 +215,14 @@ public partial class LibraryViewModel : ViewModelBase
             // UI thread only needs to do a single-Reset collection swap.
             var newMyGames   = BuildMyGamesList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
             var newPlatforms = BuildPlatformList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
+            TagStores(newMyGames, userSnap);
 
             // Pre-compute filtered My Games on the background thread using the snapshotted
             // filter values.  This avoids doing N individual ObservableCollection.Add calls
             // on the UI thread (which would cause a layout pass per-item and freeze the UI
             // for large libraries during a background cloud sync).
             var filteredMyGames = ComputeFilteredMyGames(
-                newMyGames, filterPlatformSnap, searchTextSnap, installStatusSnap);
+                newMyGames, filterPlatformSnap, searchTextSnap, installStatusSnap, storesSnap, platformsSnap);
 
             // Switch to UI thread only for collection updates
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
@@ -243,7 +247,9 @@ public partial class LibraryViewModel : ViewModelBase
                 // current values; otherwise use the pre-computed result (common case).
                 if (FilterPlatform == filterPlatformSnap &&
                     SearchText == searchTextSnap &&
-                    FilterInstallStatus == installStatusSnap)
+                    FilterInstallStatus == installStatusSnap &&
+                    SelectedStores.SetEquals(storesSnap) &&
+                    SelectedPlatforms.SetEquals(platformsSnap))
                 {
                     // Refresh playtime labels before pushing to UI
                     foreach (var card in filteredMyGames)
@@ -276,13 +282,20 @@ public partial class LibraryViewModel : ViewModelBase
         List<LocalGameCardVm> allMyGames,
         string filterPlatform,
         string searchText,
-        string installStatus)
+        string installStatus,
+        IReadOnlyCollection<string>? stores = null,
+        IReadOnlyCollection<string>? platforms = null)
     {
         var results = allMyGames.AsEnumerable();
 
-        if (filterPlatform != "All")
+        if (platforms is { Count: > 0 })
+            results = results.Where(c => platforms.Contains(c.Platform, StringComparer.OrdinalIgnoreCase));
+        else if (filterPlatform != "All")
             results = results.Where(c =>
                 string.Equals(c.Platform, filterPlatform, StringComparison.OrdinalIgnoreCase));
+
+        if (stores is { Count: > 0 })
+            results = results.Where(c => stores.Any(st => c.Stores.Contains(st)));
 
         if (!string.IsNullOrWhiteSpace(searchText))
             results = results.Where(c =>
@@ -392,8 +405,36 @@ public partial class LibraryViewModel : ViewModelBase
             .ToList();
     }
 
+    /// <summary>Store filter (multi-select tick boxes); empty = every store.</summary>
+    public HashSet<string> SelectedStores { get; } = new(StringComparer.OrdinalIgnoreCase);
+    /// <summary>Platform filter from the right-stick menu (multi-select); empty = use <see cref="FilterPlatform"/>.</summary>
+    public HashSet<string> SelectedPlatforms { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Tags each card with the stores that own/provide it so the Store filter can match.</summary>
+    private static void TagStores(List<LocalGameCardVm> cards, string? user)
+    {
+        var owned = new Dictionary<string, HashSet<string>>();
+        foreach (var og in OwnedStoreGamesService.All(user))
+        {
+            string key = OwnedStoreGamesService.Normalize(og.Title);
+            if (!owned.TryGetValue(key, out var set)) owned[key] = set = new(StringComparer.OrdinalIgnoreCase);
+            set.Add(og.Store);
+        }
+        foreach (var c in cards)
+        {
+            var st = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (owned.TryGetValue(OwnedStoreGamesService.Normalize(c.Title), out var o)) st.UnionWith(o);
+            if ((c.SourceCloudGame?.SteamAppId ?? 0) > 0 || (c.SourceGame?.SteamAppId ?? 0) > 0 || c.SourceGame?.Source == "Steam") st.Add("Steam");
+            if (c.SourceGame?.Source is "Epic" or "Epic Games") st.Add("Epic Games");
+            else if (c.SourceGame?.Source is "GOG" or "Xbox" or "EA" or "Ubisoft" or "Battle.net" or "itch.io") st.Add(c.SourceGame.Source);
+            if (c.SourceRepack != null) st.Add("Repack");
+            c.Stores = st;
+        }
+    }
+
     partial void OnFilterPlatformChanged(string value)
     {
+        if (SelectedPlatforms.Count > 0 && value != "All") SelectedPlatforms.Clear();
         // Update chip selection state
         foreach (var chip in PlatformChips)
             chip.IsSelected = string.Equals(chip.Name, value, StringComparison.OrdinalIgnoreCase);
@@ -532,20 +573,27 @@ public partial class LibraryViewModel : ViewModelBase
         }
     }
 
-    // ── Filter box (X) ────────────────────────────────────────────────────
+    // ── Filter box (X) and platform box (right-stick click) ───────────────
     [ObservableProperty] private bool _isFilterMenuOpen;
     [ObservableProperty] private int  _filterMenuIndex;
+    [ObservableProperty] private string _filterMenuTitle = "Filters";
+    private bool _platformMenuMode;
 
-    /// <summary>Entries shown in the filter box: install statuses first, then platforms.</summary>
-    public List<(string Kind, string Value, string Label)> FilterMenuEntries()
+    private List<(string Kind, string Value, string Label)> FilterMenuEntries()
     {
-        var list = new List<(string, string, string)>
+        var list = new List<(string, string, string)>();
+        if (_platformMenuMode)
         {
-            ("Install", "All", "All games"),
-            ("Install", "Installed", "Installed"),
-            ("Install", "Uninstalled", "Not installed"),
-        };
-        foreach (var plat in Platforms) list.Add(("Platform", plat, plat));
+            foreach (var plat in Platforms.Where(p => p != "All")) list.Add(("PlatformMulti", plat, plat));
+            return list;
+        }
+        list.Add(("Install", "All", "All games"));
+        list.Add(("Install", "Installed", "Installed"));
+        list.Add(("Install", "Uninstalled", "Not installed"));
+        var stores = new List<string> { "Steam", "Epic Games" };
+        foreach (var st in _allMyGames.SelectMany(c => c.Stores).Concat(OwnedStoreGamesService.All(StoreAccountsService.CurrentUser).Select(o => o.Store)))
+            if (!stores.Contains(st, StringComparer.OrdinalIgnoreCase)) stores.Add(st);
+        foreach (var st in stores) list.Add(("Store", st, st));
         return list;
     }
 
@@ -556,12 +604,20 @@ public partial class LibraryViewModel : ViewModelBase
         public string Kind  { get; init; } = "";
         public string Value { get; init; } = "";
         public string Label { get; init; } = "";
-        [ObservableProperty] private bool _isHighlighted;
-        [ObservableProperty] private bool _isActive;
+        public bool IsMulti => Kind is "Store" or "PlatformMulti";
+        [ObservableProperty] [NotifyPropertyChangedFor(nameof(Mark))] private bool _isHighlighted;
+        [ObservableProperty] [NotifyPropertyChangedFor(nameof(Mark))] private bool _isActive;
+        /// <summary>Tick-box glyph for multi-select rows; single-select rows only show a tick when active.</summary>
+        public string Mark => IsMulti ? (IsActive ? "☑" : "☐") : (IsActive ? "✓" : "");
     }
 
-    public void OpenFilterMenu()
+    public void OpenFilterMenu() => OpenMenu(false);
+    public void OpenPlatformMenu() => OpenMenu(true);
+
+    private void OpenMenu(bool platforms)
     {
+        _platformMenuMode = platforms;
+        FilterMenuTitle = platforms ? "Platforms" : "Filters";
         FilterMenuItems.Clear();
         foreach (var (k, v, l) in FilterMenuEntries())
             FilterMenuItems.Add(new FilterMenuItem { Kind = k, Value = v, Label = l });
@@ -569,6 +625,9 @@ public partial class LibraryViewModel : ViewModelBase
         RefreshFilterMenu();
         IsFilterMenuOpen = true;
     }
+
+    /// <summary>True while the platform box (not the filter box) is showing.</summary>
+    public bool IsPlatformMenuMode => _platformMenuMode;
 
     [RelayCommand] public void CloseFilterMenu() => IsFilterMenuOpen = false;
 
@@ -583,8 +642,19 @@ public partial class LibraryViewModel : ViewModelBase
     {
         if (FilterMenuIndex < 0 || FilterMenuIndex >= FilterMenuItems.Count) return;
         var item = FilterMenuItems[FilterMenuIndex];
-        if (item.Kind == "Install") FilterInstallStatus = item.Value;
-        else FilterPlatform = item.Value;
+        switch (item.Kind)
+        {
+            case "Install": FilterInstallStatus = item.Value; break;
+            case "Store":
+                if (!SelectedStores.Remove(item.Value)) SelectedStores.Add(item.Value);
+                ApplyFilter();
+                break;
+            case "PlatformMulti":
+                if (!SelectedPlatforms.Remove(item.Value)) SelectedPlatforms.Add(item.Value);
+                if (FilterPlatform != "All") FilterPlatform = "All";
+                else { foreach (var chip in PlatformChips) chip.IsSelected = chip.Name == "All" && SelectedPlatforms.Count == 0; ApplyFilter(); }
+                break;
+        }
         RefreshFilterMenu();
     }
 
@@ -594,8 +664,13 @@ public partial class LibraryViewModel : ViewModelBase
         {
             var it = FilterMenuItems[i];
             it.IsHighlighted = i == FilterMenuIndex;
-            it.IsActive = it.Kind == "Install" ? it.Value == FilterInstallStatus
-                                               : it.Value == FilterPlatform;
+            it.IsActive = it.Kind switch
+            {
+                "Install" => it.Value == FilterInstallStatus,
+                "Store" => SelectedStores.Contains(it.Value),
+                "PlatformMulti" => SelectedPlatforms.Contains(it.Value),
+                _ => it.Value == FilterPlatform,
+            };
         }
     }
 
@@ -1208,7 +1283,7 @@ public partial class LibraryViewModel : ViewModelBase
         // Build the filtered list then replace the collection with a single Reset
         // notification.  This avoids firing N CollectionChanged events for a large library
         // which would cause the UI to freeze during background cloud syncs.
-        var filtered = ComputeFilteredMyGames(_allMyGames, plat, search, installStatus);
+        var filtered = ComputeFilteredMyGames(_allMyGames, plat, search, installStatus, SelectedStores, SelectedPlatforms);
         FilteredMyGames.Reset(filtered);
         HasMyGames = FilteredMyGames.Count > 0;
         ResetGameFocusAfterRebuild();
