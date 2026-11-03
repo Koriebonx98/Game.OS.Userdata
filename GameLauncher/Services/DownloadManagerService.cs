@@ -217,7 +217,7 @@ namespace GameLauncher.Services
         }
 
         /// <summary>Queues a new download into <c>&lt;Root&gt;/...</c> per category/platform and starts it when a slot is free.</summary>
-        public DownloadItem Add(string url, string name, string category, string platform, string referer = "", string cookie = "", string game = "")
+        public DownloadItem Add(string url, string name, string category, string platform, string referer = "", string cookie = "", string game = "", bool? autoExtract = null, params string[] subfolders)
         {
             Load();
             var s = Settings;
@@ -233,7 +233,8 @@ namespace GameLauncher.Services
                 Cookie = cookie ?? "",
                 Category = category,
                 Platform = platform,
-                Folder = DownloadPathResolver.Resolve(root, platform, category),
+                AutoExtract = autoExtract,
+                Folder = DownloadPathResolver.Resolve(root, platform, category, subfolders),
             };
             Ui(() => { Items.Insert(0, item); });
             Save();
@@ -368,7 +369,7 @@ namespace GameLauncher.Services
         private async Task FinishAsync(DownloadItem item, CancellationToken ct)
         {
             var s = Settings;
-            if (s.AutoExtract && !item.Extracted)
+            if ((item.AutoExtract ?? s.AutoExtract) && !item.Extracted)
             {
                 var archives = FindArchivesToExtract(item);
                 if (archives.Count > 0)
@@ -605,6 +606,32 @@ namespace GameLauncher.Services
                 _engineKey = key;
                 return _engine;
             }
+        }
+
+        /// <summary>
+        /// Builds a trackerless torrent for a mod file/folder, starts seeding it from where it already lives and
+        /// returns the magnet link. The sender must stay online (DHT) until the friend has finished downloading.
+        /// </summary>
+        public async Task<string> SeedPathAsync(string path)
+        {
+            if (!Settings.EnableTorrents) throw new InvalidOperationException("Torrents are disabled in Settings → Downloads.");
+            if (!File.Exists(path) && !Directory.Exists(path)) throw new FileNotFoundException("Mod not found.", path);
+            string full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar);
+
+            var creator = new TorrentCreator();
+            var dict = await creator.CreateAsync(new TorrentFileSource(full));
+            var torrent = Torrent.Load(dict);
+
+            string key = "seed:" + full;
+            TorrentManager? existing;
+            lock (_gate) _torrents.TryGetValue(key, out existing);
+            if (existing == null)
+            {
+                var manager = await GetEngine().AddAsync(torrent, Path.GetDirectoryName(full)!);
+                lock (_gate) _torrents[key] = manager;
+                await manager.StartAsync();
+            }
+            return new MagnetLink(torrent.InfoHashes, torrent.Name).ToV1String();
         }
 
         private async Task RunTorrentAsync(DownloadItem item, CancellationToken ct)

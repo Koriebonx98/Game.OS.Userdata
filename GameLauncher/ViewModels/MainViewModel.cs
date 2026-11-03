@@ -570,6 +570,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         QuickMenuVm.OnOpenUrl = (platform, game, url) => OpenBrowserForGame(platform, game, url, QuickMenuVm.IsPlayingGame);
         DetailVm.OnOpenBrowserForGame = (platform, title) => OpenBrowserForGame(platform, title);
         DetailVm.OnOpenUrlInBrowser = (platform, title, url) => OpenBrowserForGame(platform, title, url);
+        DetailVm.GetFriendsForShare = () => _client.GetFriendsAsync();
+        DetailVm.SendHiddenMessage = (friend, text) => _client.SendMessageAsync(friend, text);
         QuickMenuVm.OnSignOut = () => SignOutCommand.Execute(null);
         QuickMenuVm.OnSwitchAccount = () => SwitchAccountCommand.Execute(null);
         QuickMenuVm.OnExitApplication = () => ExitAppCommand.Execute(null);

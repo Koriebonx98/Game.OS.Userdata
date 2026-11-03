@@ -21,11 +21,14 @@ public partial class InboxViewModel : ViewModelBase
 
     public ObservableCollection<InboxConversationVm> Conversations { get; } = new();
     public ObservableCollection<GameInvite> PendingInvites { get; } = new();
+    public ObservableCollection<Services.PendingModShare> PendingModShares { get; } = new();
+    public bool HasPendingModShares => PendingModShares.Count > 0;
+    [ObservableProperty] private string _modShareStatus = "";
     public ObservableCollection<Message> ConversationMessages { get; } = new();
 
     public bool HasConversations => Conversations.Count > 0;
     public bool HasPendingInvites => PendingInvites.Count > 0;
-    public bool HasEmptyInbox => !IsLoading && Conversations.Count == 0 && PendingInvites.Count == 0;
+    public bool HasEmptyInbox => !IsLoading && Conversations.Count == 0 && PendingInvites.Count == 0 && PendingModShares.Count == 0;
 
     partial void OnIsLoadingChanged(bool value) => OnPropertyChanged(nameof(HasEmptyInbox));
 
@@ -162,6 +165,25 @@ public partial class InboxViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void AcceptModShare(Services.PendingModShare? share)
+    {
+        if (share == null) return;
+        try { ModShareStatus = Services.ModShareService.Accept(share); }
+        catch (Exception ex) { ModShareStatus = "Could not accept: " + ex.Message; return; }
+        PendingModShares.Remove(share);
+        OnPropertyChanged(nameof(HasPendingModShares));
+    }
+
+    [RelayCommand]
+    private void DeclineModShare(Services.PendingModShare? share)
+    {
+        if (share == null) return;
+        Services.ModShareService.Decline(share);
+        PendingModShares.Remove(share);
+        OnPropertyChanged(nameof(HasPendingModShares));
+    }
+
+    [RelayCommand]
     private async Task DeclineInvite(GameInvite? invite)
     {
         if (_client == null || invite == null || string.IsNullOrWhiteSpace(invite.InviteId)) return;
@@ -179,6 +201,7 @@ public partial class InboxViewModel : ViewModelBase
         ErrorMessage = "";
         Conversations.Clear();
         PendingInvites.Clear();
+        PendingModShares.Clear();
         try
         {
             var friendsTask = _client.GetFriendsAsync();
@@ -195,7 +218,15 @@ public partial class InboxViewModel : ViewModelBase
             {
                 try
                 {
-                    var messages = await _client.GetMessagesAsync(friend);
+                    var raw = await _client.GetRawMessagesAsync(friend);
+                    var shares = Services.ModShareService.FindPending(friend, raw);
+                    if (shares.Count > 0)
+                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                        {
+                            foreach (var sh in shares) PendingModShares.Add(sh);
+                            OnPropertyChanged(nameof(HasPendingModShares));
+                        });
+                    var messages = raw.Where(m => !Services.ModShareService.IsShareMessage(m.Text)).ToList();
                     var last = messages.OrderByDescending(m => m.SentAt).FirstOrDefault();
                     return last == null ? null : new InboxConversationVm
                     {

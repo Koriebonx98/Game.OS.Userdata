@@ -19,6 +19,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("category")] public string Category { get; set; } = "Game";
         [JsonPropertyName("platform")] public string Platform { get; set; } = "PC";
         [JsonPropertyName("folder")]   public string Folder { get; set; } = "";
+        /// <summary>Per-download override for the global archive auto-extract setting.</summary>
+        [JsonPropertyName("autoExtract")] public bool? AutoExtract { get; set; }
         [JsonPropertyName("created")]  public DateTime CreatedUtc { get; set; } = DateTime.UtcNow;
         [JsonPropertyName("completed")] public DateTime? CompletedUtc { get; set; }
         [JsonPropertyName("segments")] public List<long> SegmentProgress { get; set; } = new();

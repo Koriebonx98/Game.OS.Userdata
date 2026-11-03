@@ -72,11 +72,12 @@ namespace GameLauncher.Services
         }
 
         /// <summary>Destination folder for a download (not created).</summary>
-        public static string Resolve(string root, string platform, string category)
+        public static string Resolve(string root, string platform, string category, params string[] subfolders)
         {
+            string folder;
             if (IsPc(platform))
             {
-                return category switch
+                folder = category switch
                 {
                     CategoryGame => Path.Combine(root, "Repacks"),
                     CategoryMod  => Path.Combine(root, "Mods"),
@@ -85,16 +86,25 @@ namespace GameLauncher.Services
                     _            => Path.Combine(root, "Other"),
                 };
             }
-
-            string sub = category switch
+            else
             {
-                CategoryGame => "Games",
-                CategoryMod  => "Mods",
-                CategoryDlc  => "DLC",
-                CategoryUpdate => "Updates",
-                _            => "Other",
-            };
-            return Path.Combine(root, "Roms", PlatformFolder(root, platform), sub);
+                string sub = category switch
+                {
+                    CategoryGame => "Games",
+                    CategoryMod  => "Mods",
+                    CategoryDlc  => "DLC",
+                    CategoryUpdate => "Updates",
+                    _            => "Other",
+                };
+                folder = Path.Combine(root, "Roms", PlatformFolder(root, platform), sub);
+            }
+
+            foreach (string segment in subfolders ?? Array.Empty<string>())
+            {
+                string safe = SanitizeFileName(segment ?? "");
+                if (safe.Length > 0) folder = Path.Combine(folder, safe);
+            }
+            return folder;
         }
 
         /// <summary>The configured root, or the first drive that already has Roms/Repacks, else ~/GameOS.</summary>
