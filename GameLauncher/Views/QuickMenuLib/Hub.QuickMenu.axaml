@@ -187,6 +187,7 @@
                         </ItemsControl>
                         <TextBlock Text="{Binding InviteStatusMessage}" Foreground="#9E9E9E" FontSize="11"
                                    IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        <Button Classes="btn-primary" Command="{Binding AddFriendCommand}">➕ Add Friend</Button>
                         <Button Classes="btn-secondary" Command="{Binding OpenFriendsPageCommand}">Open Friends Page</Button>
                     </StackPanel>
                 </Border>

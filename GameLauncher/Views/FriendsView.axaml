@@ -7,518 +7,249 @@
              x:DataType="vm:FriendsViewModel"
              Background="#0d1117">
 
-    <Grid RowDefinitions="*,Auto">
+    <UserControl.Resources>
+        <DataTemplate x:Key="FriendTile" x:DataType="models:FriendEntry">
+            <Border Classes="con-tile" Classes.sel="{Binding IsSelected}"
+                    views:BringIntoViewBehavior.Active="{Binding IsSelected}">
+                <StackPanel Spacing="10">
+                    <Grid ColumnDefinitions="68,*,Auto">
+                        <Panel Width="54" Height="54" HorizontalAlignment="Left">
+                            <Border Classes="con-avatar">
+                                <TextBlock Text="{Binding AvatarInitial}" FontSize="22" FontWeight="Bold"
+                                           Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Panel>
+                        <Border Grid.Column="0" Width="14" Height="14" CornerRadius="7" Background="#3fb950"
+                                BorderBrush="#141a22" BorderThickness="2" Margin="0,0,10,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                IsVisible="{Binding IsOnline}"/>
+                        <Border Grid.Column="0" Width="14" Height="14" CornerRadius="7" Background="#e8960c"
+                                BorderBrush="#141a22" BorderThickness="2" Margin="0,0,10,0"
+                                HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                IsVisible="{Binding IsAway}"/>
+
+                        <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="3">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding Username}" FontSize="18" FontWeight="SemiBold" Foreground="White"/>
+                                <Border CornerRadius="8" Padding="7,2" Background="#21262d" VerticalAlignment="Center"
+                                        IsVisible="{Binding GamerScoreLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding GamerScoreLabel}" FontSize="10" FontWeight="Bold" Foreground="#f1c40f"/>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Border Classes="con-dot" Classes.online="{Binding IsOnline}" Classes.away="{Binding IsAway}"/>
+                                <TextBlock Text="{Binding Status}" FontSize="12" Foreground="#8b949e" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding LastSeen}" FontSize="12" Foreground="#6e7681" VerticalAlignment="Center"
+                                           IsVisible="{Binding !IsOnline}"/>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6"
+                                        IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="🎮 Playing" FontSize="12" Foreground="#8b949e" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding CurrentGame}" FontSize="12" FontWeight="SemiBold" Foreground="#58a6ff"
+                                           VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"/>
+                                <Border Background="#21262d" CornerRadius="6" Padding="6,1" VerticalAlignment="Center"
+                                        IsVisible="{Binding RecentGamePlatform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                    <TextBlock Text="{Binding RecentGamePlatform}" FontSize="10" FontWeight="Bold" Foreground="#8b949e"/>
+                                </Border>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="6"
+                                        IsVisible="{Binding RecentGameTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                <TextBlock Text="Last played" FontSize="12" Foreground="#6e7681" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding RecentGameTitle}" FontSize="12" Foreground="#8b949e"
+                                           VerticalAlignment="Center" MaxWidth="320" TextTrimming="CharacterEllipsis"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button Classes="con-act"
+                                    Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
+                                    CommandParameter="{Binding Username}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="con-btn a"><TextBlock Text="A"/></Border>
+                                    <TextBlock Text="Message"/>
+                                </StackPanel>
+                                </Button>
+                            <Button Classes="con-act">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="con-btn x"><TextBlock Text="X"/></Border>
+                                    <TextBlock Text="Invite"/>
+                                </StackPanel>
+                                <Button.Flyout>
+                                    <MenuFlyout Placement="BottomEdgeAlignedRight">
+                                        <MenuItem Header="Crossplay"
+                                                  Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                  CommandParameter="{Binding Username, StringFormat='{}{0}|Crossplay'}"/>
+                                        <MenuItem Header="Radmin"
+                                                  Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                  CommandParameter="{Binding Username, StringFormat='{}{0}|Radmin'}"/>
+                                        <MenuItem Header="OnlineFix"
+                                                  Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                  CommandParameter="{Binding Username, StringFormat='{}{0}|OnlineFix'}"/>
+                                        <MenuItem Header="Steam"
+                                                  Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
+                                                  CommandParameter="{Binding Username, StringFormat='{}{0}|Steam'}"/>
+                                    </MenuFlyout>
+                                </Button.Flyout>
+                            </Button>
+                            <Button Classes="con-act"
+                                    Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
+                                    CommandParameter="{Binding Username}">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Border Classes="con-btn y"><TextBlock Text="Y"/></Border>
+                                    <TextBlock Text="Profile"/>
+                                </StackPanel>
+                            </Button>
+                            <Button Classes="con-act" Padding="12,5"
+                                    ToolTip.Tip="Manage network IPs for direct connect"
+                                    Command="{Binding $parent[UserControl].DataContext.ToggleFriendIpPanelCommand}"
+                                    CommandParameter="{Binding Username}">
+                                <TextBlock Text="🌐"/>
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+
+                    <ItemsControl ItemsSource="{Binding IpAddresses}"
+                                  IsVisible="{Binding HasIpAddresses}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:FriendIpEntry">
+                                <Grid ColumnDefinitions="*,Auto" Margin="68,0,0,4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                        <Border Background="#21262d" CornerRadius="6" Padding="6,2">
+                                            <TextBlock Text="{Binding TypeLabel}" FontSize="10" FontWeight="Bold" Foreground="#58a6ff"/>
+                                        </Border>
+                                        <TextBlock Text="{Binding Label}" FontSize="12" FontWeight="SemiBold" Foreground="White" VerticalAlignment="Center"/>
+                                        <TextBlock Text="{Binding Address}" FontSize="12" Foreground="#8b949e" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Padding="8,4" Classes="btn-secondary" Foreground="#f85149"
+                                            VerticalAlignment="Center" FontSize="11"
+                                            Command="{Binding $parent[UserControl].DataContext.RemoveFriendIpCommand}"
+                                            CommandParameter="{Binding}">✕</Button>
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+    </UserControl.Resources>
+
+
+    <Grid RowDefinitions="*,Auto,Auto">
 
     <!-- ── Friends list (scrollable) ── -->
     <ScrollViewer Grid.Row="0"
                   HorizontalScrollBarVisibility="Disabled"
                   VerticalScrollBarVisibility="Auto">
-    <StackPanel Margin="32,28,32,28" Spacing="0">
+    <StackPanel Margin="40,32,40,28" Spacing="0">
 
         <!-- Header -->
-        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,20">
-            <StackPanel Grid.Column="0">
-                <TextBlock Text="Friends" Classes="page-title"/>
-                <TextBlock Classes="page-subtitle">
-                    <TextBlock.Text>
-                        <MultiBinding StringFormat="{}{0} online · {1} total">
-                            <Binding Path="OnlineCount"/>
-                            <Binding Path="TotalCount"/>
-                        </MultiBinding>
-                    </TextBlock.Text>
-                </TextBlock>
+        <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,22">
+            <StackPanel Grid.Column="0" Spacing="8">
+                <TextBlock Text="FRIENDS" Classes="con-title"/>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Classes="con-pill">
+                        <StackPanel Orientation="Horizontal" Spacing="7">
+                            <Border Classes="con-dot online"/>
+                            <TextBlock Foreground="#c9d1d9" FontSize="12" VerticalAlignment="Center">
+                                <Run Text="{Binding OnlineCount}"/><Run Text=" online"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                    <Border Classes="con-pill">
+                        <TextBlock Foreground="#c9d1d9" FontSize="12">
+                            <Run Text="{Binding TotalCount}"/><Run Text=" friends"/>
+                        </TextBlock>
+                    </Border>
+                </StackPanel>
             </StackPanel>
-            <Button Grid.Column="1" Classes="btn-primary"
-                    VerticalAlignment="Center" Padding="16,10"
+            <Button Grid.Column="1" Classes="con-act" VerticalAlignment="Center"
                     Command="{Binding OpenAddFriendKeyboardCommand}">
-                + Add Friend
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Border Classes="con-btn s"><TextBlock Text="≡"/></Border>
+                    <TextBlock Text="Add Friend"/>
+                </StackPanel>
             </Button>
         </Grid>
 
-        <TextBlock Text="{Binding ControllerHint}" FontSize="11" Foreground="#6e7681" Margin="0,-12,0,14"/>
-
-        <!-- Loading indicator -->
         <TextBlock Text="Loading friends…"
                    Foreground="#8b949e" FontSize="13" Margin="0,0,0,16"
                    IsVisible="{Binding IsLoading}"/>
 
-        <!-- Error message -->
-        <Border Background="#3d1a1a" CornerRadius="6" Padding="14,10"
+        <Border Background="#3d1a1a" CornerRadius="10" Padding="14,10"
                 Margin="0,0,0,16"
                 IsVisible="{Binding ErrorMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock Text="{Binding ErrorMessage}"
                        Foreground="#f85149" FontSize="13"/>
         </Border>
 
-        <Border Background="#132238" CornerRadius="6" Padding="14,10"
+        <Border Background="#132238" BorderBrush="#1f3a5f" BorderThickness="1" CornerRadius="10" Padding="14,10"
                 Margin="0,0,0,16"
                 IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
             <TextBlock Text="{Binding InviteStatusMessage}"
                        Foreground="#58a6ff" FontSize="13"/>
         </Border>
 
-        <!-- ── Recent Activity Feed ── -->
-        <StackPanel IsVisible="False" Margin="0,0,0,24">
-            <TextBlock Text="Recent Activity" Classes="section-header" Margin="0,0,0,10"/>
-            <Border Background="#161b22" CornerRadius="12" Padding="4">
-                <ItemsControl ItemsSource="{Binding RecentActivity}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="models:FriendActivityItem">
-                            <Border Padding="14,10" CornerRadius="8">
-                                <Grid ColumnDefinitions="36,*,Auto">
-                                    <!-- Mini avatar -->
-                                    <Border Grid.Column="0" Width="30" Height="30"
-                                            CornerRadius="15" Background="#1f6feb">
-                                        <TextBlock Text="{Binding AvatarInitial}"
-                                                   FontSize="13" FontWeight="Bold"
-                                                   Foreground="White"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
-                                    </Border>
-                                    <!-- Activity description -->
-                                    <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                                                Margin="10,0,0,0" Spacing="1">
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <TextBlock Text="{Binding Icon}" FontSize="12"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding Username}"
-                                                       FontSize="13" FontWeight="Bold"
-                                                       Foreground="White"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock Text="{Binding ActivityText}"
-                                                       FontSize="12" Foreground="#8b949e"
-                                                       VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                        <StackPanel Orientation="Horizontal" Spacing="6">
-                                            <TextBlock Text="{Binding GameTitle}"
-                                                       FontSize="12" Foreground="#0ea5e9"
-                                                       VerticalAlignment="Center"/>
-                                            <TextBlock Text="·" FontSize="11" Foreground="#30363d"
-                                                       VerticalAlignment="Center"
-                                                       IsVisible="{Binding Platform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
-                                            <Border Background="#21262d" CornerRadius="4"
-                                                    Padding="5,2"
-                                                    IsVisible="{Binding Platform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                                <TextBlock Text="{Binding Platform}"
-                                                           FontSize="10" FontWeight="Bold"
-                                                           Foreground="#8b949e"/>
-                                            </Border>
-                                        </StackPanel>
-                                    </StackPanel>
-                                    <!-- Time ago -->
-                                    <TextBlock Grid.Column="2"
-                                               Text="{Binding TimeAgo}"
-                                               FontSize="11" Foreground="#484f58"
-                                               VerticalAlignment="Center"/>
-                                </Grid>
-                            </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Border>
-        </StackPanel>
-
-        <!-- Pending Requests -->
-        <StackPanel IsVisible="False" Margin="0,0,0,24">
-            <TextBlock Text="Friend Requests" Classes="section-header"/>
+        <!-- ── Friend requests ── -->
+        <StackPanel IsVisible="{Binding PendingRequests.Count}" Margin="0,0,0,18">
+            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                <TextBlock Text="FRIEND REQUESTS" Classes="con-section"/>
+                <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+            </Grid>
             <ItemsControl ItemsSource="{Binding PendingRequests}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:FriendRequestDisplay">
-                        <Border Background="#161b22" CornerRadius="10" BorderBrush="Transparent" BorderThickness="2"
-                                Padding="16,12" Margin="0,0,0,8" Classes.sel="{Binding IsSelected}">
-                            <Border.Styles>
-                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                            <Grid ColumnDefinitions="52,*,Auto,Auto">
-                                <!-- Avatar -->
-                                <Border Grid.Column="0" Width="42" Height="42"
-                                        CornerRadius="21" Background="#1f6feb">
-                                    <TextBlock Text="{Binding AvatarInitial}"
-                                               FontSize="18" FontWeight="Bold"
-                                               Foreground="White"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
+                        <Border Classes="con-tile" Classes.sel="{Binding IsSelected}"
+                                views:BringIntoViewBehavior.Active="{Binding IsSelected}">
+                            <Grid ColumnDefinitions="68,*,Auto,Auto">
+                                <Border Classes="con-avatar">
+                                    <TextBlock Text="{Binding AvatarInitial}" FontSize="22" FontWeight="Bold"
+                                               Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                 </Border>
-                                <!-- Info -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                                            Margin="12,0,0,0" Spacing="2">
-                                    <TextBlock Text="{Binding FromUsername}"
-                                               FontSize="14" FontWeight="SemiBold"
-                                               Foreground="White"/>
-                                    <TextBlock FontSize="11" Foreground="#8b949e">
-                                        <Run Text="Sent "/>
-                                        <Run Text="{Binding SentAgo}"/>
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                    <TextBlock Text="{Binding FromUsername}" FontSize="17" FontWeight="SemiBold" Foreground="White"/>
+                                    <TextBlock FontSize="12" Foreground="#8b949e">
+                                        <Run Text="Wants to be friends · "/><Run Text="{Binding SentAgo}"/>
                                     </TextBlock>
                                 </StackPanel>
-                                <!-- Accept -->
-                                <Button Grid.Column="2" Classes="btn-success"
-                                        Padding="14,7" Margin="0,0,8,0"
+                                <Button Grid.Column="2" Classes="con-act" Margin="0,0,8,0"
                                         Command="{Binding $parent[UserControl].DataContext.AcceptRequestCommand}"
                                         CommandParameter="{Binding}">
-                                    ✓ Accept
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <Border Classes="con-btn a"><TextBlock Text="A"/></Border>
+                                        <TextBlock Text="Accept"/>
+                                    </StackPanel>
                                 </Button>
-                                <!-- Decline -->
-                                <Button Grid.Column="3" Classes="btn-secondary"
-                                        Padding="14,7"
+                                <Button Grid.Column="3" Classes="con-act"
                                         Command="{Binding $parent[UserControl].DataContext.DeclineRequestCommand}"
                                         CommandParameter="{Binding}">
-                                    ✕ Decline
-                                </Button>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </StackPanel>
-
-        <!-- Online Friends -->
-        <StackPanel IsVisible="{Binding OnlineFriends.Count}" Margin="0,0,0,24">
-            <TextBlock Classes="section-header" Margin="0,0,0,8">
-                <Run Text="🟢  Online — "/>
-                <Run Text="{Binding OnlineCount}"/>
-            </TextBlock>
-            <ItemsControl ItemsSource="{Binding OnlineFriends}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:FriendEntry">
-                        <Border Background="#161b22" CornerRadius="12" BorderBrush="Transparent" BorderThickness="2"
-                                Padding="16,14" Margin="0,0,0,8" Classes.sel="{Binding IsSelected}">
-                            <Border.Styles>
-                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                            <StackPanel Spacing="8">
-                            <Grid ColumnDefinitions="56,*,Auto,Auto,Auto">
-                                <!-- Avatar with status dot -->
-                                <Panel Grid.Column="0" Width="46" Height="46">
-                                    <Border Width="46" Height="46" CornerRadius="23"
-                                            Background="#1f6feb">
-                                        <TextBlock Text="{Binding AvatarInitial}"
-                                                   FontSize="20" FontWeight="Bold"
-                                                   Foreground="White"
-                                                   HorizontalAlignment="Center"
-                                                   VerticalAlignment="Center"/>
-                                    </Border>
-                                    <!-- Online dot -->
-                                    <Border Width="14" Height="14" CornerRadius="7"
-                                            Background="#3fb950"
-                                            BorderBrush="#161b22" BorderThickness="2"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Bottom"
-                                            IsVisible="{Binding IsOnline}"/>
-                                    <!-- Away dot -->
-                                    <Border Width="14" Height="14" CornerRadius="7"
-                                            Background="#e8960c"
-                                            BorderBrush="#161b22" BorderThickness="2"
-                                            HorizontalAlignment="Right"
-                                            VerticalAlignment="Bottom"
-                                            IsVisible="{Binding IsAway}"/>
-                                </Panel>
-
-                                <!-- Friend info + current game -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                                            Margin="14,0,0,0" Spacing="3">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding Username}"
-                                                   FontSize="15" FontWeight="Bold"
-                                                   Foreground="White"/>
-                                        <!-- GamerScore badge -->
-                                        <Border CornerRadius="4" Padding="6,2"
-                                                Background="#21262d"
-                                                VerticalAlignment="Center"
-                                                IsVisible="{Binding GamerScoreLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                            <TextBlock Text="{Binding GamerScoreLabel}"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="#f1c40f"/>
-                                        </Border>
+                                        <Border Classes="con-btn x"><TextBlock Text="X"/></Border>
+                                        <TextBlock Text="Decline"/>
                                     </StackPanel>
-                                    <!-- Status line -->
-                                    <StackPanel Orientation="Horizontal" Spacing="5"
-                                                IsVisible="{Binding IsOnline}">
-                                        <TextBlock Text="●" FontSize="9"
-                                                   Foreground="#3fb950"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="Online" FontSize="12"
-                                                   Foreground="#3fb950"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <StackPanel Orientation="Horizontal" Spacing="5"
-                                                IsVisible="{Binding IsAway}">
-                                        <TextBlock Text="●" FontSize="9"
-                                                   Foreground="#e8960c"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="Away" FontSize="12"
-                                                   Foreground="#e8960c"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
-                                    <!-- Currently playing -->
-                                    <StackPanel Orientation="Horizontal" Spacing="6"
-                                                IsVisible="{Binding CurrentGame, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                        <TextBlock Text="🎮" FontSize="11"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="Playing " FontSize="12"
-                                                   Foreground="#8b949e"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding CurrentGame}"
-                                                   FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="#e6edf3"
-                                                   VerticalAlignment="Center"
-                                                   MaxWidth="200"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <Border Background="#21262d" CornerRadius="4"
-                                                Padding="5,2" VerticalAlignment="Center"
-                                                IsVisible="{Binding RecentGamePlatform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                            <TextBlock Text="{Binding RecentGamePlatform}"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="#8b949e"/>
-                                        </Border>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- View Profile button -->
-                                <Button Grid.Column="2" Classes="btn-secondary"
-                                        Padding="10,7" VerticalAlignment="Center"
-                                        Margin="0,0,8,0"
-                                        Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
-                                        CommandParameter="{Binding Username}">
-                                    👤 Profile
-                                </Button>
-                                <!-- Friend actions (Invite / Message / View) -->
-                                <Button Grid.Column="3" Classes="btn-secondary"
-                                        Padding="12,7" VerticalAlignment="Center"
-                                        Margin="0,0,8,0"
-                                        ToolTip.Tip="Friend actions">
-                                    ⋯
-                                    <Button.Flyout>
-                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                            <MenuItem Header="Invite">
-                                                <MenuItem Header="Crossplay"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Crossplay'}"/>
-                                                <MenuItem Header="Radmin"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Radmin'}"/>
-                                                <MenuItem Header="OnlineFix"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|OnlineFix'}"/>
-                                                <MenuItem Header="Steam"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Steam'}"/>
-                                            </MenuItem>
-                                            <MenuItem Header="Message"
-                                                      Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
-                                                      CommandParameter="{Binding Username}"/>
-                                            <MenuItem Header="View"
-                                                      Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
-                                                      CommandParameter="{Binding Username}"/>
-                                        </MenuFlyout>
-                                    </Button.Flyout>
-                                </Button>
-                                <!-- Manage IPs button -->
-                                <Button Grid.Column="4" Classes="btn-secondary"
-                                        Padding="12,7" VerticalAlignment="Center"
-                                        ToolTip.Tip="Manage network IPs for direct connect"
-                                        Command="{Binding $parent[UserControl].DataContext.ToggleFriendIpPanelCommand}"
-                                        CommandParameter="{Binding Username}">
-                                    🌐
                                 </Button>
                             </Grid>
-
-                            <!-- Saved IP addresses (always visible when any exist) -->
-                            <ItemsControl ItemsSource="{Binding IpAddresses}"
-                                          IsVisible="{Binding HasIpAddresses}"
-                                          Margin="0,4,0,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:FriendIpEntry">
-                                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
-                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
-                                                        VerticalAlignment="Center">
-                                                <Border Background="#21262d" CornerRadius="4" Padding="5,2">
-                                                    <TextBlock Text="{Binding TypeLabel}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="#58a6ff"/>
-                                                </Border>
-                                                <TextBlock Text="{Binding Label}"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="White"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Address}"
-                                                           FontSize="12" Foreground="#8b949e"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="2" Padding="8,4"
-                                                    Classes="btn-secondary" Foreground="#f85149"
-                                                    VerticalAlignment="Center" FontSize="11"
-                                                    Command="{Binding $parent[UserControl].DataContext.RemoveFriendIpCommand}"
-                                                    CommandParameter="{Binding}">✕</Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            </StackPanel>
                         </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </StackPanel>
 
-        <!-- Offline Friends -->
+        <!-- ── Online ── -->
+        <StackPanel IsVisible="{Binding OnlineFriends.Count}" Margin="0,0,0,18">
+            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                <TextBlock Text="ONLINE" Classes="con-section"/>
+                <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding OnlineFriends}" ItemTemplate="{StaticResource FriendTile}"/>
+        </StackPanel>
+
+        <!-- ── Offline ── -->
         <StackPanel IsVisible="{Binding OfflineFriends.Count}">
-            <TextBlock Text="⚫  Offline" Classes="section-header" Margin="0,0,0,8"/>
-            <ItemsControl ItemsSource="{Binding OfflineFriends}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:FriendEntry">
-                        <Border Background="#161b22" CornerRadius="12" BorderBrush="Transparent" BorderThickness="2"
-                                Padding="16,14" Margin="0,0,0,8"
-                                Opacity="0.8" Classes.sel="{Binding IsSelected}">
-                            <Border.Styles>
-                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
-                            </Border.Styles>
-                            <StackPanel Spacing="8">
-                            <Grid ColumnDefinitions="56,*,Auto,Auto,Auto">
-                                <!-- Avatar (dimmed) -->
-                                <Border Grid.Column="0" Width="46" Height="46"
-                                        CornerRadius="23" Background="#21262d">
-                                    <TextBlock Text="{Binding AvatarInitial}"
-                                               FontSize="20" FontWeight="Bold"
-                                               Foreground="#484f58"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-
-                                <!-- Friend info + last played -->
-                                <StackPanel Grid.Column="1" VerticalAlignment="Center"
-                                            Margin="14,0,0,0" Spacing="3">
-                                    <StackPanel Orientation="Horizontal" Spacing="8">
-                                        <TextBlock Text="{Binding Username}"
-                                                   FontSize="15" FontWeight="Bold"
-                                                   Foreground="#c9d1d9"/>
-                                        <!-- GamerScore badge -->
-                                        <Border CornerRadius="4" Padding="6,2"
-                                                Background="#1c2128"
-                                                VerticalAlignment="Center"
-                                                IsVisible="{Binding GamerScoreLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                            <TextBlock Text="{Binding GamerScoreLabel}"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="#8b949e"/>
-                                        </Border>
-                                    </StackPanel>
-                                    <!-- Last seen -->
-                                    <TextBlock FontSize="12" Foreground="#484f58">
-                                        <Run Text="Last seen "/>
-                                        <Run Text="{Binding LastSeen}"/>
-                                    </TextBlock>
-                                    <!-- Last played game -->
-                                    <StackPanel Orientation="Horizontal" Spacing="6"
-                                                IsVisible="{Binding RecentGameTitle, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                        <TextBlock Text="🎮" FontSize="11"
-                                                   VerticalAlignment="Center"
-                                                   Opacity="0.6"/>
-                                        <TextBlock Text="Last played " FontSize="12"
-                                                   Foreground="#484f58"
-                                                   VerticalAlignment="Center"/>
-                                        <TextBlock Text="{Binding RecentGameTitle}"
-                                                   FontSize="12" FontWeight="SemiBold"
-                                                   Foreground="#8b949e"
-                                                   VerticalAlignment="Center"
-                                                   MaxWidth="200"
-                                                   TextTrimming="CharacterEllipsis"/>
-                                        <Border Background="#1c2128" CornerRadius="4"
-                                                Padding="5,2" VerticalAlignment="Center"
-                                                IsVisible="{Binding RecentGamePlatform, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                                            <TextBlock Text="{Binding RecentGamePlatform}"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="#484f58"/>
-                                        </Border>
-                                    </StackPanel>
-                                </StackPanel>
-
-                                <!-- View Profile button -->
-                                <Button Grid.Column="2" Classes="btn-secondary"
-                                        Padding="10,7" VerticalAlignment="Center"
-                                        Margin="0,0,8,0"
-                                        Opacity="0.7"
-                                        Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
-                                        CommandParameter="{Binding Username}">
-                                    👤 Profile
-                                </Button>
-                                <!-- Friend actions (Invite / Message / View) -->
-                                <Button Grid.Column="3" Classes="btn-secondary"
-                                        Padding="12,7" VerticalAlignment="Center"
-                                        Margin="0,0,8,0"
-                                        Opacity="0.7"
-                                        ToolTip.Tip="Friend actions">
-                                    ⋯
-                                    <Button.Flyout>
-                                        <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                            <MenuItem Header="Invite">
-                                                <MenuItem Header="Crossplay"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Crossplay'}"/>
-                                                <MenuItem Header="Radmin"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Radmin'}"/>
-                                                <MenuItem Header="OnlineFix"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|OnlineFix'}"/>
-                                                <MenuItem Header="Steam"
-                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Steam'}"/>
-                                            </MenuItem>
-                                            <MenuItem Header="Message"
-                                                      Command="{Binding $parent[UserControl].DataContext.OpenConversationCommand}"
-                                                      CommandParameter="{Binding Username}"/>
-                                            <MenuItem Header="View"
-                                                      Command="{Binding $parent[UserControl].DataContext.ViewFriendProfileCommand}"
-                                                      CommandParameter="{Binding Username}"/>
-                                        </MenuFlyout>
-                                    </Button.Flyout>
-                                </Button>
-                                <!-- Manage IPs button -->
-                                <Button Grid.Column="4" Classes="btn-secondary"
-                                        Padding="12,7" VerticalAlignment="Center"
-                                        Opacity="0.7"
-                                        ToolTip.Tip="Manage network IPs for direct connect"
-                                        Command="{Binding $parent[UserControl].DataContext.ToggleFriendIpPanelCommand}"
-                                        CommandParameter="{Binding Username}">
-                                    🌐
-                                </Button>
-                            </Grid>
-
-                            <!-- Saved IP addresses (always visible when any exist) -->
-                            <ItemsControl ItemsSource="{Binding IpAddresses}"
-                                          IsVisible="{Binding HasIpAddresses}"
-                                          Margin="0,4,0,0">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:FriendIpEntry">
-                                        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,4">
-                                            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8"
-                                                        VerticalAlignment="Center">
-                                                <Border Background="#21262d" CornerRadius="4" Padding="5,2">
-                                                    <TextBlock Text="{Binding TypeLabel}"
-                                                               FontSize="10" FontWeight="Bold"
-                                                               Foreground="#58a6ff"/>
-                                                </Border>
-                                                <TextBlock Text="{Binding Label}"
-                                                           FontSize="12" FontWeight="SemiBold"
-                                                           Foreground="White"
-                                                           VerticalAlignment="Center"/>
-                                                <TextBlock Text="{Binding Address}"
-                                                           FontSize="12" Foreground="#8b949e"
-                                                           VerticalAlignment="Center"/>
-                                            </StackPanel>
-                                            <Button Grid.Column="2" Padding="8,4"
-                                                    Classes="btn-secondary" Foreground="#f85149"
-                                                    VerticalAlignment="Center" FontSize="11"
-                                                    Command="{Binding $parent[UserControl].DataContext.RemoveFriendIpCommand}"
-                                                    CommandParameter="{Binding}">✕</Button>
-                                        </Grid>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
+            <Grid ColumnDefinitions="Auto,*" Margin="0,0,0,10">
+                <TextBlock Text="OFFLINE" Classes="con-section"/>
+                <Border Grid.Column="1" Height="1" Background="#222a35" Margin="14,0,0,0"/>
+            </Grid>
+            <ItemsControl ItemsSource="{Binding OfflineFriends}" ItemTemplate="{StaticResource FriendTile}"/>
         </StackPanel>
 
         <!-- ── Add IP panel — shown when a friend's 🌐 button is clicked ── -->
@@ -663,7 +394,7 @@
                     <ItemsControl ItemsSource="{Binding ConversationMessages}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="models:Message">
-                                <Border CornerRadius="10" Padding="10,7"
+                                <Border CornerRadius="12" Padding="12,8" Background="#1c2430"
                                         Margin="0,2">
                                     <StackPanel Spacing="2">
                                         <TextBlock Text="{Binding From}"
@@ -705,6 +436,18 @@
         </Grid>
     </Border>
 
-    <views:OnScreenKeyboardView Grid.RowSpan="2" DataContext="{Binding Keyboard}"/>
+
+    <!-- ── Console button prompts ── -->
+    <Border Grid.Row="2" Classes="con-bar">
+        <StackPanel Orientation="Horizontal" Spacing="26">
+            <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn s"><TextBlock Text="↕"/></Border><TextBlock Classes="con-bar-text" Text="Select"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn a"><TextBlock Text="A"/></Border><TextBlock Classes="con-bar-text" Text="Message / Accept"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn x"><TextBlock Text="X"/></Border><TextBlock Classes="con-bar-text" Text="Invite / Decline"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn y"><TextBlock Text="Y"/></Border><TextBlock Classes="con-bar-text" Text="Profile"/></StackPanel>
+            <StackPanel Orientation="Horizontal" Spacing="7"><Border Classes="con-btn s"><TextBlock Text="≡"/></Border><TextBlock Classes="con-bar-text" Text="Add Friend"/></StackPanel>
+        </StackPanel>
+    </Border>
+
+    <views:OnScreenKeyboardView Grid.RowSpan="3" DataContext="{Binding Keyboard}"/>
     </Grid>
 </UserControl>

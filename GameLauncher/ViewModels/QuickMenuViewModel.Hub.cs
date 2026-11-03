@@ -60,6 +60,11 @@ public partial class QuickMenuViewModel
         finally { _rebuildingHubActions = false; }
     }
 
+    partial void OnInviteStatusMessageChanged(string value)
+    {
+        if (ActivePage == "friends" && !IsXb360Theme && !UsesHubLayout) RebuildHubActions();
+    }
+
     partial void OnHubActionIndexChanged(int value) => SyncHubCursor();
 
     private void SyncHubCursor()
@@ -115,6 +120,7 @@ public partial class QuickMenuViewModel
             yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "", "home");
             yield return Act("🎮", "Recent", () => OpenLibraryPageCommand.Execute(null));
             yield return Act("👥", "Friends", () => OpenFriendsPageCommand.Execute(null));
+            yield return Act("➕", "Add Friend", () => AddFriendCommand.Execute(null));
             yield return Act("📬", "Inbox", () => OpenInboxPageCommand.Execute(null));
             yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null));
             foreach (var t in SharedTools()) yield return t;
@@ -135,6 +141,7 @@ public partial class QuickMenuViewModel
                     yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null), "Saved links & favourites - returns to your game");
                 }
                 foreach (var t in SharedTools()) yield return t;
+                yield return Act("➕", "Add Friend", () => AddFriendCommand.Execute(null), "Send a friend request", "addfriend");
                 if (HasAchievementsProgress) yield return Act("🏆", "Achievements", () => OpenAchievementsCommand.Execute(null), AchievementsLabel, "achievements");
                 yield return Act("⚙", "Settings", () => OpenSettingsPageCommand.Execute(null), "", "settings");
                 break;
@@ -163,10 +170,15 @@ public partial class QuickMenuViewModel
                 yield return Act("▦", "Open Library", () => OpenDownloadsPageCommand.Execute(null));
                 break;
             case "friends":
+                if (!string.IsNullOrEmpty(InviteStatusMessage))
+                    yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = InviteStatusMessage };
+                yield return Act("➕", "Add Friend", () => AddFriendCommand.Execute(null), "Send a friend request", "addfriend");
                 foreach (var f in QuickFriends.Take(4))
                 {
                     var name = f.Username;
                     yield return Act("👤", $"View {name}", () => ViewFriendCommand.Execute(name), f.StatusLabel);
+                    yield return Act("🎮", $"Invite {name}", () => InviteFriendCommand.Execute(name),
+                        IsPlayingGame ? $"Join me in {CurrentGameTitle}" : "Start a game to invite", "invite");
                     yield return Act("💬", $"Message {name}", () => MessageFriendCommand.Execute(name));
                 }
                 yield return Act("👥", "Open Friends Page", () => OpenFriendsPageCommand.Execute(null));

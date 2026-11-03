@@ -262,6 +262,7 @@
                                             <TextBlock Text="{Binding InviteStatusMessage}" Foreground="#555" FontSize="11"
                                                        IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                                             <Button Classes="xb360-sub-action-btn" Command="{Binding OpenFriendsPageCommand}">All Friends</Button>
+                                            <Button Classes="xb360-sub-action-btn" Command="{Binding AddFriendCommand}">Add Friend</Button>
                                         </StackPanel>
 
                                         <!-- Achievements detail: name, description and icon list -->

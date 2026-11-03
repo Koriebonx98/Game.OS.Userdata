@@ -549,6 +549,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 return false;
             }
         };
+        QuickMenuVm.OnSendFriendRequest = async username =>
+        {
+            await _client.SendFriendRequestAsync(username);
+            return true;
+        };
         QuickMenuVm.OnNavigatePage = page =>
         {
             if (string.IsNullOrWhiteSpace(page)) return;

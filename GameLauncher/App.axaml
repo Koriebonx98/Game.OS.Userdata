@@ -6,5 +6,6 @@
     <Application.Styles>
         <FluentTheme />
         <StyleInclude Source="avares://GameLauncher/Styles/GameOsStyles.axaml"/>
+        <StyleInclude Source="avares://GameLauncher/Styles/ConsoleSocialStyles.axaml"/>
     </Application.Styles>
 </Application>
