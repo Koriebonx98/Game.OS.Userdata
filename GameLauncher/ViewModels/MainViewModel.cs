@@ -81,6 +81,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// A user is considered Online when their lastSeen is &lt;5 min old.
     /// </summary>
     private Timer? _presenceTimer;
+    private LfgService? _lfg;
 
     // ── Friend presence poller ─────────────────────────────────────────────
     /// <summary>Fires every 2 minutes to detect when friends come online or start a game.</summary>
@@ -515,6 +516,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Give the detail VM access to the per-system metadata cache so it can
         // load achievement JSON from disk instead of re-downloading every time.
         DetailVm.CacheService = _metadataCache;
+        _lfg = new LfgService(_client);
+        DetailVm.Lfg = _lfg;
 
         DetailVm.OnClose = () => ShowDetail = false;
 
@@ -3941,6 +3944,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private void StartPresenceHeartbeat()
     {
+        _ = _lfg?.JoinSwarmAsync();
         _presenceTimer?.Dispose();
         _presenceTimer = new Timer(_ =>
         {
@@ -3951,6 +3955,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 try   { await _client.UpdatePresenceAsync(currentGame).ConfigureAwait(false); }
                 catch { /* presence update failure is non-fatal */ }
+                if (_lfg != null) await _lfg.JoinSwarmAsync().ConfigureAwait(false);
             });
         }, null, TimeSpan.FromMinutes(2), TimeSpan.FromMinutes(2));
     }

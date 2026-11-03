@@ -8,6 +8,18 @@ using System.Text.RegularExpressions;
 
 namespace GameLauncher.Models
 {
+    /// <summary>Row that can be highlighted by controller navigation.</summary>
+    public class SelectableItem : INotifyPropertyChanged
+    {
+        private bool _isSelected;
+        public event PropertyChangedEventHandler? PropertyChanged;
+        public bool IsSelected
+        {
+            get => _isSelected;
+            set { if (_isSelected != value) { _isSelected = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsSelected))); } }
+        }
+    }
+
     public class UserProfile
     {
         [JsonPropertyName("username")]            public string  Username     { get; set; } = "";
@@ -166,7 +178,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("sentAt")] public string SentAt { get; set; } = "";
     }
 
-    public class GameInvite
+    public class GameInvite : SelectableItem
     {
         [JsonPropertyName("inviteId")]    public string  InviteId    { get; set; } = "";
         [JsonPropertyName("from")]        public string  From        { get; set; } = "";
@@ -176,6 +188,21 @@ namespace GameLauncher.Models
         [JsonPropertyName("sentAt")]      public string  SentAt      { get; set; } = "";
         [JsonPropertyName("status")]      public string  Status      { get; set; } = "";
         [JsonPropertyName("respondedAt")] public string? RespondedAt { get; set; }
+    }
+
+    /// <summary>A public LFG / group room published to the shared swarm. The connection endpoint is never included.</summary>
+    public class LfgRoom
+    {
+        [JsonPropertyName("roomId")]     public string       RoomId     { get; set; } = "";
+        [JsonPropertyName("host")]       public string       Host       { get; set; } = "";
+        [JsonPropertyName("game")]       public string       Game       { get; set; } = "";
+        [JsonPropertyName("platform")]   public string       Platform   { get; set; } = "";
+        [JsonPropertyName("kind")]       public string       Kind       { get; set; } = "lfg";
+        [JsonPropertyName("maxPlayers")] public int          MaxPlayers { get; set; }
+        [JsonPropertyName("members")]    public List<string> Members    { get; set; } = new();
+        public string KindLabel   => Kind == "group" ? "Group" : "LFG";
+        public string PlayersText => $"{Members.Count}/{MaxPlayers}";
+        public bool   CanJoin     => Members.Count < MaxPlayers;
     }
 
     public class ActivityEntry
@@ -239,7 +266,7 @@ namespace GameLauncher.Models
     }
 
     /// <summary>A friend displayed in the Friends screen, populated from presence API.</summary>
-    public class FriendEntry
+    public class FriendEntry : SelectableItem
     {
         public string Username      { get; set; } = "";
         /// <summary>First character of Username, upper-cased, for the avatar circle.</summary>
@@ -297,7 +324,7 @@ namespace GameLauncher.Models
     }
 
     /// <summary>An incoming friend request shown in the Friends screen.</summary>
-    public class FriendRequestDisplay
+    public class FriendRequestDisplay : SelectableItem
     {
         public string FromUsername  { get; set; } = "";
         public string AvatarInitial =>

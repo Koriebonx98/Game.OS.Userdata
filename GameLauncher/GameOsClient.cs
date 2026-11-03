@@ -618,6 +618,33 @@ namespace GameLauncher
             throw new GameOsException(400, "No connection available to send invites.");
         }
 
+        // ── Shared swarm / LFG (backend mode only) ─────────────────────────────
+        public bool SupportsSwarm => _backend != null && _username != null;
+
+        public Task SwarmHeartbeatAsync(CancellationToken ct = default) =>
+            _backend != null ? _backend.SwarmHeartbeatAsync(ct) : Task.CompletedTask;
+
+        public Task<string> CreateLfgAsync(string game, string platform, string kind, string endpoint, int maxPlayers, CancellationToken ct = default, bool vpn = false) =>
+            _backend != null ? _backend.CreateLfgAsync(game, platform, kind, endpoint, maxPlayers, ct, vpn)
+                             : throw new GameOsException(400, "LFG needs the Game.OS backend.");
+
+        public Task<List<LfgRoom>> ListLfgAsync(string game, string platform, CancellationToken ct = default) =>
+            _backend != null ? _backend.ListLfgAsync(game, platform, ct) : Task.FromResult(new List<LfgRoom>());
+
+        public Task<BackendApiService.LfgJoinResult> JoinLfgAsync(string roomId, CancellationToken ct = default) =>
+            _backend != null ? _backend.JoinLfgAsync(roomId, ct)
+                             : throw new GameOsException(400, "LFG needs the Game.OS backend.");
+
+        public Task<BackendApiService.VpnSession> GetVpnSessionAsync(string roomId, CancellationToken ct = default) =>
+            _backend != null ? _backend.GetVpnSessionAsync(roomId, ct)
+                             : throw new GameOsException(400, "Virtual network needs the Game.OS backend.");
+
+        public Task LfgHeartbeatAsync(string roomId, CancellationToken ct = default) =>
+            _backend != null ? _backend.LfgHeartbeatAsync(roomId, ct) : Task.CompletedTask;
+
+        public Task CloseLfgAsync(string roomId, CancellationToken ct = default) =>
+            _backend != null ? _backend.CloseLfgAsync(roomId, ct) : Task.CompletedTask;
+
         public async Task RespondInviteAsync(string inviteId, string response, CancellationToken ct = default)
         {
             if (_backend != null)

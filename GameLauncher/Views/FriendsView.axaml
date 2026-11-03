@@ -2,6 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
              xmlns:models="using:GameLauncher.Models"
+             xmlns:views="using:GameLauncher.Views"
              x:Class="GameLauncher.Views.FriendsView"
              x:DataType="vm:FriendsViewModel"
              Background="#0d1117">
@@ -28,10 +29,13 @@
                 </TextBlock>
             </StackPanel>
             <Button Grid.Column="1" Classes="btn-primary"
-                    VerticalAlignment="Center" Padding="16,10">
+                    VerticalAlignment="Center" Padding="16,10"
+                    Command="{Binding OpenAddFriendKeyboardCommand}">
                 + Add Friend
             </Button>
         </Grid>
+
+        <TextBlock Text="{Binding ControllerHint}" FontSize="11" Foreground="#6e7681" Margin="0,-12,0,14"/>
 
         <!-- Loading indicator -->
         <TextBlock Text="Loading friends…"
@@ -120,8 +124,11 @@
             <ItemsControl ItemsSource="{Binding PendingRequests}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:FriendRequestDisplay">
-                        <Border Background="#161b22" CornerRadius="10"
-                                Padding="16,12" Margin="0,0,0,8">
+                        <Border Background="#161b22" CornerRadius="10" BorderBrush="Transparent" BorderThickness="2"
+                                Padding="16,12" Margin="0,0,0,8" Classes.sel="{Binding IsSelected}">
+                            <Border.Styles>
+                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+                            </Border.Styles>
                             <Grid ColumnDefinitions="52,*,Auto,Auto">
                                 <!-- Avatar -->
                                 <Border Grid.Column="0" Width="42" Height="42"
@@ -145,12 +152,16 @@
                                 </StackPanel>
                                 <!-- Accept -->
                                 <Button Grid.Column="2" Classes="btn-success"
-                                        Padding="14,7" Margin="0,0,8,0">
+                                        Padding="14,7" Margin="0,0,8,0"
+                                        Command="{Binding $parent[UserControl].DataContext.AcceptRequestCommand}"
+                                        CommandParameter="{Binding}">
                                     ✓ Accept
                                 </Button>
                                 <!-- Decline -->
                                 <Button Grid.Column="3" Classes="btn-secondary"
-                                        Padding="14,7">
+                                        Padding="14,7"
+                                        Command="{Binding $parent[UserControl].DataContext.DeclineRequestCommand}"
+                                        CommandParameter="{Binding}">
                                     ✕ Decline
                                 </Button>
                             </Grid>
@@ -169,8 +180,11 @@
             <ItemsControl ItemsSource="{Binding OnlineFriends}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:FriendEntry">
-                        <Border Background="#161b22" CornerRadius="12"
-                                Padding="16,14" Margin="0,0,0,8">
+                        <Border Background="#161b22" CornerRadius="12" BorderBrush="Transparent" BorderThickness="2"
+                                Padding="16,14" Margin="0,0,0,8" Classes.sel="{Binding IsSelected}">
+                            <Border.Styles>
+                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+                            </Border.Styles>
                             <StackPanel Spacing="8">
                             <Grid ColumnDefinitions="56,*,Auto,Auto,Auto">
                                 <!-- Avatar with status dot -->
@@ -352,9 +366,12 @@
             <ItemsControl ItemsSource="{Binding OfflineFriends}">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="models:FriendEntry">
-                        <Border Background="#161b22" CornerRadius="12"
+                        <Border Background="#161b22" CornerRadius="12" BorderBrush="Transparent" BorderThickness="2"
                                 Padding="16,14" Margin="0,0,0,8"
-                                Opacity="0.8">
+                                Opacity="0.8" Classes.sel="{Binding IsSelected}">
+                            <Border.Styles>
+                                <Style Selector="Border.sel"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+                            </Border.Styles>
                             <StackPanel Spacing="8">
                             <Grid ColumnDefinitions="56,*,Auto,Auto,Auto">
                                 <!-- Avatar (dimmed) -->
@@ -688,5 +705,6 @@
         </Grid>
     </Border>
 
+    <views:OnScreenKeyboardView Grid.RowSpan="2" DataContext="{Binding Keyboard}"/>
     </Grid>
 </UserControl>

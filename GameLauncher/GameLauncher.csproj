@@ -47,6 +47,7 @@
     </PackageReference>
     <PackageReference Include="MonoTorrent" Version="3.0.2" />
     <PackageReference Include="NAudio" Version="2.2.1" />
+    <PackageReference Include="Open.NAT" Version="2.1.0" />
     <PackageReference Include="SharpCompress" Version="0.50.7" />
     <PackageReference Include="System.Drawing.Common" Version="8.0.10" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />

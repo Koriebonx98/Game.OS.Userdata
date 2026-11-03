@@ -4295,6 +4295,119 @@ async function initAdminAccount() {
     }
 }
 
+// ── Shared swarm / LFG rooms (in-memory, ephemeral) ───────────────────────────
+// Every signed-in launcher heartbeats into the pool. Hosts publish a room for a
+// game + platform; the connection endpoint is only revealed to a joining user.
+const SWARM_TTL_MS = 5 * 60 * 1000;
+const swarmPeers = new Map();   // username -> lastSeen
+const lfgRooms   = new Map();   // roomId   -> room
+const ENDPOINT_RE = /^(\d{1,3}\.){3}\d{1,3}(:\d{1,5})?$/;
+const VPN_SECRET = process.env.VPN_SECRET || '';
+const VPN_RELAY_HOST = process.env.VPN_RELAY_HOST || '';
+const VPN_RELAY_PORT = parseInt(process.env.VPN_RELAY_PORT || '26501', 10);
+
+function pruneSwarm() {
+    const now = Date.now();
+    for (const [u, t] of swarmPeers) if (now - t > SWARM_TTL_MS) swarmPeers.delete(u);
+    for (const [id, r] of lfgRooms) if (now - r.lastSeen > SWARM_TTL_MS) lfgRooms.delete(id);
+}
+
+app.post('/api/swarm/heartbeat', authenticateToken, (req, res) => {
+    swarmPeers.set(req.tokenUser.username.toLowerCase(), Date.now());
+    pruneSwarm();
+    res.json({ success: true, peers: swarmPeers.size });
+});
+
+app.post('/api/lfg', authenticateToken, (req, res) => {
+    const { game, platform, kind, endpoint, maxPlayers } = req.body || {};
+    if (typeof game !== 'string' || !game.trim() || game.length > 120
+        || typeof platform !== 'string' || !platform.trim() || platform.length > 40) {
+        return res.status(400).json({ success: false, message: 'game and platform are required' });
+    }
+    const wantVpn = !!(req.body || {}).vpn;
+    if (wantVpn && !VPN_SECRET) {
+        return res.status(503).json({ success: false, message: 'Virtual network is not configured on this server' });
+    }
+    if (!wantVpn && (typeof endpoint !== 'string' || !ENDPOINT_RE.test(endpoint))) {
+        return res.status(400).json({ success: false, message: 'Invalid endpoint' });
+    }
+    const host = req.tokenUser.username.toLowerCase();
+    for (const [id, r] of lfgRooms) if (r.host === host) lfgRooms.delete(id);
+    let subnet = 0;
+    if (wantVpn) {
+        const used = new Set([...lfgRooms.values()].map(r => r.subnet));
+        for (let n = 1; n < 255; n++) if (!used.has(n)) { subnet = n; break; }
+        if (!subnet) return res.status(503).json({ success: false, message: 'No virtual networks available' });
+    }
+    const roomId = require('crypto').randomBytes(8).toString('hex');
+    lfgRooms.set(roomId, {
+        roomId, host, game: game.trim(), platform: platform.trim(),
+        kind: kind === 'group' ? 'group' : 'lfg',
+        maxPlayers: Math.min(Math.max(parseInt(maxPlayers, 10) || 4, 2), 32),
+        endpoint: wantVpn ? `10.77.${subnet}.1` : endpoint,
+        subnet, members: [host], lastSeen: Date.now(),
+    });
+    res.json({ success: true, roomId });
+});
+
+app.get('/api/lfg', authenticateToken, (req, res) => {
+    pruneSwarm();
+    const game = String(req.query.game || '').toLowerCase();
+    const platform = String(req.query.platform || '').toLowerCase();
+    const rooms = [...lfgRooms.values()]
+        .filter(r => (!game || r.game.toLowerCase() === game) && (!platform || r.platform.toLowerCase() === platform))
+        .map(({ endpoint, ...pub }) => pub);
+    res.json({ success: true, rooms, peers: swarmPeers.size });
+});
+
+app.post('/api/lfg/join', authenticateToken, (req, res) => {
+    pruneSwarm();
+    const room = lfgRooms.get(String((req.body || {}).roomId || ''));
+    if (!room) return res.status(404).json({ success: false, message: 'Room no longer exists' });
+    const me = req.tokenUser.username.toLowerCase();
+    if (!room.members.includes(me)) {
+        if (room.members.length >= room.maxPlayers) return res.status(409).json({ success: false, message: 'Room is full' });
+        room.members.push(me);
+    }
+    res.json({ success: true, endpoint: room.endpoint, host: room.host, game: room.game, platform: room.platform, vpn: !!room.subnet });
+});
+
+app.post('/api/lfg/heartbeat', authenticateToken, (req, res) => {
+    const room = lfgRooms.get(String((req.body || {}).roomId || ''));
+    if (!room || room.host !== req.tokenUser.username.toLowerCase()) return res.status(404).json({ success: false });
+    room.lastSeen = Date.now();
+    res.json({ success: true, members: room.members });
+});
+
+// Issues a signed virtual-network token for a room the caller belongs to.
+// Host is always 10.77.N.1; members get .2+ in join order.
+app.post('/api/vpn/session', authenticateToken, (req, res) => {
+    if (!VPN_SECRET || !VPN_RELAY_HOST) {
+        return res.status(503).json({ success: false, message: 'Virtual network is not configured on this server' });
+    }
+    const room = lfgRooms.get(String((req.body || {}).roomId || ''));
+    if (!room || !room.subnet) return res.status(404).json({ success: false, message: 'Room has no virtual network' });
+    const me = req.tokenUser.username.toLowerCase();
+    const idx = room.members.indexOf(me);
+    if (idx < 0) return res.status(403).json({ success: false, message: 'Join the room first' });
+    const vip = idx + 1;
+    if (vip > 250) return res.status(409).json({ success: false, message: 'Room is full' });
+    const exp = Date.now() + 6 * 60 * 60 * 1000;
+    const crypto = require('crypto');
+    const sig = crypto.createHmac('sha256', VPN_SECRET).update(`${room.roomId}.${vip}.${exp}`).digest('hex');
+    res.json({
+        success: true, token: `${room.roomId}.${vip}.${exp}.${sig}`,
+        relayHost: VPN_RELAY_HOST, relayPort: VPN_RELAY_PORT,
+        subnet: room.subnet, vip, ip: `10.77.${room.subnet}.${vip}`,
+    });
+});
+
+app.delete('/api/lfg/:roomId', authenticateToken, (req, res) => {
+    const room = lfgRooms.get(req.params.roomId);
+    if (room && room.host === req.tokenUser.username.toLowerCase()) lfgRooms.delete(room.roomId);
+    res.json({ success: true });
+});
+
 // ── Start server ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

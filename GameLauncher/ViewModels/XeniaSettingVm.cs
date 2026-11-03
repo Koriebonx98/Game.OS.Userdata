@@ -10,7 +10,8 @@ public partial class XeniaSettingVm : ViewModelBase
     public int Line { get; init; }
     public bool IsBool { get; init; }
     public string OriginalValue { get; init; } = "";
-    public string Label => Section.Length == 0 ? Key : Section + " › " + Key;
+    public string? DisplayName { get; init; }
+    public string Label => DisplayName ?? (Section.Length == 0 ? Key : Section + " › " + Key);
 
     [ObservableProperty] private string _value = "";
 

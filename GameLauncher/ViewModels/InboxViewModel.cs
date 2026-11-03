@@ -193,6 +193,65 @@ public partial class InboxViewModel : ViewModelBase
         OnPropertyChanged(nameof(HasEmptyInbox));
     }
 
+    // ── Controller navigation + on-screen keyboard ────────────────────────────
+    public OnScreenKeyboardViewModel Keyboard { get; } = new();
+    private object? _focused;
+
+    private List<object> FocusList() =>
+        PendingInvites.Cast<object>().Concat(PendingModShares).Concat(Conversations).ToList();
+
+    private void SetFocus(object? item)
+    {
+        foreach (var i in FocusList())
+        {
+            bool on = ReferenceEquals(i, item);
+            if (i is SelectableItem s) s.IsSelected = on;
+            else if (i is InboxConversationVm c) c.IsSelected = on;
+        }
+        _focused = item;
+    }
+
+    private void MoveFocus(int delta)
+    {
+        var list = FocusList();
+        if (list.Count == 0) return;
+        int idx = _focused == null ? -1 : list.FindIndex(i => ReferenceEquals(i, _focused));
+        idx = Math.Clamp((idx < 0 ? (delta > 0 ? -1 : list.Count) : idx) + delta, 0, list.Count - 1);
+        SetFocus(list[idx]);
+    }
+
+    /// <summary>Controller handling for the Inbox page. Returns true when the key was consumed.</summary>
+    public bool HandleKey(string name)
+    {
+        if (Keyboard.IsOpen) return Keyboard.HandleKey(name);
+        if (ShowConversation)
+        {
+            switch (name)
+            {
+                case "A": Keyboard.Open(NewMessageText, $"Message {ConversationFriend}", t => NewMessageText = t,
+                                        _ => SendMessageCommand.Execute(null)); break;
+                case "X": SendMessageCommand.Execute(null); break;
+                case "B": CloseConversationCommand.Execute(null); break;
+            }
+            return true;
+        }
+        switch (name)
+        {
+            case "Up": MoveFocus(-1); return true;
+            case "Down": MoveFocus(1); return true;
+        }
+        switch (_focused)
+        {
+            case GameInvite inv when name == "A": AcceptInviteCommand.Execute(inv); return true;
+            case GameInvite inv when name == "X": DeclineInviteCommand.Execute(inv); return true;
+            case Services.PendingModShare sh when name == "A": AcceptModShareCommand.Execute(sh); return true;
+            case Services.PendingModShare sh when name == "X": DeclineModShareCommand.Execute(sh); return true;
+            case InboxConversationVm c when name == "A": OpenConversationCommand.Execute(c.FriendUsername); return true;
+            case InboxConversationVm c when name == "Y": ViewFriendProfileCommand.Execute(c.FriendUsername); return true;
+        }
+        return false;
+    }
+
     private async Task LoadAsync()
     {
         if (_client == null) return;
@@ -284,4 +343,5 @@ public partial class InboxConversationVm : ViewModelBase
     [ObservableProperty] private string _friendUsername = "";
     [ObservableProperty] private string _lastMessage = "";
     [ObservableProperty] private string _lastMessageAt = "";
+    [ObservableProperty] private bool _isSelected;
 }
