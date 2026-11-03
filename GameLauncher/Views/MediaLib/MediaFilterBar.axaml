@@ -16,5 +16,6 @@
                 Command="{Binding CycleGenreCommand}" Content="{Binding GenreLabel}"/>
         <Button Classes="btn-secondary" Command="{Binding ClearFiltersCommand}" Content="✕ Clear"
                 IsVisible="{Binding ShowClearFilters}"/>
+        <Button Classes="btn-secondary" Command="{Binding OpenMediaSettingsCommand}" Content="⚙" ToolTip.Tip="Movies &amp; TV settings"/>
     </StackPanel>
 </UserControl>

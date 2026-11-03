@@ -150,6 +150,94 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     public Action? BringToForegroundRequested { get; set; }
 
     // ── Session data ───────────────────────────────────────────────────────
+    private string _broadcastError = "";
+
+    /// <summary>Starts the public relay broadcast and marks the account live so the profile shows "Watch Stream".</summary>
+    private async Task<bool> BeginBroadcastAsync(string title)
+    {
+        try
+        {
+            var s = Services.AppSettingsService.Load();
+            var (roomId, relay) = await StreamHostService.StartBroadcastAsync(
+                s.StreamRelayUrl, s.StreamRelayKey, title, s.StreamAudioEnabled,
+                s.StreamFrameRate, s.StreamMaxWidth, s.StreamJpegQuality);
+            await _client.SetBroadcastAsync(new Models.BroadcastInfo
+            {
+                Live = true, RelayUrl = relay, RoomId = roomId, Title = title,
+                StartedAt = DateTimeOffset.UtcNow.ToString("o")
+            });
+            return true;
+        }
+        catch (Exception ex) { _broadcastError = "Broadcast failed: " + ex.Message; return false; }
+    }
+
+    /// <summary>Starts a broadcast room for the title, invites the friends, and (optionally) waits for someone to accept before playback.</summary>
+    private async Task<bool> RunWatchPartyAsync(WatchPartyRequest req, Action<IReadOnlyList<string>> report)
+    {
+        if (!await BeginBroadcastAsync(req.Title))
+        {
+            report(new[] { _broadcastError });
+            await Task.Delay(2500);
+            return false;
+        }
+        if (req.Cancel.IsCancellationRequested) { await EndBroadcastAsync(); return false; }
+
+        var info = (new { Relay = StreamHostService.BroadcastRelayUrl, Room = StreamHostService.BroadcastRoomId });
+        var status = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var friend in req.Friends)
+        {
+            try
+            {
+                ids[friend] = await _client.SendWatchInviteAsync(friend, new GameInvite
+                {
+                    GameName = req.Title, Kind = "watch", RoomId = info.Room, RelayUrl = info.Relay,
+                    MediaType = req.MediaType, Season = req.Season, Episode = req.Episode,
+                });
+                status[friend] = "pending";
+            }
+            catch (Exception ex) { status[friend] = "failed: " + ex.Message; }
+        }
+
+        IReadOnlyList<string> Lines() => status.Select(kv => kv.Value switch
+        {
+            "accepted" => $"✓  {kv.Key} joined",
+            "declined" => $"✕  {kv.Key} declined",
+            "pending"  => $"⏳  Waiting for {kv.Key}…",
+            _          => $"⚠  {kv.Key}: {kv.Value}",
+        }).ToList();
+        report(Lines());
+
+        if (!req.WaitForAccept) return true;
+
+        var deadline = DateTime.UtcNow.AddMinutes(3);
+        while (DateTime.UtcNow < deadline && !req.Cancel.IsCancellationRequested && !req.StartNow)
+        {
+            foreach (var (friend, id) in ids.ToList())
+            {
+                if (status[friend] != "pending") continue;
+                try { status[friend] = await _client.GetInviteStatusAsync(friend, id) ?? "pending"; } catch { }
+            }
+            report(Lines());
+            if (status.Values.Any(v => v == "accepted")) return true;
+            if (!status.Values.Any(v => v == "pending")) break;
+            try { await Task.Delay(3000, req.Cancel.Token); } catch (OperationCanceledException) { break; }
+        }
+        if (req.Cancel.IsCancellationRequested) { await EndBroadcastAsync(); return false; }
+        if (req.StartNow || status.Values.Any(v => v == "accepted")) return true;
+        // Nobody joined: don't leave a dangling broadcast.
+        report(new[] { "Nobody accepted the invite." });
+        await EndBroadcastAsync();
+        await Task.Delay(2000);
+        return false;
+    }
+
+    private async Task EndBroadcastAsync()
+    {
+        StreamHostService.StopBroadcast();
+        try { await _client.SetBroadcastAsync(null); } catch { }
+    }
+
     private UserProfile     _profile      = new();
     private List<Game>      _library      = new();
     private List<Achievement> _achievements = new();
@@ -413,10 +501,31 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         RefreshBrowserSuspend();
     }
 
+    /// <summary>Builds the hosted watch.html link for a watch-party invite or live broadcast.</summary>
+    private static string BuildWatchUrl(GameInvite invite)
+    {
+        var web = Services.AppSettingsService.Load().WebAppUrl;
+        if (string.IsNullOrWhiteSpace(web)) web = new Models.AppSettings().WebAppUrl;
+        var q = $"relay={Uri.EscapeDataString(invite.RelayUrl ?? "")}&room={Uri.EscapeDataString(invite.RoomId ?? "")}" +
+                $"&title={Uri.EscapeDataString(invite.GameName)}&type={Uri.EscapeDataString(invite.MediaType ?? "")}" +
+                $"&season={Uri.EscapeDataString(invite.Season ?? "")}&episode={Uri.EscapeDataString(invite.Episode ?? "")}";
+        return web.TrimEnd('/') + "/watch.html?" + q;
+    }
+
     private void TryLaunchAcceptedInvite(GameInvite invite)
     {
         if (invite == null || string.IsNullOrWhiteSpace(invite.GameName))
             return;
+
+        if (invite.IsWatchParty)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(BuildWatchUrl(invite)) { UseShellExecute = true });
+            }
+            catch (Exception ex) { DevLogService.Log("[WatchParty] Could not open viewer: " + ex.Message); }
+            return;
+        }
 
         string invitePlatform = string.IsNullOrWhiteSpace(invite.Platform) ? "PC" : invite.Platform;
         string targetPlatform = PlatformHelper.NormalizePlatform(invitePlatform);
@@ -549,6 +658,17 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 return false;
             }
         };
+        QuickMenuVm.OnStartBroadcast = async () =>
+        {
+            var ok = await BeginBroadcastAsync(string.IsNullOrEmpty(QuickMenuVm.CurrentGameTitle) ? "Live on Game OS" : QuickMenuVm.CurrentGameTitle);
+            if (!ok) QuickMenuVm.InviteStatusMessage = _broadcastError;
+        };
+        QuickMenuVm.OnStopBroadcast = EndBroadcastAsync;
+        MediaVm.PartyFriendsProvider = () =>
+            FriendsVm.OnlineFriends.Concat(FriendsVm.OfflineFriends).Select(f => f.Username).ToList();
+        MediaVm.StartWatchParty = RunWatchPartyAsync;
+        MediaVm.EndWatchParty = () => _ = EndBroadcastAsync();
+        StreamHostService.BroadcastEnded += () => _ = _client.SetBroadcastAsync(null);
         QuickMenuVm.OnSendFriendRequest = async username =>
         {
             await _client.SendFriendRequestAsync(username);
@@ -1168,11 +1288,33 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             MediaVm.ResumePlayback = SettingsVm.ResumePlayback;
             MediaVm.MarkWatchedPercent = SettingsVm.MarkWatchedPercent;
             MediaVm.SkipWatchedEpisodes = SettingsVm.SkipWatchedEpisodes;
+            MediaVm.SubtitlesEnabled = SettingsVm.SubtitlesEnabled;
+            MediaVm.SubtitleLanguage = SettingsVm.SubtitleLanguage;
             MediaVm.PipPosition = SettingsVm.PipPosition;
             MediaVm.PipSize = SettingsVm.PipSize;
             Services.MediaMetadataService.Configure(SettingsVm.MovieInfoSource, SettingsVm.TvInfoSource, SettingsVm.MusicInfoSource, SettingsVm.TmdbApiKey, SettingsVm.OmdbApiKey);
         }
         SyncMediaSettings();
+        // The Movies & TV settings menu edits the same settings and stores them straight away.
+        MediaVm.SettingsEdited = () =>
+        {
+            SettingsVm.ShowMovieDetails = SettingsVm.ShowTvDetails = MediaVm.ShowMovieDetails;
+            SettingsVm.AutoPlayNextEpisode = MediaVm.AutoPlayNextEpisode;
+            SettingsVm.SkipWatchedEpisodes = MediaVm.SkipWatchedEpisodes;
+            SettingsVm.ResumePlayback = MediaVm.ResumePlayback;
+            SettingsVm.OnlineMediaInfo = MediaVm.OnlineInfoEnabled;
+            SettingsVm.SubtitlesEnabled = MediaVm.SubtitlesEnabled;
+            SettingsVm.SubtitleLanguage = MediaVm.SubtitleLanguage;
+            var stored = Services.AppSettingsService.Load();
+            stored.ShowMovieDetails = stored.ShowTvDetails = MediaVm.ShowMovieDetails;
+            stored.AutoPlayNextEpisode = MediaVm.AutoPlayNextEpisode;
+            stored.SkipWatchedEpisodes = MediaVm.SkipWatchedEpisodes;
+            stored.ResumePlayback = MediaVm.ResumePlayback;
+            stored.OnlineMediaInfo = MediaVm.OnlineInfoEnabled;
+            stored.SubtitlesEnabled = MediaVm.SubtitlesEnabled;
+            stored.SubtitleLanguage = MediaVm.SubtitleLanguage;
+            Services.AppSettingsService.Save(stored);
+        };
         MediaVm.MediaPresenceChanged = label =>
         {
             if (DetailVm.IsGameRunning || !Services.AppSettingsService.Load().BroadcastGameStart) return;
@@ -1185,6 +1327,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 or nameof(SettingsViewModel.MusicShuffle) or nameof(SettingsViewModel.MusicRepeat) or nameof(SettingsViewModel.OnlineMediaInfo)
                 or nameof(SettingsViewModel.ResumePlayback) or nameof(SettingsViewModel.MarkWatchedPercent)
                 or nameof(SettingsViewModel.SkipWatchedEpisodes) or nameof(SettingsViewModel.PipPosition)
+                or nameof(SettingsViewModel.SubtitlesEnabled) or nameof(SettingsViewModel.SubtitleLanguage)
                 or nameof(SettingsViewModel.PipSize) or nameof(SettingsViewModel.MovieInfoSource) or nameof(SettingsViewModel.TvInfoSource) or nameof(SettingsViewModel.MusicInfoSource)
                 or nameof(SettingsViewModel.TmdbApiKey) or nameof(SettingsViewModel.OmdbApiKey))
                 SyncMediaSettings();

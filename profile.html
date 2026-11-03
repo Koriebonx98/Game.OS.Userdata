@@ -244,6 +244,7 @@
                 MODE === 'demo' ? Promise.resolve([])                            : getActivityLogGitHub(username),
                 getFriendPresence(username)
             ]);
+            const liveBroadcast = await getLiveBroadcast(username);
 
             const online = isOnline(presence);
 
@@ -339,6 +340,7 @@
                         </div>
                     </div>
                     <div class="profile-header-actions">
+                        ${liveBroadcast ? `<a class="btn-profile-msg" style="background:#dc2626;color:#fff;" href="${watchStreamUrl(username)}">🔴 Watch Stream</a>` : ''}
                         <button class="btn-profile-msg" onclick="openChat('${safeUser}')">💬 Message</button>
                         <a class="btn-profile-msg" href="friends.html">← Back</a>
                     </div>

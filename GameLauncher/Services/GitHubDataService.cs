@@ -1091,6 +1091,22 @@ namespace GameLauncher.Services
             catch { return new List<Models.ActivityEntry>(); }
         }
 
+        /// <summary>Publishes (or clears, when <paramref name="info"/> is null) the account's live broadcast marker.</summary>
+        public async Task SetBroadcastAsync(string username, Models.BroadcastInfo? info, CancellationToken ct = default)
+        {
+            try
+            {
+                var key = $"accounts/{username.ToLowerInvariant()}/broadcast.json";
+                var (_, sha) = await ReadFileAsync<Models.BroadcastInfo>(key, ct);
+                var data = info ?? new Models.BroadcastInfo { Live = false };
+                await WriteFileAsync(key, data, $"Broadcast {(data.Live ? "start" : "stop")}: {username}", sha, ct);
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[GitHubDataService] SetBroadcast failed: {ex.Message}");
+            }
+        }
+
         public async Task UpdatePresenceAsync(
             string username, CancellationToken ct = default)
         {
@@ -1185,13 +1201,14 @@ namespace GameLauncher.Services
         /// their <c>accounts/{user}/invites.json</c> file.  The invite is also delivered
         /// as a message in the shared conversation file so it appears in the messages inbox.
         /// </summary>
-        public async Task SendInviteAsync(
+        public async Task<string> SendInviteAsync(
             string fromUsername,
             string toUsername,
             string gameName,
             string platform,
             string connectionType,
-            CancellationToken ct = default)
+            CancellationToken ct = default,
+            GameInvite? watch = null)
         {
             string toLower   = toUsername.ToLowerInvariant();
             string fromLower = fromUsername.ToLowerInvariant();
@@ -1210,6 +1227,12 @@ namespace GameLauncher.Services
                 ConnectionType = connectionType.Trim(),
                 SentAt         = DateTimeOffset.UtcNow.ToString("o"),
                 Status         = "pending",
+                Kind           = watch?.Kind,
+                RoomId         = watch?.RoomId,
+                RelayUrl       = watch?.RelayUrl,
+                MediaType      = watch?.MediaType,
+                Season         = watch?.Season,
+                Episode        = watch?.Episode,
             });
             await WriteFileAsync(invitesKey, inviteList,
                 $"Invite from {fromUsername} to {toUsername} for {gameName}", invitesSha, ct);
@@ -1217,7 +1240,9 @@ namespace GameLauncher.Services
             // Also deliver the invite as a message so it surfaces in the inbox conversation.
             string platformStr = string.IsNullOrWhiteSpace(platform) ? "" : $" ({platform.Trim()})";
             string connStr     = string.IsNullOrWhiteSpace(connectionType) ? "" : $" via {connectionType.Trim()}";
-            string notifyText  = $"[Game Invite] Join me in {gameName.Trim()}{platformStr}{connStr}";
+            string notifyText  = watch != null
+                ? $"[Watch Party] Join me watching {gameName.Trim()}"
+                : $"[Game Invite] Join me in {gameName.Trim()}{platformStr}{connStr}";
             var (a, b) = BuildThreadKey(fromLower, toLower);
             var convKey = $"accounts/messages/{a}_{b}.json";
             var (msgs, msgSha) = await ReadFileAsync<List<Message>>(convKey, ct);
@@ -1230,6 +1255,26 @@ namespace GameLauncher.Services
             });
             await WriteFileAsync(convKey, msgList,
                 $"Invite message from {fromUsername} to {toUsername}", msgSha, ct);
+            return inviteId;
+        }
+
+        /// <summary>Current status ("pending" / "accepted" / "declined") of an invite sent to <paramref name="toUsername"/>, or null if missing.</summary>
+        public async Task<string?> GetInviteStatusAsync(string toUsername, string inviteId, CancellationToken ct = default)
+        {
+            var (invites, _) = await ReadFileAsync<List<GameInvite>>($"accounts/{toUsername.ToLowerInvariant()}/invites.json", ct);
+            return invites?.FirstOrDefault(i => i.InviteId == inviteId)?.Status;
+        }
+
+        /// <summary>Marks one of <paramref name="username"/>'s own invites accepted / declined (GitHub data mode).</summary>
+        public async Task RespondInviteAsync(string username, string inviteId, string response, CancellationToken ct = default)
+        {
+            var key = $"accounts/{username.ToLowerInvariant()}/invites.json";
+            var (invites, sha) = await ReadFileAsync<List<GameInvite>>(key, ct);
+            var invite = invites?.FirstOrDefault(i => i.InviteId == inviteId);
+            if (invites == null || invite == null) return;
+            invite.Status = response;
+            invite.RespondedAt = DateTimeOffset.UtcNow.ToString("o");
+            await WriteFileAsync(key, invites, $"Invite {response}: {inviteId}", sha, ct);
         }
 
         /// <summary>

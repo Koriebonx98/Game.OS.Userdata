@@ -7,6 +7,10 @@
              x:Class="GameLauncher.Views.MediaView"
              x:DataType="vm:MediaViewModel">
 
+    <UserControl.Styles>
+        <Style Selector="Border.season-bar.focused"><Setter Property="BorderBrush" Value="#f5c518"/></Style>
+    </UserControl.Styles>
+
     <Panel>
         <!--
             Media page. The layouts live in separate files chosen by Settings -> Design:
@@ -198,6 +202,8 @@
                                     <Run Text="{Binding SelectedItem.WatchTimeLabel}"/><Run Text="  ·  "/>
                                     <Run Text="{Binding DetailAddedLabel}"/>
                                 </TextBlock>
+                                <TextBlock Text="{Binding SelectedItem.CopiesLabel}" FontSize="12" Foreground="#8b949e"
+                                           IsVisible="{Binding SelectedItem.HasCopies}"/>
                                 <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,4,0,0">
                                     <Button Classes="btn-primary media-nav" Classes.focused="{Binding IsDetailPlayFocused}"
                                             Padding="26,12" FontSize="15" FontWeight="Bold"
@@ -210,6 +216,10 @@
                                             CommandParameter="{Binding SelectedItem}">✓  Watched</Button>
                                     <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailInfoFocused}"
                                             Padding="16,10" Command="{Binding RefreshOnlineInfoCommand}">⟳  Info</Button>
+                                    <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailSettingsFocused}"
+                                            Padding="16,10" Command="{Binding OpenMediaSettingsCommand}">⚙  Settings</Button>
+                                    <Button Classes="btn-secondary media-nav" Padding="16,10"
+                                            Command="{Binding OpenWatchPartyCommand}">👥  Watch party</Button>
                                     <Button Classes="btn-secondary media-nav" Classes.focused="{Binding IsDetailBackFocused}"
                                             Padding="16,10" Command="{Binding CloseDetailCommand}">‹  Back</Button>
                                 </StackPanel>
@@ -241,63 +251,70 @@
                         </Grid>
                     </Grid>
 
-                    <StackPanel Margin="56,0,56,36" Spacing="12"
+                    <StackPanel Margin="56,0,56,24" Spacing="14"
                                 IsVisible="{Binding SelectedItem.IsTv}">
-                        <TextBlock Text="{Binding DetailRelatedTitle}" Classes="section-header"
-                                   IsVisible="{Binding HasDetailRelated}"/>
-                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
-                                      IsVisible="{Binding HasDetailRelated}">
-                            <ItemsControl ItemsSource="{Binding DetailRelated}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Classes="media-nav" Classes.focused="{Binding IsFocused}"
-                                                Background="Transparent" BorderThickness="0" Padding="0"
-                                                Margin="0,0,14,0" Width="224"
-                                                Command="{Binding $parent[UserControl].DataContext.SelectMediaItemCommand}"
-                                                CommandParameter="{Binding}">
-                                            <StackPanel Spacing="7">
-                                                <Border Height="126" CornerRadius="7" ClipToBounds="True">
-                                                    <Grid>
-                                                        <views:CoverImage FallbackText="{Binding ListTitle}"
-                                                                          FallbackGradient="{Binding Gradient}"
-                                                                          LocalCachePath="{Binding CoverPath}"
-                                                                          LetterFontSize="48" ImageCornerRadius="7"/>
-                                                        <Border VerticalAlignment="Bottom" Height="54">
-                                                            <Border.Background>
-                                                                <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
-                                                                    <GradientStop Offset="0" Color="Transparent"/>
-                                                                    <GradientStop Offset="1" Color="#DD000000"/>
-                                                                </LinearGradientBrush>
-                                                            </Border.Background>
-                                                        </Border>
-                                                        <TextBlock Text="{Binding EpisodeLabel}" HorizontalAlignment="Left"
-                                                                   VerticalAlignment="Bottom" Margin="9,0,9,8"
-                                                                   Foreground="White" FontSize="12" FontWeight="Bold"
-                                                                   TextTrimming="CharacterEllipsis"/>
-                                                        <Border Background="#CC000000" CornerRadius="9" Padding="5,1"
-                                                                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
-                                                                IsVisible="{Binding Watched}">
-                                                            <TextBlock Text="✓" Foreground="#46d369" FontSize="11"/>
-                                                        </Border>
-                                                        <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0"
-                                                                     Maximum="1" Value="{Binding ProgressFraction}"
-                                                                     IsVisible="{Binding HasProgress}" Foreground="#E50914"/>
-                                                    </Grid>
-                                                </Border>
-                                                <TextBlock Text="{Binding ListTitle}" Foreground="White" FontSize="13"
-                                                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
-                                            </StackPanel>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                        <!-- Season bar: ‹ Season 1/4 › -->
+                        <Border Background="#1a1f27" CornerRadius="6" Padding="14,8" IsVisible="{Binding HasDetailRelated}"
+                                BorderThickness="2" BorderBrush="Transparent" Classes="season-bar" Classes.focused="{Binding IsDetailSeasonFocused}">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                <TextBlock Text="{Binding DetailSeasonLabel}" FontWeight="Bold" FontSize="15" Foreground="White" VerticalAlignment="Center"/>
+                                <TextBlock Grid.Column="1" Text="{Binding DetailRelatedTitle}" FontSize="12" Foreground="#8b949e"
+                                           VerticalAlignment="Center" Margin="16,0,0,0" TextTrimming="CharacterEllipsis"/>
+                                <Button Grid.Column="2" Classes="btn-secondary" Padding="12,2" Command="{Binding PreviousSeasonCommand}"
+                                        IsVisible="{Binding HasMultipleSeasons}" Content="‹"/>
+                                <Button Grid.Column="3" Classes="btn-secondary" Padding="12,2" Margin="6,0,0,0" Command="{Binding NextSeasonCommand}"
+                                        IsVisible="{Binding HasMultipleSeasons}" Content="›"/>
+                            </Grid>
+                        </Border>
+                        <!-- Episode cards, 4 per row (keep in sync with DetailEpisodeColumns) -->
+                        <ItemsControl ItemsSource="{Binding DetailSeasonEpisodes}" IsVisible="{Binding HasDetailRelated}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><UniformGrid Columns="4"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Classes="media-nav" Classes.focused="{Binding IsFocused}"
+                                            Background="Transparent" BorderThickness="0" Padding="0"
+                                            Margin="0,0,16,18" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch"
+                                            Command="{Binding $parent[UserControl].DataContext.PlayEpisodeCommand}"
+                                            CommandParameter="{Binding}">
+                                        <StackPanel Spacing="6">
+                                            <Border Height="126" CornerRadius="7" ClipToBounds="True">
+                                                <Grid>
+                                                    <views:CoverImage FallbackText="{Binding CardTitle}"
+                                                                      FallbackGradient="{Binding Gradient}"
+                                                                      LocalCachePath="{Binding CoverPath}"
+                                                                      LetterFontSize="48" ImageCornerRadius="7"/>
+                                                    <Border Background="#CC000000" CornerRadius="9" Padding="6,2"
+                                                            HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="8"
+                                                            IsVisible="{Binding Watched}">
+                                                        <TextBlock Text="✓" Foreground="#46d369" FontSize="12"/>
+                                                    </Border>
+                                                    <Border Background="#99000000" CornerRadius="5" Padding="6,2"
+                                                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="8"
+                                                            IsVisible="{Binding HasScore}">
+                                                        <TextBlock Text="{Binding ScoreLabel}" Foreground="#f5c518" FontSize="11" FontWeight="Bold"/>
+                                                    </Border>
+                                                    <TextBlock Text="▶" Foreground="White" FontSize="22" HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center" Opacity="0.85"/>
+                                                    <ProgressBar VerticalAlignment="Bottom" Height="4" Minimum="0"
+                                                                 Maximum="1" Value="{Binding ProgressFraction}"
+                                                                 IsVisible="{Binding HasProgress}" Foreground="#E50914"/>
+                                                </Grid>
+                                            </Border>
+                                            <TextBlock Text="{Binding EpisodeCode}" Foreground="#8b949e" FontSize="12" FontWeight="SemiBold"/>
+                                            <TextBlock Text="{Binding CardTitle}" Foreground="White" FontSize="13"
+                                                       FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding CardSubtitle}" Foreground="#8b949e" FontSize="11"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
                     <TextBlock Margin="56,0,56,20"
-                               Text="◀ ▶ ▲ ▼ move  ·  A select  ·  X play  ·  LB / RB rate  ·  Start menu  ·  Right stick volume  ·  B close"
+                               Text="◀ ▶ ▲ ▼ move  ·  A select / play episode  ·  X play  ·  LB / RB rate  ·  Start settings  ·  Right stick volume  ·  B close"
                                FontSize="11" Foreground="#484f58"/>
                 </StackPanel>
             </ScrollViewer>

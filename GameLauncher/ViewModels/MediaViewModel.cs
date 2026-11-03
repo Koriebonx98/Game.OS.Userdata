@@ -10,6 +10,20 @@ using System.Threading.Tasks;
 
 namespace GameLauncher.ViewModels;
 
+/// <summary>A watch party being set up: who is invited and whether playback waits for them to accept.</summary>
+public sealed class WatchPartyRequest
+{
+    public string Title { get; init; } = "";
+    public string MediaType { get; init; } = "";
+    public string Season { get; init; } = "";
+    public string Episode { get; init; } = "";
+    public IReadOnlyList<string> Friends { get; init; } = Array.Empty<string>();
+    public bool WaitForAccept { get; init; }
+    /// <summary>Set by the "Start now" entry to stop waiting and play immediately.</summary>
+    public volatile bool StartNow;
+    public System.Threading.CancellationTokenSource Cancel { get; } = new();
+}
+
 public partial class MediaViewModel : ObservableObject
 {
     public sealed partial class MediaLibraryItem : ObservableObject
@@ -23,6 +37,15 @@ public partial class MediaViewModel : ObservableObject
         public int Season { get; init; }
         public int Episode { get; init; }
         public string EpisodeLabel { get; init; } = "";
+        /// <summary>"S01E02" and the episode's own name, for the episode cards.</summary>
+        public string EpisodeCode { get; init; } = "";
+        public string EpisodeName { get; init; } = "";
+        public string CardTitle => EpisodeName.Length > 0 ? EpisodeName : ListTitle;
+        public string CardSubtitle => string.Join("  ·  ", new[] { Quality, Format, SizeLabel }.Where(x => x.Length > 0));
+        /// <summary>The same movie / episode found on other drives; merged into this entry so it is listed once.</summary>
+        public List<string> OtherPaths { get; init; } = new();
+        public bool HasCopies => OtherPaths.Count > 0;
+        public string CopiesLabel => OtherPaths.Count == 0 ? "" : "Also on: " + string.Join(", ", OtherPaths.Select(p => Path.GetPathRoot(p) ?? p).Distinct(StringComparer.OrdinalIgnoreCase));
         /// <summary>Text under a poster tile; a show name when the tile stands for a whole show.</summary>
         public string TileTitle { get; init; } = "";
         public string TileText => TileTitle.Length > 0 ? TileTitle : DisplayTitle;
@@ -115,6 +138,7 @@ public partial class MediaViewModel : ObservableObject
             var c = new MediaLibraryItem
             {
                 Season = Season, Episode = Episode, EpisodeLabel = EpisodeLabel, TileTitle = tileTitle ?? TileTitle,
+                EpisodeCode = EpisodeCode, EpisodeName = EpisodeName, OtherPaths = OtherPaths,
                 Special = Special, Title = Title, FullPath = FullPath, SourceFolder = SourceFolder, MediaType = MediaType,
                 Extension = Extension, FileSizeBytes = FileSizeBytes, Group = Group, DisplayTitle = DisplayTitle, Album = Album,
                 IsTv = IsTv, Quality = Quality, Gradient = Gradient, HasLocalCover = HasLocalCover, AddedUtc = AddedUtc,
@@ -312,7 +336,7 @@ public partial class MediaViewModel : ObservableObject
         EndVideoSession();
         SelectedItem = list[next];
         BeginVideoSession(SelectedItem);
-        return SelectedItem.FullPath;
+        return PlayablePath(SelectedItem);
     }
     public Action<string>? PlayMediaItemRequested { get; set; }
 
@@ -709,7 +733,7 @@ public partial class MediaViewModel : ObservableObject
         {
             _videoItem = SelectedItem;
             _pendingResumeMs = SelectedItem.HasProgress ? SelectedItem.ResumeMs : 0;
-            PlayMediaItemRequested?.Invoke(SelectedItem.FullPath);
+            PlayMediaItemRequested?.Invoke(PlayablePath(SelectedItem));
         }
     }
 
@@ -769,7 +793,15 @@ public partial class MediaViewModel : ObservableObject
     {
         foreach (var item in _movies.Concat(_tvShows).Concat(_music))
         {
-            item.ApplyStat(MediaStatsService.Get(item.FullPath));
+            var stat = MediaStatsService.Get(item.FullPath);
+            // Progress recorded while only the copy on another drive was played still belongs to this entry.
+            if (stat.PlayCount == 0 && !stat.Watched && stat.ResumeMs == 0 && stat.Rating == 0 && !stat.Favourite)
+                foreach (var other in item.OtherPaths)
+                {
+                    var alt = MediaStatsService.Get(other);
+                    if (alt.PlayCount > 0 || alt.Watched || alt.ResumeMs > 0 || alt.Rating > 0 || alt.Favourite) { stat = alt; break; }
+                }
+            item.ApplyStat(stat);
             if (item.MediaType == "music") continue;
             if (MediaMetadataService.GetCached(KindOf(item), LookupName(item)) is { } meta) item.ApplyMeta(meta);
         }
@@ -797,12 +829,58 @@ public partial class MediaViewModel : ObservableObject
         if (value) StartEnrichment();
     }
 
+    /// <summary>"Info" button: lists the possible matches online so the right title can be picked (like Kodi's scraper).</summary>
     [RelayCommand]
     private void RefreshOnlineInfo()
     {
         var it = SelectedItem;
-        if (it == null || it.MediaType == "music") return;
-        _ = EnrichAsync(new[] { it }, force: true, _enrichRun);
+        if (it == null || it.MediaType == "music" || IsMusicMenuOpen) return;
+        _ = OpenInfoPickerAsync(it, LookupName(it));
+    }
+
+    private async System.Threading.Tasks.Task OpenInfoPickerAsync(MediaLibraryItem item, string query)
+    {
+        string kind = KindOf(item), lookup = LookupName(item);
+        List<MediaCandidate> found;
+        try { found = await MediaMetadataService.SearchAsync(kind, query).ConfigureAwait(false); }
+        catch (Exception ex) { DevLogService.Log($"[Media] Info search failed: {ex.Message}"); found = new(); }
+
+        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+        {
+            if (IsMusicMenuOpen) return;
+            MusicMenuEntries.Clear();
+            void Add(string label, Action a) => MusicMenuEntries.Add(new MusicMenuEntry { Label = label, Action = a });
+            foreach (var c in found)
+            {
+                var pick = c;
+                string extra = string.Join("  ·  ", new[] { pick.Meta.Score > 0 ? $"★ {pick.Meta.Score:0.0}" : "", string.Join(", ", pick.Meta.Genres.Take(2)) }.Where(x => x.Length > 0));
+                Add(pick.Label + (extra.Length > 0 ? $"\n{extra}" : ""), () => _ = ConfirmInfoAsync(item, kind, lookup, pick));
+            }
+            Add("✎  Search with a different name…", () => MusicKeyboard.Open(query, "Search title",
+                _ => { }, text => { if (!string.IsNullOrWhiteSpace(text)) _ = OpenInfoPickerAsync(item, text.Trim()); }));
+            Add("⟳  Detect automatically again", () => _ = EnrichAsync(new[] { item }, force: true, _enrichRun));
+            MusicMenuTitle = found.Count > 0 ? $"Choose the correct {(kind == "tv" ? "TV show" : "movie")} for “{query}”" : $"No matches found for “{query}”";
+            _menuIdx = 0;
+            for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == 0;
+            IsMusicMenuOpen = true;
+        });
+    }
+
+    private async System.Threading.Tasks.Task ConfirmInfoAsync(MediaLibraryItem item, string kind, string lookup, MediaCandidate pick)
+    {
+        try
+        {
+            var meta = await MediaMetadataService.ConfirmAsync(kind, lookup, pick).ConfigureAwait(false);
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                foreach (var other in _movies.Concat(_tvShows).Concat(_activeGroups?.SelectMany(g => g.Items) ?? Enumerable.Empty<MediaLibraryItem>())
+                             .Where(x => x.MediaType != "music" && KindOf(x) == kind && string.Equals(LookupName(x), lookup, StringComparison.OrdinalIgnoreCase))
+                             .Append(item))
+                    other.ApplyMeta(meta);
+                OnPropertyChanged(nameof(AvailableGenres));
+            });
+        }
+        catch (Exception ex) { DevLogService.Log($"[Media] Saving chosen info failed: {ex.Message}"); }
     }
 
     private void StartEnrichment()
@@ -988,16 +1066,166 @@ public partial class MediaViewModel : ObservableObject
     [ObservableProperty] private bool _resumePlayback = true;
     [ObservableProperty] private int  _markWatchedPercent = 90;
     [ObservableProperty] private bool _skipWatchedEpisodes = true;
+    [ObservableProperty] private bool _subtitlesEnabled = true;
+    [ObservableProperty] private string _subtitleLanguage = "Auto";
+    public static readonly IReadOnlyList<string> SubtitleLanguages = new[]
+        { "Auto", "English", "Spanish", "French", "German", "Italian", "Portuguese", "Dutch", "Russian", "Japanese", "Korean", "Chinese" };
+    /// <summary>Raised after the Movies &amp; TV settings menu changed a value, so the launcher can store it.</summary>
+    public Action? SettingsEdited { get; set; }
     [ObservableProperty] private string _pipPosition = "Bottom right";
     [ObservableProperty] private string _pipSize = "Medium";
     [ObservableProperty] private bool _musicShuffle;
     [ObservableProperty] private bool _musicRepeat = true;
 
+    // ── Watch party (invite friends to watch the same movie / episode) ────────
+    /// <summary>Friend usernames to offer in the picker (wired by MainViewModel).</summary>
+    public Func<IReadOnlyList<string>>? PartyFriendsProvider { get; set; }
+    /// <summary>Starts the broadcast and sends the invites; reports progress lines; returns true when playback should begin.</summary>
+    public Func<WatchPartyRequest, Action<IReadOnlyList<string>>, Task<bool>>? StartWatchParty { get; set; }
+    /// <summary>Ends the party broadcast when the player closes.</summary>
+    public Action? EndWatchParty { get; set; }
+    private readonly HashSet<string> _partyPicked = new(StringComparer.OrdinalIgnoreCase);
+    private bool _partyWait = true;
+    private WatchPartyRequest? _party;
+    private bool _partyActive;
+    private MediaLibraryItem? _partyItem;
+
+    [RelayCommand]
+    public void OpenWatchParty()
+    {
+        var item = SelectedItem;
+        if (item == null || item.MediaType == "music" || item.IsSpecial) return;
+        if (PartyFriendsProvider == null || StartWatchParty == null) return;
+        _partyItem = item;
+        ShowWatchPartyPicker(0);
+    }
+
+    private void ShowWatchPartyPicker(int focus)
+    {
+        var item = _partyItem;
+        if (item == null) return;
+        MusicMenuEntries.Clear();
+        void Add(string label, Action a) => MusicMenuEntries.Add(new MusicMenuEntry { Label = label, Action = a });
+        var friends = PartyFriendsProvider?.Invoke() ?? Array.Empty<string>();
+        if (friends.Count == 0) Add("ℹ  Add friends first to start a watch party", () => IsMusicMenuOpen = false);
+        foreach (var f in friends)
+        {
+            var name = f;
+            Add($"{(_partyPicked.Contains(name) ? "✓" : "＋")}  {name}", () =>
+            {
+                if (!_partyPicked.Remove(name)) _partyPicked.Add(name);
+                ShowWatchPartyPicker(_menuIdx);
+            });
+        }
+        Add($"⏳  Wait for friends to accept before playing: {(_partyWait ? "On" : "Off")}", () => { _partyWait = !_partyWait; ShowWatchPartyPicker(_menuIdx); });
+        if (_partyPicked.Count > 0) Add($"▶  Start party ({_partyPicked.Count} invited)", BeginWatchParty);
+        Add("✕  Cancel", () => IsMusicMenuOpen = false);
+        MusicMenuTitle = "👥  Watch Party – " + item.DisplayTitle;
+        _menuIdx = Math.Clamp(focus, 0, MusicMenuEntries.Count - 1);
+        for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == _menuIdx;
+        IsMusicMenuOpen = true;
+    }
+
+    private async void BeginWatchParty()
+    {
+        var item = _partyItem;
+        if (item == null || StartWatchParty == null || _partyPicked.Count == 0) return;
+        var req = new WatchPartyRequest
+        {
+            Title = item.IsTv && item.Group.Length > 0 ? item.Group : item.DisplayTitle,
+            MediaType = item.IsTv ? "tv" : "movie",
+            Season = item.Season > 0 ? item.Season.ToString() : "",
+            Episode = item.Episode > 0 ? item.Episode.ToString() : "",
+            Friends = _partyPicked.ToList(),
+            WaitForAccept = _partyWait,
+        };
+        _party = req;
+        ShowPartyStatus(new[] { "Starting your broadcast…" });
+        bool play;
+        try { play = await StartWatchParty(req, lines => Avalonia.Threading.Dispatcher.UIThread.Post(() => { if (_party == req) ShowPartyStatus(lines); })); }
+        catch (Exception ex) { ShowPartyStatus(new[] { "Watch party failed: " + ex.Message }); _party = null; return; }
+        if (_party != req) return; // cancelled
+        _party = null;
+        IsMusicMenuOpen = false;
+        if (!play) return;
+        _partyActive = true;
+        IsDetailOpen = false;
+        _partyPicked.Clear();
+        SelectedItem = item;
+        PlaySelectedMedia();
+    }
+
+    private void ShowPartyStatus(IReadOnlyList<string> lines)
+    {
+        var req = _party;
+        MusicMenuEntries.Clear();
+        foreach (var l in lines) MusicMenuEntries.Add(new MusicMenuEntry { Label = l, Action = () => ShowPartyStatus(lines) });
+        if (req != null && req.WaitForAccept) MusicMenuEntries.Add(new MusicMenuEntry { Label = "▶  Start now", Action = () => { req.StartNow = true; ShowPartyStatus(lines); } });
+        MusicMenuEntries.Add(new MusicMenuEntry { Label = "✕  Cancel party", Action = CancelWatchParty });
+        MusicMenuTitle = "👥  Watch Party";
+        _menuIdx = Math.Clamp(_menuIdx, 0, MusicMenuEntries.Count - 1);
+        for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == _menuIdx;
+        IsMusicMenuOpen = true;
+    }
+
+    private void CancelWatchParty()
+    {
+        var req = _party;
+        _party = null;
+        req?.Cancel.Cancel();
+        EndWatchParty?.Invoke();
+        IsMusicMenuOpen = false;
+    }
+
+    /// <summary>B on the overlay while a party is still being set up cancels it. Returns true if handled.</summary>
+    public bool TryCancelPartyOnBack()
+    {
+        if (_party == null) return false;
+        CancelWatchParty();
+        return true;
+    }
+
+    /// <summary>⚙ on the Movies &amp; TV pages (and Start on the info page): the basic playback settings.</summary>
+    [RelayCommand]
+    public void OpenMediaSettings() => ShowMediaSettings(0);
+
+    private void ShowMediaSettings(int focus)
+    {
+        MusicMenuEntries.Clear();
+        void Add(string label, Action change) => MusicMenuEntries.Add(new MusicMenuEntry
+        {
+            Label = label,
+            Action = () => { change(); SettingsEdited?.Invoke(); ShowMediaSettings(_menuIdx); },
+        });
+        string OnOff(bool on) => on ? "On" : "Off";
+        Add($"💬  Subtitles: {OnOff(SubtitlesEnabled)}", () => SubtitlesEnabled = !SubtitlesEnabled);
+        Add($"🌐  Subtitle language: {SubtitleLanguage}", () =>
+        {
+            int i = SubtitleLanguages.ToList().IndexOf(SubtitleLanguage);
+            SubtitleLanguage = SubtitleLanguages[(i + 1) % SubtitleLanguages.Count];
+        });
+        Add($"⏭  Play next episode automatically: {OnOff(AutoPlayNextEpisode)}", () => AutoPlayNextEpisode = !AutoPlayNextEpisode);
+        Add($"⏩  Skip watched episodes: {OnOff(SkipWatchedEpisodes)}", () => SkipWatchedEpisodes = !SkipWatchedEpisodes);
+        Add($"↺  Resume where you left off: {OnOff(ResumePlayback)}", () => ResumePlayback = !ResumePlayback);
+        Add($"ℹ  Show info page before playing: {OnOff(ShowMovieDetails && ShowTvDetails)}", () => ShowMovieDetails = ShowTvDetails = !(ShowMovieDetails && ShowTvDetails));
+        Add($"🌍  Look up info online: {OnOff(OnlineInfoEnabled)}", () => OnlineInfoEnabled = !OnlineInfoEnabled);
+        if (PartyFriendsProvider != null && SelectedItem is { MediaType: not "music", IsSpecial: false })
+            MusicMenuEntries.Add(new MusicMenuEntry { Label = "👥  Watch party – invite friends", Action = OpenWatchParty });
+        MusicMenuTitle = "⚙  Movies & TV settings";
+        _menuIdx = Math.Clamp(focus, 0, MusicMenuEntries.Count - 1);
+        for (int i = 0; i < MusicMenuEntries.Count; i++) MusicMenuEntries[i].IsFocused = i == _menuIdx;
+        IsMusicMenuOpen = true;
+    }
+
     // ── Detail page (movies and TV shows) ─────────────────────────────────────
     [ObservableProperty] private bool _isDetailOpen;
+    [ObservableProperty] private int _detailSeason;
+    private IReadOnlyList<MediaLibraryItem> _detailEpisodes = Array.Empty<MediaLibraryItem>();
 
     partial void OnSelectedItemChanged(MediaLibraryItem? value)
     {
+        if (value is { IsTv: true } && value.Season != DetailSeason) DetailSeason = value.Season;
+        RebuildDetailEpisodes();
         OnPropertyChanged(nameof(DetailRelated));
         OnPropertyChanged(nameof(DetailRelatedTitle));
         OnPropertyChanged(nameof(HasDetailRelated));
@@ -1005,6 +1233,16 @@ public partial class MediaViewModel : ObservableObject
         OnPropertyChanged(nameof(DetailKindLabel));
         OnPropertyChanged(nameof(DetailTitle));
         OnPropertyChanged(nameof(DetailEpisodeLabel));
+    }
+
+    partial void OnDetailSeasonChanged(int value) => RebuildDetailEpisodes();
+
+    private void RebuildDetailEpisodes()
+    {
+        _detailEpisodes = DetailRelated.Where(i => i.Season == DetailSeason).ToList();
+        OnPropertyChanged(nameof(DetailSeasonEpisodes));
+        OnPropertyChanged(nameof(DetailSeasonLabel));
+        OnPropertyChanged(nameof(HasMultipleSeasons));
     }
 
     /// <summary>Other files of the same show / folder (episodes for TV shows).</summary>
@@ -1015,6 +1253,34 @@ public partial class MediaViewModel : ObservableObject
                          .OrderBy(i => i.Season).ThenBy(i => i.Episode).ThenBy(i => i.DisplayTitle, StringComparer.OrdinalIgnoreCase).ToList();
     public bool HasDetailRelated => SelectedItem?.IsTv == true ? DetailRelated.Count > 0 : DetailRelated.Count > 1;
     public string DetailRelatedTitle => SelectedItem?.IsTv == true ? $"Episodes · {SelectedItem?.Group}" : $"More in {SelectedItem?.Group}";
+
+    /// <summary>Episodes of the season shown on the info page.</summary>
+    public IReadOnlyList<MediaLibraryItem> DetailSeasonEpisodes => _detailEpisodes;
+    private List<int> DetailSeasons() => DetailRelated.Select(i => i.Season).Distinct().OrderBy(x => x).ToList();
+    public bool HasMultipleSeasons => SelectedItem?.IsTv == true && DetailSeasons().Count > 1;
+    /// <summary>"Season 1/4" like the streaming apps; "Episodes" when the files carry no season.</summary>
+    public string DetailSeasonLabel
+    {
+        get
+        {
+            var seasons = DetailSeasons();
+            return DetailSeason > 0 ? $"Season {DetailSeason}/{seasons.Max()}" : "Episodes";
+        }
+    }
+    private bool ShowEpisodes => SelectedItem?.IsTv == true && _detailEpisodes.Count > 0;
+
+    [RelayCommand] private void NextSeason() => ChangeSeason(1);
+    [RelayCommand] private void PreviousSeason() => ChangeSeason(-1);
+
+    private void ChangeSeason(int dir)
+    {
+        var seasons = DetailSeasons();
+        if (seasons.Count < 2) return;
+        int i = Math.Clamp(Math.Max(0, seasons.IndexOf(DetailSeason)) + dir, 0, seasons.Count - 1);
+        DetailSeason = seasons[i];
+        ApplyDetailFocus();
+    }
+
     public string DetailAddedLabel => SelectedItem == null || string.IsNullOrEmpty(SelectedItem.AddedLabel) ? "" : $"Added {SelectedItem.AddedLabel}";
     public string DetailKindLabel => SelectedItem?.IsTv == true ? "TV SHOW" : "MOVIE";
     public string DetailTitle => SelectedItem?.IsTv == true && SelectedItem.Group.Length > 0
@@ -1057,14 +1323,29 @@ public partial class MediaViewModel : ObservableObject
         PlaySelectedMedia();
     }
 
-    // ── Info page controller focus: 0..4 = Play, My List, Watched, Info, Back; 5+ = related title (index - 5) ──
-    private const int DetailButtonCount = 5;
+    /// <summary>Click / A on an episode card: play that episode.</summary>
+    [RelayCommand]
+    private void PlayEpisode(MediaLibraryItem? episode)
+    {
+        if (episode == null) return;
+        SelectedItem = episode;
+        PlayDetail();
+    }
+
+    // ── Info page controller focus: 0..5 = Play, My List, Watched, Info, Settings, Back; 6 = season bar; 7+ = episode (index - 7) ──
+    private const int DetailButtonCount = 6;
+    private const int DetailSeasonSlot = DetailButtonCount;
+    private const int DetailEpisodeBase = DetailButtonCount + 1;
+    /// <summary>Episode cards per row; keep in sync with the UniformGrid in MediaView.axaml.</summary>
+    public const int DetailEpisodeColumns = 4;
     private int _detailIdx;
-    public bool IsDetailPlayFocused    => IsDetailOpen && _detailIdx == 0;
-    public bool IsDetailListFocused    => IsDetailOpen && _detailIdx == 1;
-    public bool IsDetailWatchedFocused => IsDetailOpen && _detailIdx == 2;
-    public bool IsDetailInfoFocused    => IsDetailOpen && _detailIdx == 3;
-    public bool IsDetailBackFocused    => IsDetailOpen && _detailIdx == 4;
+    public bool IsDetailPlayFocused     => IsDetailOpen && _detailIdx == 0;
+    public bool IsDetailListFocused     => IsDetailOpen && _detailIdx == 1;
+    public bool IsDetailWatchedFocused  => IsDetailOpen && _detailIdx == 2;
+    public bool IsDetailInfoFocused     => IsDetailOpen && _detailIdx == 3;
+    public bool IsDetailSettingsFocused => IsDetailOpen && _detailIdx == 4;
+    public bool IsDetailBackFocused     => IsDetailOpen && _detailIdx == 5;
+    public bool IsDetailSeasonFocused   => IsDetailOpen && _detailIdx == DetailSeasonSlot;
 
     partial void OnIsDetailOpenChanged(bool value)
     {
@@ -1074,32 +1355,57 @@ public partial class MediaViewModel : ObservableObject
 
     private void ApplyDetailFocus()
     {
-        var related = DetailRelated;
-        for (int i = 0; i < related.Count; i++) related[i].IsFocused = IsDetailOpen && _detailIdx == DetailButtonCount + i;
+        foreach (var r in DetailRelated) r.IsFocused = false;
+        int e = _detailIdx - DetailEpisodeBase;
+        if (IsDetailOpen && e >= 0 && e < _detailEpisodes.Count) _detailEpisodes[e].IsFocused = true;
         OnPropertyChanged(nameof(IsDetailPlayFocused));
         OnPropertyChanged(nameof(IsDetailListFocused));
         OnPropertyChanged(nameof(IsDetailWatchedFocused));
         OnPropertyChanged(nameof(IsDetailInfoFocused));
+        OnPropertyChanged(nameof(IsDetailSettingsFocused));
         OnPropertyChanged(nameof(IsDetailBackFocused));
+        OnPropertyChanged(nameof(IsDetailSeasonFocused));
+        MediaFocusChanged?.Invoke();
     }
 
-    /// <summary>D-pad on the info page: Left / Right across the buttons, Up / Down between the buttons and the episode list.</summary>
+    /// <summary>
+    /// D-pad on the info page. Buttons: Left / Right move, Down enters the season bar and the episode grid.
+    /// Season bar: Left / Right change season. Episode grid: all four directions move across the cards.
+    /// </summary>
     public void MoveDetail(int dx, int dy = 0)
     {
-        int related = HasDetailRelated ? DetailRelated.Count : 0;
-        if (dx != 0 && _detailIdx < DetailButtonCount)
-            _detailIdx = Math.Clamp(_detailIdx + dx, 0, DetailButtonCount - 1);
-        else if (dy > 0)
+        int n = ShowEpisodes ? _detailEpisodes.Count : 0;
+        if (_detailIdx < DetailButtonCount)
         {
-            if (_detailIdx < DetailButtonCount) { if (related > 0) _detailIdx = DetailButtonCount; }
-            else _detailIdx = Math.Min(_detailIdx + 1, DetailButtonCount + related - 1);
+            if (dx != 0) _detailIdx = Math.Clamp(_detailIdx + dx, 0, DetailButtonCount - 1);
+            else if (dy > 0 && n > 0) _detailIdx = DetailSeasonSlot;
         }
-        else if (dy < 0)
-            _detailIdx = _detailIdx > DetailButtonCount ? _detailIdx - 1 : _detailIdx == DetailButtonCount ? 0 : _detailIdx;
+        else if (_detailIdx == DetailSeasonSlot)
+        {
+            if (dx != 0) ChangeSeason(dx);
+            else if (dy < 0) _detailIdx = 0;
+            else if (dy > 0 && n > 0) _detailIdx = DetailEpisodeBase;
+        }
+        else
+        {
+            int e = Math.Clamp(_detailIdx - DetailEpisodeBase, 0, Math.Max(0, n - 1));
+            if (dx != 0) e = Math.Clamp(e + dx, 0, n - 1);
+            else if (dy < 0)
+            {
+                if (e < DetailEpisodeColumns) { _detailIdx = DetailSeasonSlot; ApplyDetailFocus(); return; }
+                e -= DetailEpisodeColumns;
+            }
+            else if (dy > 0)
+            {
+                if (e + DetailEpisodeColumns < n) e += DetailEpisodeColumns;
+                else if (e / DetailEpisodeColumns < (n - 1) / DetailEpisodeColumns) e = n - 1;
+            }
+            _detailIdx = DetailEpisodeBase + e;
+        }
         ApplyDetailFocus();
     }
 
-    /// <summary>A on the info page: activates the highlighted button, or switches to the highlighted episode.</summary>
+    /// <summary>A on the info page: activates the highlighted button, or plays the highlighted episode.</summary>
     public void ActivateDetail()
     {
         switch (_detailIdx)
@@ -1108,16 +1414,12 @@ public partial class MediaViewModel : ObservableObject
             case 1: if (SelectedItem != null) ToggleFavourite(SelectedItem); break;
             case 2: if (SelectedItem != null) ToggleWatched(SelectedItem); break;
             case 3: RefreshOnlineInfo(); break;
-            case 4: IsDetailOpen = false; break;
+            case 4: OpenMediaSettings(); break;
+            case 5: IsDetailOpen = false; break;
+            case DetailSeasonSlot: ChangeSeason(1); break;
             default:
-                var related = DetailRelated;
-                int i = _detailIdx - DetailButtonCount;
-                if (i >= 0 && i < related.Count)
-                {
-                    SelectedItem = related[i];
-                    _detailIdx = 0;
-                    ApplyDetailFocus();
-                }
+                int i = _detailIdx - DetailEpisodeBase;
+                if (i >= 0 && i < _detailEpisodes.Count) PlayEpisode(_detailEpisodes[i]);
                 break;
         }
     }
@@ -1276,6 +1578,8 @@ public partial class MediaViewModel : ObservableObject
             Add($"{new string('★', stars)}{new string('☆', 5 - stars)}  Rate {stars}" + (item.Rating == stars ? " (tap to clear)" : ""),
                 () => Persist(item.FullPath, st => st.Rating = st.Rating == stars ? 0 : stars));
         }
+        Add("👥  Watch party – invite friends", () => { SelectedItem = item; OpenWatchParty(); });
+        Add("⚙  Settings", OpenMediaSettings);
         if (IsPip) { Add("⤢  Expand picture-in-picture", () => IsPip = false); Add("✕  Close player", CloseVlcPlayer); }
         MusicMenuTitle = item.DisplayTitle;
         _menuIdx = 0;
@@ -1587,6 +1891,7 @@ public partial class MediaViewModel : ObservableObject
             case "LB": AdjustRating(-1); return true;
             case "RB": AdjustRating(1); return true;
             case "X": PlayDetail(); return true;
+            case "Menu": OpenMediaSettings(); return true;
             case "Enter": ActivateDetail(); return true;
             case "Left":  MoveDetail(-1); return true;
             case "Right": MoveDetail(1); return true;
@@ -1631,12 +1936,46 @@ public partial class MediaViewModel : ObservableObject
             catch (Exception ex) { DevLogService.Log($"[Media] Scan of '{driveRoot}' failed: {ex.Message}"); }
         }
 
+        MergeDuplicates(_movies);
+        MergeDuplicates(_tvShows);
         _lastScanUtc = DateTime.UtcNow;
         ApplyStatsAndCachedInfo();
         NotifyLibraryChanged();
         StartEnrichment();
         EnsureSelectedItemForActiveSection();
     }
+
+    private static string DuplicateKey(MediaLibraryItem i)
+    {
+        static string Norm(string v) => new string(v.Where(char.IsLetterOrDigit).ToArray()).ToLowerInvariant();
+        return i.IsTv && i.Episode > 0
+            ? $"tv|{Norm(i.Group)}|{i.Season}|{i.Episode}"
+            : $"{(i.IsTv ? "tv" : "movie")}|{Norm(i.IsTv ? i.Group + i.DisplayTitle : i.DisplayTitle)}|{i.Year}";
+    }
+
+    private static int QualityRank(string q) => q.ToLowerInvariant() switch
+    {
+        "4k" or "2160p" => 4, "1440p" => 3, "1080p" => 2, "720p" => 1, _ => 0,
+    };
+
+    /// <summary>The same movie / episode on several drives becomes one entry (best quality, then largest file); the other copies are kept as fallbacks.</summary>
+    private static void MergeDuplicates(ObservableCollection<MediaLibraryItem> list)
+    {
+        var kept = new List<MediaLibraryItem>();
+        foreach (var group in list.GroupBy(DuplicateKey).ToList())
+        {
+            var best = group.OrderByDescending(i => QualityRank(i.Quality)).ThenByDescending(i => i.FileSizeBytes)
+                            .ThenBy(i => i.FullPath, StringComparer.OrdinalIgnoreCase).First();
+            best.OtherPaths.AddRange(group.Where(i => i != best).Select(i => i.FullPath));
+            kept.Add(best);
+        }
+        var keptSet = new HashSet<MediaLibraryItem>(kept);
+        foreach (var item in list.Where(i => !keptSet.Contains(i)).ToList()) list.Remove(item);
+    }
+
+    /// <summary>The file to play: the entry's own file, or a copy on another drive when that one is not connected.</summary>
+    private static string PlayablePath(MediaLibraryItem item) =>
+        File.Exists(item.FullPath) ? item.FullPath : item.OtherPaths.FirstOrDefault(File.Exists) ?? item.FullPath;
 
     private static string NormalizeSection(string? section) =>
         section?.Trim().ToLowerInvariant() switch
@@ -1700,7 +2039,7 @@ public partial class MediaViewModel : ObservableObject
                 bool isTv = categoryFolderNames[0] == "TV Shows";
                 string group = segments.Length > 1 ? segments[0] : categoryFolderNames[0];
                 int season = 0, episode = 0;
-                string episodeLabel = "";
+                string episodeLabel = "", episodeCode = "", episodeName = "";
                 if (isTv)
                 {
                     var tv = TvPathParser.Parse(segments);
@@ -1708,6 +2047,8 @@ public partial class MediaViewModel : ObservableObject
                     string ep = tv.Episode > 0 ? tv.Code + (tv.EpisodeTitle.Length > 0 ? " · " + tv.EpisodeTitle : "")
                                                : (tv.EpisodeTitle.Length > 0 ? tv.EpisodeTitle : title);
                     episodeLabel = ep;
+                    episodeCode = tv.Code;
+                    episodeName = tv.EpisodeTitle;
                     title = string.Equals(ep, tv.Show, StringComparison.OrdinalIgnoreCase) ? ep : $"{tv.Show} · {ep}";
                     year = 0;
                 }
@@ -1721,6 +2062,7 @@ public partial class MediaViewModel : ObservableObject
                     Quality = quality,
                     IsTv = isTv,
                     Season = season, Episode = episode, EpisodeLabel = episodeLabel,
+                    EpisodeCode = episodeCode, EpisodeName = episodeName,
                     Gradient = GradientFor(isTv ? group : title),
                     Group = group,
                     Album = isMusic && segments.Length > 2 ? segments[1] : "",
@@ -1832,5 +2174,6 @@ public partial class MediaViewModel : ObservableObject
         StopVideoRequested?.Invoke();
         IsVlcPlayerOpen = false;
         VlcMediaPath    = "";
+        if (_partyActive) { _partyActive = false; EndWatchParty?.Invoke(); }
     }
 }

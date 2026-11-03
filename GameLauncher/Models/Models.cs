@@ -188,6 +188,15 @@ namespace GameLauncher.Models
         [JsonPropertyName("sentAt")]      public string  SentAt      { get; set; } = "";
         [JsonPropertyName("status")]      public string  Status      { get; set; } = "";
         [JsonPropertyName("respondedAt")] public string? RespondedAt { get; set; }
+
+        // Watch-party invites ("kind":"watch") carry the hosted relay room instead of a game connection.
+        [JsonPropertyName("kind")]      public string? Kind      { get; set; }
+        [JsonPropertyName("roomId")]    public string? RoomId    { get; set; }
+        [JsonPropertyName("relayUrl")]  public string? RelayUrl  { get; set; }
+        [JsonPropertyName("mediaType")] public string? MediaType { get; set; }
+        [JsonPropertyName("season")]    public string? Season    { get; set; }
+        [JsonPropertyName("episode")]   public string? Episode   { get; set; }
+        [JsonIgnore] public bool IsWatchParty => string.Equals(Kind, "watch", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>A public LFG / group room published to the shared swarm. The connection endpoint is never included.</summary>
@@ -220,6 +229,16 @@ namespace GameLauncher.Models
         [JsonPropertyName("achievementName")] public string? AchievementName { get; set; }
         /// <summary>For achievement_unlocked events: optional icon URL or local path.</summary>
         [JsonPropertyName("achievementIcon")] public string? AchievementIcon { get; set; }
+    }
+
+    /// <summary>Public "I'm live" marker stored in accounts/{user}/broadcast.json. Holds only the hosted relay address — never the user's IP.</summary>
+    public class BroadcastInfo
+    {
+        [JsonPropertyName("live")]     public bool Live { get; set; }
+        [JsonPropertyName("relayUrl")] public string? RelayUrl { get; set; }
+        [JsonPropertyName("roomId")]   public string? RoomId { get; set; }
+        [JsonPropertyName("title")]    public string? Title { get; set; }
+        [JsonPropertyName("startedAt")] public string? StartedAt { get; set; }
     }
 
     public class PresenceData
@@ -566,6 +585,11 @@ namespace GameLauncher.Models
 
         /// <summary>Maximum capture rate for the local PC stream.</summary>
         [JsonPropertyName("streamFrameRate")] public int StreamFrameRate { get; set; } = 20;
+        /// <summary>Base URL of the hosted stream relay used by Start Broadcasting / Watch Party (see /stream-relay).</summary>
+        [JsonPropertyName("streamRelayUrl")] public string StreamRelayUrl { get; set; } = "";
+        /// <summary>Hosted Game OS web app address; watch-party invites open its watch.html viewer.</summary>
+        [JsonPropertyName("webAppUrl")] public string WebAppUrl { get; set; } = "https://koriebonx98.github.io/Game.OS.Userdata/";
+        [JsonPropertyName("streamRelayKey")] public string StreamRelayKey { get; set; } = "";
         /// <summary>Maximum output width for the local PC stream.</summary>
         [JsonPropertyName("streamMaxWidth")] public int StreamMaxWidth { get; set; } = 1280;
         /// <summary>JPEG quality from 30 (lower bandwidth) to 90 (higher quality).</summary>
@@ -640,6 +664,9 @@ namespace GameLauncher.Models
         /// <summary>Percentage of a video that has to be played before it counts as watched.</summary>
         [JsonPropertyName("markWatchedPercent")] public int MarkWatchedPercent { get; set; } = 90;
         [JsonPropertyName("skipWatchedEpisodes")] public bool SkipWatchedEpisodes { get; set; } = true;
+        /// <summary>Show subtitles when a video has them, and the preferred language ("Auto" = the player's default).</summary>
+        [JsonPropertyName("subtitlesEnabled")] public bool SubtitlesEnabled { get; set; } = true;
+        [JsonPropertyName("subtitleLanguage")] public string SubtitleLanguage { get; set; } = "Auto";
 
         /// <summary>Store page design: "Default", "Sony", "Xbox" or "Nintendo".</summary>
         [JsonPropertyName("storeTheme")] public string StoreTheme { get; set; } = "Default";

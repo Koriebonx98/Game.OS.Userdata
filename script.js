@@ -1078,6 +1078,17 @@ function populateAccountDetails() {
     const profileLinkEl = document.getElementById('viewMyProfileLink');
     if (profileLinkEl) profileLinkEl.href = `profile.html?user=${encodeURIComponent(user.username)}`;
 
+    // Live broadcast row: becomes "Watch Stream" while this account is broadcasting
+    const watchRow = document.getElementById('watchStreamRow');
+    if (watchRow) {
+        getLiveBroadcast(user.username).then(b => {
+            if (!b) return;
+            const link = document.getElementById('watchStreamLink');
+            if (link) { link.href = watchStreamUrl(user.username); link.textContent = `🔴 Watch Stream${b.viewers ? ` (${b.viewers} watching)` : ''}`; }
+            watchRow.style.display = '';
+        });
+    }
+
     // Show the Danger Zone only for the admin account
     const dangerZone = document.getElementById('dangerZone');
     if (dangerZone) {
@@ -1791,6 +1802,51 @@ async function getFriendPresence(friendUsername) {
 }
 
 /**
+ * Returns the user's live broadcast ({relayUrl, roomId, title, viewers}) or null when not streaming.
+ * The broadcast marker only contains the hosted relay address - never the streamer's IP.
+ */
+async function getLiveBroadcast(username) {
+    if (MODE === 'demo' || !username) return null;
+    try {
+        const file = await githubRead(`accounts/${username.toLowerCase()}/broadcast.json`);
+        const b = file && file.content;
+        if (!b || !b.live || !b.relayUrl || !b.roomId) return null;
+        const resp = await fetch(`${b.relayUrl.replace(/\/+$/, '')}/api/rooms/${encodeURIComponent(b.roomId)}`, { cache: 'no-store' });
+        if (!resp.ok) return null;
+        const info = await resp.json();
+        return info.live ? Object.assign({}, b, { viewers: info.viewers || 0 }) : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+function watchStreamUrl(username) {
+    return `watch.html?user=${encodeURIComponent(username)}`;
+}
+
+/**
+ * Records a movie / episode the signed-in user watched (e.g. through a watch party) so it
+ * counts towards their history and recommendations. Stored in accounts/{user}/watched-media.json.
+ */
+async function recordWatchedMedia(entry) {
+    const me = getCurrentUser();
+    if (MODE === 'demo' || !me || !me.username || !entry || !entry.title) return false;
+    const path = `accounts/${me.username.toLowerCase()}/watched-media.json`;
+    for (let attempt = 0; attempt < 3; attempt++) {
+        try {
+            const file = await githubRead(path);
+            const list = Array.isArray(file && file.content) ? file.content : [];
+            const key = e => [e.title, e.season || '', e.episode || ''].join('|').toLowerCase();
+            if (list.some(e => key(e) === key(entry))) return true;
+            list.push(Object.assign({ watchedAt: new Date().toISOString(), source: 'watch-party' }, entry));
+            await githubWrite(path, list.slice(-500), `Watched: ${entry.title}`, file ? file.sha : undefined);
+            return true;
+        } catch (_) { /* sha conflict - retry */ }
+    }
+    return false;
+}
+
+/**
  * Returns true if the given lastSeen ISO string is within the online threshold.
  */
 function isOnline(lastSeen) {
@@ -2053,7 +2109,15 @@ async function loadInbox() {
         `);
 
         // Build invite items
-        const inviteItems = invites.map(inv => `
+        const inviteItems = invites.map(inv => inv.kind === 'watch' ? `
+            <div class="friend-item">
+                <span class="friend-name">🍿 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to a watch party: <strong>${escapeHtml(inv.gameName)}</strong></span></span>
+                <div class="friend-actions">
+                    <button class="btn-accept-friend" onclick="handleAcceptWatchInvite('${escapeHtml(inv.inviteId)}', '${encodeURIComponent(buildWatchPartyUrl(inv)).replace(/'/g, '%27')}')">▶ Join</button>
+                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined')">❌ Decline</button>
+                </div>
+            </div>
+        ` : `
             <div class="friend-item">
                 <span class="friend-name">🎮 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong></span></span>
                 <div class="friend-actions">
@@ -2378,6 +2442,28 @@ function respondInviteDemo(username, inviteId, response) {
 // ============================================================
 // INVITES – UI HANDLER
 // ============================================================
+
+function buildWatchPartyUrl(inv) {
+    const q = new URLSearchParams({
+        relay: inv.relayUrl || '', room: inv.roomId || '', title: inv.gameName || '',
+        type: inv.mediaType || '', season: inv.season || '', episode: inv.episode || ''
+    });
+    return `watch.html?${q.toString()}`;
+}
+
+/** Accepts a watch-party invite (so the host's launcher starts playback) and opens the viewer. */
+async function handleAcceptWatchInvite(inviteId, encodedUrl) {
+    const user = getCurrentUser();
+    if (!user) return;
+    try {
+        if (MODE === 'demo') respondInviteDemo(user.username, inviteId, 'accepted');
+        else await respondInviteGitHub(user.username, inviteId, 'accepted');
+    } catch (err) {
+        console.error('Failed to accept watch invite:', err);
+        return;
+    }
+    window.location.href = decodeURIComponent(encodedUrl);
+}
 
 async function handleRespondInvite(inviteId, response) {
     const user = getCurrentUser();
