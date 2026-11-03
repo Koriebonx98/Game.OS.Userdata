@@ -1060,6 +1060,8 @@ public partial class GameDetailViewModel : ViewModelBase
     // ── Mod browser (Steam-workshop-style list of the database's mod links) ─────
     private List<GameModEntry> _dbMods = new();
     private List<GameModEntry> _browseMods = new();
+    private List<GameModEntry> _switchRepoMods = new();
+    private int _switchRepoGeneration;
     [ObservableProperty] private bool   _isModBrowserOpen;
     [ObservableProperty] private bool   _isModsInstalledTab = true;
     public bool IsModsBrowseTab => !IsModsInstalledTab;
@@ -1095,7 +1097,7 @@ public partial class GameDetailViewModel : ViewModelBase
                 Description = "Your saved link (" + l.Kind + ")",
                 Genres = string.IsNullOrWhiteSpace(l.ModType) ? new List<string> { "My link" } : new List<string> { "My link", l.ModType },
             });
-        _browseMods = mine.Concat(_dbMods).ToList();
+        _browseMods = mine.Concat(_switchRepoMods).Concat(_dbMods).ToList();
         RefreshModList();
     }
     [ObservableProperty] private string _modSearchText = "";
@@ -1221,6 +1223,72 @@ public partial class GameDetailViewModel : ViewModelBase
         OnPropertyChanged(nameof(NoInstalledMods));
     }
 
+    // ── Xenia settings editor (per-title config toml: switches for booleans, text for the rest) ──
+    private List<XeniaSettingVm> _allXeniaSettings = new();
+    private EmulatorModVm? _xeniaEditMod;
+    public ObservableCollection<XeniaSettingVm> XeniaSettings { get; } = new();
+    [ObservableProperty] private bool   _showXeniaEditor;
+    [ObservableProperty] private string _xeniaEditorTitle = "";
+    [ObservableProperty] private string _xeniaFilter = "";
+    [ObservableProperty] private string _xeniaEditorStatus = "";
+    partial void OnXeniaFilterChanged(string value) => ApplyXeniaFilter();
+
+    private void ApplyXeniaFilter()
+    {
+        var f = (XeniaFilter ?? "").Trim();
+        XeniaSettings.Clear();
+        foreach (var s in _allXeniaSettings.Where(s => f.Length == 0 || s.Label.Contains(f, StringComparison.OrdinalIgnoreCase)))
+            XeniaSettings.Add(s);
+    }
+
+    [RelayCommand]
+    private void OpenXeniaSettings(EmulatorModVm? mod)
+    {
+        if (mod == null || !mod.IsXenia) return;
+        try
+        {
+            string cfg = EmulatorModsService.EnsureXeniaConfigForEditing(mod.EmulatorPath, mod.TitleId, mod.SourcePath);
+            if (!File.Exists(cfg)) { EmulatorModsStatus = "No Xenia config found for this game."; return; }
+            _xeniaEditMod = mod;
+            _allXeniaSettings = EmulatorModsService.ParseToml(File.ReadAllText(cfg))
+                .Select(t => new XeniaSettingVm
+                {
+                    Section = t.Section, Key = t.Key, Line = t.Line, IsBool = t.IsBool,
+                    OriginalValue = t.Value, Value = t.Value,
+                }).ToList();
+            XeniaFilter = "";
+            ApplyXeniaFilter();
+            XeniaEditorTitle = $"Xenia settings · {mod.TitleId}";
+            XeniaEditorStatus = _allXeniaSettings.Count == 0 ? "This config has no editable settings." : "";
+            ShowXeniaEditor = true;
+        }
+        catch (Exception ex) { EmulatorModsStatus = "Could not open settings: " + ex.Message; }
+    }
+
+    [RelayCommand]
+    private void SaveXeniaSettings()
+    {
+        var mod = _xeniaEditMod;
+        if (mod == null) return;
+        try
+        {
+            string cfg = EmulatorModsService.XeniaConfigPath(mod.EmulatorPath, mod.TitleId);
+            var changed = _allXeniaSettings.Where(s => s.IsChanged)
+                .Select(s => new EmulatorModsService.TomlSetting(s.Section, s.Key, s.Value, s.Line)).ToList();
+            if (changed.Count > 0 && !File.Exists(cfg + EmulatorModsService.ManagedMarker) && !File.Exists(cfg + ".gameos-bak"))
+                File.Copy(cfg, cfg + ".gameos-bak");
+            if (changed.Count > 0)
+                File.WriteAllText(cfg, EmulatorModsService.ApplyToml(File.ReadAllText(cfg), changed));
+            EmulatorModsService.MarkXeniaConfigManaged(mod.EmulatorPath, mod.TitleId);
+            mod.Enabled = true;
+            EmulatorModsStatus = $"✓  Saved {changed.Count} setting(s).";
+            ShowXeniaEditor = false;
+        }
+        catch (Exception ex) { XeniaEditorStatus = "Failed to save: " + ex.Message; }
+    }
+
+    [RelayCommand] private void CloseXeniaSettings() => ShowXeniaEditor = false;
+
     [RelayCommand]
     private async System.Threading.Tasks.Task ToggleEmulatorMod(EmulatorModVm? mod)
     {
@@ -1285,6 +1353,26 @@ public partial class GameDetailViewModel : ViewModelBase
             RefreshInstalledMods();
         }
         finally { IsWorkshopBusy = false; }
+    }
+
+    /// <summary>Enable = extract the archived mod to a folder; Disable = pack the folder back into an archive.</summary>
+    [RelayCommand]
+    private async System.Threading.Tasks.Task ToggleInstalledMod(InstalledMod? mod)
+    {
+        if (mod == null || !mod.CanToggle) return;
+        try
+        {
+            bool enable = !mod.Enabled;
+            ModsStatus = enable ? $"Extracting {mod.Name}…" : $"Archiving {mod.Name}…";
+            await System.Threading.Tasks.Task.Run(() =>
+            {
+                if (enable) GameModsService.EnableArchivedMod(mod.Path);
+                else GameModsService.DisableModToArchive(mod.Path);
+            });
+            ModsStatus = enable ? "✓  Mod enabled (extracted)." : "✓  Mod disabled (archived).";
+        }
+        catch (Exception ex) { ModsStatus = "Failed: " + ex.Message; }
+        RefreshInstalledMods();
     }
 
     [RelayCommand]
@@ -1366,6 +1454,16 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         if (mod == null || !Uri.TryCreate(mod.Url, UriKind.Absolute, out var u) ||
             (u.Scheme != Uri.UriSchemeHttp && u.Scheme != Uri.UriSchemeHttps)) return;
+
+        if (IsSwitch && mod.Genres.Contains("Game OS") && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath)
+            && await InstallSwitchRepoModAsync(mod)) return;
+        if (IsSwitch && mod.Genres.Contains("Game OS") && Services.SwitchModRepoService.IsModArchive(u.AbsolutePath))
+        {
+            string file = mod.Name + System.IO.Path.GetExtension(u.AbsolutePath);
+            Services.DownloadManagerService.Instance.Add(u.AbsoluteUri, file, Services.DownloadPathResolver.CategoryMod, "Switch", game: Title);
+            ModsStatus = $"⬇ Downloading {file} — see Downloads (set the Ryujinx path in Settings to auto-install).";
+            return;
+        }
 
         // GitHub releases: grab the latest asset with our downloader instead of browsing.
         if (GameModsService.ParseGitHubReleaseUrl(u.AbsoluteUri) is { } gh)
@@ -5528,6 +5626,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         IsSwitch = string.Equals(Platform, "Switch", StringComparison.OrdinalIgnoreCase);
         RefreshPs2Recomp();
+        _ = LoadSwitchRepoModsAsync();
         if (!IsSwitch) return;
 
         // Resolve TitleID using a three-tier fallback:
@@ -5583,6 +5682,55 @@ public partial class GameDetailViewModel : ViewModelBase
         HasSwitchMods          = SwitchMods.Count > 0;
         // ModsJsonExistsButEmpty = file was found but contained no mod entries.
         ModsJsonExistsButEmpty = !HasSwitchMods;
+    }
+
+    /// <summary>Loads this game's mods from the Game OS Switch mods repository into the Browse list.</summary>
+    private async System.Threading.Tasks.Task LoadSwitchRepoModsAsync()
+    {
+        int gen = ++_switchRepoGeneration;
+        if (!IsSwitch || string.IsNullOrEmpty(Title))
+        {
+            if (_switchRepoMods.Count > 0) { _switchRepoMods = new(); RebuildBrowseMods(); }
+            return;
+        }
+        string title = Title;
+        string? tid = _currentLocalRom?.TitleId ?? _databaseTitleId
+                      ?? Services.GitHubDataService.TryGetTitleIdFromLocalCache("Switch", title);
+        try
+        {
+            var mods = await Services.SwitchModRepoService.GetModsAsync(title, tid);
+            if (gen != _switchRepoGeneration) return;
+            _switchRepoMods = mods.Select(m => new GameModEntry
+            {
+                Name = m.Name,
+                Url = m.DownloadUrl,
+                Description = (m.Category.Length > 0 ? m.Category + " · " : "") + "Game OS Switch mods database — click to install.",
+                Genres = m.Category.Length > 0 ? new List<string> { "Game OS", m.Category } : new List<string> { "Game OS" },
+            }).ToList();
+            RebuildBrowseMods();
+        }
+        catch { /* best-effort */ }
+    }
+
+    /// <summary>Downloads a repo mod and extracts it into Ryujinx's mods folder, registering it as enabled in mods.json.</summary>
+    private async System.Threading.Tasks.Task<bool> InstallSwitchRepoModAsync(GameModEntry mod)
+    {
+        string? modsJson = _ryujinxModsJsonPath;
+        if (string.IsNullOrEmpty(modsJson)) return false;
+        try
+        {
+            ModsStatus = $"Installing {mod.Name}…";
+            string dir = await Services.SwitchModRepoService.InstallAsync(
+                mod.Url, mod.Name, Services.RyujinxModService.GetModsContentDir(modsJson));
+            var list = Services.RyujinxModService.LoadMods(modsJson);
+            list.RemoveAll(m => string.Equals(m.Path, dir, StringComparison.OrdinalIgnoreCase));
+            list.Add(new GameLauncher.Models.RyujinxMod { Name = mod.Name, Path = dir, Enabled = true });
+            Services.RyujinxModService.SaveMods(modsJson, list);
+            ModsStatus = $"✓  Installed {mod.Name} (enabled in Ryujinx).";
+            LoadSwitchMods();
+        }
+        catch (Exception ex) { ModsStatus = "Failed to install: " + ex.Message; }
+        return true;
     }
 
     /// <summary>Toggles the enabled state of a Ryujinx mod and persists the change to <c>mods.json</c>.</summary>

@@ -133,7 +133,7 @@ namespace GameLauncher.Services
         public static bool IsXeniaSettingsEnabled(string xeniaExePath, string titleId, string cachedToml)
         {
             string cfg = XeniaConfigPath(xeniaExePath, titleId);
-            try { return File.Exists(cfg) && File.ReadAllText(cfg) == File.ReadAllText(cachedToml); }
+            try { return File.Exists(cfg) && (File.Exists(cfg + ManagedMarker) || File.ReadAllText(cfg) == File.ReadAllText(cachedToml)); }
             catch { return false; }
         }
 
@@ -146,6 +146,84 @@ namespace GameLauncher.Services
             if (File.Exists(cfg) && !File.Exists(bak) && File.ReadAllText(cfg) != File.ReadAllText(cachedToml))
                 File.Copy(cfg, bak);
             File.Copy(cachedToml, cfg, overwrite: true);
+            File.WriteAllText(cfg + ManagedMarker, "");
+        }
+
+        /// <summary>Marks the config as Game OS-managed so user edits made in the settings editor keep it "Enabled".</summary>
+        public static void MarkXeniaConfigManaged(string xeniaExePath, string titleId) =>
+            File.WriteAllText(XeniaConfigPath(xeniaExePath, titleId) + ManagedMarker, "");
+
+        /// <summary>One <c>key = value</c> line of a Xenia toml; <see cref="Line"/> is its index in the file.</summary>
+        public sealed record TomlSetting(string Section, string Key, string Value, int Line)
+        {
+            public bool IsBool => Value == "true" || Value == "false";
+        }
+
+        /// <summary>Lists the editable settings (non-comment <c>key = value</c> lines) of a toml, grouped by <c>[section]</c>.</summary>
+        public static List<TomlSetting> ParseToml(string text)
+        {
+            var list = new List<TomlSetting>();
+            string section = "";
+            var lines = text.Replace("\r\n", "\n").Split('\n');
+            for (int i = 0; i < lines.Length; i++)
+            {
+                string t = lines[i].Trim();
+                if (t.Length == 0 || t[0] == '#') continue;
+                if (t[0] == '[' && t.EndsWith("]")) { section = t.Trim('[', ']').Trim(); continue; }
+                int eq = t.IndexOf('=');
+                if (eq <= 0) continue;
+                string key = t[..eq].Trim();
+                string val = StripTomlComment(t[(eq + 1)..]).Trim();
+                if (key.Length > 0) list.Add(new TomlSetting(section, key, val, i));
+            }
+            return list;
+        }
+
+        private static string StripTomlComment(string v)
+        {
+            bool inStr = false;
+            for (int i = 0; i < v.Length; i++)
+            {
+                if (v[i] == '"' && (i == 0 || v[i - 1] != '\\')) inStr = !inStr;
+                else if (v[i] == '#' && !inStr) return v[..i];
+            }
+            return v;
+        }
+
+        /// <summary>Rewrites the values of the given settings (by line) while keeping comments, order and untouched lines.</summary>
+        public static string ApplyToml(string text, IEnumerable<TomlSetting> changed)
+        {
+            bool crlf = text.Contains("\r\n");
+            var lines = text.Replace("\r\n", "\n").Split('\n');
+            foreach (var c in changed)
+            {
+                if (c.Line < 0 || c.Line >= lines.Length) continue;
+                string line = lines[c.Line];
+                int eq = line.IndexOf('=');
+                if (eq < 0) continue;
+                string rest = line[(eq + 1)..];
+                string oldVal = StripTomlComment(rest);
+                string comment = rest[oldVal.Length..];
+                string tail = comment.Length > 0 ? " " + comment.TrimStart() : "";
+                lines[c.Line] = line[..(eq + 1)] + " " + c.Value.Trim() + tail;
+            }
+            return string.Join(crlf ? "\r\n" : "\n", lines);
+        }
+
+        /// <summary>
+        /// Path of the toml the user edits: Xenia's per-title config. When it doesn't exist yet it is
+        /// created from the cached optimized settings so there is always something to tweak.
+        /// </summary>
+        public static string EnsureXeniaConfigForEditing(string xeniaExePath, string titleId, string? cachedToml)
+        {
+            string cfg = XeniaConfigPath(xeniaExePath, titleId);
+            if (!File.Exists(cfg) && cachedToml != null && File.Exists(cachedToml))
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(cfg)!);
+                File.Copy(cachedToml, cfg);
+                File.WriteAllText(cfg + ManagedMarker, "");
+            }
+            return cfg;
         }
 
         /// <summary>Removes the optimized config, restoring the user's previous one if it was backed up.</summary>
@@ -154,6 +232,7 @@ namespace GameLauncher.Services
             string cfg = XeniaConfigPath(xeniaExePath, titleId);
             string bak = cfg + ".gameos-bak";
             if (File.Exists(cfg)) File.Delete(cfg);
+            if (File.Exists(cfg + ManagedMarker)) File.Delete(cfg + ManagedMarker);
             if (File.Exists(bak)) File.Move(bak, cfg);
         }
 
@@ -314,7 +393,8 @@ namespace GameLauncher.Services
                         string name = Path.GetFileName(entry);
                         if (name.Equals(HdTexturePacksFolder, StringComparison.OrdinalIgnoreCase)) continue;
                         if (Matches(name))
-                            result.Add(new InstalledMod { Name = name, Path = entry, TypeName = type, Source = folder + " folder", IsDirectory = Directory.Exists(entry) });
+                            result.Add(new InstalledMod { Name = name, Path = entry, TypeName = type, Source = folder + " folder", IsDirectory = Directory.Exists(entry),
+                                CanToggle = type == "Mod" && GameModsService.CanToggleEntry(entry) });
                     }
                 }
                 catch { /* best-effort */ }

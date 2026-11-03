@@ -22,13 +22,18 @@ namespace GameLauncher.Services
         public string TypeName { get; set; } = "Mod";
         public string Source   { get; set; } = "Game folder";
         public bool   IsDirectory { get; set; }
+        /// <summary>True for entries in a mod folder that can be switched between archive (disabled) and extracted folder (enabled).</summary>
+        public bool   CanToggle { get; set; }
+        public bool   Enabled => IsDirectory;
+        public string ToggleLabel => Enabled ? "Disable" : "Enable";
+        public string StatusLabel => Enabled ? "✓ Enabled" : "✗ Disabled (archived)";
         public string Icon => TypeName switch
         {
             "DLC"    => "🎁",
             "Update" => "⬆",
             _        => GameModsService.PresetFor(TypeName)?.Icon ?? "🧩",
         };
-        public string Subtitle => $"{TypeName} · {Source}";
+        public string Subtitle => CanToggle ? $"{TypeName} · {Source} · {StatusLabel}" : $"{TypeName} · {Source}";
     }
 
     /// <summary>
@@ -87,6 +92,7 @@ namespace GameLauncher.Services
                             TypeName = type.Name,
                             Source = System.IO.Path.GetFileName(folder) + " folder",
                             IsDirectory = Directory.Exists(entry),
+                            CanToggle = CanToggleEntry(entry),
                         });
                 }
                 catch { /* best-effort */ }
@@ -112,6 +118,62 @@ namespace GameLauncher.Services
                 }
             }
             return result.OrderBy(m => m.TypeName).ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>A mod entry can be toggled when it is a folder (enabled) or an archive such as zip/rar/7z (disabled).</summary>
+        public static bool CanToggleEntry(string path) =>
+            Directory.Exists(path) || (File.Exists(path) && ArchiveExtractor.IsArchive(path));
+
+        /// <summary>
+        /// Enables an archived mod by extracting it to a folder named after the archive (a lone wrapper folder is unwrapped)
+        /// and removing the archive. Returns the new folder path.
+        /// </summary>
+        public static string EnableArchivedMod(string archivePath)
+        {
+            string parent = System.IO.Path.GetDirectoryName(archivePath)!;
+            string name = ArchiveStem(archivePath);
+            string dest = System.IO.Path.Combine(parent, name);
+            if (Directory.Exists(dest) || File.Exists(dest))
+                throw new IOException($"'{name}' already exists in this folder.");
+
+            string tmp = System.IO.Path.Combine(parent, ".gameos-extract-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                ArchiveExtractor.Extract(archivePath, tmp);
+                string content = tmp;
+                while (!Directory.EnumerateFiles(content).Any() && Directory.GetDirectories(content) is { Length: 1 } one)
+                    content = one[0];
+                Directory.Move(content, dest);
+            }
+            finally { try { if (Directory.Exists(tmp)) Directory.Delete(tmp, true); } catch { } }
+            File.Delete(archivePath);
+            return dest;
+        }
+
+        /// <summary>Disables a mod folder by zipping it next to itself and removing the folder. Returns the new .zip path.</summary>
+        public static string DisableModToArchive(string folderPath)
+        {
+            folderPath = folderPath.TrimEnd(System.IO.Path.DirectorySeparatorChar, System.IO.Path.AltDirectorySeparatorChar);
+            string zip = folderPath + ".zip";
+            if (File.Exists(zip)) throw new IOException($"'{System.IO.Path.GetFileName(zip)}' already exists in this folder.");
+            string tmp = zip + ".tmp";
+            try
+            {
+                if (File.Exists(tmp)) File.Delete(tmp);
+                ZipFile.CreateFromDirectory(folderPath, tmp, CompressionLevel.Optimal, includeBaseDirectory: false);
+                File.Move(tmp, zip);
+            }
+            catch { try { if (File.Exists(tmp)) File.Delete(tmp); } catch { } throw; }
+            Directory.Delete(folderPath, true);
+            return zip;
+        }
+
+        private static string ArchiveStem(string path)
+        {
+            string n = System.IO.Path.GetFileName(path);
+            n = System.Text.RegularExpressions.Regex.Replace(n, @"\.part0*1\.rar$", "", RegexOptions.IgnoreCase);
+            if (n.EndsWith(".tar.gz", StringComparison.OrdinalIgnoreCase)) return n[..^7];
+            return System.IO.Path.GetFileNameWithoutExtension(n);
         }
 
         // ── Steam locations ─────────────────────────────────────────────────
