@@ -68,6 +68,18 @@ public static class RyujinxModService
         return Path.Combine(appData, "Ryujinx", "games", tid, "mods.json");
     }
 
+    /// <summary>
+    /// Ryujinx mod content folder for the game that owns <paramref name="modsJsonPath"/>:
+    /// <c>{root}/games/{tid}/mods.json</c> → <c>{root}/mods/contents/{tid}</c>.
+    /// </summary>
+    public static string GetModsContentDir(string modsJsonPath)
+    {
+        string gameDir = Path.GetDirectoryName(modsJsonPath) ?? "";
+        string tid     = Path.GetFileName(gameDir);
+        string root    = Path.GetDirectoryName(Path.GetDirectoryName(gameDir)) ?? "";
+        return Path.Combine(root, "mods", "contents", tid);
+    }
+
     /// <summary>Deserialises <paramref name="modsJsonPath"/> and returns the mod list.</summary>
     public static List<RyujinxMod> LoadMods(string modsJsonPath)
     {

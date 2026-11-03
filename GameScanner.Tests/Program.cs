@@ -2784,6 +2784,31 @@ class Program
             Check(inst.Any(m => m.Name == "MyMod" && m.TypeName == "Mod Client"), "UserMods/<folder> listed by folder name");
             Check(inst.Any(m => m.Name == "mp_cool" && m.TypeName == "Usermaps"), "Usermaps/<folder> listed by folder name");
 
+            // PC mod archive toggle: zip = disabled, extracted folder = enabled
+            string umaps = Path.Combine(gdir, "Usermaps");
+            Directory.CreateDirectory(Path.Combine(root, "zsrc", "wrap"));
+            File.WriteAllText(Path.Combine(root, "zsrc", "wrap", "m.txt"), "z");
+            System.IO.Compression.ZipFile.CreateFromDirectory(Path.Combine(root, "zsrc"), Path.Combine(umaps, "zm_arch.zip"));
+            var arch = GameModsService.ScanInstalled(gdir, 0).First(m => m.Name == "zm_arch.zip");
+            Check(arch.CanToggle && !arch.Enabled, "archived mod listed as disabled");
+            string en = GameModsService.EnableArchivedMod(arch.Path);
+            Check(File.Exists(Path.Combine(en, "m.txt")) && !File.Exists(arch.Path), "enable extracts (unwraps) and removes archive");
+            string dz = GameModsService.DisableModToArchive(en);
+            Check(File.Exists(dz) && !Directory.Exists(en), "disable archives the folder");
+
+            // Xenia toml editing keeps comments and untouched lines
+            string tomlText = "# hi\n[GPU]\nvsync = true # note\nres = 2\n";
+            var ts = EmulatorModsService.ParseToml(tomlText);
+            Check(ts.Count == 2 && ts[0].IsBool && ts[0].Section == "GPU" && ts[1].Value == "2", "toml parsed");
+            string edited = EmulatorModsService.ApplyToml(tomlText, new[] { ts[0] with { Value = "false" }, ts[1] with { Value = "4" } });
+            Check(edited == "# hi\n[GPU]\nvsync = false # note\nres = 4\n", "toml edit preserves comments");
+
+            // Game OS Switch mods repo layout
+            string tree = "{\"tree\":[{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/burgertoad_v1.zip\",\"type\":\"blob\"},{\"path\":\"Mario Kart 8 Deluxe/Drivers/Toad/Toad.txt\",\"type\":\"blob\"},{\"path\":\"Other/x.zip\",\"type\":\"blob\"}]}";
+            var rm = SwitchModRepoService.ParseTree(tree, "Mario Kart 8 Deluxe", null);
+            Check(rm.Count == 1 && rm[0].Name == "burgertoad_v1" && rm[0].Category == "Drivers › Toad" && rm[0].DownloadUrl.Contains("Mario%20Kart%208%20Deluxe"), "switch repo archive mods parsed");
+            Check(RyujinxModService.GetModsContentDir(Path.Combine("r", "portable", "games", "0100", "mods.json")) == Path.Combine("r", "portable", "mods", "contents", "0100"), "ryujinx mods content dir");
+
             var gh = GameModsService.ParseGitHubReleaseUrl("https://github.com/alterware/alterware-launcher/releases");
             Check(gh is { Owner: "alterware", Repo: "alterware-launcher" }, "GitHub releases URL parsed");
             Check(GameModsService.ParseGitHubReleaseUrl("https://github.com/alterware/alterware-launcher") == null, "non-release GitHub URL ignored");

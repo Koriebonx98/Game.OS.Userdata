@@ -34,5 +34,7 @@
     <Compile Include="../GameLauncher/Services/ArchiveExtractor.cs" />
     <Compile Include="../GameLauncher/Services/GameModsService.cs" />
     <Compile Include="../GameLauncher/Services/DownloadPathResolver.cs" />
+    <Compile Include="../GameLauncher/Services/SwitchModRepoService.cs" />
+    <Compile Include="../GameLauncher/Services/RyujinxModService.cs" />
   </ItemGroup>
 </Project>

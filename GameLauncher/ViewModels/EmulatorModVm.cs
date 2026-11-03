@@ -16,6 +16,7 @@ public partial class EmulatorModVm : ViewModelBase
     /// <summary>Cached toml (Xenia) or pack source folder (PS2).</summary>
     public string SourcePath { get; set; } = "";
     public EmulatorModsService.TexturePack? Pack { get; set; }
+    public bool IsXenia => Kind == "Xenia";
 
     [ObservableProperty] private bool _enabled;
 
