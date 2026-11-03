@@ -1027,8 +1027,30 @@ public partial class GameDetailViewModel : ViewModelBase
                 Description = "Your saved link (" + l.Kind + ")",
                 Genres = string.IsNullOrWhiteSpace(l.ModType) ? new List<string> { "My link" } : new List<string> { "My link", l.ModType },
             });
-        _browseMods = mine.Concat(_dbMods).ToList();
+        _browseMods = mine.Concat(_dbMods).Concat(_repoMods).ToList();
         RefreshModList();
+        LoadSwitchRepoMods();
+    }
+
+    private List<GameModEntry> _repoMods = new();
+    private string _repoModsFor = "";
+
+    /// <summary>For Switch games, pulls mods from the Game_OS.Mods.switch repo ({Game}/{ModType}/{Mod}) and appends them to Browse.</summary>
+    private async void LoadSwitchRepoMods()
+    {
+        if (!string.Equals(Platform, "Switch", StringComparison.OrdinalIgnoreCase)) { _repoMods = new(); _repoModsFor = ""; return; }
+        var title = Title;
+        if (_repoModsFor == title) return;
+        _repoModsFor = title;
+        try
+        {
+            var mods = await SwitchModsRepoService.GetModsForGameAsync(title);
+            if (_repoModsFor != title) return;
+            _repoMods = mods;
+            _browseMods = _browseMods.Where(m => !m.Genres.Contains("Switch Mods")).Concat(mods).ToList();
+            Avalonia.Threading.Dispatcher.UIThread.Post(RefreshModList);
+        }
+        catch { _repoModsFor = ""; }
     }
     [ObservableProperty] private string _modSearchText = "";
     public ObservableCollection<GameModEntry> FilteredMods { get; } = new();
