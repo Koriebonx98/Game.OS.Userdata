@@ -1,0 +1,2 @@
+#GameName, type, connect
+Call of Duty: Ghosts, mod: IW6-mod.exe, -multiplayer -connect $IP
