@@ -30,7 +30,7 @@ namespace GameLauncher.Services
         {
             "PS1", "PS2", "PS3", "PS4", "PS5", "PSP", "PS Vita",
             "Xbox 360", "Xbox One",
-            "Switch", "Nintendo - 3DS", "Nintendo - GameBoy",
+            "Switch", "Nintendo - Switch 2", "Nintendo - 3DS", "Nintendo - GameBoy",
             "GameCube", "Wii",
         };
 
