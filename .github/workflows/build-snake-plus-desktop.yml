@@ -1,0 +1,44 @@
+# Builds the standalone Windows installer for Snake Plus (Electron shell around the Game OS site).
+name: Build Snake Plus Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/snake-plus/**'
+      - '.github/workflows/build-snake-plus-desktop.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/snake-plus
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check main process syntax
+        run: node --check main.js
+      - name: Install dependencies
+        run: npm install
+      - name: Build installer
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: SnakePlus-Setup-win-x64
+          path: desktop/snake-plus/dist/*.exe
+      - name: Publish release asset for the PC launcher
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: desktop/snake-plus/dist
+        run: |
+          gh release view snake-plus-desktop >/dev/null 2>&1 || gh release create snake-plus-desktop --title "Snake Plus (PC installer)" --notes "Installer used by the Game OS PC app."
+          gh release upload snake-plus-desktop SnakePlus-Setup.exe --clobber

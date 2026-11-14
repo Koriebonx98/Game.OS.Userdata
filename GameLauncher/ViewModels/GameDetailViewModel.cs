@@ -244,7 +244,7 @@ public partial class GameDetailViewModel : ViewModelBase
     // ── Install / launch state ────────────────────────────────────────────────
     /// <summary>True when the game is found installed on a local drive.</summary>
     [NotifyPropertyChangedFor(nameof(ShowStandaloneSteamInstall))]
-    [NotifyPropertyChangedFor(nameof(ShowDigitalAbyssInstall))]
+    [NotifyPropertyChangedFor(nameof(ShowExclusiveInstall))]
     [NotifyPropertyChangedFor(nameof(ShowRepackInstall))]
     [ObservableProperty] private bool _isInstalled;
     /// <summary>True when a repack archive is available to install (but game is not yet installed).</summary>
@@ -424,10 +424,10 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty] private bool   _hasSteamLaunchOption;
     public bool HasEpicLaunchOption => IsInstalled && EpicLaunchUrl() != null;
-    public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall) && !IsRepack && !ShowDigitalAbyssInstall;
-    /// <summary>Digital Abyss uses the repack-style Install button (drive picker, installs to &lt;root&gt;/Games).</summary>
-    public bool ShowDigitalAbyssInstall => _isDigitalAbyss && !IsInstalled;
-    public bool ShowRepackInstall => IsRepack || ShowDigitalAbyssInstall;
+    public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall) && !IsRepack && !ShowExclusiveInstall;
+    /// <summary>Game OS exclusives (Digital Abyss, Snake Plus) use the repack-style Install button (drive picker, installs to &lt;root&gt;/Games).</summary>
+    public bool ShowExclusiveInstall => _exclusive != null && !IsInstalled;
+    public bool ShowRepackInstall => IsRepack || ShowExclusiveInstall;
 
     /// <summary>Epic Games library owns this title (Epic can install it).</summary>
     [NotifyPropertyChangedFor(nameof(ShowStandaloneSteamInstall))]
@@ -453,22 +453,22 @@ public partial class GameDetailViewModel : ViewModelBase
         if (HasEpicInstall) IsCloudOnly = false;
     }
 
-    private bool _isDigitalAbyss;
+    private Services.ExclusiveGame? _exclusive;
 
-    /// <summary>Marks Digital Abyss as installed (ready to play) when its desktop app is already on disk.</summary>
-    private void ApplyDigitalAbyssState(string? platform, string? title)
+    /// <summary>Marks a Game OS exclusive as installed (ready to play) when its desktop app is already on disk.</summary>
+    private void ApplyExclusiveState(string? platform, string? title)
     {
-        _isDigitalAbyss = Services.DigitalAbyssInstallerService.IsDigitalAbyss(platform, title);
-        if (_isDigitalAbyss && !IsInstalled) IsCloudOnly = false;
+        _exclusive = Services.ExclusiveGameInstallerService.Find(platform, title);
+        if (_exclusive != null && !IsInstalled) IsCloudOnly = false;
         OnPropertyChanged(nameof(ShowStandaloneSteamInstall));
-        OnPropertyChanged(nameof(ShowDigitalAbyssInstall));
+        OnPropertyChanged(nameof(ShowExclusiveInstall));
         OnPropertyChanged(nameof(ShowRepackInstall));
-        var found = _isDigitalAbyss && !IsInstalled ? Services.DigitalAbyssInstallerService.FindInstalledExe() : null;
+        var found = _exclusive != null && !IsInstalled ? Services.ExclusiveGameInstallerService.FindInstalledExe(_exclusive) : null;
         if (found == null) return;
-        SetDigitalAbyssInstalled(found);
+        SetExclusiveInstalled(found);
     }
 
-    private void SetDigitalAbyssInstalled(string exe)
+    private void SetExclusiveInstalled(string exe)
     {
         IsInstalled = true;
         IsRepack = false;
@@ -483,29 +483,29 @@ public partial class GameDetailViewModel : ViewModelBase
         SelectedDriveIndex = 0;
         RefreshActiveDrive();
         OnPropertyChanged(nameof(ShowStandaloneSteamInstall));
-        OnPropertyChanged(nameof(ShowDigitalAbyssInstall));
+        OnPropertyChanged(nameof(ShowExclusiveInstall));
         OnPropertyChanged(nameof(ShowRepackInstall));
     }
 
-    private async System.Threading.Tasks.Task InstallDigitalAbyssAsync(string installFolder)
+    private async System.Threading.Tasks.Task InstallExclusiveAsync(string installFolder)
     {
         if (IsExtracting) return;
         ShowInstallSourcePicker = false;
-        InstallStatusMessage = "⏳  Downloading and installing Digital Abyss…";
+        InstallStatusMessage = $"⏳  Downloading and installing {_exclusive?.Title}…";
         InstallStatusIsError = false;
         ExtractionProgress = 0;
         IsExtracting = true;
         try
         {
             var progress = new Progress<double>(p => ExtractionProgress = p);
-            var exe = await Services.DigitalAbyssInstallerService.InstallAsync(installFolder, progress);
+            var exe = await Services.ExclusiveGameInstallerService.InstallAsync(_exclusive!, installFolder, progress);
             WriteGameOsTitle(installFolder, Title);
-            SetDigitalAbyssInstalled(exe);
-            InstallStatusMessage = "✓  Digital Abyss is installed and ready to play.";
+            SetExclusiveInstalled(exe);
+            InstallStatusMessage = $"✓  {_exclusive!.Title} is installed and ready to play.";
         }
         catch (Exception ex)
         {
-            Services.DevLogService.Log($"[DigitalAbyss] install failed: {ex}");
+            Services.DevLogService.Log($"[ExclusiveGame] install failed: {ex}");
             InstallStatusMessage = $"⛔  Install failed: {ex.Message}";
             InstallStatusIsError = true;
         }
@@ -516,7 +516,7 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void InstallGame()
     {
-        if (ShowDigitalAbyssInstall) { InstallRepack(); return; }
+        if (ShowExclusiveInstall) { InstallRepack(); return; }
         if (InstallSourceCount == 1)
         {
             if (HasEpicInstall) { InstallViaEpic(); return; }
@@ -4243,7 +4243,7 @@ public partial class GameDetailViewModel : ViewModelBase
     [RelayCommand]
     private void InstallRepack()
     {
-        if (ShowDigitalAbyssInstall)
+        if (ShowExclusiveInstall)
         {
             PopulateInstallDrives();
             ShowDrivePicker = InstallDrives.Count > 0;
@@ -4330,9 +4330,9 @@ public partial class GameDetailViewModel : ViewModelBase
         string destFolder = Path.Combine(option.GamesFolderPath, Title);
         try { Directory.CreateDirectory(destFolder); } catch { }
 
-        if (ShowDigitalAbyssInstall)
+        if (ShowExclusiveInstall)
         {
-            _ = InstallDigitalAbyssAsync(destFolder);
+            _ = InstallExclusiveAsync(destFolder);
             return;
         }
 
@@ -4770,7 +4770,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title, game.PlaytimeMinutes);
         ApplyInstallState(localGame, repack, localRom);
-        ApplyDigitalAbyssState(game.Platform, game.Title);
+        ApplyExclusiveState(game.Platform, game.Title);
         // IsCloudOnly: cloud library entry with no local copy of any kind
         IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
@@ -4840,7 +4840,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
-        ApplyDigitalAbyssState(game.Platform, game.Title);
+        ApplyExclusiveState(game.Platform, game.Title);
         IsCloudOnly = false;
         // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
         // so stale Switch state from a previously viewed game is always cleared.

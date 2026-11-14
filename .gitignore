@@ -25,3 +25,6 @@ QuickMenu.Tests/obj/
 
 # Digital Abyss desktop build output
 desktop/digital-abyss/dist/
+
+# Snake Plus desktop build output
+desktop/snake-plus/dist/
