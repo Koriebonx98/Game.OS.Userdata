@@ -130,6 +130,7 @@ class DigitalAbyssGame {
                     ${this.savedRun ? '<button class="start-button" id="continue-game-button">Continue Saved Case</button>' : ''}
                     <button class="start-button${this.savedRun ? ' secondary' : ''}" id="start-game-button">${this.savedRun ? 'Start New Investigation' : 'Start Investigation'}</button>
                     <button class="start-button secondary" id="achievements-button">🏆 Achievements</button>
+                    <button class="start-button secondary" id="quit-game-button">⏻ Quit to Game OS</button>
                 </div>
             </div>
         `;
@@ -145,6 +146,7 @@ class DigitalAbyssGame {
             this.restoreRun(this.savedRun);
             this.startGame();
         });
+        document.getElementById('quit-game-button').addEventListener('click', () => this.exitGame());
         document.getElementById('achievements-button').addEventListener('click', () => this.showAchievementsScreen());
     }
     
@@ -358,6 +360,7 @@ class DigitalAbyssGame {
                 <div class="right">
                     <span id="timer-display">60:00</span>
                     <span>🔋 100%</span>
+                    <button id="exit-game-btn" type="button" title="Exit game" aria-label="Exit game">⏻</button>
                 </div>
             </div>
             
@@ -448,6 +451,7 @@ class DigitalAbyssGame {
                 <div class="game-over-title">Game Over</div>
                 <div class="game-over-message">Time's up!</div>
                 <button class="game-over-button" onclick="location.reload()">Play Again</button>
+                <button class="game-over-button" id="game-over-quit" type="button">Quit to Game OS</button>
             </div>
         `;
         
@@ -455,7 +459,17 @@ class DigitalAbyssGame {
         this.setupEventListeners();
         
         // Update current time display
-        setInterval(() => this.updateCurrentTime(), 1000);
+        setInterval(() => { if (!document.hidden) this.updateCurrentTime(); }, 1000);
+        document.getElementById('game-over-quit').addEventListener('click', () => this.exitGame());
+        document.getElementById('exit-game-btn').addEventListener('click', () => this.exitGame());
+    }
+
+    async exitGame() {
+        if (!confirm('Quit Digital Abyss and return to Game OS? Your progress is saved.')) return;
+        try { this.persistRun(); await Promise.race([GameOSSDK.flush(), new Promise(r => setTimeout(r, 4000))]); } catch (_) {}
+        GameOSSDK.setRunning(false);
+        if (window.gameOSDesktop) { window.gameOSDesktop.quit(); return; }
+        location.href = '../../app.html';
     }
     
     setupEventListeners() {
@@ -936,6 +950,10 @@ class DigitalAbyssGame {
         this.gameStartTime = Date.now() - (this.resumeElapsed || 0);
         
         this.timerInterval = setInterval(() => {
+            if (document.hidden) {
+                if (Date.now() - this.gameStartTime >= this.gameDuration) this.endGame('timeout');
+                return;
+            }
             const elapsed = Date.now() - this.gameStartTime;
             const remaining = this.gameDuration - elapsed;
             

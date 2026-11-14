@@ -1,6 +1,6 @@
 // Digital Abyss desktop shell. The game itself is served from the Game OS site so the PC, website and
 // iOS versions share one build, one login, one DRM check and one cloud save.
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
 
 const SITE = process.env.GAMEOS_SITE || 'https://koriebonx98.github.io/Game.OS.Userdata/';
@@ -9,12 +9,14 @@ const SITE_ORIGIN = new URL(SITE).origin;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
+ipcMain.on('gameos:quit', e => { if (e.senderFrame && new URL(e.senderFrame.url).origin === SITE_ORIGIN) app.quit(); });
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 480, height: 900, minWidth: 360, minHeight: 640,
         backgroundColor: '#000000', title: 'Digital Abyss',
         autoHideMenuBar: true,
-        webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, partition: 'persist:digital-abyss' }
+        webPreferences: { contextIsolation: true, sandbox: true, preload: path.join(__dirname, 'preload.js'), backgroundThrottling: true, nodeIntegration: false, partition: 'persist:digital-abyss' }
     });
     win.webContents.setUserAgent(win.webContents.getUserAgent() + ' GameOSDesktop/' + app.getVersion());
 
