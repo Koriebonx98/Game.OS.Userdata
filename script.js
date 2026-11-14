@@ -887,7 +887,7 @@ async function handleLogin(event) {
             const isStandalone = window.navigator.standalone === true ||
                 (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
             setTimeout(() => {
-                window.location.href = isStandalone ? 'app.html' : 'index.html';
+                window.location.href = loginNextTarget(isStandalone ? 'app.html' : 'index.html');
             }, isStandalone ? 600 : 2000);
         } else {
             // Handle error from backend
@@ -916,7 +916,7 @@ async function handleLogin(event) {
                         } else {
                             sessionStorage.setItem('gameOSUser', JSON.stringify(userSession));
                         }
-                        setTimeout(() => { window.location.href = 'index.html'; }, 2000);
+                        setTimeout(() => { window.location.href = loginNextTarget('index.html'); }, 2000);
                         return;
                     }
                 } else {
@@ -1042,6 +1042,12 @@ function logout() {
     localStorage.removeItem('gameOSUser');
     sessionStorage.removeItem('gameOSUser');
     window.location.href = 'login.html';
+}
+
+/** Post-login destination: honours ?next= when it is a same-site relative path (e.g. games/digital-abyss/index.html). */
+function loginNextTarget(fallback) {
+    const next = new URLSearchParams(window.location.search).get('next') || '';
+    return /^[\w][\w\-./]*(\?[\w\-=&%.]*)?$/.test(next) && !next.includes('..') ? next : fallback;
 }
 
 /**

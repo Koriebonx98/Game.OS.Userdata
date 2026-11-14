@@ -22,3 +22,6 @@ LoginAuth.Tests/bin/
 LoginAuth.Tests/obj/
 QuickMenu.Tests/bin/
 QuickMenu.Tests/obj/
+
+# Digital Abyss desktop build output
+desktop/digital-abyss/dist/

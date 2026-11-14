@@ -1,0 +1,49 @@
+{
+  "Items": [
+    {
+      "achievementId": "first_steps",
+      "Name": "First Steps",
+      "Description": "Start your first investigation."
+    },
+    {
+      "achievementId": "case_closed",
+      "Name": "Case Closed",
+      "Description": "Solve a case."
+    },
+    {
+      "achievementId": "perfect_run",
+      "Name": "Perfect Run",
+      "Description": "Solve a case without a single mistake."
+    },
+    {
+      "achievementId": "outta_luck",
+      "Name": "Outta Luck",
+      "Description": "Run out of time or lose all your lives."
+    },
+    {
+      "achievementId": "thorough",
+      "Name": "Leave No Stone Unturned",
+      "Description": "Read every message, email, note and voicemail in a case, then solve it."
+    },
+    {
+      "achievementId": "on_the_edge",
+      "Name": "On the Edge",
+      "Description": "Solve a case with only one life left."
+    },
+    {
+      "achievementId": "speed_sleuth",
+      "Name": "Speed Sleuth",
+      "Description": "Solve a case in under 20 minutes."
+    },
+    {
+      "achievementId": "perfect_trio",
+      "Name": "Flawless Streak",
+      "Description": "Earn a perfect run on three different cases."
+    },
+    {
+      "achievementId": "all_cases",
+      "Name": "Master Detective",
+      "Description": "Solve all five cases."
+    }
+  ]
+}

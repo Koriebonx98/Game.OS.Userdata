@@ -80,6 +80,9 @@ jobs:
       - name: Check script.js syntax
         run: node --check script.js && echo "✅ script.js syntax OK"
 
+      - name: Digital Abyss achievements tests
+        run: node --test games/digital-abyss/achievements.test.js games/gameos-drm.test.js
+
   validate-csharp:
     name: Build & test C# launcher
     runs-on: ubuntu-latest
