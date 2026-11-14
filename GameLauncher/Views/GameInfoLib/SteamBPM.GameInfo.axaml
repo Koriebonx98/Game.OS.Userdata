@@ -126,11 +126,6 @@
                                 Command="{Binding ToggleMoreMenuCommand}">
                             <TextBlock Text="⚙" FontSize="18" VerticalAlignment="Center"/>
                         </Button>
-                        <Button Classes="btn-secondary" Padding="16,14" ToolTip.Tip="Manage Mods"
-                                Command="{Binding OpenModsPanelCommand}"
-                                IsVisible="{Binding IsSwitch}">
-                            <TextBlock Text="🧩  Mods" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center"/>
-                        </Button>
                         <Button Classes="btn-secondary" Padding="16,14" ToolTip.Tip="Backup / Restore saves"
                                 Command="{Binding ToggleCloudMenuCommand}">
                             <TextBlock Text="☁" FontSize="18" VerticalAlignment="Center"/>

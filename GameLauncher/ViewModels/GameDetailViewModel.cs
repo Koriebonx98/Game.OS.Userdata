@@ -404,6 +404,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// entry available alongside other exe options in the settings panel.
     /// </summary>
     [ObservableProperty] private bool   _hasSteamLaunchOption;
+    public bool HasEpicLaunchOption => IsInstalled && EpicLaunchUrl() != null;
     public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall) && !IsRepack;
 
     /// <summary>Epic Games library owns this title (Epic can install it).</summary>
@@ -1054,6 +1055,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private void Close()
     {
         IsModBrowserOpen = false;
+        IsModsFullScreen = false;
         OnClose?.Invoke();
     }
 
@@ -1073,6 +1075,8 @@ public partial class GameDetailViewModel : ViewModelBase
     public bool NoInstalledMods => !IsSwitch && !IsPs2 && InstalledMods.Count == 0 && EmulatorMods.Count == 0;
     partial void OnIsModsInstalledTabChanged(bool value)
     {
+        OnPropertyChanged(nameof(HasMoreInstalled));
+        OnPropertyChanged(nameof(HasMoreBrowse));
         OnPropertyChanged(nameof(IsModsBrowseTab));
         OnPropertyChanged(nameof(InstalledTabOpacity));
         OnPropertyChanged(nameof(BrowseTabOpacity));
@@ -1129,15 +1133,53 @@ public partial class GameDetailViewModel : ViewModelBase
         var term = (ModSearchText ?? "").Trim();
         FilteredMods.Clear();
         string filter = SelectedModFilter ?? "All";
-        foreach (var m in _browseMods.Where(m => (filter == "All" || string.Equals(m.Group, filter, StringComparison.OrdinalIgnoreCase)) && (term.Length == 0
+        var matches = _browseMods.Where(m => (filter == "All" || string.Equals(m.Group, filter, StringComparison.OrdinalIgnoreCase)) && (term.Length == 0
                      || m.Name.Contains(term, StringComparison.OrdinalIgnoreCase)
-                     || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase)))))
+                     || m.Genres.Any(g => g.Contains(term, StringComparison.OrdinalIgnoreCase)))).ToList();
+        FilteredModsTotal = matches.Count;
+        foreach (var m in matches.Take(ModsCap))
             FilteredMods.Add(m);
+        OnPropertyChanged(nameof(BrowseAllLabel));
+        OnPropertyChanged(nameof(HasMoreBrowse));
         OnPropertyChanged(nameof(HasDbMods));
         OnPropertyChanged(nameof(NoModsFound));
     }
 
-    [RelayCommand] private void CloseModBrowser() => IsModBrowserOpen = false;
+    [RelayCommand] private void CloseModBrowser()
+    {
+        // B / Close first leaves the full-screen "All" view, then closes the menu.
+        if (IsModsFullScreen) { IsModsFullScreen = false; return; }
+        IsModBrowserOpen = false;
+    }
+
+    private const int ModsPreviewCount = 5;
+    [ObservableProperty] private bool _isModsFullScreen;
+    private int ModsCap => IsModsFullScreen ? int.MaxValue : ModsPreviewCount;
+    /// <summary>Total items behind the compact Installed list (Ryujinx + emulator + detected mods).</summary>
+    public string InstalledAllLabel => $"All ({SwitchMods.Count + FilteredEmulatorModsTotal + FilteredInstalledModsTotal})";
+    public bool HasMoreInstalled => IsModsInstalledTab && !IsModsFullScreen && (SwitchMods.Count > ModsPreviewCount
+        || FilteredEmulatorModsTotal > ModsPreviewCount || FilteredInstalledModsTotal > ModsPreviewCount);
+    public string BrowseAllLabel => $"All ({FilteredModsTotal})";
+    public bool HasMoreBrowse => !IsModsInstalledTab && !IsModsFullScreen && FilteredModsTotal > ModsPreviewCount;
+    private int FilteredModsTotal, FilteredInstalledModsTotal, FilteredEmulatorModsTotal;
+    public ObservableCollection<RyujinxModVm> SwitchModsShown { get; } = new();
+
+    [RelayCommand] private void ShowAllMods() => IsModsFullScreen = true;
+
+    partial void OnIsModsFullScreenChanged(bool value)
+    {
+        RefreshModList();
+        RefreshInstalledMods();
+        RefreshSwitchModsShown();
+    }
+
+    private void RefreshSwitchModsShown()
+    {
+        SwitchModsShown.Clear();
+        foreach (var m in SwitchMods.Take(ModsCap)) SwitchModsShown.Add(m);
+        OnPropertyChanged(nameof(InstalledAllLabel));
+        OnPropertyChanged(nameof(HasMoreInstalled));
+    }
 
     // ── Mods: installed detection, URLs with type presets, Steam Workshop ───────
     public ObservableCollection<InstalledMod> InstalledMods { get; } = new();
@@ -1233,11 +1275,15 @@ public partial class GameDetailViewModel : ViewModelBase
                 || type.Contains(term, StringComparison.OrdinalIgnoreCase) || extra.Contains(term, StringComparison.OrdinalIgnoreCase));
 
         FilteredInstalledMods.Clear();
-        foreach (var m in InstalledMods.Where(m => Ok(m.Name, m.TypeName, m.Source ?? "")
-                     && (SelectedInstalledGroup == "All" || string.Equals(GroupOf(m), SelectedInstalledGroup, StringComparison.OrdinalIgnoreCase))))
-            FilteredInstalledMods.Add(m);
+        var installed = InstalledMods.Where(m => Ok(m.Name, m.TypeName, m.Source ?? "")
+                     && (SelectedInstalledGroup == "All" || string.Equals(GroupOf(m), SelectedInstalledGroup, StringComparison.OrdinalIgnoreCase))).ToList();
+        FilteredInstalledModsTotal = installed.Count;
+        foreach (var m in installed.Take(ModsCap)) FilteredInstalledMods.Add(m);
         FilteredEmulatorMods.Clear();
-        foreach (var m in EmulatorMods.Where(m => Ok(m.Name, m.TypeName, m.Description))) FilteredEmulatorMods.Add(m);
+        var emu = EmulatorMods.Where(m => Ok(m.Name, m.TypeName, m.Description)).ToList();
+        FilteredEmulatorModsTotal = emu.Count;
+        foreach (var m in emu.Take(ModsCap)) FilteredEmulatorMods.Add(m);
+        RefreshSwitchModsShown();
         OnPropertyChanged(nameof(HasInstalledMods));
         OnPropertyChanged(nameof(HasEmulatorMods));
         OnPropertyChanged(nameof(NoInstalledMods));
@@ -1592,7 +1638,40 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _launchTargetPromptPath = "";
     public string LaunchTargetPromptText => IsRom
         ? "Choose the ROM file to launch this game with. It is saved for next time."
-        : "Choose the game's executable. It is saved for next time.";
+        : HasLaunchPromptLaunchers
+            ? "How should this game run? Pick a launcher, or choose the game's exe. It is saved for next time."
+            : "Choose the game's executable. It is saved for next time.";
+
+    /// <summary>Launchers (Steam / Epic Games) that can start this game, offered in the first-run prompt.</summary>
+    public ObservableCollection<string> LaunchPromptLaunchers { get; } = new();
+    public bool HasLaunchPromptLaunchers => LaunchPromptLaunchers.Count > 0;
+
+    private List<string> AvailableLaunchers()
+    {
+        var l = new List<string>();
+        if (_steamAppId > 0) l.Add("Steam");
+        if (EpicLaunchUrl() != null) l.Add("Epic Games");
+        return l;
+    }
+
+    [RelayCommand]
+    private void ChooseLaunchLauncher(string? launcher)
+    {
+        if (string.IsNullOrEmpty(launcher)) return;
+        var saved = GameSettingsService.Load(Title);
+        saved.GameTitle = Title;
+        saved.LaunchMode = launcher;
+        GameSettingsService.Save(saved);
+        ShowLaunchTargetPrompt = false;
+        LaunchGame();
+    }
+
+    private bool TryLaunchViaSteam()
+    {
+        if (_steamAppId <= 0) return false;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = $"steam://launch/{_steamAppId}", UseShellExecute = true }); return true; }
+        catch (Exception ex) { DevLogService.Log($"[LaunchGame] Steam launch failed for AppId {_steamAppId}: {ex.Message}"); return false; }
+    }
 
     private bool NeedsLaunchTarget(GameSettings saved)
     {
@@ -1602,8 +1681,9 @@ public partial class GameDetailViewModel : ViewModelBase
             return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
         }
         if (saved.ModClient is { Enabled: true } mc && !string.IsNullOrWhiteSpace(mc.ClientExe) && File.Exists(mc.ClientExe)) return false;
+        if (saved.LaunchMode != null) return !(saved.LaunchMode == "exe" ? !string.IsNullOrEmpty(saved.ExePath) && IsLaunchTargetAvailable(saved.ExePath) : AvailableLaunchers().Contains(saved.LaunchMode));
+        if (AvailableLaunchers().Count > 0) return true;
         if (!string.IsNullOrEmpty(saved.ExePath) && IsLaunchTargetAvailable(saved.ExePath)) return false;
-        if (_steamAppId > 0) return false;
         return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
     }
 
@@ -1619,7 +1699,7 @@ public partial class GameDetailViewModel : ViewModelBase
         if (path.Length == 0 || !File.Exists(path)) return;
         var saved = GameSettingsService.Load(Title);
         saved.GameTitle = Title;
-        if (IsRom) saved.RomPath = path; else saved.ExePath = path;
+        if (IsRom) saved.RomPath = path; else { saved.ExePath = path; saved.LaunchMode = "exe"; }
         GameSettingsService.Save(saved);
         ShowLaunchTargetPrompt = false;
         LaunchGame();
@@ -2851,6 +2931,9 @@ public partial class GameDetailViewModel : ViewModelBase
         if (NeedsLaunchTarget(saved))
         {
             LaunchTargetPromptPath = "";
+            LaunchPromptLaunchers.Clear();
+            if (!IsRom) foreach (var l in AvailableLaunchers()) LaunchPromptLaunchers.Add(l);
+            OnPropertyChanged(nameof(HasLaunchPromptLaunchers));
             OnPropertyChanged(nameof(LaunchTargetPromptText));
             ShowLaunchTargetPrompt = true;
             return;
@@ -3041,6 +3124,9 @@ public partial class GameDetailViewModel : ViewModelBase
             return;
         }
 
+        if (saved.LaunchMode == "Epic Games" && TryLaunchViaEpic()) return;
+        if (saved.LaunchMode == "Steam" && TryLaunchViaSteam()) return;
+
         if (!string.IsNullOrEmpty(saved.ExePath) && IsLaunchTargetAvailable(saved.ExePath))
         {
             exePath = saved.ExePath;
@@ -3062,6 +3148,10 @@ public partial class GameDetailViewModel : ViewModelBase
             {
                 DevLogService.Log($"[LaunchGame] Steam launch failed for AppId {_steamAppId}: {ex.Message}");
             }
+            return;
+        }
+        else if (TryLaunchViaEpic())
+        {
             return;
         }
         else if (_driveInstances.Count > 0)
@@ -4287,6 +4377,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         IsActionMenuOpen = false;
         ModSearchText = "";
+        IsModsFullScreen = false;
         IsModsInstalledTab = true;
         LoadSwitchMods();       // also refreshes IsSwitch / IsPs2 for the current game
         RebuildBrowseMods();
@@ -4389,6 +4480,28 @@ public partial class GameDetailViewModel : ViewModelBase
         catch (Exception ex) { LfgStatus = "Could not join: " + ex.Message; }
         IsLfgBusy = false;
         NotifyLfgState();
+    }
+
+    /// <summary>Epic launcher URL for this title when the logged-in account owns it on Epic.</summary>
+    private string? EpicLaunchUrl()
+    {
+        var epic = OwnedStoreGamesService.FindOwned(_currentUsername, Title).FirstOrDefault(o => o.Store == "Epic Games");
+        return epic == null || string.IsNullOrEmpty(epic.LaunchId) ? null
+            : $"com.epicgames.launcher://apps/{Uri.EscapeDataString(epic.LaunchId)}?action=launch&silent=true";
+    }
+
+    private bool TryLaunchViaEpic()
+    {
+        var url = EpicLaunchUrl();
+        if (url == null || !IsInstalled) return false;
+        try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true }); return true; }
+        catch (Exception ex) { DevLogService.Log($"[LaunchGame] Epic launch failed: {ex.Message}"); return false; }
+    }
+
+    [RelayCommand] private void MenuLaunchViaEpic()
+    {
+        IsActionMenuOpen = false;
+        TryLaunchViaEpic();
     }
 
     [RelayCommand] private void MenuLaunchViaSteam()
@@ -4607,6 +4720,7 @@ public partial class GameDetailViewModel : ViewModelBase
         // when navigating from a Switch game to a PC game.
         IsSwitch             = false;
         SwitchMods.Clear();
+        SwitchModsShown.Clear();
         HasSwitchMods        = false;
         ModsJsonExistsButEmpty = false;
         SwitchModsStatus     = "";
@@ -4736,6 +4850,7 @@ public partial class GameDetailViewModel : ViewModelBase
         ActiveExeType        = "";
         IsSwitch             = false;
         SwitchMods.Clear();
+        SwitchModsShown.Clear();
         HasSwitchMods        = false;
         ShowModsPanel        = false;
         SwitchModsStatus     = "";
@@ -6001,6 +6116,7 @@ public partial class GameDetailViewModel : ViewModelBase
     private void LoadSwitchMods()
     {
         SwitchMods.Clear();
+        SwitchModsShown.Clear();
         HasSwitchMods           = false;
         ModsJsonExistsButEmpty  = false;
         ShowModsPanel           = false;
@@ -6064,6 +6180,7 @@ public partial class GameDetailViewModel : ViewModelBase
             SwitchMods.Add(new RyujinxModVm { Name = mod.Name, Path = mod.Path, Enabled = mod.Enabled });
 
         HasSwitchMods          = SwitchMods.Count > 0;
+        RefreshSwitchModsShown();
         // ModsJsonExistsButEmpty = file was found but contained no mod entries.
         ModsJsonExistsButEmpty = !HasSwitchMods;
     }

@@ -1,0 +1,74 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:GameLauncher.ViewModels"
+             x:Class="GameLauncher.Views.FirstRunView"
+             x:DataType="vm:FirstRunViewModel">
+    <Grid>
+        <Border>
+            <Border.Background>
+                <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                    <GradientStop Color="#05070d" Offset="0"/>
+                    <GradientStop Color="#0b1f3a" Offset="0.55"/>
+                    <GradientStop Color="#05070d" Offset="1"/>
+                </LinearGradientBrush>
+            </Border.Background>
+        </Border>
+
+        <Grid RowDefinitions="*,Auto" Margin="80,60">
+            <StackPanel Grid.Row="0" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="22" MaxWidth="900">
+
+                <!-- 0 · Welcome -->
+                <StackPanel IsVisible="{Binding IsWelcome}" Spacing="16" HorizontalAlignment="Center">
+                    <TextBlock Text="Game.OS" FontSize="72" FontWeight="Black" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="All your games. One console experience." FontSize="22" Foreground="#8fb8ff" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Let's get this device ready in a minute." FontSize="16" Foreground="#8b949e" HorizontalAlignment="Center"/>
+                </StackPanel>
+
+                <!-- 1 · Disclosure -->
+                <StackPanel IsVisible="{Binding IsDisclosure}" Spacing="18">
+                    <TextBlock Text="Before you start" FontSize="40" FontWeight="Bold" Foreground="White"/>
+                    <Border Background="#99161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="16" Padding="28">
+                        <ScrollViewer MaxHeight="360">
+                            <TextBlock Text="{x:Static vm:FirstRunViewModel.DisclosureText}" FontSize="20" Foreground="#e6edf3" TextWrapping="Wrap" LineHeight="30"/>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+
+                <!-- 2 · Emulators -->
+                <StackPanel IsVisible="{Binding IsEmulators}" Spacing="18">
+                    <TextBlock Text="Set up your emulators" FontSize="40" FontWeight="Bold" Foreground="White"/>
+                    <TextBlock Text="{Binding EmulatorStatus}" FontSize="18" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                    <TextBlock Text="{Binding EmulatorsFolder}" FontSize="14" Foreground="#58a6ff" TextTrimming="CharacterEllipsis"
+                               IsVisible="{Binding EmulatorsFolder, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                    <Border Background="#99161b22" CornerRadius="14" Padding="20" IsVisible="{Binding HasDetections}">
+                        <ScrollViewer MaxHeight="260">
+                            <ItemsControl ItemsSource="{Binding DetectedLines}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Text="{Binding}" FontSize="18" Foreground="White" Margin="0,4"/>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+
+                <!-- 3 · Ready -->
+                <StackPanel IsVisible="{Binding IsReady}" Spacing="16" HorizontalAlignment="Center">
+                    <TextBlock Text="You're all set" FontSize="52" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+                    <TextBlock Text="Add games and ROMs any time from Settings. Press the Guide button or Shift+Ctrl for the Quick Menu."
+                               FontSize="18" Foreground="#8b949e" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Controller hint bar (also clickable) -->
+            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Spacing="16">
+                <TextBlock Text="{Binding StepLabel}" FontSize="14" Foreground="#6e7681" VerticalAlignment="Center"/>
+                <Button Classes="btn-secondary" Content="B  Back" Command="{Binding BackCommand}" IsVisible="{Binding !IsWelcome}"/>
+                <Button Classes="btn-secondary" Content="X  Skip" Command="{Binding SkipCommand}" IsVisible="{Binding IsEmulators}"/>
+                <Button Classes="btn-secondary" Content="Y  Choose folder" Command="{Binding BrowseEmulatorsFolderCommand}" IsVisible="{Binding IsEmulators}"/>
+                <Button Classes="btn-primary" Content="{Binding PrimaryHint}" Command="{Binding PrimaryCommand}"/>
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

@@ -255,7 +255,7 @@ public partial class CoverImage : UserControl
         {
             var bitmap = await Task.Run(async () => Decode(await File.ReadAllBytesAsync(path, ct)), ct);
             CacheBitmap(path, bitmap);
-            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); });
+            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); }, DispatcherPriority.Background);
         }
         catch { /* best-effort — fall through to gradient fallback */ }
     }
@@ -294,7 +294,7 @@ public partial class CoverImage : UserControl
             }
 
             CacheBitmap(url, bitmap);
-            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); });
+            await Dispatcher.UIThread.InvokeAsync(() => { if (!ct.IsCancellationRequested) ShowBitmap(bitmap); }, DispatcherPriority.Background);
         }
         catch (OperationCanceledException) { }
         catch

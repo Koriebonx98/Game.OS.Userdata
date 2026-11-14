@@ -17,6 +17,11 @@
             <views:LoginView DataContext="{Binding LoginVm}"/>
         </Border>
 
+        <!-- ══════════ FIRST RUN (welcome, disclosure, emulator setup) ══════════ -->
+        <Border IsVisible="{Binding ShowFirstRun}" ZIndex="900">
+            <views:FirstRunView DataContext="{Binding FirstRunVm}"/>
+        </Border>
+
         <!-- ══════════ MAIN SHELL ══════════ -->
         <Panel IsVisible="{Binding ShowMain}">
 

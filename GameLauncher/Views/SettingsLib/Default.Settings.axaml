@@ -1440,6 +1440,21 @@
                                     </StackPanel>
                                 </Border>
 
+                                <Border IsVisible="{Binding IsLibraryOptionsOpen}"
+                                        Background="#0d1117" BorderBrush="#30363d" BorderThickness="1"
+                                        CornerRadius="8" Padding="16,14" Margin="0,6,0,0">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Library" FontSize="14" FontWeight="Bold" Foreground="White"/>
+                                        <TextBlock Text="Shelves and badges on the Library page. Press Save Settings to keep the changes."
+                                                   FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowRecentlyAdded}" Content="Recently Added shelf"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowRecentlyPlayed}" Content="Recently Played shelf"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowRecommended}" Content="Recommended shelf (from games you own or have installed)"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowNotPlayedBadge}" Content="“Not played” badge"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowMultiStoreBadge}" Content="“Owned on several stores” badge"/>
+                                    </StackPanel>
+                                </Border>
+
                                 <Border IsVisible="{Binding IsOtherOptionsOpen}"
                                         Background="#0d1117" BorderBrush="#30363d" BorderThickness="1"
                                         CornerRadius="8" Padding="16,12" Margin="0,6,0,0">
@@ -2252,6 +2267,45 @@
                             <TextBlock Text="{Binding TestUpdateStatusLabel}"
                                        FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
                                        IsVisible="{Binding TestUpdateStatusLabel, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Shell replacement card -->
+                    <Border Background="#161b22" CornerRadius="10" Padding="24,20" Margin="0,0,0,24"
+                            IsVisible="{Binding ShellReplaceSupported}">
+                        <StackPanel Spacing="16">
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="🖥" FontSize="18" VerticalAlignment="Center"/>
+                                <TextBlock Text="Shell Replace"
+                                           FontSize="15" FontWeight="Bold"
+                                           Foreground="White" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <Grid ColumnDefinitions="*,Auto" VerticalAlignment="Center">
+                                <StackPanel Grid.Column="0" Spacing="2">
+                                    <TextBlock Text="Use Game OS as the Windows shell"
+                                               FontSize="13" Foreground="#e6edf3"/>
+                                    <TextBlock Text="Replaces Explorer for your user account so Windows boots straight into Game OS. Turn off to restore Explorer. A restart is required either way."
+                                               FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <ToggleSwitch Grid.Column="1"
+                                              IsChecked="{Binding ShellReplace}"
+                                              OffContent="" OnContent=""
+                                              VerticalAlignment="Center"
+                                              Margin="16,0,0,0"/>
+                            </Grid>
+                            <TextBlock Text="{Binding ShellReplaceStatus}"
+                                       FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
+                                       IsVisible="{Binding ShellReplaceStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                            <StackPanel Spacing="8" IsVisible="{Binding ShowShellRestartPrompt}">
+                                <TextBlock Text="Restart Windows now to apply the change?"
+                                           FontSize="13" FontWeight="SemiBold" Foreground="White"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-secondary" Padding="16,10" Content="Restart now"
+                                            Command="{Binding ConfirmShellRestartCommand}"/>
+                                    <Button Classes="btn-secondary" Padding="16,10" Content="Later"
+                                            Command="{Binding DismissShellRestartCommand}"/>
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
                     </Border>
 

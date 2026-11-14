@@ -26,6 +26,80 @@ public partial class LoginViewModel : ViewModelBase
     /// auto-logs the user in — mirrors the "Remember me" checkbox on the website.</summary>
     [ObservableProperty] private bool   _rememberMe   = true;
 
+    /// <summary>Game OS on-screen keyboard used for controller text entry on the sign-in / register forms.</summary>
+    public OnScreenKeyboardViewModel Keyboard { get; } = new();
+
+    /// <summary>Id of the controller-highlighted control (user, pass, remember, submit, toggle, email, confirm, acct:N).</summary>
+    [ObservableProperty] private string _focusId = "";
+
+    private List<string> FocusOrder()
+    {
+        var l = new List<string>();
+        if (ShowRegister) l.AddRange(new[] { "user", "email", "pass", "confirm", "submit", "toggle" });
+        else
+        {
+            if (SavedAccounts.Count > 0) l.Add("accounts");
+            l.AddRange(new[] { "user", "pass", "remember", "submit", "toggle" });
+        }
+        return l;
+    }
+
+    /// <summary>Controller handling for the login page. Returns true when the key was consumed.</summary>
+    public bool HandleKey(string name)
+    {
+        if (Keyboard.IsOpen) return Keyboard.HandleKey(name);
+        if (IsLoading) return true;
+        var order = FocusOrder();
+        int idx = order.IndexOf(FocusId);
+        switch (name)
+        {
+            case "Up": case "Down":
+                if (idx < 0) idx = name == "Down" ? -1 : order.Count;
+                FocusId = order[Math.Clamp(idx + (name == "Down" ? 1 : -1), 0, order.Count - 1)];
+                return true;
+            case "A":
+                if (idx < 0) { FocusId = order[0]; return true; }
+                Activate(FocusId);
+                return true;
+            case "Y": ToggleFormCommand.Execute(null); FocusId = "user"; return true;
+        }
+        if (FocusId == "accounts" && name is "Left" or "Right" && SavedAccounts.Count > 0)
+        {
+            SelectedAccountIndex = (SelectedAccountIndex + (name == "Right" ? 1 : -1) + SavedAccounts.Count) % SavedAccounts.Count;
+            return true;
+        }
+        return name is "Left" or "Right" or "X" or "B";
+    }
+
+    [NotifyPropertyChangedFor(nameof(SelectedAccountName))]
+    [ObservableProperty] private int _selectedAccountIndex;
+    public string SelectedAccountName =>
+        SavedAccounts.Count == 0 ? "" : $"◀  {SavedAccounts[Math.Clamp(SelectedAccountIndex, 0, SavedAccounts.Count - 1)].Username}  ▶  (A to sign in)";
+
+    private void Activate(string id)
+    {
+        switch (id)
+        {
+            case "user": OpenKeyboard(ShowRegister ? "Username" : "Username or email", Username, t => Username = t, false); break;
+            case "email": OpenKeyboard("Email address", Email, t => Email = t, false); break;
+            case "pass": OpenKeyboard("Password", Password, t => Password = t, true); break;
+            case "confirm": OpenKeyboard("Confirm password", ConfirmPassword, t => ConfirmPassword = t, true); break;
+            case "remember": RememberMe = !RememberMe; break;
+            case "submit": if (ShowRegister) RegisterCommand.Execute(null); else SignInCommand.Execute(null); break;
+            case "toggle": ToggleFormCommand.Execute(null); FocusId = "user"; break;
+            case "accounts":
+                if (SavedAccounts.Count > 0)
+                    QuickLoginCommand.Execute(SavedAccounts[Math.Clamp(SelectedAccountIndex, 0, SavedAccounts.Count - 1)]);
+                break;
+        }
+    }
+
+    private void OpenKeyboard(string title, string initial, Action<string> set, bool masked)
+    {
+        Keyboard.Open(initial, title, set);
+        Keyboard.IsMasked = masked;
+    }
+
     /// <summary>Local saved accounts shown in the quick-login panel.
     /// Populated from <see cref="SessionCacheService"/> so the list always
     /// reflects real previously-logged-in accounts.</summary>

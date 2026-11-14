@@ -1,11 +1,19 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              xmlns:models="using:GameLauncher.Models"
              x:Class="GameLauncher.Views.LoginView"
              x:DataType="vm:LoginViewModel"
              Background="#0d1117">
 
+    <UserControl.Styles>
+        <Style Selector="TextBox.kfocus"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+        <Style Selector="Button.kfocus"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+        <Style Selector="Button.kfocus /template/ ContentPresenter"><Setter Property="BorderBrush" Value="#58a6ff"/><Setter Property="BorderThickness" Value="2"/></Style>
+        <Style Selector="CheckBox.kfocus"><Setter Property="Background" Value="#2158a6ff"/></Style>
+        <Style Selector="Border.kfocus-box"><Setter Property="BorderBrush" Value="#58a6ff"/></Style>
+    </UserControl.Styles>
     <Grid>
         <!-- Subtle background gradient -->
         <Border Background="#0d1117">
@@ -50,11 +58,14 @@
                 </StackPanel>
 
                 <!-- ══ SAVED ACCOUNTS (Quick Login) ══ -->
-                <Border Background="#161b22" CornerRadius="12" Padding="20,16"
+                <Border Background="#161b22" CornerRadius="12" Padding="20,16" BorderThickness="2" BorderBrush="Transparent"
+                        Classes.kfocus-box="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=accounts}"
                         IsVisible="{Binding SavedAccounts.Count}">
                     <StackPanel Spacing="12">
                         <TextBlock Text="Saved Accounts" FontSize="13" FontWeight="SemiBold"
                                    Foreground="#8b949e"/>
+                        <TextBlock Text="{Binding SelectedAccountName}" FontSize="13" Foreground="#58a6ff"
+                                   IsVisible="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=accounts}"/>
                         <ItemsControl ItemsSource="{Binding SavedAccounts}">
                             <ItemsControl.ItemTemplate>
                                 <DataTemplate x:DataType="models:SavedSession">
@@ -174,7 +185,7 @@
                             <!-- Username -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Username or Email" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=user}" Classes="form-input"
                                          Text="{Binding Username}"
                                          Watermark="Enter username or email"/>
                             </StackPanel>
@@ -182,7 +193,7 @@
                             <!-- Password -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Password" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=pass}" Classes="form-input"
                                          Text="{Binding Password}"
                                          PasswordChar="●"
                                          Watermark="Enter password"/>
@@ -191,7 +202,7 @@
                             <!-- Remember me (mirrors the website's "Remember me" checkbox) -->
                             <StackPanel Orientation="Horizontal" Spacing="8"
                                         VerticalAlignment="Center">
-                                <CheckBox IsChecked="{Binding RememberMe}"
+                                <CheckBox IsChecked="{Binding RememberMe}" Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=remember}"
                                           Foreground="#8b949e"
                                           VerticalAlignment="Center"/>
                                 <TextBlock Text="Remember me"
@@ -211,7 +222,7 @@
                             <Button Classes="btn-primary"
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Center"
-                                    Command="{Binding SignInCommand}"
+                                    Command="{Binding SignInCommand}" Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=submit}"
                                     IsEnabled="{Binding !IsLoading}">
                                 <Panel>
                                     <TextBlock Text="Sign In"
@@ -226,7 +237,7 @@
                             <Button Background="Transparent" Foreground="#1f6feb"
                                     HorizontalAlignment="Center"
                                     BorderThickness="0" FontSize="13"
-                                    Command="{Binding ToggleFormCommand}">
+                                    Command="{Binding ToggleFormCommand}" Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=toggle}">
                                 Don't have an account? Create one →
                             </Button>
 
@@ -241,7 +252,7 @@
                             <!-- Username -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Username" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=user}" Classes="form-input"
                                          Text="{Binding Username}"
                                          Watermark="Choose a username (3–24 chars)"/>
                             </StackPanel>
@@ -249,7 +260,7 @@
                             <!-- Email -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Email Address" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=email}" Classes="form-input"
                                          Text="{Binding Email}"
                                          Watermark="your@email.com"/>
                             </StackPanel>
@@ -257,7 +268,7 @@
                             <!-- Password -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Password" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=pass}" Classes="form-input"
                                          Text="{Binding Password}"
                                          PasswordChar="●"
                                          Watermark="Min. 8 characters"/>
@@ -266,7 +277,7 @@
                             <!-- Confirm Password -->
                             <StackPanel Spacing="0">
                                 <TextBlock Text="Confirm Password" Classes="form-label"/>
-                                <TextBox Classes="form-input"
+                                <TextBox Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=confirm}" Classes="form-input"
                                          Text="{Binding ConfirmPassword}"
                                          PasswordChar="●"
                                          Watermark="Repeat password"/>
@@ -281,7 +292,7 @@
                             <Button Classes="btn-primary"
                                     HorizontalAlignment="Stretch"
                                     HorizontalContentAlignment="Center"
-                                    Command="{Binding RegisterCommand}"
+                                    Command="{Binding RegisterCommand}" Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=submit}"
                                     IsEnabled="{Binding !IsLoading}">
                                 Create Account
                             </Button>
@@ -290,7 +301,7 @@
                             <Button Background="Transparent" Foreground="#1f6feb"
                                     HorizontalAlignment="Center"
                                     BorderThickness="0" FontSize="13"
-                                    Command="{Binding ToggleFormCommand}">
+                                    Command="{Binding ToggleFormCommand}" Classes.kfocus="{Binding FocusId, Converter={x:Static ObjectConverters.Equal}, ConverterParameter=toggle}">
                                 ← Already have an account? Sign in
                             </Button>
 
@@ -301,5 +312,8 @@
 
             </StackPanel>
         </ScrollViewer>
+        <TextBlock Text="D-pad: move · A: select / type · Y: switch sign in / register"
+                   FontSize="11" Foreground="#6e7681" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,12"/>
+        <views:OnScreenKeyboardView DataContext="{Binding Keyboard}"/>
     </Grid>
 </UserControl>

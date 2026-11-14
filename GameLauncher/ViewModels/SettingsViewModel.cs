@@ -84,6 +84,42 @@ public partial class SettingsViewModel : ViewModelBase
     /// <summary>Write all debug output and exceptions to Dev.log next to the exe.</summary>
     [ObservableProperty] private bool _devLogs = false;
 
+    // ── Shell replacement (Windows only) ───────────────────────────────────
+    /// <summary>True when Game OS is registered as the Windows shell instead of Explorer.</summary>
+    [ObservableProperty] private bool _shellReplace;
+    [ObservableProperty] private bool _showShellRestartPrompt;
+    [ObservableProperty] private string _shellReplaceStatus = "";
+    public bool ShellReplaceSupported => ShellReplacementService.IsSupported;
+    private bool _syncingShell;
+
+    partial void OnShellReplaceChanged(bool value)
+    {
+        if (_syncingShell) return;
+        var error = ShellReplacementService.SetEnabled(value);
+        if (error != null)
+        {
+            ShellReplaceStatus = "⚠  " + error;
+            _syncingShell = true;
+            ShellReplace = !value;
+            _syncingShell = false;
+            return;
+        }
+        ShellReplaceStatus = value
+            ? "Game OS will replace Explorer as your Windows shell after a restart."
+            : "Explorer will be restored as your Windows shell after a restart.";
+        ShowShellRestartPrompt = true;
+    }
+
+    [RelayCommand]
+    private void ConfirmShellRestart()
+    {
+        ShowShellRestartPrompt = false;
+        ShellReplacementService.RestartWindows();
+    }
+
+    [RelayCommand]
+    private void DismissShellRestart() => ShowShellRestartPrompt = false;
+
     // ── Game launch settings ───────────────────────────────────────────────
     /// <summary>Minimise Game.OS when a game launches; restore when it exits.</summary>
     [ObservableProperty] private bool _minimizeOnGameLaunch = false;
@@ -313,12 +349,20 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private string _openOptionsPanel = "";
     public bool IsDashboardOptionsOpen => OpenOptionsPanel == "dashboard";
     public bool IsQuickMenuOptionsOpen => OpenOptionsPanel == "quickmenu";
-    public bool IsOtherOptionsOpen => !string.IsNullOrEmpty(OpenOptionsPanel) && OpenOptionsPanel is not ("dashboard" or "quickmenu");
+    public bool IsLibraryOptionsOpen => OpenOptionsPanel == "library";
+    public bool IsOtherOptionsOpen => !string.IsNullOrEmpty(OpenOptionsPanel) && OpenOptionsPanel is not ("dashboard" or "quickmenu" or "library");
+
+    [ObservableProperty] private bool _libraryShowRecentlyAdded = true;
+    [ObservableProperty] private bool _libraryShowRecentlyPlayed = true;
+    [ObservableProperty] private bool _libraryShowRecommended = true;
+    [ObservableProperty] private bool _libraryShowNotPlayedBadge = true;
+    [ObservableProperty] private bool _libraryShowMultiStoreBadge = true;
     partial void OnOpenOptionsPanelChanged(string value)
     {
         OnPropertyChanged(nameof(IsDashboardOptionsOpen));
         OnPropertyChanged(nameof(IsOtherOptionsOpen));
         OnPropertyChanged(nameof(IsQuickMenuOptionsOpen));
+        OnPropertyChanged(nameof(IsLibraryOptionsOpen));
     }
 
     [RelayCommand]
@@ -1006,11 +1050,19 @@ public partial class SettingsViewModel : ViewModelBase
         AutoUpdate             = appSettings.AutoUpdate;
         AppAutoUpdate          = appSettings.AppAutoUpdate;
         ShowIntroVideo         = appSettings.ShowIntroVideo;
+        LibraryShowRecentlyAdded    = appSettings.LibraryShowRecentlyAdded;
+        LibraryShowRecentlyPlayed   = appSettings.LibraryShowRecentlyPlayed;
+        LibraryShowRecommended      = appSettings.LibraryShowRecommended;
+        LibraryShowNotPlayedBadge   = appSettings.LibraryShowNotPlayedBadge;
+        LibraryShowMultiStoreBadge  = appSettings.LibraryShowMultiStoreBadge;
         IntroVideoPath         = appSettings.IntroVideoPath;
         MediaLocation          = appSettings.MediaLocation;
         GameSavesLocationsText = string.Join("\n", appSettings.GameSavesLocations ?? new());
         ReadSwitchLog          = appSettings.ReadSwitchLog;
         DevLogs                = appSettings.DevLogs;
+        _syncingShell          = true;
+        ShellReplace           = ShellReplacementService.IsEnabled();
+        _syncingShell          = false;
         MinimizeOnGameLaunch   = appSettings.MinimizeOnGameLaunch;
         TrackFolderProcesses   = appSettings.TrackFolderProcesses;
         NotifyFriendOnline     = appSettings.NotifyFriendOnline;
@@ -1264,6 +1316,11 @@ public partial class SettingsViewModel : ViewModelBase
             StreamRelayUrl       = (StreamRelayUrl ?? "").Trim(),
             StreamRelayKey       = (StreamRelayKey ?? "").Trim(),
             ShowIntroVideo        = ShowIntroVideo,
+            LibraryShowRecentlyAdded   = LibraryShowRecentlyAdded,
+            LibraryShowRecentlyPlayed  = LibraryShowRecentlyPlayed,
+            LibraryShowRecommended     = LibraryShowRecommended,
+            LibraryShowNotPlayedBadge  = LibraryShowNotPlayedBadge,
+            LibraryShowMultiStoreBadge = LibraryShowMultiStoreBadge,
             IntroVideoPath        = IntroVideoPath,
             MediaLocation         = MediaLocation,
             GameSavesLocations    = GameSavesLocationsText.Split(new[] { '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries).ToList(),

@@ -286,6 +286,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     // ── Child view models ──────────────────────────────────────────────────
     public LoginViewModel     LoginVm          { get; }
+    public FirstRunViewModel  FirstRunVm       { get; } = new();
+    [ObservableProperty] private bool _showFirstRun;
     public DashboardViewModel DashboardVm      { get; }
     public LibraryViewModel   LibraryVm        { get; }
     public StoreViewModel     StoreVm          { get; }
@@ -724,7 +726,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         SettingsVm.LoadStoreAccounts();
         Services.StoreAccountsService.Captured += () =>
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(SettingsVm.LoadStoreAccounts);
+            Avalonia.Threading.Dispatcher.UIThread.Post(SettingsVm.LoadStoreAccounts,
+                Avalonia.Threading.DispatcherPriority.Background);
             // A store login was just captured: pull its library into Games.
             _ = Task.Run(async () => { try { await Services.StoreLibraryFetcher.SyncAllAsync(); } catch { } });
         };
@@ -793,7 +796,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
             // ── Window minimize ─────────────────────────────────────────────
             if (settings.MinimizeOnGameLaunch)
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => MinimizeWindowRequested?.Invoke());
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => MinimizeWindowRequested?.Invoke(),
+                Avalonia.Threading.DispatcherPriority.Background);
 
             // ── Playtime tracking ───────────────────────────────────────────
             // Run TrackProcess on the thread pool — it sets up event handlers and
@@ -859,7 +863,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             }
 
             if (settings.MinimizeOnGameLaunch)
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => MinimizeWindowRequested?.Invoke());
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => MinimizeWindowRequested?.Invoke(),
+                Avalonia.Threading.DispatcherPriority.Background);
 
             _playtimeSvc.TrackProcessFromLaunchSnapshot(
                 title,
@@ -1206,7 +1211,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     Services.NotificationService.ShowSessionEndedNotification(title, sessionMinutes);
 
                 StopExophasePolling(platform, title);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
         };
 
         LoginVm.OnLoginSuccess = OnLoginSuccess;
@@ -1269,7 +1275,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 DetailVm.LoadFromLocalGame(game, 0);
                 DetailVm.LaunchGameCommand.Execute(null);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
             return true;
         };
         StreamHostService.AccountProvider = () => _profile?.Username ?? "";
@@ -1286,7 +1293,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 DetailVm.LoadFromLocalRom(rom);
                 DetailVm.LaunchGameCommand.Execute(null);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
             return true;
         };
         LibraryVm.OnOpenDetail        = OpenDetailFromGame;
@@ -1387,6 +1395,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _appliedDashboardDesign = DashboardCatalog.Normalise(SettingsVm.DesignTheme);
             DashboardVm.Options.Load(_appliedDashboardDesign, LoadDashboardOptions(_appliedDashboardDesign));
             OnPropertyChanged(nameof(PageVerticalScrollBar));
+            LibraryVm.RefreshShelves();
         };
         StoreVm.OnOpenDetail          = OpenDetailFromStoreGame;
         DashboardVm.StoreCatalogProvider = () => StoreVm.CatalogForRecommendations();
@@ -1672,7 +1681,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (!isOffline)
         {
             DevLogService.Log("[MainViewModel] Online mode — saving offline cache and starting background services.");
-            _offlineCache.Save(profile.Username, profile, library, achievements);
+            var cacheGames = library.ToList();
+            var cacheAchievements = achievements.ToList();
+            _ = Task.Run(() => _offlineCache.Save(profile.Username, profile, cacheGames, cacheAchievements));
 
             // Flush any pending offline changes now that we are back online
             _ = FlushPendingChangesAsync(profile.Username);
@@ -1839,7 +1850,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     LibraryVm.Load(_library);
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
 
                 // Sync steamUserId + new total game count to the cloud profile so other
                 // devices and friends see the updated values.
@@ -1919,7 +1931,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     {
                         LibraryVm.Load(_library);
                         ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
-                    });
+                    },
+                Avalonia.Threading.DispatcherPriority.Background);
                 }
             }
         });
@@ -2014,7 +2027,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             {
                                 LibraryVm.Load(_library);
                                 ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
-                            });
+                            },
+                Avalonia.Threading.DispatcherPriority.Background);
                         }
                     }
 
@@ -2056,7 +2070,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         settings.SteamUserId = profile.SteamUserId!;
                         Services.AppSettingsService.Save(settings);
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                            SettingsVm.SteamUserId = settings.SteamUserId);
+                            SettingsVm.SteamUserId = settings.SteamUserId,
+                Avalonia.Threading.DispatcherPriority.Background);
                         DevLogService.Log($"[Steam Sync] Populated local SteamUserId from cloud profile.");
                     }
                 }
@@ -2119,9 +2134,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (!SettingsVm.ShowFirstRunSetupBanner)
             return;
 
-        Navigate("settings");
-        SettingsVm.SelectedSection = "app";
-        DevLogService.Log("[MainViewModel] First run detected — opening Settings for initial setup.");
+        FirstRunVm.Completed = () =>
+        {
+            ShowFirstRun = false;
+            SettingsVm.Load();
+            SettingsVm.ShowFirstRunSetupBanner = false;
+        };
+        ShowFirstRun = true;
+        DevLogService.Log("[MainViewModel] First run detected — showing the first-run setup flow.");
     }
 
     /// <summary>
@@ -2746,7 +2766,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             if (ShowQuickMenu)
                 QuickMenuVm.UpdateAchievements(GetQuickMenuAchievements());
-        });
+        },
+                Avalonia.Threading.DispatcherPriority.Background);
     }
 
     public void ToggleQuickMenu()
@@ -2830,7 +2851,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess())
             DashboardVm.UpdateFriends(allFriends);
         else
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => DashboardVm.UpdateFriends(allFriends));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => DashboardVm.UpdateFriends(allFriends),
+                Avalonia.Threading.DispatcherPriority.Background);
     }
 
     private static void SendMediaPrevious()
@@ -2880,7 +2902,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 FriendProfileVm.Load(profile, games, new List<Achievement>(), false);
                 FriendProfileVm.LoadFriendActivity(games);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
         }
         catch { /* best-effort — placeholder already visible */ }
     }
@@ -3186,7 +3209,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         url,
                         knownUnlocked.Count > 0 ? knownUnlocked : null);
                 }
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
         }
         catch { /* best-effort */ }
     }
@@ -3267,7 +3291,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 else
                     card.AchievementLabel = "";
             }
-        });
+        },
+                Avalonia.Threading.DispatcherPriority.Background);
     }
 
     private int GetCachedAchievementTotal(string platform, string? titleId, string title)
@@ -3441,7 +3466,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                             if (!string.IsNullOrEmpty(realTitle))
                                 card.DisplayTitle = realTitle;
-                        });
+                        },
+                Avalonia.Threading.DispatcherPriority.Background);
                     }
                 }
                 catch { /* best-effort per platform */ }
@@ -3483,7 +3509,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                 {
                     if (string.IsNullOrEmpty(card.CoverUrl) && meta.CoverUrl != "") card.CoverUrl = meta.CoverUrl;
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
             }
             catch (Exception ex) { DevLogService.Log($"[Metadata] '{title}' ({platform}): {ex.Message}"); }
         }
@@ -3540,7 +3567,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                             {
                                 card.CoverUrl = cover;
                             }
-                        });
+                        },
+                Avalonia.Threading.DispatcherPriority.Background);
                     }
                 }
                 catch { /* best-effort per platform */ }
@@ -3572,7 +3600,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (!string.IsNullOrEmpty(cover)) DetailVm.CoverUrl = cover;
         }
         if (Avalonia.Threading.Dispatcher.UIThread.CheckAccess()) Apply();
-        else Avalonia.Threading.Dispatcher.UIThread.Post(Apply);
+        else Avalonia.Threading.Dispatcher.UIThread.Post(Apply,
+                Avalonia.Threading.DispatcherPriority.Background);
     }
 
     private async Task EnrichLocalGameDetailAsync(string localTitle, string platform,
@@ -3586,7 +3615,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             .ConfigureAwait(true);   // resume on UI thread so Dispatcher.Post is safe
         if (cached != null)
         {
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => DetailVm.EnrichFromDatabaseGame(cached));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => DetailVm.EnrichFromDatabaseGame(cached),
+                Avalonia.Threading.DispatcherPriority.Background);
             if (steamAppId <= 0 && cached.AppId.HasValue)
                 steamAppId = (int)cached.AppId.Value;
         }
@@ -3603,7 +3633,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (dbGame != null)
             {
                 Avalonia.Threading.Dispatcher.UIThread.Post(
-                    () => DetailVm.EnrichFromDatabaseGame(dbGame));
+                    () => DetailVm.EnrichFromDatabaseGame(dbGame),
+                Avalonia.Threading.DispatcherPriority.Background);
             }
         }
         catch
@@ -3699,7 +3730,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         LibraryVm.Load(_library);
                         // Pass localCards so the "Continue Playing" section rebuilds with
                         // newly-enriched cover URLs on cloud game cards.
-                    });
+                    },
+                Avalonia.Threading.DispatcherPriority.Background);
                     ScheduleDashboardReload();
                     // Also re-run cover enrichment for any dashboard cards still missing covers
                     _ = EnrichDashboardCoversAsync();
@@ -4306,7 +4338,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 {
                     StopOfflineReconnectTimer();
                     IsOfflineMode = false;
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
                 return;
             }
 
@@ -4342,7 +4375,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 LibraryVm.Load(_library);
                 StoreVm.Load(GameCatalog.Store, _library, _profile, _client, _client.IsAdmin);
                 ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
 
             // Persist fresh cache so the next offline session is up to date
             _offlineCache.Save(username, profile, games, achievements);
@@ -4552,14 +4586,16 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 _lastSyncedAt = DateTime.UtcNow;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    SettingsVm.LastSyncedLabel = FormatLastSyncedLabel(_lastSyncedAt));
+                    SettingsVm.LastSyncedLabel = FormatLastSyncedLabel(_lastSyncedAt),
+                Avalonia.Threading.DispatcherPriority.Background);
             }
         }
         catch (OperationCanceledException)
         {
             // Timed out or cancelled — update the label so the user knows
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                SettingsVm.LastSyncedLabel = "Last sync: timed out — try again");
+                SettingsVm.LastSyncedLabel = "Last sync: timed out — try again",
+                Avalonia.Threading.DispatcherPriority.Background);
         }
         finally
         {
@@ -4673,7 +4709,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
                 if (merged.Count > 0)
                     DetailVm.PopulateAchievements(merged);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
 
         }
     }
@@ -4982,7 +5019,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
                             LibraryVm.Load(_library);
-                        });
+                        },
+                Avalonia.Threading.DispatcherPriority.Background);
                     }
                     _ = RefreshMyGamesAchievementLabelsAsync();
                 }
@@ -5005,7 +5043,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 // Track last sync time for the Settings label
                 _lastSyncedAt = DateTime.UtcNow;
                 Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                    SettingsVm.LastSyncedLabel = FormatLastSyncedLabel(_lastSyncedAt));
+                    SettingsVm.LastSyncedLabel = FormatLastSyncedLabel(_lastSyncedAt),
+                Avalonia.Threading.DispatcherPriority.Background);
 
                 // Also check Games.Database for updated platform JSON files (respects AutoUpdate preference)
                 if (Services.AppSettingsService.Load().AutoUpdate)
@@ -5028,7 +5067,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     _presenceTimer?.Dispose();
                     _presenceTimer = null;
                     StartOfflineReconnectTimer();
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
             }
             catch (Exception ex)
             {
@@ -5257,7 +5297,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (added == 0)
             {
                 // Library may already hold the titles; still refresh so store tags/filters pick up new ownership.
-                Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library));
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library),
+                Avalonia.Threading.DispatcherPriority.Background);
                 return;
             }
             DevLogService.Log($"[Store Merge] Added {added} store games to library.");
@@ -5266,7 +5307,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 LibraryVm.Load(_library);
                 ProfileVm.Load(_profile, _library, _achievements, _client.IsAdmin);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
         }
 
 
@@ -5540,7 +5582,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 if (gameAchs.Count > 0)
                     game.GameAchievements = gameAchs;
             }
-        });
+        },
+                Avalonia.Threading.DispatcherPriority.Background);
         _ = RefreshMyGamesAchievementLabelsAsync();
 
         DevLogService.Log($"[SteamAchievements] Synced achievements for {processed} Steam games.");
@@ -5666,7 +5709,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     changed = true;
                 }
                 if (changed) DetailVm.PopulateAchievements(merged);
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
 
             // Refresh the offline cache so offline sessions show the latest state.
             string localPath = GetLocalPerGameAchievementsPath(user, platform, usedKey);
@@ -5768,7 +5812,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 {
                     DetailVm.PopulateAchievements(achievements);
                 }
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
 
             // 4. Sync the player's own unlocked achievements from Steam to their profile
             if (!string.IsNullOrWhiteSpace(settings.SteamUserId))
@@ -5809,7 +5854,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                         .ToList();
 
                     DetailVm.PopulateAchievements(merged);
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
             }
         }
         catch (Exception ex) { DevLogService.Log($"[SteamAch] TryContributeSteamGameAchievementsAsync failed for appId={appId}: {ex.Message}"); }
@@ -5945,7 +5991,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     game.GameAchievements = cloudAchs;
                     if (cloudAchs.Count > game.TotalAchievements)
                         game.TotalAchievements = cloudAchs.Count;
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
                 SetCachedAchievementTotal("PC", titleKey, game.Title, cloudAchs.Count);
 
                 DevLogService.Log(
@@ -5964,7 +6011,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             DevLogService.Log(
                 $"[AchievementSync] Synced per-game achievements from cloud for {loaded} game(s).");
             // Refresh the library view so card denominators reflect the full counts.
-            Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library));
+            Avalonia.Threading.Dispatcher.UIThread.Post(() => LibraryVm.Load(_library),
+                Avalonia.Threading.DispatcherPriority.Background);
             _ = RefreshMyGamesAchievementLabelsAsync();
         }
     }
@@ -5986,7 +6034,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             _lastCacheLabelUpdatedAt = now;
         }
 
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => CacheSyncLabel = label);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => CacheSyncLabel = label,
+                Avalonia.Threading.DispatcherPriority.Background);
     }
 
     private void ResetCacheSyncLabelTracking()
@@ -6029,7 +6078,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (library.Count == 0) return;
         System.Threading.Interlocked.Increment(ref _cacheTaskCount);
-        Avalonia.Threading.Dispatcher.UIThread.Post(() => IsCachingGames = true);
+        Avalonia.Threading.Dispatcher.UIThread.Post(() => IsCachingGames = true,
+                Avalonia.Threading.DispatcherPriority.Background);
         try
         {
             // Group by platform so we fetch each Games.Database at most once
@@ -6154,7 +6204,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 {
                     IsCachingGames = false;
                     CacheSyncLabel = "";
-                });
+                },
+                Avalonia.Threading.DispatcherPriority.Background);
                 ResetCacheSyncLabelTracking();
             }
         }
@@ -6205,7 +6256,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             Avalonia.Threading.Dispatcher.UIThread.Post(() =>
             {
                 IsCachingGames = true;
-            });
+            },
+                Avalonia.Threading.DispatcherPriority.Background);
             UpdateCacheSyncLabel("Scanning local games…", force: true);
 
             // Group by platform to fetch each database at most once
@@ -6272,7 +6324,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     {
                         IsCachingGames = false;
                         CacheSyncLabel = "";
-                    });
+                    },
+                Avalonia.Threading.DispatcherPriority.Background);
                     ResetCacheSyncLabelTracking();
                 }
             }
