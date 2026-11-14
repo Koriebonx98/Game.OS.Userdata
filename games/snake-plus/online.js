@@ -2,6 +2,8 @@
  *   host  -> backend: opens a room and invites a Game OS friend (they get a "Join" invite in their inbox)
  *   friend -> backend: joins the room from the invite; the backend relays game traffic between the players
  * Everyone is signed in with their Game OS account, only friends can be invited, and no IP addresses are shared.
+ * If the game server can't be reached, play connects directly between the two players, with the connection details
+ * exchanged through the same Game OS chat messages (this shares IP addresses with the invited friend).
  * The host runs the game; guests send steering and receive snapshots. */
 (function () {
     'use strict';
@@ -13,7 +15,7 @@
 
     const cloud = () => typeof MODE !== 'undefined' && MODE !== 'demo';
     const me = () => getCurrentUser().username;
-    const supported = () => cloud() && typeof WebSocket === 'function' && !!(window.crypto && crypto.subtle);
+    const supported = () => cloud() && !!(window.crypto && crypto.subtle) && (typeof WebSocket === 'function' || typeof RTCPeerConnection === 'function');
 
     function backendBase() {
         let base = '';
@@ -59,7 +61,7 @@
                     method, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + auth },
                     body: body ? JSON.stringify(body) : undefined
                 });
-            } catch (_) { throw new Error('Online play is unavailable right now. Check your connection and try again.'); }
+            } catch (_) { const e = new Error('Online play is unavailable right now. Check your connection and try again.'); e.unreachable = true; throw e; }
             const data = await resp.json().catch(() => ({}));
             if (resp.ok) return data;
             last = new Error(data.message || `Online play error ${resp.status}`);
@@ -112,10 +114,148 @@
         return r;
     }
 
+
+    // ── Direct play (no game server) ────────────────────────────────────────────
+    // Used when the Game OS game server can't be reached. The invite travels through the same hidden Game OS chat
+    // messages as every other invite; the WebRTC offer/answer ride along in them, then the players connect directly.
+    const P2P_PREFIX = 'p2p-';
+    const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+    const SIGNAL_POLL_MS = 3000;
+
+    async function postSignal(friend, envelope) {
+        const path = conversationKey(me(), friend);
+        for (let i = 0; ; i++) {
+            try {
+                const file = await githubRead(path);
+                const msgs = file ? [...file.content] : [];
+                msgs.push({ from: me(), text: INVITE_MESSAGE_MARKER + JSON.stringify(envelope), sentAt: new Date().toISOString() });
+                await githubWrite(path, msgs.slice(-200), `Game invite from ${me()} to ${friend}`, file ? file.sha : undefined);
+                return;
+            } catch (err) {
+                if (i >= 3) throw err;
+                await new Promise(r => setTimeout(r, 400 * (i + 1)));
+            }
+        }
+    }
+
+    async function readSignals(friend, roomId, kind) {
+        const file = await githubRead(conversationKey(me(), friend));
+        const from = friend.toLowerCase();
+        let found = null;
+        for (const m of (file && Array.isArray(file.content) ? file.content : [])) {
+            if ((m && m.from || '').toLowerCase() !== from) continue;
+            const env = parseInviteEnvelope(m.text);
+            if (env && env.Signal && env.Signal.room === roomId && env.Signal.kind === kind) found = env.Signal;
+        }
+        return found;
+    }
+
+    function gathered(pc) {
+        return new Promise(resolve => {
+            if (pc.iceGatheringState === 'complete') return resolve();
+            const done = () => { clearTimeout(t); pc.removeEventListener('icegatheringstatechange', check); resolve(); };
+            const check = () => { if (pc.iceGatheringState === 'complete') done(); };
+            const t = setTimeout(done, 5000);
+            pc.addEventListener('icegatheringstatechange', check);
+        });
+    }
+
+    function wireChannel(channel, peer, handlers) {
+        channel.onopen = () => handlers.open();
+        channel.onclose = () => handlers.close();
+        channel.onmessage = e => { let d; try { d = JSON.parse(e.data); } catch (_) { return; } handlers.message(d); };
+    }
+
+    async function inviteDirect(friend, cb) {
+        const roomId = P2P_PREFIX + hex(crypto.getRandomValues(new Uint8Array(6)));
+        const pc = new RTCPeerConnection(ICE);
+        const channel = pc.createDataChannel('snake');
+        let timer = null, poll = null, done = false, wasOpen = false;
+        const peer = {
+            friend, open: false,
+            send(obj) { if (peer.open && channel.readyState === 'open') channel.send(JSON.stringify(obj)); },
+            close() { finish(true); }
+        };
+        function finish(report) {
+            if (done) return;
+            done = true; clearTimeout(timer); clearInterval(poll);
+            peer.open = false;
+            try { channel.close(); pc.close(); } catch (_) {}
+            if (!report) return;
+            if (wasOpen) cb.onClose && cb.onClose(peer); else cb.onFail && cb.onFail(peer);
+        }
+        wireChannel(channel, peer, {
+            open() { if (done || peer.open) return; clearTimeout(timer); clearInterval(poll); wasOpen = peer.open = true; cb.onOpen && cb.onOpen(peer); },
+            close() { finish(true); },
+            message(d) { if (peer.open) cb.onMessage && cb.onMessage(peer, d); }
+        });
+        pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'closed') finish(true); };
+
+        await pc.setLocalDescription(await pc.createOffer());
+        await gathered(pc);
+        const sentAt = new Date().toISOString();
+        await postSignal(friend, {
+            Invite: {
+                inviteId: 'msg-' + GAME_KEY + '-' + roomId, from: me(), gameName: 'Snake Plus', platform: 'PC', connectionType: 'Game OS Online',
+                game: GAME_KEY, kind: 'game', roomId, sentAt
+            },
+            Signal: { room: roomId, kind: 'offer', sdp: pc.localDescription.sdp }
+        });
+        cb.onStatus && cb.onStatus(`Invite sent to ${friend}. Waiting for them to join…`);
+
+        let applying = false;
+        poll = setInterval(async () => {
+            if (applying || done || pc.signalingState !== 'have-local-offer') return;
+            applying = true;
+            try {
+                const answer = await readSignals(friend, roomId, 'answer');
+                if (answer && pc.signalingState === 'have-local-offer') await pc.setRemoteDescription({ type: 'answer', sdp: answer.sdp });
+            } catch (_) {} finally { applying = false; }
+        }, SIGNAL_POLL_MS);
+        timer = setTimeout(() => { cb.onStatus && cb.onStatus(`${friend} didn't join in time.`); finish(true); }, INVITE_TTL_MS);
+        return { peer, cancel() { finish(false); } };
+    }
+
+    async function joinDirect(host, roomId, cb) {
+        cb.onStatus && cb.onStatus(`Connecting to ${host}…`);
+        const offer = await readSignals(host, roomId, 'offer');
+        if (!offer) throw new Error(`Could not find ${host}'s invite. They may have closed the lobby.`);
+        const pc = new RTCPeerConnection(ICE);
+        let channel = null, opened = false;
+        const peer = {
+            friend: host, get open() { return opened && !!channel && channel.readyState === 'open'; },
+            send(obj) { if (peer.open) channel.send(JSON.stringify(obj)); },
+            close() { try { if (channel) channel.close(); pc.close(); } catch (_) {} }
+        };
+        return new Promise((resolve, reject) => {
+            const fail = () => { peer.close(); reject(new Error(`Could not connect to ${host}. They may have closed the lobby.`)); };
+            const timer = setTimeout(fail, 30 * 1000);
+            pc.ondatachannel = e => {
+                channel = e.channel;
+                wireChannel(channel, peer, {
+                    open() { opened = true; clearTimeout(timer); cb.onOpen && cb.onOpen(peer); resolve(peer); },
+                    close() { clearTimeout(timer); if (opened) { opened = false; cb.onClose && cb.onClose(peer); } else fail(); },
+                    message(d) { cb.onMessage && cb.onMessage(peer, d); }
+                });
+            };
+            pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' && !opened) fail(); };
+            (async () => {
+                await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
+                await pc.setLocalDescription(await pc.createAnswer());
+                await gathered(pc);
+                await postSignal(host, { Signal: { room: roomId, kind: 'answer', sdp: pc.localDescription.sdp } });
+            })().catch(err => { clearTimeout(timer); peer.close(); reject(err); });
+        });
+    }
+
     /** Host side: invites `friend` to the lobby and reports when they join. Returns {peer, cancel()}. */
     async function invite(friend, cb) {
         if (!supported()) throw new Error('Online play needs a signed-in Game OS account.');
-        const r = await ensureRoom();
+        let r;
+        try { r = await ensureRoom(); } catch (err) {
+            if (typeof RTCPeerConnection === 'function') return inviteDirect(friend, cb);
+            throw err;
+        }
         const key = friend.toLowerCase();
         let timer = null, done = false;
         const peer = {
@@ -152,6 +292,7 @@
     /** Guest side: joins the room `roomId` that `host` invited you to. Resolves once connected. */
     async function join(host, roomId, cb) {
         if (!supported()) throw new Error('Online play needs a signed-in Game OS account.');
+        if (String(roomId).startsWith(P2P_PREFIX)) return joinDirect(host, roomId, cb);
         cb.onStatus && cb.onStatus(`Connecting to ${host}…`);
         const ws = await openSocket(roomId);
         let opened = false;
