@@ -11,6 +11,11 @@ internal sealed class Program
     [STAThread]
     public static void Main(string[] args)
     {
+        if (args.Length == 1 && args[0] == "--playtime-watchdog")
+        {
+            Services.PlaytimeWatchdog.RunAsync().GetAwaiter().GetResult();
+            return;
+        }
         DemoMode.DetectAndEnable(args);
 
         // Start dev logging as early as possible so that any startup crash is captured.

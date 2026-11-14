@@ -88,7 +88,7 @@ namespace GameLauncher.Services
                 .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
                 .Any(ua => ua.Address.Equals(address.Address));
             if (!localAddress) throw new InvalidOperationException("The selected address is not assigned to an active network adapter.");
-            ConnectionInfo = $"Host address {address.Address}. Use the same LAN/VPN; configure the game's own port separately if needed";
+            ConnectionInfo = "Room is live. Everyone must be on the same LAN/VPN; configure the game's own port separately if needed";
             if (!string.IsNullOrEmpty(_vpnFallbackReason))
                 ConnectionInfo += $". Game.OS VPN unavailable: {_vpnFallbackReason}";
             id = await _client.CreateLfgAsync(game, platform, group ? "group" : "lfg", address.Address.ToString(), maxPlayers)
@@ -136,7 +136,7 @@ namespace GameLauncher.Services
                 HostedRoomId = id;
                 HostedGame = game;
                 HostedPlatform = platform;
-                ConnectionInfo = $"Game.OS virtual network — your address {session.Ip}";
+                ConnectionInfo = "Game.OS virtual network — private room connected";
                 HostedAddress = session.Ip;
                 StartHostedServer();
                 StartRoomTimer();
@@ -190,11 +190,12 @@ namespace GameLauncher.Services
             {
                 var session = await _client.GetVpnSessionAsync(room.RoomId).ConfigureAwait(false);
                 if (!_vpn.Start(session)) throw new InvalidOperationException(_vpn.Status);
-                ConnectionInfo = $"Game.OS virtual network — your address {session.Ip}";
+                ConnectionInfo = "Game.OS virtual network — private room connected";
             }
-            var existing = FriendIpService.Load(host).Where(e => e.Label != TempLabel).ToList();
-            existing.Add(new FriendIpEntry { Label = TempLabel, Address = res.Endpoint, Type = "local" });
-            FriendIpService.Save(host, existing);
+            // Room addresses are temporary and never shown or stored; drop any entry saved by older versions.
+            var saved = FriendIpService.Load(host);
+            if (saved.Any(e => e.Label == TempLabel))
+                FriendIpService.Save(host, saved.Where(e => e.Label != TempLabel).ToList());
             JoinedEndpoint = res.Endpoint;
             JoinedGame = res.Game;
             JoinedPlatform = res.Platform;

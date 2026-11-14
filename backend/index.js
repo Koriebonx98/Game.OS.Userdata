@@ -2253,15 +2253,15 @@ app.patch('/api/me/games/playtime', authenticateToken, async (req, res) => {
 
         const path = `accounts/${usernameLower}/games.json`;
         const file = await getFile(path);
-        if (!file) return res.status(404).json({ success: false, message: 'Game library not found.' });
-
-        const library = [...file.content];
-        const game = library.find(
+        const library = file ? [...file.content] : [];
+        let game = library.find(
             g => g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase()
         );
         if (!game) {
-            // Game not in library — silently succeed (local-only ROM not yet added to cloud library)
-            return res.json({ success: true, message: 'Game not in cloud library — playtime not stored.' });
+            // Played locally but not in the cloud library yet: add it so recently-played and
+            // playtime sync to the website and every other device.
+            game = { platform, title, titleId: null, coverUrl: null, steamAppId: null, playtimeMinutes: 0, addedAt: new Date().toISOString() };
+            library.push(game);
         }
 
         // Only advance the playtime forward (never decrease it from a stale client write)
@@ -2272,7 +2272,7 @@ app.patch('/api/me/games/playtime', authenticateToken, async (req, res) => {
 
         await putFile(path, library,
             `Playtime: ${title} (${platform}) – ${game.playtimeMinutes}min`,
-            file.sha);
+            file ? file.sha : undefined);
         res.json({ success: true, message: 'Playtime updated.', game });
     } catch (err) {
         console.error('PATCH /api/me/games/playtime error:', err);
@@ -4410,8 +4410,18 @@ app.delete('/api/lfg/:roomId', authenticateToken, (req, res) => {
 
 // ── Start server ──────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+const httpServer = app.listen(PORT, () => {
     console.log(`✅ Game.OS Backend running on port ${PORT}`);
     console.log(`   Data repository: ${REPO_OWNER}/${REPO_NAME}`);
     initAdminAccount();
+});
+
+// Built-in stream relay: lets launchers broadcast / host watch parties to the website and iOS app.
+require('./stream-relay').mountStreamRelay(app, httpServer, async (rawToken) => {
+    const usernameLower = parseTokenUsername(rawToken);
+    if (!usernameLower || !sanitiseUsername(usernameLower)) return false;
+    if (_lookupTokenCache(rawToken)) return true;
+    const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+    const storedHash = accountFile && accountFile.content.api_token_hash;
+    return !!accountFile && (storedHash === hashToken(rawToken) || storedHash === sha256Token(rawToken));
 });

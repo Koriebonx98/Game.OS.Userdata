@@ -37,6 +37,20 @@ public partial class LocalGameCardVm : ViewModelBase
     public int      PlayedMinutes { get; set; }
     public bool     NotPlayedBadge { get; set; }
     public bool     MultiStoreBadge { get; set; }
+    public bool     ShowPlatformGlyph { get; set; }
+    public Avalonia.Media.Geometry? PlatformIcon  => Services.PlatformIcons.GeometryFor(Platform);
+    public Avalonia.Media.IBrush?   PlatformBrush => Services.PlatformIcons.BrushFor(Platform);
+
+    private static readonly string[] StoreOrder = { "Steam", "Epic Games", "GOG", "Xbox", "EA", "Ubisoft", "Battle.net", "itch.io" };
+    /// <summary>The store shown on the card: the first owned store with an icon, in a stable priority order.</summary>
+    private string? PrimaryStore => StoreOrder.FirstOrDefault(Stores.Contains)
+        ?? Stores.Where(s => Services.PlatformIcons.KeyFor(s) != null).OrderBy(s => s, StringComparer.OrdinalIgnoreCase).FirstOrDefault();
+    public Avalonia.Media.Geometry? StoreIcon  => Services.PlatformIcons.GeometryFor(PrimaryStore);
+    public Avalonia.Media.IBrush?   StoreBrush => Services.PlatformIcons.BrushFor(PrimaryStore);
+    public bool     HasStoreIcon  => ShowPlatformGlyph && PrimaryStore != null;
+    /// <summary>"+N" for the other stores this game is owned on (shown next to the first store icon).</summary>
+    public string   ExtraStoresLabel => PrimaryStore == null || Stores.Count <= 1 ? "" : $"+{Stores.Count - 1}";
+    public string   StoresList => string.Join(", ", Stores.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
     public string   StoresBadge   => $"🛒 {Stores.Count}";
     public string   StoresTooltip => "Owned on: " + string.Join(", ", Stores.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
 

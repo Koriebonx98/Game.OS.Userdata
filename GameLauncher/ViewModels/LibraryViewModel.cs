@@ -104,7 +104,32 @@ public partial class LibraryViewModel : ViewModelBase
     public BulkObservableCollection<LocalGameCardVm> FilteredMyGames { get; } = new();
 
     // ── Shelves above the grid (Recently Added / Recently Played / Recommended) ──
-    private const int ShelfSize = 12;
+    private const int ShelfSize = 30;
+    /// <summary>Games shown on a shelf; the 6th tile is "All" which opens the full shelf.</summary>
+    private const int ShelfPreview = 5;
+    private List<LocalGameCardVm> _shelfAdded = new(), _shelfPlayed = new(), _shelfRecommended = new();
+    public BulkObservableCollection<LocalGameCardVm> ExpandedShelf { get; } = new();
+    [ObservableProperty] private string _expandedShelfTitle = "";
+    [ObservableProperty] private bool _isShelfExpanded;
+    [ObservableProperty] private bool _hasMoreAdded;
+    [ObservableProperty] private bool _hasMorePlayed;
+    [ObservableProperty] private bool _hasMoreRecommended;
+
+    [RelayCommand]
+    private void ShowShelf(string which)
+    {
+        var (title, list) = which switch
+        {
+            "added"  => ("🆕  Recently Added", _shelfAdded),
+            "played" => ("▶  Recently Played", _shelfPlayed),
+            _        => ("✨  Recommended for you", _shelfRecommended),
+        };
+        ExpandedShelf.Reset(list);
+        ExpandedShelfTitle = title;
+        IsShelfExpanded = true;
+    }
+
+    [RelayCommand] private void CloseShelf() { IsShelfExpanded = false; ExpandedShelf.Reset(new List<LocalGameCardVm>()); }
     public BulkObservableCollection<LocalGameCardVm> RecentlyAddedShelf  { get; } = new();
     public BulkObservableCollection<LocalGameCardVm> RecentlyPlayedShelf { get; } = new();
     public BulkObservableCollection<LocalGameCardVm> RecommendedShelf    { get; } = new();
@@ -133,6 +158,7 @@ public partial class LibraryViewModel : ViewModelBase
             bool owned = c.SourceCloudGame != null || c.SourceGame != null || c.SourceRom != null || c.IsInstalledLocal;
             c.NotPlayedBadge  = opts.LibraryShowNotPlayedBadge && owned && minutes == 0 && last == DateTime.MinValue;
             c.MultiStoreBadge = opts.LibraryShowMultiStoreBadge && c.Stores.Count > 1;
+            c.ShowPlatformGlyph = opts.LibraryShowPlatformIcons;
         }
     }
 
@@ -327,9 +353,14 @@ public partial class LibraryViewModel : ViewModelBase
                 RebuildPlatformChips();
 
                 TotalGames = newMyGames.Count;
-                RecentlyAddedShelf.Reset(shelves.Added);
-                RecentlyPlayedShelf.Reset(shelves.Played);
-                RecommendedShelf.Reset(shelves.Recommended);
+                _shelfAdded = shelves.Added; _shelfPlayed = shelves.Played; _shelfRecommended = shelves.Recommended;
+                RecentlyAddedShelf.Reset(shelves.Added.Take(ShelfPreview).ToList());
+                RecentlyPlayedShelf.Reset(shelves.Played.Take(ShelfPreview).ToList());
+                RecommendedShelf.Reset(shelves.Recommended.Take(ShelfPreview).ToList());
+                HasMoreAdded       = shelves.Added.Count > ShelfPreview;
+                HasMorePlayed      = shelves.Played.Count > ShelfPreview;
+                HasMoreRecommended = shelves.Recommended.Count > ShelfPreview;
+                if (IsShelfExpanded) IsShelfExpanded = false;
                 HasRecentlyAdded  = shelves.Added.Count > 0;
                 HasRecentlyPlayed = shelves.Played.Count > 0;
                 HasRecommended    = shelves.Recommended.Count > 0;

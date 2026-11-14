@@ -338,7 +338,7 @@ public partial class FriendsViewModel : ViewModelBase
     {
         var saved = FriendIpService.Load(entry.Username);
         entry.IpAddresses.Clear();
-        foreach (var ip in saved)
+        foreach (var ip in saved.Where(e => e.Label != Services.LfgService.TempLabel))
             entry.IpAddresses.Add(ip);
     }
 
@@ -513,14 +513,17 @@ public partial class FriendsViewModel : ViewModelBase
     {
         if (_client == null) return;
 
+        int version = ++_loadVersion;
         IsLoading    = true;
         ErrorMessage = "";
         InviteStatusMessage = "";
 
-        OnlineFriends.Clear();
-        OfflineFriends.Clear();
-        PendingRequests.Clear();
-        RecentActivity.Clear();
+        // Fresh data is built aside and swapped in at the end, so the lists (also read by the Quick Guide and
+        // dashboard) stay populated while refreshing and overlapping loads cannot duplicate entries.
+        var newOnline   = new List<FriendEntry>();
+        var newOffline  = new List<FriendEntry>();
+        var newPending  = new List<FriendRequestDisplay>();
+        var newActivity = new List<FriendActivityItem>();
 
         try
         {
@@ -535,7 +538,7 @@ public partial class FriendsViewModel : ViewModelBase
             // Build pending requests for display
             foreach (var req in requests)
             {
-                PendingRequests.Add(new FriendRequestDisplay
+                newPending.Add(new FriendRequestDisplay
                 {
                     FromUsername = req.From,
                     SentAgo      = FormatTimeAgo(req.SentAt)
@@ -611,9 +614,9 @@ public partial class FriendsViewModel : ViewModelBase
                 entry.GamerScore = gs;
                 LoadLocalIpsIntoEntry(entry);
                 if (entry.IsOnline || entry.IsAway)
-                    OnlineFriends.Add(entry);
+                    newOnline.Add(entry);
                 else
-                    OfflineFriends.Add(entry);
+                    newOffline.Add(entry);
 
                 // Recent activity: prefer currentGame (from presence) if active, else last-played
                 bool    isActive         = entry.IsOnline || entry.IsAway;
@@ -637,10 +640,14 @@ public partial class FriendsViewModel : ViewModelBase
             }
 
             // Sort activity: online first (SortKey=0), away second (1), offline last (2)
-            foreach (var item in activityItems.OrderBy(i => i.SortKey))
-            {
-                RecentActivity.Add(item);
-            }
+            newActivity.AddRange(activityItems.OrderBy(i => i.SortKey));
+
+            if (version != _loadVersion) return;
+            ReplaceAll(OnlineFriends, newOnline);
+            ReplaceAll(OfflineFriends, newOffline);
+            ReplaceAll(PendingRequests, newPending);
+            ReplaceAll(RecentActivity, newActivity);
+            LastLoadedUtc = DateTime.UtcNow;
 
             OnPropertyChanged(nameof(HasRecentActivity));
             OnlineCount = OnlineFriends.Count;
@@ -660,8 +667,22 @@ public partial class FriendsViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            if (version == _loadVersion) IsLoading = false;
         }
+    }
+
+    private int _loadVersion;
+
+    /// <summary>When the friend lists were last refreshed from the cloud; <see cref="DateTime.MinValue"/> if never.</summary>
+    public DateTime LastLoadedUtc { get; private set; } = DateTime.MinValue;
+
+    /// <summary>Refreshes the lists in the background without clearing them first.</summary>
+    public Task RefreshAsync() => _client == null ? Task.CompletedTask : LoadAsync();
+
+    private static void ReplaceAll<T>(ObservableCollection<T> target, List<T> items)
+    {
+        target.Clear();
+        foreach (var item in items) target.Add(item);
     }
 
     /// <param name="currentGame">

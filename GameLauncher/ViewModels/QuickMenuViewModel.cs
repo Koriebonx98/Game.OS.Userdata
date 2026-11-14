@@ -1206,6 +1206,22 @@ public partial class QuickMenuViewModel : ViewModelBase
         HasAchievements = Achievements.Count > 0;
     }
 
+    /// <summary>Replaces the friend lists; also used to refresh them while the guide is already open.</summary>
+    public void UpdateFriends(
+        System.Collections.Generic.IReadOnlyList<FriendPresenceVm> onlineFriends,
+        System.Collections.Generic.IReadOnlyList<FriendPresenceVm> allFriends)
+    {
+        OnlineFriends.Clear();
+        foreach (var f in onlineFriends)
+            OnlineFriends.Add(f);
+        HasOnlineFriends = OnlineFriends.Count > 0;
+
+        Friends.Clear();
+        foreach (var f in allFriends.OrderByDescending(f => f.IsOnline).ThenBy(f => f.Username, StringComparer.OrdinalIgnoreCase))
+            Friends.Add(f);
+        HasFriends = Friends.Count > 0;
+    }
+
     public void Refresh(
         string? currentUsername,
         string? currentGameTitle,
@@ -1253,15 +1269,7 @@ public partial class QuickMenuViewModel : ViewModelBase
             CurrentSessionLabel = "Not playing";
         }
 
-        OnlineFriends.Clear();
-        foreach (var f in onlineFriends)
-            OnlineFriends.Add(f);
-        HasOnlineFriends = OnlineFriends.Count > 0;
-
-        Friends.Clear();
-        foreach (var f in allFriends.OrderByDescending(f => f.IsOnline).ThenBy(f => f.Username, StringComparer.OrdinalIgnoreCase))
-            Friends.Add(f);
-        HasFriends = Friends.Count > 0;
+        UpdateFriends(onlineFriends, allFriends);
 
         UnreadMessageCount = unreadCount;
         LastMessagePreview = lastMessage ?? "";

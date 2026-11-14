@@ -165,6 +165,7 @@ public partial class InboxViewModel : ViewModelBase
             await _client.RespondInviteAsync(invite, "accepted");
         }
         catch (Exception ex) { ErrorMessage = "Could not accept invite: " + ex.Message; return; }
+        _respondedIds.Add(invite.InviteId);
         PendingInvites.Remove(invite);
         OnPropertyChanged(nameof(HasPendingInvites));
         OnPropertyChanged(nameof(HasEmptyInbox));
@@ -270,9 +271,12 @@ public partial class InboxViewModel : ViewModelBase
 
         IsLoading = true;
         ErrorMessage = "";
-        Conversations.Clear();
-        PendingInvites.Clear();
-        PendingModShares.Clear();
+        // Build fresh lists off to the side and swap them in at the end so the page (and the Quick Guide
+        // badge) never flashes empty and overlapping loads cannot interleave their items.
+        var invites = new List<GameInvite>();
+        var shares = new List<Services.PendingModShare>();
+        var convos = new List<InboxConversationVm>();
+        string? error = null;
         try
         {
             var friendsTask = _client.GetFriendsAsync();
@@ -282,29 +286,19 @@ public partial class InboxViewModel : ViewModelBase
             var messageInvitesTask = _client.GetMessageInvitesAsync(friends);
             try
             {
-                foreach (var invite in (await invitesTask)
-                    .Where(i => string.Equals(i.Status, "pending", StringComparison.OrdinalIgnoreCase)))
-                    PendingInvites.Add(invite);
+                invites.AddRange((await invitesTask)
+                    .Where(i => i != null && string.Equals(i.Status, "pending", StringComparison.OrdinalIgnoreCase)));
             }
-            catch (Exception ex) { ErrorMessage = "Could not load older invites: " + ex.Message; }
-            try
-            {
-                foreach (var invite in await messageInvitesTask) PendingInvites.Add(invite);
-            }
-            catch (Exception ex) { ErrorMessage = "Could not load friend invitations: " + ex.Message; }
+            catch (Exception ex) { error = "Could not load older invites: " + ex.Message; }
+            try { invites.AddRange(await messageInvitesTask); }
+            catch (Exception ex) { error = "Could not load friend invitations: " + ex.Message; }
+
             var convoTasks = friends.Select(async friend =>
             {
                 try
                 {
                     var raw = await _client.GetRawMessagesAsync(friend);
-                    var shares = Services.ModShareService.FindPending(friend, raw);
-                    if (shares.Count > 0)
-                        Avalonia.Threading.Dispatcher.UIThread.Post(() =>
-                        {
-                            if (version != _loadVersion) return;
-                            foreach (var sh in shares) PendingModShares.Add(sh);
-                            OnPropertyChanged(nameof(HasPendingModShares));
-                        });
+                    lock (shares) shares.AddRange(Services.ModShareService.FindPending(friend, raw));
                     var messages = raw.Where(m => !Services.ModShareService.IsShareMessage(m.Text)
                         && !Services.InviteMessageService.IsInviteMessage(m.Text)).ToList();
                     var last = messages.OrderByDescending(m => m.SentAt).FirstOrDefault();
@@ -317,15 +311,16 @@ public partial class InboxViewModel : ViewModelBase
                 }
                 catch { return null; }
             });
-
-            var convos = await Task.WhenAll(convoTasks);
+            convos.AddRange((await Task.WhenAll(convoTasks))
+                .Where(c => c != null).Select(c => c!).OrderByDescending(c => c.LastMessageAt));
             if (version != _loadVersion) return;
-            foreach (var convo in convos
-                .Where(c => c != null)
-                .OrderByDescending(c => c!.LastMessageAt))
-            {
-                Conversations.Add(convo!);
-            }
+
+            invites.RemoveAll(i => _respondedIds.Contains(i.InviteId));
+
+            ReplaceAll(PendingInvites, invites);
+            ReplaceAll(PendingModShares, shares);
+            ReplaceAll(Conversations, convos);
+            if (error != null) ErrorMessage = error;
         }
         catch (Exception ex)
         {
@@ -336,8 +331,18 @@ public partial class InboxViewModel : ViewModelBase
             if (version == _loadVersion) IsLoading = false;
             OnPropertyChanged(nameof(HasConversations));
             OnPropertyChanged(nameof(HasPendingInvites));
+            OnPropertyChanged(nameof(HasPendingModShares));
             OnPropertyChanged(nameof(HasEmptyInbox));
         }
+    }
+
+    // Invites answered locally; message-based invites stay "pending" until the response message is readable.
+    private readonly HashSet<string> _respondedIds = new(StringComparer.Ordinal);
+
+    private static void ReplaceAll<T>(ObservableCollection<T> target, List<T> items)
+    {
+        target.Clear();
+        foreach (var item in items) target.Add(item);
     }
 
     private int _pollRunning;
@@ -350,6 +355,7 @@ public partial class InboxViewModel : ViewModelBase
     {
         var newInvites = new List<GameInvite>();
         var newShares = new List<Services.PendingModShare>();
+        LastPollCompleted = false;
         if (_client == null || IsLoading || Interlocked.Exchange(ref _pollRunning, 1) == 1) return (newInvites, newShares);
         try
         {
@@ -372,7 +378,7 @@ public partial class InboxViewModel : ViewModelBase
             {
                 foreach (var inv in found)
                 {
-                    if (string.IsNullOrEmpty(inv.InviteId) || PendingInvites.Any(p => p.InviteId == inv.InviteId)) continue;
+                    if (string.IsNullOrEmpty(inv.InviteId) || _respondedIds.Contains(inv.InviteId) || PendingInvites.Any(p => p.InviteId == inv.InviteId)) continue;
                     PendingInvites.Add(inv);
                     newInvites.Add(inv);
                 }
@@ -386,11 +392,15 @@ public partial class InboxViewModel : ViewModelBase
                 OnPropertyChanged(nameof(HasPendingModShares));
                 OnPropertyChanged(nameof(HasEmptyInbox));
             });
+            LastPollCompleted = true;
         }
         catch { }
         finally { Interlocked.Exchange(ref _pollRunning, 0); }
         return (newInvites, newShares);
     }
+
+    /// <summary>True when the last <see cref="PollPendingAsync"/> actually fetched and merged data (not skipped or failed).</summary>
+    public volatile bool LastPollCompleted;
 
     private void UpdateConversationPreview(string friendUsername, string text, string sentAt)
     {
