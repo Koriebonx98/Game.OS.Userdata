@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101710">
+  <meta name="description" content="Snake Plus - a Game OS exclusive. Play with up to 4 snakes, online with your Game OS friends.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Snake Plus">
+  <link rel="icon" type="image/svg+xml" href="cover.svg">
+  <title>Snake Plus - Game OS Exclusive</title>
+  <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../app.html" aria-label="Back to Game OS"><span class="brand-icon">S</span><span>SNAKE<span>PLUS</span></span></a>
+      <span class="top-label">GAME OS EXCLUSIVE <span class="status-dot"></span></span>
+    </header>
+
+    <main>
+      <section id="menu" class="screen">
+        <div class="hero">
+          <div class="eyebrow"><span></span> READY PLAYER ONE?</div>
+          <h1>SNAKE<br><em>PLUS</em><span class="title-period">.</span></h1>
+          <p>Eat. Grow. Outlast.<br>The classic snake game, with a little more bite.</p>
+          <div class="hero-actions">
+            <button class="button primary" id="play-button">PLAY GAME <span>↗</span></button>
+            <button class="button secondary" id="how-button">HOW TO PLAY <span>↗</span></button>
+            <button class="button secondary" data-go="achievements">ACHIEVEMENTS <span>↗</span></button>
+            <button class="button secondary" data-go="leaderboard">LEADERBOARD <span>↗</span></button>
+          </div>
+          <div class="hero-foot"><span>01 — 04 PLAYERS</span><span>ONLINE WITH GAME OS FRIENDS</span><span>KEYBOARD + GAMEPAD</span></div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-label"><span>INSERT COIN</span><span>● ● ●</span></div>
+          <div class="art-grid">
+            <div class="art-snake"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><b><span></span><span></span></b></div>
+            <div class="art-food"></div>
+            <div class="art-cross">✳</div>
+            <div class="art-score">HIGH SCORE<br><strong>000<span>50</span></strong></div>
+          </div>
+          <div class="art-bottom"><span>↑ ↓ ← → &nbsp; MOVE</span><span>PRESS PLAY TO START</span></div>
+        </div>
+      </section>
+
+      <section id="lobby" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> GET YOUR GAME FACE ON</div><h2>THE LOBBY<span class="title-period">.</span></h2><p>Set up your squad and choose how you want to play.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="lobby-layout">
+          <div>
+            <div class="section-label"><span>01 / PLAYER SETUP</span><span>UP TO 4 PLAYERS</span></div>
+            <div id="player-slots" class="player-slots"></div>
+          </div>
+          <aside class="setup-panel">
+            <div class="section-label"><span>02 / GAME SETTINGS</span></div>
+            <label for="mode">GAME MODE</label>
+            <select id="mode">
+              <option value="survival">SURVIVAL</option>
+              <option value="firstTo">FIRST TO</option>
+              <option value="classic">CLASSIC 1P</option>
+              <option value="rush">RUSH</option>
+            </select>
+            <p id="mode-description" class="mode-description"></p>
+            <div id="target-wrap" class="hidden"><label for="target">TARGET SCORE</label><input id="target" type="number" min="50" step="50" value="50"></div>
+            <button class="button primary start-button" id="start-button">START GAME <span>↗</span></button>
+            <p id="lobby-error" class="error" role="alert"></p>
+            <div class="online-panel">
+              <div class="section-label"><span>03 / PLAY WITH FRIENDS</span></div>
+              <label for="friend-select">GAME OS FRIEND</label>
+              <select id="friend-select"></select>
+              <button class="button secondary start-button" id="invite-button">INVITE TO PLAY <span>↗</span></button>
+              <p id="invite-status" class="mode-description" role="status">Invite a friend: they get it in their Game OS Inbox and join your lobby. Keep this page open while you wait.</p>
+            </div>
+            <div class="setup-note"><strong>THE RULES ARE SIMPLE.</strong><br>Don't hit a wall, yourself, or another snake. Everything else is fair game.</div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="help" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> KNOW BEFORE YOU GO</div><h2>HOW TO PLAY<span class="title-period">.</span></h2><p>A little help goes a long way.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="help-grid">
+          <article class="help-card"><span class="card-number">01 / CONTROLS</span><h3>GET MOVING</h3><p>Steer with <strong>WASD</strong> or the <strong>arrow keys</strong>. Gamepad players use the D-pad. On touch screens, use the on-screen arrows.</p><p>Connect your controllers before starting. Gamepad slots are assigned in order.</p></article>
+          <article class="help-card"><span class="card-number">02 / GAME MODES</span><h3>YOUR GAME, YOUR RULES</h3><p><strong>Survival:</strong> Last snake standing wins.<br><strong>First To:</strong> Reach the target score.<br><strong>Classic 1P:</strong> Survive and grow.<br><strong>Rush:</strong> Grow faster as you get longer.</p></article>
+          <article class="help-card wide"><span class="card-number">03 / POWER-UPS</span><h3>EXPECT THE UNEXPECTED</h3><div class="legend"><span><i class="food"></i><strong>FOOD</strong> +5 points</span><span><i class="speed"></i><strong>SPEED</strong> Temporary boost</span><span><i class="lockdown"></i><strong>LOCKDOWN</strong> Center barriers</span><span><i class="colour"></i><strong>COLOR SWAP</strong> Swap colors & lengths</span><span><i class="tp"></i><strong>TELEPORT</strong> Swap bodies</span><span><i class="destruction"></i><strong>DESTRUCTION</strong> Chop rival tails</span><span><i class="bomb"></i><strong>BOMB</strong> Instant death</span></div></article>
+        </div>
+      </section>
+
+      <section id="join" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> ONLINE</div><h2>JOINING A FRIEND<span class="title-period">.</span></h2></div>
+          <button class="text-button" id="join-leave">← LEAVE</button>
+        </div>
+        <div class="join-box"><p id="join-status" role="status">Connecting…</p></div>
+      </section>
+
+      <section id="achievements" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> TROPHIES</div><h2>ACHIEVEMENTS <span id="ach-count"></span><span class="title-period">.</span></h2><p>Synced to your Game OS profile.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div id="ach-list" class="help-grid"></div>
+      </section>
+
+      <section id="leaderboard" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> RANKINGS</div><h2>LEADERBOARD<span class="title-period">.</span></h2><p>Your progress and cloud save sync to your Game OS account.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="lb-controls">
+          <select id="lb-metric" aria-label="Ranking"></select>
+          <div class="lb-scope" role="group" aria-label="Scope"><button class="button secondary active" data-scope="global">EVERYONE</button><button class="button secondary" data-scope="friends">FRIENDS</button></div>
+        </div>
+        <div id="lb-list" class="lb-list" role="list"></div>
+        <p id="lb-status" class="lb-status" role="status"></p>
+      </section>
+
+      <section id="game" class="screen hidden">
+        <div class="game-heading"><div><div class="eyebrow"><span></span> NOW PLAYING / <span id="game-mode-label"></span></div><h2>LET'S ROLL<span class="title-period">.</span></h2></div><button id="leave-button" class="text-button">← LEAVE GAME</button></div>
+        <div id="scoreboard" class="scoreboard"></div>
+        <div class="board-wrap">
+          <canvas id="board" width="1275" height="700" aria-label="Snake game board"></canvas>
+          <div id="game-over" class="game-over hidden"><div class="eyebrow"><span></span> GAME OVER</div><h2 id="result"></h2><button class="button primary" id="again-button">BACK TO LOBBY <span>↗</span></button></div>
+        </div>
+        <div class="game-bottom"><span>WASD / ARROWS OR D-PAD TO STEER</span><span id="game-status">STAY SHARP. KEEP MOVING.</span></div>
+        <div class="touch-controls" aria-label="Touch controls"><button data-direction="up" aria-label="Move up">↑</button><div><button data-direction="left" aria-label="Move left">←</button><button data-direction="down" aria-label="Move down">↓</button><button data-direction="right" aria-label="Move right">→</button></div></div>
+      </section>
+    </main>
+    <footer><span>© SNAKE PLUS</span><span>A GAME OS EXCLUSIVE <span class="footer-star">✳</span></span><span>EST. PLAYER ONE</span></footer>
+  </div>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../../sw.js').catch(function () {});</script>
+  <script src="../../script.js"></script>
+  <script src="achievements.js"></script>
+  <script src="leaderboard.js"></script>
+  <script src="../gameos-drm.js"></script>
+  <script src="gameos-sdk.js"></script>
+  <script src="online.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

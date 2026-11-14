@@ -36,6 +36,11 @@
                 <div style="flex:1"><small>GAME OS EXCLUSIVE</small><br><b>Digital Abyss</b><br><small>Solve Elena's disappearance. Cloud saves, achievements and playtime sync to your account.</small></div>
                 <span class="btn app-more">▶ Play</span>
             </a>
+            <a class="app-card" href="games/snake-plus/index.html" id="snakePlusCard" style="display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit">
+                <img src="games/snake-plus/cover.svg" alt="" width="64" height="86" style="border-radius:8px">
+                <div style="flex:1"><small>GAME OS EXCLUSIVE</small><br><b>Snake Plus</b><br><small>Up to 4 snakes, power-ups and bots. Invite your Game OS friends to play online.</small></div>
+                <span class="btn app-more">▶ Play</span>
+            </a>
             <h2 class="app-h2">Recently added</h2>
             <div id="recentList" class="app-list"></div>
             <h2 class="app-h2">Recently played</h2>
@@ -450,8 +455,9 @@
                 $('detailPlay').before(pcBox);
                 $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(g.title) + (g.platform && g.platform !== 'PC' ? '&platform=' + encodeURIComponent(g.platform) : ''); };
             }
-            if (!g._owner && g.platform === 'PC' && String(g.title).toLowerCase() === 'digital abyss') {
-                $('detailPlay').innerHTML = '<a class="btn app-more" id="detailPlayBtn" href="games/digital-abyss/index.html">▶ Play</a>';
+            const exclusivePath = !g._owner ? exclusivePlayPath(g.platform, g.title) : '';
+            if (exclusivePath) {
+                $('detailPlay').innerHTML = `<a class="btn app-more" id="detailPlayBtn" href="${exclusivePath}">▶ Play</a>`;
             } else if (!g._owner && window.GameOSEmu) {
                 const box = $('detailPlay');
                 const draw = async () => {

@@ -2133,8 +2133,19 @@ async function loadInbox() {
             if (result.success) invites = invites.concat(pendingMessageInvites(user.username, friendName, result.rawMessages));
         }
 
+        // Snake Plus invites only work while the host waits in the lobby.
+        invites = invites.filter(inv => !isSnakePlusInvite(inv) || Date.now() - new Date(inv.sentAt).getTime() < SNAKE_PLUS_INVITE_TTL_MS);
+
         // Build invite items
-        const inviteItems = invites.map(inv => inv.kind === 'watch' ? `
+        const inviteItems = invites.map(inv => isSnakePlusInvite(inv) ? `
+            <div class="friend-item">
+                <span class="friend-name">🐍 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong> online</span></span>
+                <div class="friend-actions">
+                    <a class="btn-accept-friend" style="text-decoration:none;" href="${snakePlusJoinUrl(inv)}">▶ Join</a>
+                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">❌ Decline</button>
+                </div>
+            </div>
+        ` : inv.kind === 'watch' ? `
             <div class="friend-item">
                 <span class="friend-name">🍿 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to a watch party: <strong>${escapeHtml(inv.gameName)}</strong></span></span>
                 <div class="friend-actions">
@@ -2512,6 +2523,17 @@ function buildWatchPartyUrl(inv) {
         type: inv.mediaType || '', season: inv.season || '', episode: inv.episode || ''
     });
     return `watch.html?${q.toString()}`;
+}
+
+const SNAKE_PLUS_INVITE_TTL_MS = 10 * 60 * 1000;
+
+/** Snake Plus online invites (sent by the Game OS backend when a host invites a friend) open the game and join the host's room. */
+function isSnakePlusInvite(inv) {
+    return !!inv && inv.game === 'snake-plus' && typeof inv.roomId === 'string' && typeof inv.from === 'string';
+}
+
+function snakePlusJoinUrl(inv) {
+    return 'games/snake-plus/index.html?join=' + encodeURIComponent(inv.from) + '&room=' + encodeURIComponent(inv.roomId);
 }
 
 /** True when the invite carries a hosted relay room the browser can open (direct LAN parties need the launcher). */
@@ -3471,7 +3493,24 @@ function getBuiltInGames() {
         features: ['Exclusive', 'Achievements', 'Free'],
         gameOSExclusive: true,
         playUrl: new URL('games/digital-abyss/index.html', base).href
+    }, {
+        platform: 'PC',
+        Title: 'Snake Plus',
+        TitleID: 'snake-plus',
+        image: new URL('games/snake-plus/cover.svg', base).href,
+        description: 'The classic snake game, supercharged: power-ups, bots and up to 4 players. Invite your Game OS friends to play together online. Achievements and playtime sync to your account.',
+        genres: ['Arcade', 'Action'],
+        categories: ['Exclusive', 'Free', 'Achievements', 'Multiplayer'],
+        features: ['Exclusive', 'Achievements', 'Free'],
+        gameOSExclusive: true,
+        playUrl: new URL('games/snake-plus/index.html', base).href
     }];
+}
+
+/** Relative play page for a Game OS exclusive (PC) by title, or '' for any other game. */
+function exclusivePlayPath(platform, title) {
+    if (platform !== 'PC') return '';
+    return { 'digital abyss': 'games/digital-abyss/index.html', 'snake plus': 'games/snake-plus/index.html' }[String(title || '').toLowerCase()] || '';
 }
 
 function _withBuiltInGames(platform, games) {
@@ -7549,8 +7588,7 @@ function _buildFriendsSection(friendLibraries, platform, title) {
 }
 
 function _buildPlaySection(platform, title) {
-    const isAbyss = platform === 'PC' && (title || '').toLowerCase() === 'digital abyss';
-    if (!window.GameOSEmu && !isAbyss) return '';
+    if (!window.GameOSEmu && !exclusivePlayPath(platform, title)) return '';
     return `<div class="game-modal-section" id="gameModalPlay" data-p="${escapeHtml(platform || '')}" data-t="${escapeHtml(title || '')}"></div>`;
 }
 
@@ -7558,8 +7596,9 @@ async function _initPlaySection(root = document) {
     const box = root.querySelector('#gameModalPlay');
     if (!box) return;
     const p = box.dataset.p, t = box.dataset.t;
-    if (p === 'PC' && t.toLowerCase() === 'digital abyss') {
-        box.innerHTML = '<a class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;" href="games/digital-abyss/index.html">▶ Play</a>';
+    const exclusivePath = exclusivePlayPath(p, t);
+    if (exclusivePath) {
+        box.innerHTML = `<a class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;" href="${exclusivePath}">▶ Play</a>`;
         return;
     }
     let inst = false;

@@ -4446,3 +4446,19 @@ require('./stream-relay').mountStreamRelay(app, httpServer, async (rawToken) => 
     const storedHash = accountFile && accountFile.content.api_token_hash;
     return !!accountFile && (storedHash === hashToken(rawToken) || storedHash === sha256Token(rawToken));
 });
+
+// Built-in online play for Game OS exclusives (friend invites + room relay), signed in with the player's Game OS account.
+require('./game-rooms').mountGameRooms(app, httpServer, {
+    getFile, putFile, areFriends, sanitiseUsername, conversationPath, parseTokenUsername,
+    checkRateLimit: ip => checkRateLimit('game:' + ip, RATE_LIMIT_API),
+    verifyApiToken: async rawToken => {
+        const usernameLower = parseTokenUsername(rawToken);
+        if (!usernameLower || !sanitiseUsername(usernameLower)) return null;
+        const cached = _lookupTokenCache(rawToken);
+        if (cached) return { username: cached.username, usernameLower };
+        const accountFile = await getFile(`accounts/${usernameLower}/profile.json`);
+        const storedHash = accountFile && accountFile.content.api_token_hash;
+        if (!accountFile || (storedHash !== hashToken(rawToken) && storedHash !== sha256Token(rawToken))) return null;
+        return { username: accountFile.content.username, usernameLower };
+    }
+});

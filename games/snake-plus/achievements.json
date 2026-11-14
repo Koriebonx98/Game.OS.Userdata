@@ -1,0 +1,89 @@
+{
+  "Items": [
+    {
+      "achievementId": "first_game",
+      "Name": "Slither In",
+      "Description": "Start your first game."
+    },
+    {
+      "achievementId": "first_bite",
+      "Name": "First Bite",
+      "Description": "Eat your first food."
+    },
+    {
+      "achievementId": "growing_up",
+      "Name": "Growing Up",
+      "Description": "Reach 100 points in a single game."
+    },
+    {
+      "achievementId": "long_boi",
+      "Name": "Long Boi",
+      "Description": "Reach 250 points in a single game."
+    },
+    {
+      "achievementId": "winner",
+      "Name": "Last Snake Standing",
+      "Description": "Win a game against other snakes."
+    },
+    {
+      "achievementId": "classic_200",
+      "Name": "Classic Cruiser",
+      "Description": "Score 200 points in Classic 1P."
+    },
+    {
+      "achievementId": "rush_hour",
+      "Name": "Rush Hour",
+      "Description": "Score 150 points in Rush."
+    },
+    {
+      "achievementId": "first_to",
+      "Name": "First To The Finish",
+      "Description": "Win a First To game."
+    },
+    {
+      "achievementId": "speed_demon",
+      "Name": "Speed Demon",
+      "Description": "Grab a speed power-up."
+    },
+    {
+      "achievementId": "lockdown",
+      "Name": "Locked Down",
+      "Description": "Trigger a lockdown."
+    },
+    {
+      "achievementId": "chop_chop",
+      "Name": "Chop Chop",
+      "Description": "Chop a rival's tail with a destruction power-up."
+    },
+    {
+      "achievementId": "power_user",
+      "Name": "Power User",
+      "Description": "Collect every kind of power-up."
+    },
+    {
+      "achievementId": "sweet_tooth",
+      "Name": "Sweet Tooth",
+      "Description": "Eat 100 food in total."
+    },
+    {
+      "achievementId": "marathon",
+      "Name": "Marathon Slitherer",
+      "Description": "Play 10 games."
+    },
+    {
+      "achievementId": "bot_buster",
+      "Name": "Bot Buster",
+      "Description": "Beat a HARD bot in a head-to-head game."
+    },
+    {
+      "achievementId": "better_together",
+      "Name": "Better Together",
+      "Description": "Play a game online with a Game OS friend."
+    },
+    {
+      "achievementId": "online_champion",
+      "Name": "Online Champion",
+      "Description": "Win a game online against a Game OS friend."
+    }
+  ]
+}

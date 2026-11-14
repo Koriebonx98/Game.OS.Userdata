@@ -77,11 +77,18 @@ jobs:
       - name: Check backend JS syntax
         run: node --check backend/index.js && echo "✅ backend/index.js syntax OK"
 
+      - name: Game room relay tests
+        working-directory: backend
+        run: npm ci --no-audit --no-fund && node --test --test-timeout=30000 test-game-rooms.js
+
       - name: Check script.js syntax
         run: node --check script.js && echo "✅ script.js syntax OK"
 
-      - name: Digital Abyss achievements tests
-        run: node --test games/digital-abyss/achievements.test.js games/gameos-drm.test.js
+      - name: Game OS exclusives tests
+        run: node --test games/digital-abyss/achievements.test.js games/snake-plus/achievements.test.js games/snake-plus/leaderboard.test.js games/gameos-drm.test.js
+
+      - name: Snake Plus syntax check
+        run: node --check games/snake-plus/game.js && node --check games/snake-plus/online.js && node --check games/snake-plus/leaderboard.js && node --check backend/game-rooms.js && node --check games/snake-plus/gameos-sdk.js && node --check desktop/snake-plus/main.js
 
   validate-csharp:
     name: Build & test C# launcher
