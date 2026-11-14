@@ -2948,9 +2948,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             pendingDownloadCount:  LibraryVm.ReadyToInstall.Count,
             quickMenuTheme:        SettingsVm.QuickMenuTheme);
 
-        QuickMenuVm.SetNotifications(BuildQuickNotifications());
+        try { QuickMenuVm.SetNotifications(BuildQuickNotifications()); }
+        catch (Exception ex) { DevLogService.Log($"[QuickMenu] Could not load notifications: {ex}"); }
         ShowQuickMenu = true;
-        AutoAcceptFreshNotification();
+        try { AutoAcceptFreshNotification(); }
+        catch (Exception ex) { DevLogService.Log($"[QuickMenu] Auto-accept failed: {ex}"); }
     }
 
     /// <summary>
