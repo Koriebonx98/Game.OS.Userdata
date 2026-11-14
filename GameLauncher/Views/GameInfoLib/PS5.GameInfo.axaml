@@ -167,7 +167,7 @@
 
                         <!-- ── Install button when repack available ── -->
             <StackPanel Margin="0,16,0,0" Spacing="6"
-                        IsVisible="{Binding IsRepack}">
+                        IsVisible="{Binding ShowRepackInstall}">
                 <Button Classes="btn-success"
                         Padding="24,12"
                         HorizontalAlignment="Left"

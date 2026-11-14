@@ -151,7 +151,7 @@
                                IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
 
                     <!-- Install (repack) -->
-                    <StackPanel Spacing="6" IsVisible="{Binding IsRepack}">
+                    <StackPanel Spacing="6" IsVisible="{Binding ShowRepackInstall}">
                         <Button Classes="btn-success" Padding="30,14" HorizontalAlignment="Left"
                                 IsEnabled="{Binding !IsExtracting}"
                                 Command="{Binding InstallRepackCommand}">
