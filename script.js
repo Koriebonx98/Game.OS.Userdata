@@ -7549,7 +7549,8 @@ function _buildFriendsSection(friendLibraries, platform, title) {
 }
 
 function _buildPlaySection(platform, title) {
-    if (!window.GameOSEmu) return '';
+    const isAbyss = platform === 'PC' && (title || '').toLowerCase() === 'digital abyss';
+    if (!window.GameOSEmu && !isAbyss) return '';
     return `<div class="game-modal-section" id="gameModalPlay" data-p="${escapeHtml(platform || '')}" data-t="${escapeHtml(title || '')}"></div>`;
 }
 
@@ -7557,6 +7558,10 @@ async function _initPlaySection(root = document) {
     const box = root.querySelector('#gameModalPlay');
     if (!box) return;
     const p = box.dataset.p, t = box.dataset.t;
+    if (p === 'PC' && t.toLowerCase() === 'digital abyss') {
+        box.innerHTML = '<a class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;" href="games/digital-abyss/index.html">▶ Play</a>';
+        return;
+    }
     let inst = false;
     try { inst = await GameOSEmu.isInstalled(p, t); } catch (_) {}
     box.innerHTML = `<button class="btn" id="gameModalPlayBtn" style="background:#16a34a;color:#fff;">${inst ? '▶ Play' : '⬇ Set up ROM to play'}</button>` +
