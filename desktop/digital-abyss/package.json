@@ -18,7 +18,7 @@
   "build": {
     "appId": "com.gameos.digitalabyss",
     "productName": "Digital Abyss",
-    "files": ["main.js", "offline.html"],
+    "files": ["main.js", "preload.js", "offline.html"],
     "win": { "target": "nsis" },
     "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
   }
