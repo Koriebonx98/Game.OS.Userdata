@@ -724,6 +724,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Wire Quick Menu callbacks
         QuickMenuVm.OnDismiss  = () => ShowQuickMenu = false;
+        QuickMenuVm.OnAcceptNotification  = AcceptQuickNotificationAsync;
+        QuickMenuVm.OnDeclineNotification = DeclineQuickNotificationAsync;
         QuickMenuVm.OnExitGame = () =>
         {
             // Forward to DetailVm to kill the running game process
@@ -2876,7 +2878,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             pendingDownloadCount:  LibraryVm.ReadyToInstall.Count,
             quickMenuTheme:        SettingsVm.QuickMenuTheme);
 
+        QuickMenuVm.SetNotifications(BuildQuickNotifications());
         ShowQuickMenu = true;
+        AutoAcceptFreshNotification();
     }
 
     /// <summary>
@@ -6415,15 +6419,104 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _messagePoller?.Dispose();
         _lastKnownMessageAt.Clear();
+        _notifSeeded = false;
+        int tick = 0;
         _messagePoller = new Timer(_ =>
         {
             // Fire-and-forget with structured exception handling
             Task.Run(async () =>
             {
+                try   { await PollInviteNotificationsAsync().ConfigureAwait(false); }
+                catch { /* polling failure is non-fatal */ }
+                if (Interlocked.Increment(ref tick) % 3 != 0) return;
                 try   { await PollMessagesAsync().ConfigureAwait(false); }
                 catch { /* polling failure is non-fatal */ }
             });
-        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(20));
+    }
+
+    // ── Invite / watch party / mod share notifications (Quick Guide) ──────────
+    private bool _notifSeeded;
+    private readonly Dictionary<string, DateTime> _freshNotifs = new();
+    private static readonly TimeSpan FreshNotifWindow = TimeSpan.FromMinutes(3);
+
+    private async Task PollInviteNotificationsAsync()
+    {
+        if (!_client.IsAuthenticated) return;
+        var (invites, shares) = await InboxVm.PollPendingAsync();
+        bool seed = !_notifSeeded;
+        _notifSeeded = true;
+        if (seed) return;
+        foreach (var inv in invites)
+        {
+            lock (_freshNotifs) _freshNotifs[InviteNotifId(inv)] = DateTime.UtcNow;
+            NotificationService.ShowMessageNotification(inv.From, InviteNotifDetail(inv) + " — open the Quick Guide to accept");
+        }
+        foreach (var sh in shares)
+        {
+            lock (_freshNotifs) _freshNotifs["share:" + sh.Id] = DateTime.UtcNow;
+            NotificationService.ShowMessageNotification(sh.From, "Shared a mod: " + sh.Payload.Name + " — open the Quick Guide to accept");
+        }
+        if (invites.Count + shares.Count > 0)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (ShowQuickMenu) QuickMenuVm.SetNotifications(BuildQuickNotifications());
+            });
+    }
+
+    private static string InviteNotifId(GameInvite i) => "invite:" + i.InviteId;
+
+    private static string InviteNotifDetail(GameInvite i) =>
+        i.StreamPort.HasValue || string.Equals(i.Kind, "watch", StringComparison.OrdinalIgnoreCase)
+            ? $"Watch party: {i.GameName}"
+            : $"Invited you to play {i.GameName}";
+
+    private List<QuickNotificationVm> BuildQuickNotifications()
+    {
+        var list = new List<QuickNotificationVm>();
+        foreach (var i in InboxVm.PendingInvites.ToList())
+        {
+            bool watch = i.StreamPort.HasValue || string.Equals(i.Kind, "watch", StringComparison.OrdinalIgnoreCase);
+            list.Add(new QuickNotificationVm
+            {
+                Id = InviteNotifId(i), Glyph = watch ? "📺" : "🎮", Source = i,
+                Title = watch ? $"{i.From} started a watch party" : $"{i.From} invited you",
+                Detail = InviteNotifDetail(i),
+            });
+        }
+        foreach (var sh in InboxVm.PendingModShares.ToList())
+            list.Add(new QuickNotificationVm
+            {
+                Id = "share:" + sh.Id, Glyph = "🧩", Source = sh, Title = sh.Title, Detail = sh.Detail,
+            });
+        lock (_freshNotifs)
+        {
+            foreach (var n in list)
+                n.IsFresh = _freshNotifs.TryGetValue(n.Id, out var at) && DateTime.UtcNow - at < FreshNotifWindow;
+        }
+        return list;
+    }
+
+    private async Task AcceptQuickNotificationAsync(QuickNotificationVm n)
+    {
+        lock (_freshNotifs) _freshNotifs.Remove(n.Id);
+        if (n.Source is GameInvite inv) await InboxVm.AcceptInviteCommand.ExecuteAsync(inv);
+        else if (n.Source is PendingModShare sh) InboxVm.AcceptModShareCommand.Execute(sh);
+    }
+
+    private async Task DeclineQuickNotificationAsync(QuickNotificationVm n)
+    {
+        lock (_freshNotifs) _freshNotifs.Remove(n.Id);
+        if (n.Source is GameInvite inv) await InboxVm.DeclineInviteCommand.ExecuteAsync(inv);
+        else if (n.Source is PendingModShare sh) InboxVm.DeclineModShareCommand.Execute(sh);
+    }
+
+    /// <summary>Opening the Quick Guide while an invite just arrived accepts the newest one.</summary>
+    private void AutoAcceptFreshNotification()
+    {
+        var fresh = QuickMenuVm.Notifications.LastOrDefault(n => n.IsFresh);
+        if (fresh == null) return;
+        _ = QuickMenuVm.AcceptNotificationCommand.ExecuteAsync(fresh);
     }
 
     /// <summary>
@@ -6448,7 +6541,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 try
                 {
-                    var messages = await _client.GetMessagesAsync(friendUsername);
+                    var messages = (await _client.GetMessagesAsync(friendUsername))
+                        .Where(m => !ModShareService.IsShareMessage(m.Text) && !InviteMessageService.IsInviteMessage(m.Text))
+                        .ToList();
                     if (messages.Count == 0) continue;
 
                     // The most recent message in the conversation

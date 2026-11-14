@@ -849,6 +849,37 @@ public partial class QuickMenuViewModel : ViewModelBase
         OnDismiss?.Invoke();
     }
 
+    // ── Pending invites / watch parties / mod shares ────────────────────────
+    public ObservableCollection<QuickNotificationVm> Notifications { get; } = new();
+    public bool HasNotifications => Notifications.Count > 0;
+    public Func<QuickNotificationVm, Task>? OnAcceptNotification { get; set; }
+    public Func<QuickNotificationVm, Task>? OnDeclineNotification { get; set; }
+
+    public void SetNotifications(System.Collections.Generic.IEnumerable<QuickNotificationVm> items)
+    {
+        Notifications.Clear();
+        foreach (var n in items) Notifications.Add(n);
+        OnPropertyChanged(nameof(HasNotifications));
+    }
+
+    [RelayCommand]
+    private async Task AcceptNotification(QuickNotificationVm? n)
+    {
+        if (n == null || OnAcceptNotification == null) return;
+        try { await OnAcceptNotification(n); } catch { }
+        Notifications.Remove(n);
+        OnPropertyChanged(nameof(HasNotifications));
+    }
+
+    [RelayCommand]
+    private async Task DeclineNotification(QuickNotificationVm? n)
+    {
+        if (n == null || OnDeclineNotification == null) return;
+        try { await OnDeclineNotification(n); } catch { }
+        Notifications.Remove(n);
+        OnPropertyChanged(nameof(HasNotifications));
+    }
+
     [RelayCommand]
     private void OpenNotificationsPage()
     {
@@ -1334,4 +1365,15 @@ public class QuickMenuSwitcherItemVm
     public string Title { get; set; } = "";
     public string Subtitle { get; set; } = "";
     public bool IsActive { get; set; }
+}
+
+/// <summary>An actionable Quick Guide notification (game invite, watch party or shared mod).</summary>
+public class QuickNotificationVm
+{
+    public string Id { get; set; } = "";
+    public string Glyph { get; set; } = "🔔";
+    public string Title { get; set; } = "";
+    public string Detail { get; set; } = "";
+    public bool IsFresh { get; set; }
+    public object? Source { get; set; }
 }
