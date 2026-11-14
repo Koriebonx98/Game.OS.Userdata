@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using GameLauncher.Models;
@@ -578,7 +579,8 @@ namespace GameLauncher
         /// <summary>Visible conversation: hidden system messages (mod shares) are filtered out.</summary>
         public async Task<List<Message>> GetMessagesAsync(
             string withUsername, CancellationToken ct = default)
-            => new List<Message>(System.Linq.Enumerable.Where(await GetRawMessagesAsync(withUsername, ct), m => !Services.ModShareService.IsShareMessage(m.Text)));
+            => new List<Message>((await GetRawMessagesAsync(withUsername, ct)).Where(m =>
+                !ModShareService.IsShareMessage(m.Text) && !InviteMessageService.IsInviteMessage(m.Text)));
 
         /// <summary>All messages including hidden system ones.</summary>
         public async Task<List<Message>> GetRawMessagesAsync(
@@ -601,6 +603,14 @@ namespace GameLauncher
             return new();
         }
 
+        public async Task<List<GameInvite>> GetMessageInvitesAsync(IEnumerable<string> friends, CancellationToken ct = default)
+        {
+            if (_username == null) throw new GameOsException(401, "Not authenticated.");
+            var threads = await Task.WhenAll(friends.Select(async friend =>
+                InviteMessageService.Pending(await GetRawMessagesAsync(friend, ct), friend, _username)));
+            return threads.SelectMany(thread => thread).ToList();
+        }
+
         public async Task SendInviteAsync(
             string toUsername,
             string gameName,
@@ -608,21 +618,20 @@ namespace GameLauncher
             string connectionType,
             CancellationToken ct = default)
         {
+            await SendMessageInviteAsync(toUsername, new GameInvite
+            {
+                GameName = gameName, Platform = platform, ConnectionType = connectionType
+            }, ct);
+        }
+
+        public async Task<string> SendMessageInviteAsync(string toUsername, GameInvite invite, CancellationToken ct = default)
+        {
             if (_username == null) throw new GameOsException(401, "Not authenticated.");
-
-            if (_backend != null)
-            {
-                await _backend.SendInviteAsync(toUsername, gameName, platform, connectionType, ct);
-                return;
-            }
-
-            if (_github != null)
-            {
-                await _github.SendInviteAsync(_username, toUsername, gameName, platform, connectionType, ct);
-                return;
-            }
-
-            throw new GameOsException(400, "No connection available to send invites.");
+            invite.InviteId = "msg-" + Guid.NewGuid().ToString("N");
+            invite.From = _username;
+            invite.Status = "pending";
+            await SendMessageAsync(toUsername, InviteMessageService.EncodeInvite(invite), ct);
+            return invite.InviteId;
         }
 
         // ── Shared swarm / LFG (backend or GitHub-direct) ──────────────────────
@@ -667,24 +676,32 @@ namespace GameLauncher
             _backend != null ? _backend.CloseLfgAsync(roomId, ct)
           : _github  != null ? _github.CloseLfgRoomAsync(roomId, ct) : Task.CompletedTask;
 
-        public async Task RespondInviteAsync(string inviteId, string response, CancellationToken ct = default)
+        public async Task RespondInviteAsync(GameInvite invite, string response, CancellationToken ct = default)
         {
+            if (invite.InviteId.StartsWith("msg-", StringComparison.Ordinal))
+            {
+                await SendMessageAsync(invite.From, InviteMessageService.EncodeResponse(invite.InviteId, response), ct);
+                return;
+            }
             if (_backend != null)
-                await _backend.RespondInviteAsync(inviteId, response, ct);
+                await _backend.RespondInviteAsync(invite.InviteId, response, ct);
             else if (_github != null && _username != null)
-                await _github.RespondInviteAsync(_username, inviteId, response, ct);
+                await _github.RespondInviteAsync(_username, invite.InviteId, response, ct);
         }
 
         /// <summary>Sends a watch-party invite (GitHub data mode). Returns the invite id used to poll for the response.</summary>
         public async Task<string> SendWatchInviteAsync(string toUsername, GameInvite watch, CancellationToken ct = default)
         {
-            if (_github == null || _username == null)
-                throw new GameOsException(400, "Watch parties need a signed-in Game OS account.");
-            return await _github.SendInviteAsync(_username, toUsername, watch.GameName, "", "Watch Party", ct, watch);
+            watch.ConnectionType = "Watch Party";
+            return await SendMessageInviteAsync(toUsername, watch, ct);
         }
 
-        public Task<string?> GetInviteStatusAsync(string toUsername, string inviteId, CancellationToken ct = default) =>
-            _github != null ? _github.GetInviteStatusAsync(toUsername, inviteId, ct) : Task.FromResult<string?>(null);
+        public async Task<string?> GetInviteStatusAsync(string toUsername, string inviteId, CancellationToken ct = default)
+        {
+            if (inviteId.StartsWith("msg-", StringComparison.Ordinal))
+                return InviteMessageService.Response(await GetRawMessagesAsync(toUsername, ct), toUsername, inviteId);
+            return _github != null ? await _github.GetInviteStatusAsync(toUsername, inviteId, ct) : null;
+        }
 
         public async Task<int> SyncExophaseAchievementsAsync(
             string exophaseUrl,

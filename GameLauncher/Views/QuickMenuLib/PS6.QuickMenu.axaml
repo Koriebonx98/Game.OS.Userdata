@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              x:Class="GameLauncher.Views.QuickMenuLib.Ps6QuickMenu"
              x:DataType="vm:QuickMenuViewModel">
 
@@ -93,6 +94,8 @@
                            HorizontalAlignment="Center"/>
                 <TextBlock Text="{Binding CurrentSessionLabel}" Foreground="#9BE7FF" FontSize="13"
                            HorizontalAlignment="Center" Margin="0,0,0,10"/>
+                <TextBlock Text="{Binding InviteStatusMessage}" IsVisible="{Binding IsFriendsPage}"
+                           Foreground="#C5C2E8" FontSize="12" TextWrapping="Wrap" HorizontalAlignment="Center"/>
                 <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled"
                               MaxWidth="1100" HorizontalAlignment="Center">
                     <ItemsControl ItemsSource="{Binding HubActions}">
@@ -102,6 +105,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
                                 <Button Classes="ps6-guide-action" Classes.cursor="{Binding IsCursor}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsCursor}"
                                         IsHitTestVisible="{Binding IsActionable}"
                                         Command="{Binding ActivateCommand}">
                                     <Grid ColumnDefinitions="Auto,*">

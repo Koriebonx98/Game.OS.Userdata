@@ -82,6 +82,43 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// </summary>
     private Timer? _presenceTimer;
     private LfgService? _lfg;
+    private readonly System.Threading.SemaphoreSlim _inviteRoomGate = new(1, 1);
+
+    private async Task SendGameRoomInviteAsync(string friend, string game, string platform, string connectionType)
+    {
+        if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+        if (string.IsNullOrWhiteSpace(platform)) platform = "PC";
+        await _inviteRoomGate.WaitAsync();
+        try
+        {
+            if (!_lfg.IsHosting)
+                await _lfg.HostAsync(game, platform, true, hostAddress: DetailVm.LfgHostAddress);
+            else if (!string.Equals(_lfg.HostedGame, game, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(_lfg.HostedPlatform, platform, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("Close your current room before inviting friends to another game.");
+            await _client.SendMessageInviteAsync(friend, new GameInvite
+            {
+                GameName = game, Platform = platform, ConnectionType = connectionType,
+                Kind = "game", RoomId = _lfg.HostedRoomId,
+            });
+        }
+        finally { _inviteRoomGate.Release(); }
+    }
+
+    private async Task JoinInvitedRoomAsync(GameInvite invite)
+    {
+        if (invite.IsWatchParty || string.IsNullOrWhiteSpace(invite.RoomId)) return;
+        if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+        await _lfg.JoinAsync(new LfgRoom
+        {
+            RoomId = invite.RoomId, Host = invite.From, Game = invite.GameName, Platform = invite.Platform,
+        });
+        DetailVm.LfgStatus = $"Joined {invite.From}'s room. Host address: {_lfg.JoinedEndpoint}. {_lfg.ConnectionInfo}. " +
+            "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
+        NotificationService.ShowDeveloperNotification(
+            $"Joined {invite.From}'s room",
+            $"Host: {_lfg.JoinedEndpoint}. Configure a mod-client connect template or join manually in the game/emulator.");
+    }
 
     // ── Friend presence poller ─────────────────────────────────────────────
     /// <summary>Fires every 2 minutes to detect when friends come online or start a game.</summary>
@@ -208,6 +245,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }).ToList();
         report(Lines());
 
+        if (ids.Count == 0)
+        {
+            await EndBroadcastAsync();
+            return false;
+        }
         if (!req.WaitForAccept) return true;
 
         var deadline = DateTime.UtcNow.AddMinutes(3);
@@ -648,15 +690,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         };
         QuickMenuVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
         {
-            try
-            {
-                await _client.SendInviteAsync(friendUsername, gameName, platform, connectionType);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            await SendGameRoomInviteAsync(friendUsername, gameName, platform, connectionType);
+            return true;
         };
         QuickMenuVm.OnStartBroadcast = async () =>
         {
@@ -1222,15 +1257,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         );
         DashboardVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
         {
-            try
-            {
-                await _client.SendInviteAsync(friendUsername, gameName, platform, connectionType);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            await SendGameRoomInviteAsync(friendUsername, gameName, platform, connectionType);
+            return true;
         };
         StreamHostService.InstalledGamesProvider = () => LibraryVm.LocalGames.Select(g => g.Title).ToList();
         StreamHostService.LaunchHandler = title =>
@@ -1365,15 +1393,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FriendsVm.OnViewFriendProfile = OpenFriendProfile;
         FriendsVm.OnInviteFriend = async (friendUsername, gameName, platform, connectionType) =>
         {
-            try
-            {
-                await _client.SendInviteAsync(friendUsername, gameName, platform, connectionType);
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            await SendGameRoomInviteAsync(friendUsername, gameName, platform, connectionType);
+            return true;
         };
         FriendsVm.OnResolveCurrentGameContext = () => (
             DetailVm.IsGameRunning ? DetailVm.RunningTitle : null,
@@ -1383,6 +1404,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         FriendsVm.OnlineFriends.CollectionChanged  += (_, _) => _PushFriendsToDashboard();
         FriendsVm.OfflineFriends.CollectionChanged += (_, _) => _PushFriendsToDashboard();
         InboxVm.OnViewFriendProfile   = OpenFriendProfile;
+        InboxVm.BeforeInviteAccepted  = JoinInvitedRoomAsync;
         InboxVm.OnInviteAccepted      = TryLaunchAcceptedInvite;
 
         // Start background scanner regardless of login state
@@ -3938,6 +3960,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SignOut()
     {
+        _lfg?.StopHosting();
         // Stop all background timers before clearing credentials
         _messagePoller?.Dispose();
         _messagePoller = null;
@@ -3993,6 +4016,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     [RelayCommand]
     private void SwitchAccount()
     {
+        _lfg?.StopHosting();
         // Stop all background timers
         _messagePoller?.Dispose();
         _messagePoller = null;

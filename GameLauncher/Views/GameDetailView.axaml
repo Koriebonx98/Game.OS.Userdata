@@ -1101,7 +1101,7 @@
                                              Padding="8,6" FontSize="12"/>
 
                                     <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap">
-                                        On launch: <Run Text="{Binding ModClientExe}" Foreground="#58a6ff"/> will be started with argument <Run Text="{Binding ModClientConnectTemplate}" Foreground="#3fb950"/> (where {IP} → <Run Text="{Binding ModClientServerIp}" Foreground="#d29922"/>).
+                                        On launch: <Run Text="{Binding ModClientExe}" Foreground="#58a6ff"/> uses <Run Text="{Binding ModClientConnectTemplate}" Foreground="#3fb950"/>. {IP} is the joined room's host address, or the configured server IP when no room is joined.
                                     </TextBlock>
                                 </StackPanel>
                             </StackPanel>

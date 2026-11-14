@@ -1601,6 +1601,7 @@ public partial class GameDetailViewModel : ViewModelBase
             if (!string.IsNullOrEmpty(saved.RomPath) && File.Exists(saved.RomPath)) return false;
             return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
         }
+        if (saved.ModClient is { Enabled: true } mc && !string.IsNullOrWhiteSpace(mc.ClientExe) && File.Exists(mc.ClientExe)) return false;
         if (!string.IsNullOrEmpty(saved.ExePath) && IsLaunchTargetAvailable(saved.ExePath)) return false;
         if (_steamAppId > 0) return false;
         return !(_driveInstances.Count > 0 && !string.IsNullOrEmpty(_driveInstances[0].ExecutablePath));
@@ -2002,6 +2003,7 @@ public partial class GameDetailViewModel : ViewModelBase
         new (string, string, string)[]
         {
             ("iw4x  (CoD: MW2)",                       "iw4x",       "connect {IP}"),
+            ("iw6  (CoD: Ghosts)",                     "iw6",        "-connect {IP}"),
             ("iw7-mod  (CoD: Infinite Warfare)",        "iw7-mod",    "connect cpMode {IP}"),
             ("S4-Mod  (CoD: Vanguard — via Radmin)",    "S4-Mod",     "connect {IP}"),
             ("Plutonium  (Black Ops 1/2/3 / MW3)",      "Plutonium",  "connect {IP}"),
@@ -2993,13 +2995,8 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mc != null && mc.Enabled && !string.IsNullOrWhiteSpace(mc.ClientExe)
             && System.IO.File.Exists(mc.ClientExe))
         {
-            string connectArg = "";
-            if (!string.IsNullOrWhiteSpace(mc.ConnectArgTemplate)
-                && !string.IsNullOrWhiteSpace(mc.ServerIp))
-            {
-                connectArg = mc.ConnectArgTemplate.Replace("{IP}", mc.ServerIp,
-                    StringComparison.OrdinalIgnoreCase);
-            }
+            string connectArg = RoomConnectionService.ConnectArgument(mc.ConnectArgTemplate, mc.ServerIp,
+                Lfg?.JoinedEndpoint ?? "", Lfg?.JoinedGame ?? "", Lfg?.JoinedPlatform ?? "", Title, Platform);
 
             System.Diagnostics.Process? modProc = null;
             try
@@ -4303,8 +4300,10 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private bool   _isLfgOpen;
     [ObservableProperty] private bool   _isLfgBusy;
     [ObservableProperty] private string _lfgStatus = "";
+    [ObservableProperty] private string _lfgHostAddress = "";
     public bool IsLfgHosting => Lfg?.IsHosting == true;
     public bool IsLfgNotHosting => !IsLfgHosting;
+    public bool IsLfgConnected => !string.IsNullOrEmpty(Lfg?.JoinedEndpoint);
     public bool NoLfgRooms => LfgRooms.Count == 0;
     public string LfgHeader => $"👥  GROUPS & LFG · {Title} ({Platform})";
 
@@ -4322,6 +4321,7 @@ public partial class GameDetailViewModel : ViewModelBase
     {
         OnPropertyChanged(nameof(IsLfgHosting));
         OnPropertyChanged(nameof(IsLfgNotHosting));
+        OnPropertyChanged(nameof(IsLfgConnected));
         OnPropertyChanged(nameof(NoLfgRooms));
         OnPropertyChanged(nameof(LfgHeader));
     }
@@ -4332,9 +4332,12 @@ public partial class GameDetailViewModel : ViewModelBase
         LfgRooms.Clear();
         if (Lfg == null || !Lfg.IsAvailable) { LfgStatus = "Sign in to your Game.OS account to use Groups & LFG."; NotifyLfgState(); return; }
         IsLfgBusy = true;
-        LfgStatus = "";
-        var rooms = await Lfg.ListAsync(Title, Platform);
-        foreach (var r in rooms) LfgRooms.Add(r);
+        try
+        {
+            var rooms = await Lfg.ListAsync(Title, Platform);
+            foreach (var r in rooms) LfgRooms.Add(r);
+        }
+        catch (Exception ex) { LfgStatus = "Could not load rooms: " + ex.Message; }
         IsLfgBusy = false;
         NotifyLfgState();
     }
@@ -4345,7 +4348,7 @@ public partial class GameDetailViewModel : ViewModelBase
         try
         {
             IsLfgBusy = true;
-            await Lfg.HostAsync(Title, Platform, group);
+            await Lfg.HostAsync(Title, Platform, group, hostAddress: LfgHostAddress);
             LfgStatus = (group ? "✓ Group is live." : "✓ Looking for players…") + " " + Lfg.ConnectionInfo + ".";
         }
         catch (Exception ex) { LfgStatus = "Could not start: " + ex.Message; }
@@ -4365,6 +4368,14 @@ public partial class GameDetailViewModel : ViewModelBase
     }
 
     [RelayCommand]
+    private void DisconnectLfg()
+    {
+        Lfg?.Disconnect();
+        LfgStatus = "Disconnected from the room network.";
+        NotifyLfgState();
+    }
+
+    [RelayCommand]
     private async System.Threading.Tasks.Task JoinLfg(LfgRoom? room)
     {
         if (room == null || Lfg == null) return;
@@ -4372,10 +4383,12 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             IsLfgBusy = true;
             string host = await Lfg.JoinAsync(room);
-            LfgStatus = $"✓ Joined {host}'s room. Launch the game — their temporary connection is saved for you.";
+            LfgStatus = $"✓ Joined {host}'s room. Host address: {Lfg.JoinedEndpoint}. {Lfg.ConnectionInfo}. " +
+                "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
         }
         catch (Exception ex) { LfgStatus = "Could not join: " + ex.Message; }
         IsLfgBusy = false;
+        NotifyLfgState();
     }
 
     [RelayCommand] private void MenuLaunchViaSteam()
