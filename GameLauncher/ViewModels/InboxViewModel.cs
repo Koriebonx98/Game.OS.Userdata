@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
@@ -165,9 +166,10 @@ public partial class InboxViewModel : ViewModelBase
         }
         catch (Exception ex) { ErrorMessage = "Could not accept invite: " + ex.Message; return; }
         PendingInvites.Remove(invite);
-        OnInviteAccepted?.Invoke(invite);
         OnPropertyChanged(nameof(HasPendingInvites));
         OnPropertyChanged(nameof(HasEmptyInbox));
+        try { OnInviteAccepted?.Invoke(invite); }
+        catch (Exception ex) { ErrorMessage = "Invite accepted, but it could not be opened: " + ex.Message; }
     }
 
     [RelayCommand]
@@ -259,9 +261,12 @@ public partial class InboxViewModel : ViewModelBase
         return false;
     }
 
+    private int _loadVersion;
+
     private async Task LoadAsync()
     {
         if (_client == null) return;
+        int version = ++_loadVersion;
 
         IsLoading = true;
         ErrorMessage = "";
@@ -273,6 +278,7 @@ public partial class InboxViewModel : ViewModelBase
             var friendsTask = _client.GetFriendsAsync();
             var invitesTask = _client.GetInvitesAsync();
             var friends = await friendsTask;
+            if (version != _loadVersion) return;
             var messageInvitesTask = _client.GetMessageInvitesAsync(friends);
             try
             {
@@ -295,6 +301,7 @@ public partial class InboxViewModel : ViewModelBase
                     if (shares.Count > 0)
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
+                            if (version != _loadVersion) return;
                             foreach (var sh in shares) PendingModShares.Add(sh);
                             OnPropertyChanged(nameof(HasPendingModShares));
                         });
@@ -311,7 +318,9 @@ public partial class InboxViewModel : ViewModelBase
                 catch { return null; }
             });
 
-            foreach (var convo in (await Task.WhenAll(convoTasks))
+            var convos = await Task.WhenAll(convoTasks);
+            if (version != _loadVersion) return;
+            foreach (var convo in convos
                 .Where(c => c != null)
                 .OrderByDescending(c => c!.LastMessageAt))
             {
@@ -324,11 +333,63 @@ public partial class InboxViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            if (version == _loadVersion) IsLoading = false;
             OnPropertyChanged(nameof(HasConversations));
             OnPropertyChanged(nameof(HasPendingInvites));
             OnPropertyChanged(nameof(HasEmptyInbox));
         }
+    }
+
+    private int _pollRunning;
+
+    /// <summary>
+    /// Lightweight background refresh: adds invites / mod shares that are not listed yet and returns them.
+    /// Never clears the lists, so it is safe to run while the user is looking at the inbox.
+    /// </summary>
+    public async Task<(List<GameInvite> Invites, List<Services.PendingModShare> Shares)> PollPendingAsync()
+    {
+        var newInvites = new List<GameInvite>();
+        var newShares = new List<Services.PendingModShare>();
+        if (_client == null || IsLoading || Interlocked.Exchange(ref _pollRunning, 1) == 1) return (newInvites, newShares);
+        try
+        {
+            var friends = await _client.GetFriendsAsync();
+            var found = new List<GameInvite>();
+            try
+            {
+                found.AddRange((await _client.GetInvitesAsync())
+                    .Where(i => string.Equals(i.Status, "pending", StringComparison.OrdinalIgnoreCase)));
+            }
+            catch { }
+            try { found.AddRange(await _client.GetMessageInvitesAsync(friends)); } catch { }
+            var shares = new List<Services.PendingModShare>();
+            foreach (var friend in friends)
+            {
+                try { shares.AddRange(Services.ModShareService.FindPending(friend, await _client.GetRawMessagesAsync(friend))); }
+                catch { }
+            }
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() =>
+            {
+                foreach (var inv in found)
+                {
+                    if (string.IsNullOrEmpty(inv.InviteId) || PendingInvites.Any(p => p.InviteId == inv.InviteId)) continue;
+                    PendingInvites.Add(inv);
+                    newInvites.Add(inv);
+                }
+                foreach (var sh in shares)
+                {
+                    if (PendingModShares.Any(p => p.Id == sh.Id)) continue;
+                    PendingModShares.Add(sh);
+                    newShares.Add(sh);
+                }
+                OnPropertyChanged(nameof(HasPendingInvites));
+                OnPropertyChanged(nameof(HasPendingModShares));
+                OnPropertyChanged(nameof(HasEmptyInbox));
+            });
+        }
+        catch { }
+        finally { Interlocked.Exchange(ref _pollRunning, 0); }
+        return (newInvites, newShares);
     }
 
     private void UpdateConversationPreview(string friendUsername, string text, string sentAt)

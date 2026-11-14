@@ -30,6 +30,10 @@ namespace GameLauncher.Services
         public string? HostedRoomId { get; private set; }
         public string HostedGame { get; private set; } = "";
         public string HostedPlatform { get; private set; } = "";
+        /// <summary>Temporary address friends use to reach this host (virtual LAN IP, or the chosen LAN/VPN address).</summary>
+        public string HostedAddress { get; private set; } = "";
+        /// <summary>Result of starting the game's dedicated server for the hosted room, if one is configured.</summary>
+        public string ServerStatus { get; private set; } = "";
         public string JoinedEndpoint { get; private set; } = "";
         public string JoinedGame { get; private set; } = "";
         public string JoinedPlatform { get; private set; } = "";
@@ -92,7 +96,17 @@ namespace GameLauncher.Services
             HostedRoomId = id;
             HostedGame = game;
             HostedPlatform = platform;
+            HostedAddress = address.Address.ToString();
+            StartHostedServer();
             StartRoomTimer();
+        }
+
+        private void StartHostedServer()
+        {
+            ServerStatus = "";
+            if (GameServerService.TryStart(HostedGame, HostedAddress, out var msg)) ServerStatus = msg;
+            else if (msg.Length > 0) ServerStatus = msg;
+            if (ServerStatus.Length > 0) ConnectionInfo += ". " + ServerStatus;
         }
 
         private void StartRoomTimer()
@@ -123,6 +137,8 @@ namespace GameLauncher.Services
                 HostedGame = game;
                 HostedPlatform = platform;
                 ConnectionInfo = $"Game.OS virtual network — your address {session.Ip}";
+                HostedAddress = session.Ip;
+                StartHostedServer();
                 StartRoomTimer();
                 return true;
             }
@@ -143,8 +159,9 @@ namespace GameLauncher.Services
             _roomTimer?.Dispose();
             _roomTimer = null;
             var id = HostedRoomId;
+            if (id != null) GameServerService.Stop(HostedGame);
             HostedRoomId = null;
-            HostedGame = HostedPlatform = "";
+            HostedGame = HostedPlatform = HostedAddress = ServerStatus = "";
             if (id != null)
                 Task.Run(async () => { try { await _client.CloseLfgAsync(id).ConfigureAwait(false); } catch { } });
         }

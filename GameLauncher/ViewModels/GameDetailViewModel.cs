@@ -2074,6 +2074,10 @@ public partial class GameDetailViewModel : ViewModelBase
     [ObservableProperty] private string _modClientExe              = "";
     [ObservableProperty] private string _modClientConnectTemplate  = "";
     [ObservableProperty] private string _modClientServerIp         = "";
+    [ObservableProperty] private string _modServerFile             = "";
+    [ObservableProperty] private string _modServerArgs             = "";
+    [ObservableProperty] private bool   _modServerAuto             = true;
+    [ObservableProperty] private string _modServerPort             = "";
 
     /// <summary>
     /// Known mod-client presets for the preset picker in the Mod Client panel.
@@ -2082,16 +2086,16 @@ public partial class GameDetailViewModel : ViewModelBase
     public static readonly IReadOnlyList<(string Label, string Name, string Template)> ModClientPresets =
         new (string, string, string)[]
         {
-            ("iw4x  (CoD: MW2)",                       "iw4x",       "connect {IP}"),
-            ("iw6  (CoD: Ghosts)",                     "iw6",        "-connect {IP}"),
+            ("iw4x  (CoD: MW2)",                       "iw4x",       "-multiplayer -connect {IP}"),
+            ("iw6  (CoD: Ghosts)",                     "iw6",        "-multiplayer -connect {IP}"),
             ("iw7-mod  (CoD: Infinite Warfare)",        "iw7-mod",    "connect cpMode {IP}"),
-            ("S4-Mod  (CoD: Vanguard — via Radmin)",    "S4-Mod",     "connect {IP}"),
-            ("Plutonium  (Black Ops 1/2/3 / MW3)",      "Plutonium",  "connect {IP}"),
-            ("T7x  (CoD: Black Ops 3 — via Radmin)",    "T7x",        "connect {IP}"),
-            ("H1-Mod  (CoD: MWR)",                      "H1-Mod",     "connect {IP}"),
-            ("H2M-Mod  (CoD: MWR extended)",            "H2M-Mod",    "connect {IP}"),
+            ("S4-Mod  (CoD: Vanguard — via Radmin)",    "S4-Mod",     "-multiplayer -connect {IP}"),
+            ("Plutonium  (Black Ops 1/2/3 / MW3)",      "Plutonium",  "-connect {IP}"),
+            ("T7x  (CoD: Black Ops 3 — via Radmin)",    "T7x",        "-multiplayer -connect {IP}"),
+            ("H1-Mod  (CoD: MWR)",                      "H1-Mod",     "-multiplayer -connect {IP}"),
+            ("H2M-Mod  (CoD: MWR extended)",            "H2M-Mod",    "-multiplayer -connect {IP}"),
             ("Advanced Warfare dedi",                   "AW-Dedi",    "connect {IP}"),
-            ("Custom",                                  "Custom",     "connect {IP}"),
+            ("Custom",                                  "Custom",     "-connect {IP}"),
         };
 
     /// <summary>Status message shown at the bottom of the settings panel.</summary>
@@ -2246,6 +2250,10 @@ public partial class GameDetailViewModel : ViewModelBase
         ModClientExe             = mc?.ClientExe        ?? "";
         ModClientConnectTemplate = mc?.ConnectArgTemplate ?? "";
         ModClientServerIp        = mc?.ServerIp         ?? "";
+        ModServerFile            = mc?.ServerFile       ?? "";
+        ModServerArgs            = mc?.ServerArgs       ?? "";
+        ModServerAuto            = mc?.AutoStartServer  ?? true;
+        ModServerPort            = mc is { ServerPort: > 0 } ? mc.ServerPort.ToString() : "";
 
         NewPreLaunchPath         = "";
         NewPreLaunchArgs         = "";
@@ -2281,6 +2289,10 @@ public partial class GameDetailViewModel : ViewModelBase
                 ClientExe          = ModClientExe.Trim(),
                 ConnectArgTemplate = ModClientConnectTemplate.Trim(),
                 ServerIp           = ModClientServerIp.Trim(),
+                ServerFile         = ModServerFile.Trim(),
+                ServerArgs         = ModServerArgs.Trim(),
+                AutoStartServer    = ModServerAuto,
+                ServerPort         = int.TryParse(ModServerPort.Trim(), out var sp) && sp is > 0 and <= 65535 ? sp : 0,
             },
         };
         GameSettingsService.Save(settings);
@@ -2911,6 +2923,33 @@ public partial class GameDetailViewModel : ViewModelBase
         }
     }
 
+    private bool _serverStarting;
+
+    private bool NeedsServerFirst(Models.ModClientConfig? mc) =>
+        mc is { Enabled: true, AutoStartServer: true } && !string.IsNullOrWhiteSpace(mc.ServerFile)
+        && !string.IsNullOrWhiteSpace(mc.ClientExe) && System.IO.File.Exists(mc.ClientExe)
+        && string.IsNullOrEmpty(Lfg?.JoinedEndpoint) && !GameServerService.IsReady(Title);
+
+    private string ServerAddress() =>
+        Lfg is { IsHosting: true } && string.Equals(Lfg.HostedGame, Title, StringComparison.OrdinalIgnoreCase)
+            ? Lfg.HostedAddress : "127.0.0.1";
+
+    private async System.Threading.Tasks.Task StartServerThenLaunchAsync(Models.ModClientConfig mc)
+    {
+        _serverStarting = true;
+        try
+        {
+            SettingsStatus = LfgStatus = "Starting dedicated server…";
+            if (!GameServerService.TryStart(Title, ServerAddress(), out var msg))
+            { SettingsStatus = LfgStatus = string.IsNullOrEmpty(msg) ? "Dedicated server did not start." : msg; return; }
+            if (!await GameServerService.WaitUntilReadyAsync(Title, TimeSpan.FromSeconds(45)))
+            { SettingsStatus = LfgStatus = "The dedicated server did not open its port, so the game was not launched. Check the server file and port."; return; }
+            SettingsStatus = LfgStatus = "Dedicated server is running — launching.";
+        }
+        finally { _serverStarting = false; }
+        LaunchGame();
+    }
+
     /// <summary>Launches the installed game executable.</summary>
     [RelayCommand]
     private void LaunchGame()
@@ -2926,6 +2965,13 @@ public partial class GameDetailViewModel : ViewModelBase
 
         // Load saved settings to get the preferred exe path / arguments
         var saved = GameSettingsService.Load(Title);
+
+        // A dedicated server must be up (IP:port listening) before the mod client tries to connect to it.
+        if (!_serverStarting && NeedsServerFirst(saved.ModClient))
+        {
+            _ = StartServerThenLaunchAsync(saved.ModClient!);
+            return;
+        }
 
         // First run: nothing to launch yet, so ask once and remember the choice
         if (NeedsLaunchTarget(saved))
@@ -3078,8 +3124,13 @@ public partial class GameDetailViewModel : ViewModelBase
         if (mc != null && mc.Enabled && !string.IsNullOrWhiteSpace(mc.ClientExe)
             && System.IO.File.Exists(mc.ClientExe))
         {
+            // Joined rooms connect to the host's temp address; a host with a running dedicated server connects to its own.
+            string roomAddr = Lfg?.JoinedEndpoint ?? "", roomGame = Lfg?.JoinedGame ?? "", roomPlat = Lfg?.JoinedPlatform ?? "";
+            if (roomAddr.Length == 0 && mc.AutoStartServer && !string.IsNullOrWhiteSpace(mc.ServerFile) && GameServerService.IsReady(Title))
+            { roomAddr = ServerAddress(); roomGame = Title; roomPlat = Platform; }
+            if (roomAddr.Length > 0) roomAddr = RoomConnectionService.WithPort(roomAddr, mc.ServerPort);
             string connectArg = RoomConnectionService.ConnectArgument(mc.ConnectArgTemplate, mc.ServerIp,
-                Lfg?.JoinedEndpoint ?? "", Lfg?.JoinedGame ?? "", Lfg?.JoinedPlatform ?? "", Title, Platform);
+                roomAddr, roomGame, roomPlat, Title, Platform, mc.ClientExe);
 
             System.Diagnostics.Process? modProc = null;
             try
@@ -3327,6 +3378,10 @@ public partial class GameDetailViewModel : ViewModelBase
         => BrowseLaunchPathRequested?.Invoke(path => NewPostLaunchPath = path);
 
     [RelayCommand]
+    private void BrowseModServerFile()
+        => BrowseLaunchPathRequested?.Invoke(path => ModServerFile = path);
+
+    [RelayCommand]
     private void BrowseModClientExe()
         => BrowseLaunchPathRequested?.Invoke(path => ModClientExe = path);
 
@@ -3342,6 +3397,8 @@ public partial class GameDetailViewModel : ViewModelBase
         if (preset == default) return;
         ModClientName            = preset.Name;
         ModClientConnectTemplate = preset.Template;
+        ModServerPort            = preset.Name.Equals("Plutonium", StringComparison.OrdinalIgnoreCase) ? "4976"
+                                 : preset.Name.Equals("Custom", StringComparison.OrdinalIgnoreCase) ? "" : "28960";
         // Don't overwrite exe — the user still needs to browse to it
     }
 

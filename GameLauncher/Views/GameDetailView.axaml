@@ -1105,7 +1105,7 @@
 
                                     <!-- Connect arg template -->
                                     <TextBox Text="{Binding ModClientConnectTemplate}"
-                                             Watermark="Connect arg template — use {IP} as placeholder, e.g.  connect {IP}"
+                                             Watermark="Connect args — {IP} or $IP is replaced. Blank = auto (-multiplayer -connect {IP} for iw4x/iw6/t7 etc, else -connect {IP})"
                                              Background="#0d1117" Foreground="White"
                                              BorderBrush="#30363d" CornerRadius="6"
                                              Padding="8,6" FontSize="12"/>
@@ -1117,8 +1117,30 @@
                                              BorderBrush="#30363d" CornerRadius="6"
                                              Padding="8,6" FontSize="12"/>
 
+                                    <!-- Dedicated server (hosting a Group / LFG room) -->
+                                    <TextBlock Text="DEDICATED SERVER (optional — Play starts it, then connects the client to it)"
+                                               FontSize="10" FontWeight="Bold" Foreground="#8b949e" Margin="0,6,0,0"/>
+                                    <Grid ColumnDefinitions="*,Auto">
+                                        <TextBox Grid.Column="0" Text="{Binding ModServerFile}"
+                                                 Watermark="Server file (e.g. start_server.bat)"
+                                                 Background="#0d1117" Foreground="White"
+                                                 BorderBrush="#30363d" CornerRadius="6" Padding="8,6" FontSize="12"/>
+                                        <Button Grid.Column="1" Classes="btn-secondary" Content="Browse…"
+                                                FontSize="11" Padding="8,6" Margin="4,0,0,0" VerticalAlignment="Center"
+                                                Command="{Binding BrowseModServerFileCommand}"/>
+                                    </Grid>
+                                    <TextBox Text="{Binding ModServerPort}"
+                                             Watermark="Server port (e.g. 28960) — Play waits for it to open before connecting"
+                                             Background="#0d1117" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6" Padding="8,6" FontSize="12"/>
+                                    <TextBox Text="{Binding ModServerArgs}"
+                                             Watermark="Server args — $IP = room address, $PORT = server port"
+                                             Background="#0d1117" Foreground="White"
+                                             BorderBrush="#30363d" CornerRadius="6" Padding="8,6" FontSize="12"/>
+                                    <CheckBox IsChecked="{Binding ModServerAuto}" Content="Enable server: start it when I press Play (and when I host a room), then connect to it" FontSize="12"/>
+
                                     <TextBlock FontSize="11" Foreground="#8b949e" TextWrapping="Wrap">
-                                        On launch: <Run Text="{Binding ModClientExe}" Foreground="#58a6ff"/> uses <Run Text="{Binding ModClientConnectTemplate}" Foreground="#3fb950"/>. {IP} is the joined room's host address, or the configured server IP when no room is joined.
+                                        On launch: <Run Text="{Binding ModClientExe}" Foreground="#58a6ff"/> uses <Run Text="{Binding ModClientConnectTemplate}" Foreground="#3fb950"/>. {IP}/$IP/$TempIP is the room's temporary host address (also used to join your own server while hosting), or the configured server IP when no room is joined.
                                     </TextBlock>
                                 </StackPanel>
                             </StackPanel>

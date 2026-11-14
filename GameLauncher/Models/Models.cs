@@ -196,6 +196,9 @@ namespace GameLauncher.Models
         [JsonPropertyName("mediaType")] public string? MediaType { get; set; }
         [JsonPropertyName("season")]    public string? Season    { get; set; }
         [JsonPropertyName("episode")]   public string? Episode   { get; set; }
+        // Direct watch parties: the viewer opens http://{room address}:{StreamPort}/?pin={StreamPin} over the shared virtual LAN.
+        [JsonPropertyName("streamPort")] public int?    StreamPort { get; set; }
+        [JsonPropertyName("streamPin")]  public string? StreamPin  { get; set; }
         [JsonIgnore] public bool IsWatchParty => string.Equals(Kind, "watch", StringComparison.OrdinalIgnoreCase);
     }
 
@@ -968,6 +971,14 @@ namespace GameLauncher.Models
         [JsonPropertyName("serverIp")]           public string  ServerIp           { get; set; } = "";
         /// <summary>When false the launcher ignores this config and launches the game normally.</summary>
         [JsonPropertyName("enabled")]            public bool    Enabled            { get; set; } = true;
+        /// <summary>Optional dedicated-server file (.bat/.cmd/.exe) started when hosting a Group/LFG room for this game.</summary>
+        [JsonPropertyName("serverFile")]         public string  ServerFile         { get; set; } = "";
+        /// <summary>Arguments for <see cref="ServerFile"/>; <c>$IP</c>/<c>{IP}</c> become the room's temporary virtual address.</summary>
+        [JsonPropertyName("serverArgs")]         public string  ServerArgs         { get; set; } = "";
+        /// <summary>Start <see cref="ServerFile"/> automatically when a room is hosted.</summary>
+        [JsonPropertyName("autoStartServer")]    public bool    AutoStartServer    { get; set; } = true;
+        /// <summary>Port the dedicated server listens on (e.g. 28960). 0 = unknown: no port is appended or waited for.</summary>
+        [JsonPropertyName("serverPort")]         public int     ServerPort         { get; set; }
     }
 
     /// <summary>

@@ -107,12 +107,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task JoinInvitedRoomAsync(GameInvite invite)
     {
-        if (invite.IsWatchParty || string.IsNullOrWhiteSpace(invite.RoomId)) return;
+        if (string.IsNullOrWhiteSpace(invite.RoomId) || (invite.IsWatchParty && invite.StreamPort == null)) return;
         if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+        if (_lfg.IsHosting && string.Equals(_lfg.HostedRoomId, invite.RoomId, StringComparison.Ordinal)) return;
         await _lfg.JoinAsync(new LfgRoom
         {
             RoomId = invite.RoomId, Host = invite.From, Game = invite.GameName, Platform = invite.Platform,
         });
+        if (invite.IsWatchParty) return;
         DetailVm.LfgStatus = $"Joined {invite.From}'s room. Host address: {_lfg.JoinedEndpoint}. {_lfg.ConnectionInfo}. " +
             "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
         NotificationService.ShowDeveloperNotification(
@@ -208,10 +210,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch (Exception ex) { _broadcastError = "Broadcast failed: " + ex.Message; return false; }
     }
 
-    /// <summary>Starts a broadcast room for the title, invites the friends, and (optionally) waits for someone to accept before playback.</summary>
+    private bool _directParty;
+    private bool _partyOwnsRoom;
+
+    /// <summary>
+    /// Starts the party host. With no hosted relay configured the host streams directly: friends join the host's
+    /// private virtual-LAN room (temporary address, never the real IP) and open its stream page with a temporary PIN.
+    /// </summary>
+    private async Task<(string? Room, string? Relay, int? Port, string? Pin)> BeginPartyHostAsync(WatchPartyRequest req)
+    {
+        var settings = Services.AppSettingsService.Load();
+        if (Uri.TryCreate((settings.StreamRelayUrl ?? "").Trim(), UriKind.Absolute, out var relayUri)
+            && (relayUri.Scheme == "http" || relayUri.Scheme == "https"))
+        {
+            if (!await BeginBroadcastAsync(req.Title)) return (null, null, null, null);
+            return (StreamHostService.BroadcastRoomId, StreamHostService.BroadcastRelayUrl, null, null);
+        }
+        try
+        {
+            if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+            if (_lfg.IsHosting) throw new InvalidOperationException("Close your current room before starting a watch party.");
+            await _lfg.HostAsync(req.Title, "Watch Party", true);
+            _partyOwnsRoom = _directParty = true;
+            var (port, pin) = StreamHostService.StartParty();
+            return (_lfg.HostedRoomId, null, port, pin);
+        }
+        catch (Exception ex)
+        {
+            _broadcastError = "Watch party failed: " + ex.Message;
+            await EndBroadcastAsync();
+            return (null, null, null, null);
+        }
+    }
+
+    /// <summary>Starts the party stream, invites the friends, and (optionally) waits for someone to accept before playback.</summary>
     private async Task<bool> RunWatchPartyAsync(WatchPartyRequest req, Action<IReadOnlyList<string>> report)
     {
-        if (!await BeginBroadcastAsync(req.Title))
+        var (room, relay, streamPort, streamPin) = await BeginPartyHostAsync(req);
+        if (room == null)
         {
             report(new[] { _broadcastError });
             await Task.Delay(2500);
@@ -219,7 +255,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         if (req.Cancel.IsCancellationRequested) { await EndBroadcastAsync(); return false; }
 
-        var info = (new { Relay = StreamHostService.BroadcastRelayUrl, Room = StreamHostService.BroadcastRoomId });
+        var info = new { Relay = relay, Room = room };
         var status = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var friend in req.Friends)
@@ -229,6 +265,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 ids[friend] = await _client.SendWatchInviteAsync(friend, new GameInvite
                 {
                     GameName = req.Title, Kind = "watch", RoomId = info.Room, RelayUrl = info.Relay,
+                    Platform = streamPort != null ? "Watch Party" : "",
+                    StreamPort = streamPort, StreamPin = streamPin,
                     MediaType = req.MediaType, Season = req.Season, Episode = req.Episode,
                 });
                 status[friend] = "pending";
@@ -276,6 +314,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task EndBroadcastAsync()
     {
+        if (_directParty)
+        {
+            _directParty = false;
+            StreamHostService.EndParty();
+            if (_partyOwnsRoom) { _partyOwnsRoom = false; _lfg?.StopHosting(); }
+            return;
+        }
         StreamHostService.StopBroadcast();
         try { await _client.SetBroadcastAsync(null); } catch { }
     }
@@ -565,7 +610,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(BuildWatchUrl(invite)) { UseShellExecute = true });
+                string url = invite.StreamPort != null && !string.IsNullOrEmpty(_lfg?.JoinedEndpoint)
+                    ? $"http://{_lfg!.JoinedEndpoint.Split(':')[0]}:{invite.StreamPort}/?pin={Uri.EscapeDataString(invite.StreamPin ?? "")}"
+                    : BuildWatchUrl(invite);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex) { DevLogService.Log("[WatchParty] Could not open viewer: " + ex.Message); }
             return;
@@ -676,6 +724,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Wire Quick Menu callbacks
         QuickMenuVm.OnDismiss  = () => ShowQuickMenu = false;
+        QuickMenuVm.OnAcceptNotification  = AcceptQuickNotificationAsync;
+        QuickMenuVm.OnDeclineNotification = DeclineQuickNotificationAsync;
         QuickMenuVm.OnExitGame = () =>
         {
             // Forward to DetailVm to kill the running game process
@@ -2828,7 +2878,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             pendingDownloadCount:  LibraryVm.ReadyToInstall.Count,
             quickMenuTheme:        SettingsVm.QuickMenuTheme);
 
+        QuickMenuVm.SetNotifications(BuildQuickNotifications());
         ShowQuickMenu = true;
+        AutoAcceptFreshNotification();
     }
 
     /// <summary>
@@ -6367,15 +6419,104 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         _messagePoller?.Dispose();
         _lastKnownMessageAt.Clear();
+        _notifSeeded = false;
+        int tick = 0;
         _messagePoller = new Timer(_ =>
         {
             // Fire-and-forget with structured exception handling
             Task.Run(async () =>
             {
+                try   { await PollInviteNotificationsAsync().ConfigureAwait(false); }
+                catch { /* polling failure is non-fatal */ }
+                if (Interlocked.Increment(ref tick) % 3 != 0) return;
                 try   { await PollMessagesAsync().ConfigureAwait(false); }
                 catch { /* polling failure is non-fatal */ }
             });
-        }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
+        }, null, TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(20));
+    }
+
+    // ── Invite / watch party / mod share notifications (Quick Guide) ──────────
+    private bool _notifSeeded;
+    private readonly Dictionary<string, DateTime> _freshNotifs = new();
+    private static readonly TimeSpan FreshNotifWindow = TimeSpan.FromMinutes(3);
+
+    private async Task PollInviteNotificationsAsync()
+    {
+        if (!_client.IsAuthenticated) return;
+        var (invites, shares) = await InboxVm.PollPendingAsync();
+        bool seed = !_notifSeeded;
+        _notifSeeded = true;
+        if (seed) return;
+        foreach (var inv in invites)
+        {
+            lock (_freshNotifs) _freshNotifs[InviteNotifId(inv)] = DateTime.UtcNow;
+            NotificationService.ShowMessageNotification(inv.From, InviteNotifDetail(inv) + " — open the Quick Guide to accept");
+        }
+        foreach (var sh in shares)
+        {
+            lock (_freshNotifs) _freshNotifs["share:" + sh.Id] = DateTime.UtcNow;
+            NotificationService.ShowMessageNotification(sh.From, "Shared a mod: " + sh.Payload.Name + " — open the Quick Guide to accept");
+        }
+        if (invites.Count + shares.Count > 0)
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+            {
+                if (ShowQuickMenu) QuickMenuVm.SetNotifications(BuildQuickNotifications());
+            });
+    }
+
+    private static string InviteNotifId(GameInvite i) => "invite:" + i.InviteId;
+
+    private static string InviteNotifDetail(GameInvite i) =>
+        i.StreamPort.HasValue || string.Equals(i.Kind, "watch", StringComparison.OrdinalIgnoreCase)
+            ? $"Watch party: {i.GameName}"
+            : $"Invited you to play {i.GameName}";
+
+    private List<QuickNotificationVm> BuildQuickNotifications()
+    {
+        var list = new List<QuickNotificationVm>();
+        foreach (var i in InboxVm.PendingInvites.ToList())
+        {
+            bool watch = i.StreamPort.HasValue || string.Equals(i.Kind, "watch", StringComparison.OrdinalIgnoreCase);
+            list.Add(new QuickNotificationVm
+            {
+                Id = InviteNotifId(i), Glyph = watch ? "📺" : "🎮", Source = i,
+                Title = watch ? $"{i.From} started a watch party" : $"{i.From} invited you",
+                Detail = InviteNotifDetail(i),
+            });
+        }
+        foreach (var sh in InboxVm.PendingModShares.ToList())
+            list.Add(new QuickNotificationVm
+            {
+                Id = "share:" + sh.Id, Glyph = "🧩", Source = sh, Title = sh.Title, Detail = sh.Detail,
+            });
+        lock (_freshNotifs)
+        {
+            foreach (var n in list)
+                n.IsFresh = _freshNotifs.TryGetValue(n.Id, out var at) && DateTime.UtcNow - at < FreshNotifWindow;
+        }
+        return list;
+    }
+
+    private async Task AcceptQuickNotificationAsync(QuickNotificationVm n)
+    {
+        lock (_freshNotifs) _freshNotifs.Remove(n.Id);
+        if (n.Source is GameInvite inv) await InboxVm.AcceptInviteCommand.ExecuteAsync(inv);
+        else if (n.Source is PendingModShare sh) InboxVm.AcceptModShareCommand.Execute(sh);
+    }
+
+    private async Task DeclineQuickNotificationAsync(QuickNotificationVm n)
+    {
+        lock (_freshNotifs) _freshNotifs.Remove(n.Id);
+        if (n.Source is GameInvite inv) await InboxVm.DeclineInviteCommand.ExecuteAsync(inv);
+        else if (n.Source is PendingModShare sh) InboxVm.DeclineModShareCommand.Execute(sh);
+    }
+
+    /// <summary>Opening the Quick Guide while an invite just arrived accepts the newest one.</summary>
+    private void AutoAcceptFreshNotification()
+    {
+        var fresh = QuickMenuVm.Notifications.LastOrDefault(n => n.IsFresh);
+        if (fresh == null) return;
+        _ = QuickMenuVm.AcceptNotificationCommand.ExecuteAsync(fresh);
     }
 
     /// <summary>
@@ -6400,7 +6541,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 try
                 {
-                    var messages = await _client.GetMessagesAsync(friendUsername);
+                    var messages = (await _client.GetMessagesAsync(friendUsername))
+                        .Where(m => !ModShareService.IsShareMessage(m.Text) && !InviteMessageService.IsInviteMessage(m.Text))
+                        .ToList();
                     if (messages.Count == 0) continue;
 
                     // The most recent message in the conversation

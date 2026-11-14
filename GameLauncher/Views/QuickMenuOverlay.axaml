@@ -327,6 +327,31 @@
         <qm:SteamQuickMenu/>
         <qm:XbOneQuickMenu/>
         <qm:QuickMenuChat/>
+        <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,24,24,0" Width="380"
+                IsVisible="{Binding HasNotifications}" Background="#EE161b22" CornerRadius="12"
+                BorderBrush="#58a6ff" BorderThickness="1" Padding="12">
+            <StackPanel Spacing="8">
+                <TextBlock Text="🔔 Notifications" FontWeight="SemiBold" FontSize="15" Foreground="White"/>
+                <ItemsControl ItemsSource="{Binding Notifications}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:QuickNotificationVm">
+                            <StackPanel Spacing="4" Margin="0,4">
+                                <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                <TextBlock Text="{Binding Detail}" Foreground="#9E9E9E" FontSize="12" TextWrapping="Wrap"/>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="btn-primary" Content="Accept"
+                                            Command="{Binding $parent[UserControl].((vm:QuickMenuViewModel)DataContext).AcceptNotificationCommand}"
+                                            CommandParameter="{Binding}"/>
+                                    <Button Classes="btn-secondary" Content="Decline"
+                                            Command="{Binding $parent[UserControl].((vm:QuickMenuViewModel)DataContext).DeclineNotificationCommand}"
+                                            CommandParameter="{Binding}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
         <views:OnScreenKeyboardView DataContext="{Binding Keyboard}"/>
     </Grid>
 
