@@ -420,7 +420,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     [ObservableProperty] private bool   _hasSteamLaunchOption;
     public bool HasEpicLaunchOption => IsInstalled && EpicLaunchUrl() != null;
-    public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall) && !IsRepack;
+    public bool ShowStandaloneSteamInstall => (IsSteamInstallable || HasEpicInstall || (_isDigitalAbyss && !IsInstalled)) && !IsRepack;
 
     /// <summary>Epic Games library owns this title (Epic can install it).</summary>
     [NotifyPropertyChangedFor(nameof(ShowStandaloneSteamInstall))]
@@ -446,10 +446,63 @@ public partial class GameDetailViewModel : ViewModelBase
         if (HasEpicInstall) IsCloudOnly = false;
     }
 
+    private bool _isDigitalAbyss;
+
+    /// <summary>Marks Digital Abyss as installed (ready to play) when its desktop app is already on disk.</summary>
+    private void ApplyDigitalAbyssState(string? platform, string? title)
+    {
+        _isDigitalAbyss = Services.DigitalAbyssInstallerService.IsDigitalAbyss(platform, title);
+        OnPropertyChanged(nameof(ShowStandaloneSteamInstall));
+        if (!_isDigitalAbyss || IsInstalled || !Services.DigitalAbyssInstallerService.IsInstalled) return;
+        SetDigitalAbyssInstalled();
+    }
+
+    private void SetDigitalAbyssInstalled()
+    {
+        var exe = Services.DigitalAbyssInstallerService.ExePath;
+        IsInstalled = true;
+        IsRepack = false;
+        IsCloudOnly = false;
+        _driveInstances = new List<LocalGameDriveEntry>
+        {
+            new() { DriveRoot = Path.GetPathRoot(exe) ?? "", FolderPath = Path.GetDirectoryName(exe) ?? "", ExecutablePath = exe, ExecutableType = "exe" }
+        };
+        DriveLabels.Clear();
+        DriveLabels.Add(_driveInstances[0].DriveRoot);
+        HasMultipleDrives = false;
+        SelectedDriveIndex = 0;
+        RefreshActiveDrive();
+    }
+
+    private async System.Threading.Tasks.Task InstallDigitalAbyssAsync()
+    {
+        if (IsExtracting) return;
+        ShowInstallSourcePicker = false;
+        InstallStatusMessage = "⏳  Downloading and installing Digital Abyss…";
+        InstallStatusIsError = false;
+        ExtractionProgress = 0;
+        IsExtracting = true;
+        try
+        {
+            var progress = new Progress<double>(p => ExtractionProgress = p);
+            await Services.DigitalAbyssInstallerService.InstallAsync(progress);
+            SetDigitalAbyssInstalled();
+            InstallStatusMessage = "✓  Digital Abyss is installed and ready to play.";
+        }
+        catch (Exception ex)
+        {
+            Services.DevLogService.Log($"[DigitalAbyss] install failed: {ex}");
+            InstallStatusMessage = $"⛔  Install failed: {ex.Message}";
+            InstallStatusIsError = true;
+        }
+        finally { IsExtracting = false; }
+    }
+
     /// <summary>Single Install entry point: one source launches directly, several (or none yet) ask the user.</summary>
     [RelayCommand]
     private void InstallGame()
     {
+        if (_isDigitalAbyss && !IsInstalled) { _ = InstallDigitalAbyssAsync(); return; }
         if (InstallSourceCount == 1)
         {
             if (HasEpicInstall) { InstallViaEpic(); return; }
@@ -4690,6 +4743,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title, game.PlaytimeMinutes);
         ApplyInstallState(localGame, repack, localRom);
+        ApplyDigitalAbyssState(game.Platform, game.Title);
         // IsCloudOnly: cloud library entry with no local copy of any kind
         IsCloudOnly = !IsInstalled && !IsRepack && !IsSteamInstallable;
         LoadSwitchMods();
@@ -4759,6 +4813,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
         PopulatePlaytime(game.Platform, game.Title);
         ApplyInstallState(localGame, repack, localRom);
+        ApplyDigitalAbyssState(game.Platform, game.Title);
         IsCloudOnly = false;
         // Intentionally unconditional — resets IsSwitch=false for non-Switch store games
         // so stale Switch state from a previously viewed game is always cleared.

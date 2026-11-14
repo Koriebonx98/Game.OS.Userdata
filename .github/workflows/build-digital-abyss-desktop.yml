@@ -10,7 +10,7 @@ on:
       - '.github/workflows/build-digital-abyss-desktop.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -33,3 +33,12 @@ jobs:
         with:
           name: DigitalAbyss-Setup-win-x64
           path: desktop/digital-abyss/dist/*.exe
+      - name: Publish release asset for the PC launcher
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: desktop/digital-abyss/dist
+        run: |
+          gh release view digital-abyss-desktop >/dev/null 2>&1 || gh release create digital-abyss-desktop --title "Digital Abyss (PC installer)" --notes "Installer used by the Game OS PC app."
+          gh release upload digital-abyss-desktop DigitalAbyss-Setup.exe --clobber

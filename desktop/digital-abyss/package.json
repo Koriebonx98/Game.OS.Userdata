@@ -20,6 +20,6 @@
     "productName": "Digital Abyss",
     "files": ["main.js", "offline.html"],
     "win": { "target": "nsis" },
-    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true }
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "artifactName": "DigitalAbyss-Setup.exe" }
   }
 }
