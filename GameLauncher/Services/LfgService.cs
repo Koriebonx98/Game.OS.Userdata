@@ -1,62 +1,38 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using Open.Nat;
 using GameLauncher.Models;
 
 namespace GameLauncher.Services
 {
     /// <summary>
     /// Shared swarm + LFG/group rooms. Every signed-in launcher heartbeats into the backend pool; a host
-    /// publishes a room (game + platform) and joiners receive the host's temporary endpoint, which is
-    /// stored locally as a hidden friend address and never shown in the UI.
+    /// publishes a room (game + platform) and joiners receive the host's temporary endpoint.
     /// </summary>
     public sealed class LfgService : IDisposable
     {
         public const int DefaultPort = 26500;
         private readonly GameOsClient _client;
         private Timer? _roomTimer;
-        private NatDevice? _nat;
-        private readonly List<Mapping> _mappings = new();
         private readonly VirtualNetworkService _vpn = new();
 
-        /// <summary>Last connection result shown to the host, e.g. "Public via UPnP" or "LAN/VPN only".</summary>
+        /// <summary>Last connection result shown to the host.</summary>
         public string ConnectionInfo { get; private set; } = "";
-
-        /// <summary>Opens the game port on the router via UPnP and returns the public endpoint, or null when the router refuses.</summary>
-        private async Task<string?> TryOpenPublicEndpointAsync(int port)
-        {
-            try
-            {
-                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(6));
-                _nat = await new NatDiscoverer().DiscoverDeviceAsync(PortMapper.Upnp, cts).ConfigureAwait(false);
-                var ip = await _nat.GetExternalIPAsync().ConfigureAwait(false);
-                foreach (var proto in new[] { Protocol.Udp, Protocol.Tcp })
-                {
-                    var m = new Mapping(proto, port, port, 3600, "Game.OS room");
-                    await _nat.CreatePortMapAsync(m).ConfigureAwait(false);
-                    _mappings.Add(m);
-                }
-                return $"{ip}:{port}";
-            }
-            catch { CloseMappings(); return null; }
-        }
-
-        private void CloseMappings()
-        {
-            var nat = _nat; var maps = _mappings.ToList();
-            _nat = null; _mappings.Clear();
-            if (nat == null) return;
-            Task.Run(async () => { foreach (var m in maps) { try { await nat.DeletePortMapAsync(m).ConfigureAwait(false); } catch { } } });
-        }
+        private string _vpnFallbackReason = "";
 
         public LfgService(GameOsClient client) => _client = client;
 
         public string? HostedRoomId { get; private set; }
+        public string HostedGame { get; private set; } = "";
+        public string HostedPlatform { get; private set; } = "";
+        public string JoinedEndpoint { get; private set; } = "";
+        public string JoinedGame { get; private set; } = "";
+        public string JoinedPlatform { get; private set; } = "";
         public bool IsHosting => HostedRoomId != null;
         public bool IsAvailable => _client.SupportsSwarm;
 
@@ -88,25 +64,34 @@ namespace GameLauncher.Services
         public async Task<List<LfgRoom>> ListAsync(string game, string platform)
         {
             if (!IsAvailable) return new();
-            try { return await _client.ListLfgAsync(game, platform).ConfigureAwait(false); }
-            catch { return new(); }
+            return await _client.ListLfgAsync(game, platform).ConfigureAwait(false);
         }
 
         /// <summary>Publishes an LFG/group room for the game and keeps it alive until <see cref="StopHosting"/>.</summary>
-        public async Task HostAsync(string game, string platform, bool group, int maxPlayers = 4)
+        public async Task HostAsync(string game, string platform, bool group, int maxPlayers = 4, string? hostAddress = null)
         {
             StopHosting();
-            if (await TryHostOverVirtualNetworkAsync(game, platform, group, maxPlayers).ConfigureAwait(false)) return;
-            string? pub = await TryOpenPublicEndpointAsync(DefaultPort).ConfigureAwait(false);
-            ConnectionInfo = pub != null ? "Public connection opened via UPnP" : "UPnP unavailable — reachable over LAN/VPN (Radmin/ZeroTier) only";
+            _vpnFallbackReason = "";
+            if (string.IsNullOrWhiteSpace(hostAddress)
+                && await TryHostOverVirtualNetworkAsync(game, platform, group, maxPlayers).ConfigureAwait(false)) return;
             string id;
-            try
-            {
-                id = await _client.CreateLfgAsync(game, platform, group ? "group" : "lfg", pub ?? ResolveHostEndpoint(), maxPlayers)
-                    .ConfigureAwait(false);
-            }
-            catch { CloseMappings(); throw; }
+            var endpoint = string.IsNullOrWhiteSpace(hostAddress) ? ResolveHostEndpoint() : hostAddress.Trim() + ":" + DefaultPort;
+            if (!IPEndPoint.TryParse(endpoint, out var address)
+                || address.AddressFamily != AddressFamily.InterNetwork || IPAddress.IsLoopback(address.Address))
+                throw new InvalidOperationException("Enter a valid local LAN/VPN IPv4 address.");
+            bool localAddress = NetworkInterface.GetAllNetworkInterfaces()
+                .Where(ni => ni.OperationalStatus == OperationalStatus.Up)
+                .SelectMany(ni => ni.GetIPProperties().UnicastAddresses)
+                .Any(ua => ua.Address.Equals(address.Address));
+            if (!localAddress) throw new InvalidOperationException("The selected address is not assigned to an active network adapter.");
+            ConnectionInfo = $"Host address {address.Address}. Use the same LAN/VPN; configure the game's own port separately if needed";
+            if (!string.IsNullOrEmpty(_vpnFallbackReason))
+                ConnectionInfo += $". Game.OS VPN unavailable: {_vpnFallbackReason}";
+            id = await _client.CreateLfgAsync(game, platform, group ? "group" : "lfg", address.Address.ToString(), maxPlayers)
+                .ConfigureAwait(false);
             HostedRoomId = id;
+            HostedGame = game;
+            HostedPlatform = platform;
             StartRoomTimer();
         }
 
@@ -119,15 +104,11 @@ namespace GameLauncher.Services
                 Task.Run(async () =>
                 {
                     try { await _client.LfgHeartbeatAsync(rid).ConfigureAwait(false); } catch { }
-                    // Renew the lease before the router drops the mapping.
-                    var nat = _nat;
-                    if (nat != null)
-                        foreach (var m in _mappings.ToList()) { try { await nat.CreatePortMapAsync(m).ConfigureAwait(false); } catch { } }
                 });
             }, null, TimeSpan.FromSeconds(60), TimeSpan.FromSeconds(60));
         }
 
-        /// <summary>Creates a room on the Game.OS virtual LAN; this PC hosts at 10.77.N.1. Returns false to fall back to UPnP.</summary>
+        /// <summary>Creates a room on the Game.OS virtual LAN; this PC hosts at 10.77.N.1. Returns false to fall back to LAN/VPN.</summary>
         private async Task<bool> TryHostOverVirtualNetworkAsync(string game, string platform, bool group, int maxPlayers)
         {
             if (!VirtualNetworkService.IsSupported || !_client.IsBackendMode) return false;
@@ -139,13 +120,16 @@ namespace GameLauncher.Services
                 var session = await _client.GetVpnSessionAsync(id).ConfigureAwait(false);
                 if (!_vpn.Start(session)) throw new InvalidOperationException(_vpn.Status);
                 HostedRoomId = id;
+                HostedGame = game;
+                HostedPlatform = platform;
                 ConnectionInfo = $"Game.OS virtual network — your address {session.Ip}";
                 StartRoomTimer();
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
                 if (id != null) { try { await _client.CloseLfgAsync(id).ConfigureAwait(false); } catch { } }
+                _vpnFallbackReason = ex.Message;
                 _vpn.Stop();
                 return false;
             }
@@ -155,21 +139,36 @@ namespace GameLauncher.Services
 
         public void StopHosting()
         {
-            _vpn.Stop();
+            Disconnect();
             _roomTimer?.Dispose();
             _roomTimer = null;
             var id = HostedRoomId;
             HostedRoomId = null;
-            CloseMappings();
+            HostedGame = HostedPlatform = "";
             if (id != null)
                 Task.Run(async () => { try { await _client.CloseLfgAsync(id).ConfigureAwait(false); } catch { } });
+        }
+
+        public void Disconnect()
+        {
+            _vpn.Stop();
+            JoinedEndpoint = JoinedGame = JoinedPlatform = "";
         }
 
         /// <summary>Joins a room and saves the host's endpoint as a hidden temporary address; returns the host name.</summary>
         public async Task<string> JoinAsync(LfgRoom room)
         {
+            if (IsHosting) throw new InvalidOperationException("Close your hosted room before joining another room.");
             var res = await _client.JoinLfgAsync(room.RoomId).ConfigureAwait(false);
             string host = string.IsNullOrEmpty(res.Host) ? room.Host : res.Host;
+            if (!string.Equals(host, room.Host, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(res.Game, room.Game, StringComparison.OrdinalIgnoreCase)
+                || !string.Equals(res.Platform, room.Platform, StringComparison.OrdinalIgnoreCase))
+                throw new InvalidOperationException("The room details do not match the invitation.");
+            if (!RoomConnectionService.IsValidEndpoint(res.Endpoint))
+                throw new InvalidOperationException("The room returned an invalid host address.");
+            _vpn.Stop();
+            JoinedEndpoint = JoinedGame = JoinedPlatform = "";
             if (res.Vpn)
             {
                 var session = await _client.GetVpnSessionAsync(room.RoomId).ConfigureAwait(false);
@@ -179,6 +178,10 @@ namespace GameLauncher.Services
             var existing = FriendIpService.Load(host).Where(e => e.Label != TempLabel).ToList();
             existing.Add(new FriendIpEntry { Label = TempLabel, Address = res.Endpoint, Type = "local" });
             FriendIpService.Save(host, existing);
+            JoinedEndpoint = res.Endpoint;
+            JoinedGame = res.Game;
+            JoinedPlatform = res.Platform;
+            if (!res.Vpn) ConnectionInfo = "Use the same LAN/VPN as the host";
             return host;
         }
 

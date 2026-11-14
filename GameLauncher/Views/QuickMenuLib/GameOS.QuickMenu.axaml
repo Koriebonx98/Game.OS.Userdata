@@ -6,6 +6,13 @@
              x:Class="GameLauncher.Views.QuickMenuLib.GameOsQuickMenu"
              x:DataType="vm:QuickMenuViewModel">
 
+        <UserControl.Styles>
+            <Style Selector="Button.qm-gameos-friend.cursor /template/ ContentPresenter">
+                <Setter Property="BorderBrush" Value="#58a6ff"/>
+                <Setter Property="BorderThickness" Value="2"/>
+            </Style>
+        </UserControl.Styles>
+
         <!-- GameOS quick panel (replaces PS5 hub bar for GameOS theme) -->
         <Border Classes="qm-gameos-panel"
                 IsVisible="{Binding IsGameOsTheme}"
@@ -25,7 +32,7 @@
                 </Grid>
                 <Rectangle Height="1" Fill="#30363d"/>
                 <!-- Navigation items -->
-                <ItemsControl ItemsSource="{Binding SwitcherItems}">
+                <ItemsControl ItemsSource="{Binding SwitcherItems}" IsVisible="{Binding !IsFriendsPage}">
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:QuickMenuSwitcherItemVm">
                             <Button Classes="btn-secondary"
@@ -52,27 +59,30 @@
                 </ItemsControl>
                 <Rectangle Height="1" Fill="#30363d"/>
                 <Button Classes="btn-secondary" Command="{Binding AddFriendCommand}"
+                        IsVisible="{Binding !IsFriendsPage}"
                         HorizontalAlignment="Stretch" HorizontalContentAlignment="Left">
                     <TextBlock Text="➕  Add Friend" FontWeight="SemiBold" Foreground="#e6edf3" FontSize="13"/>
                 </Button>
-                <TextBlock Text="INVITE FRIENDS" FontSize="10" FontWeight="Bold" Foreground="#8b949e"/>
-                <ItemsControl ItemsSource="{Binding QuickFriends}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="vm:FriendPresenceVm">
-                            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Username}" Foreground="#e6edf3" FontSize="12" FontWeight="SemiBold"/>
-                                    <TextBlock Text="{Binding StatusLabel}" Foreground="#8b949e" FontSize="10" TextTrimming="CharacterEllipsis"/>
-                                </StackPanel>
-                                <Button Grid.Column="1" Classes="btn-secondary" Padding="10,4" FontSize="11"
-                                        Command="{Binding $parent[UserControl].DataContext.InviteFriendCommand}"
-                                        CommandParameter="{Binding Username}">🎮 Invite</Button>
-                            </Grid>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-                <TextBlock Text="{Binding InviteStatusMessage}" FontSize="11" Foreground="#8b949e" TextWrapping="Wrap"
-                           IsVisible="{Binding InviteStatusMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
+                <Button Classes="btn-secondary" Command="{Binding SelectFriendsCommand}"
+                        IsVisible="{Binding !IsFriendsPage}">🎮 Invite Friends</Button>
+                <Button Classes="btn-secondary" Command="{Binding SelectHomeCommand}"
+                        IsVisible="{Binding IsFriendsPage}">← Back</Button>
+                <TextBlock Text="{Binding InviteStatusMessage}"
+                           Foreground="#8b949e" FontSize="11" TextWrapping="Wrap"/>
+                <ScrollViewer IsVisible="{Binding IsFriendsPage}" MaxHeight="350" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding HubActions}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
+                                <Button Classes="btn-secondary qm-gameos-friend" Classes.cursor="{Binding IsCursor}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsCursor}"
+                                        IsHitTestVisible="{Binding IsActionable}" Command="{Binding ActivateCommand}"
+                                        HorizontalAlignment="Stretch" Margin="0,2">
+                                    <TextBlock Text="{Binding Title}" TextWrapping="Wrap"/>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
                 <Rectangle Height="1" Fill="#30363d"/>
                 <!-- Exit game shortcut when playing -->
                 <Button Classes="btn-primary"

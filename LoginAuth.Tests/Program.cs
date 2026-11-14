@@ -44,6 +44,7 @@ class Program
 
     static async Task<int> Main(string[] args)
     {
+        if (args.Contains("--room-tests")) return TestRoomConnections() ? 0 : 1;
         Banner();
         bool allPassed = true;
 
@@ -94,6 +95,7 @@ class Program
 
         // ── 15. Free metadata resolver (title cleaning, Steam/SteamGridDB/TheGamesDB parsing) ──
         allPassed &= TestMetadataResolver();
+        allPassed &= TestRoomConnections();
 
         // ── Summary ───────────────────────────────────────────────────────────
         Console.WriteLine();
@@ -110,6 +112,57 @@ class Program
         }
         Console.WriteLine("═══════════════════════════════════════════════════════════════════");
         return allPassed ? 0 : 1;
+    }
+
+    static bool TestRoomConnections()
+    {
+        Section("Room invitations and connection arguments");
+        bool passed = true;
+        void Check(bool ok, string description) { Pass(ok, description); passed &= ok; }
+
+        var invite = new GameInvite
+        {
+            InviteId = "msg-123", GameName = "Ghosts", Platform = "PC",
+            Kind = "game", RoomId = "room-1"
+        };
+        var messages = new List<Message>
+        {
+            new() { From = "Host", Text = InviteMessageService.EncodeInvite(invite), SentAt = "2026-01-01" }
+        };
+        var pending = InviteMessageService.Pending(messages, "host", "guest");
+        Check(pending.Count == 1 && pending[0].RoomId == "room-1" && pending[0].From == "host",
+            "Room invitation arrives from the conversation friend");
+        messages.Add(new Message { From = "host", Text = InviteMessageService.EncodeResponse("msg-123", "accepted") });
+        Check(InviteMessageService.Pending(messages, "host", "guest").Count == 1,
+            "A sender cannot respond to their own invitation");
+        messages.Add(new Message { From = "guest", Text = InviteMessageService.EncodeResponse("msg-123", "accepted") });
+        Check(InviteMessageService.Pending(messages, "host", "guest").Count == 0
+            && InviteMessageService.Response(messages, "guest", "msg-123") == "accepted",
+            "Acceptance removes the pending invite and is visible to the sender");
+        var watch = new GameInvite { InviteId = "msg-456", GameName = "Movie", Kind = "watch", RoomId = "stream", RelayUrl = "https://relay.example" };
+        var watchMessages = new[] { new Message { From = "host", Text = InviteMessageService.EncodeInvite(watch) } };
+        var receivedWatch = InviteMessageService.Pending(watchMessages, "host", "guest").Single();
+        Check(receivedWatch.IsWatchParty && receivedWatch.RelayUrl == watch.RelayUrl,
+            "Watch-party relay details survive the message round trip");
+        Check(InviteMessageService.Pending(new[] { new Message { From = "host", Text = InviteMessageService.Marker + "{bad" } }, "host", "guest").Count == 0,
+            "Malformed invitation is ignored");
+        Check(InviteMessageService.Pending(new[] { new Message { From = "host", Text = InviteMessageService.Marker + "{\"Invite\":{\"inviteId\":null}}" } }, "host", "guest").Count == 0,
+            "An invite without an ID is ignored");
+
+        Check(RoomConnectionService.IsValidEndpoint("10.77.1.1")
+            && RoomConnectionService.IsValidEndpoint("192.168.1.2:28960")
+            && !RoomConnectionService.IsValidEndpoint("127.0.0.1")
+            && !RoomConnectionService.IsValidEndpoint(null)
+            && !RoomConnectionService.IsValidEndpoint("10.0.0.1:65536")
+            && !RoomConnectionService.IsValidEndpoint("10.0.0.1 -exec bad"),
+            "Only valid non-loopback IPv4 room endpoints are accepted");
+        Check(RoomConnectionService.ConnectArgument("-connect {IP}", "192.168.1.2", "10.77.1.1", "Ghosts", "PC", "Ghosts", "PC") == "-connect 10.77.1.1",
+            "A matching room supplies the Ghosts connect address");
+        Check(RoomConnectionService.ConnectArgument("connect {IP}", "192.168.1.2", "10.77.1.1", "Ghosts", "PC", "Another Game", "PC") == "connect 192.168.1.2",
+            "A different game keeps its configured server address");
+        Check(RoomConnectionService.ConnectArgument("connect {IP}", "", "10.77.1.1", "Call of Duty: Ghosts", "PC", "Call of Duty - Ghosts", "PC") == "connect 10.77.1.1",
+            "Normalized game titles still use the joined room");
+        return passed;
     }
 
     // ── Test 1: PBKDF2 hash parity with Node.js reference values ─────────────

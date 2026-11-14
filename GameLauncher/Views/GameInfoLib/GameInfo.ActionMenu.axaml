@@ -77,12 +77,16 @@
                     <Button Classes="btn-secondary" Command="{Binding CloseLfgCommand}" Content="✕  Close"/>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                    <TextBox Text="{Binding LfgHostAddress}" IsVisible="{Binding IsLfgNotHosting}"
+                             Watermark="Optional: host LAN/VPN IPv4 address" FontSize="12"/>
                     <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsLfgNotHosting}">
                         <Button Classes="btn-primary" Command="{Binding StartLfgCommand}" Content="🔍  Looking for players"/>
                         <Button Classes="btn-secondary" Command="{Binding StartGroupCommand}" Content="👥  Start a group"/>
                     </StackPanel>
                     <Button Classes="btn-secondary" Command="{Binding StopLfgCommand}" Content="⏹  Close my room"
                             IsVisible="{Binding IsLfgHosting}"/>
+                    <Button Classes="btn-secondary" Command="{Binding DisconnectLfgCommand}" Content="Disconnect"
+                            IsVisible="{Binding IsLfgConnected}"/>
                     <TextBlock Text="{Binding LfgStatus}" FontSize="12" Foreground="#58a6ff" TextWrapping="Wrap"
                                IsVisible="{Binding LfgStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"/>
                 </StackPanel>

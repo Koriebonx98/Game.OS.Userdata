@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              x:Class="GameLauncher.Views.QuickMenuLib.SwitchQuickMenu"
              x:DataType="vm:QuickMenuViewModel">
 
@@ -65,6 +66,8 @@
                     <TextBlock Text="Quick Guide" FontSize="12" Foreground="#e60012" FontWeight="Bold"/>
                     <TextBlock Text="{Binding MenuTitle}" FontSize="26" FontWeight="SemiBold" Foreground="White"/>
                     <TextBlock Text="{Binding MenuSubtitle}" FontSize="13" Foreground="#aaaaaa"/>
+                    <TextBlock Text="{Binding InviteStatusMessage}" IsVisible="{Binding IsFriendsPage}"
+                               Foreground="#aaaaaa" FontSize="12" TextWrapping="Wrap"/>
                 </StackPanel>
                 <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
                   <StackPanel>
@@ -106,6 +109,7 @@
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
                                 <Button Classes="swg-row" Classes.cursor="{Binding IsCursor}"
+                                        views:BringIntoViewBehavior.Active="{Binding IsCursor}"
                                         Classes.info="{Binding !IsActionable}"
                                         IsHitTestVisible="{Binding IsActionable}"
                                         Command="{Binding ActivateCommand}">

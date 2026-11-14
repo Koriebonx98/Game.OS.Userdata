@@ -40,6 +40,7 @@ account (`accounts/<user>/broadcast.json`), so the streamer's IP is never shared
 
 ## Watch parties
 
-A party invite is a normal invite with `kind: "watch"`, `roomId`, `relayUrl`, `mediaType`, `season`, `episode`.
+A party invite is a hidden friend message with `kind: "watch"`, `roomId`, `relayUrl`, `mediaType`, `season`, `episode`;
+the recipient needs a launcher version that understands these messages.
 If the host chose *wait for friends to accept*, playback starts once an invitee accepts. Viewers who watch for a
 minute get the title recorded in `accounts/<user>/watched-media.json` for recommendations.

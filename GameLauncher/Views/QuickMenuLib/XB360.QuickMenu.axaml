@@ -186,10 +186,12 @@
                                             <TextBlock Text="{Binding Xb360FriendsCount, StringFormat='{}{0} friends'}" FontSize="13" Foreground="#444"/>
 
                                             <!-- Friend rows: highlight when Xb360FriendsSubMode is true -->
+                                            <ScrollViewer MaxHeight="240" VerticalScrollBarVisibility="Auto">
                                             <ItemsControl ItemsSource="{Binding Friends}">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="vm:FriendPresenceVm">
                                                         <Border Classes="xb360-friend-row" Classes.cursor="{Binding IsHighlighted}"
+                                                                views:BringIntoViewBehavior.Active="{Binding IsHighlighted}"
                                                                 Padding="6,4" Margin="0,1" CornerRadius="4"
                                                                 BorderThickness="3" BorderBrush="Transparent"
                                                                 Background="#e8e8e8">
@@ -203,20 +205,9 @@
                                                                     <TextBlock Text="..."/>
                                                                     <Button.Flyout>
                                                                         <MenuFlyout Placement="BottomEdgeAlignedRight">
-                                                                            <MenuItem Header="Invite">
-                                                                                <MenuItem Header="Crossplay"
-                                                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Crossplay'}"/>
-                                                                                <MenuItem Header="Radmin"
-                                                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Radmin'}"/>
-                                                                                <MenuItem Header="OnlineFix"
-                                                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|OnlineFix'}"/>
-                                                                                <MenuItem Header="Steam"
-                                                                                          Command="{Binding $parent[UserControl].DataContext.InviteFriendViaConnectionCommand}"
-                                                                                          CommandParameter="{Binding Username, StringFormat='{}{0}|Steam'}"/>
-                                                                            </MenuItem>
+                                                                            <MenuItem Header="Invite to room"
+                                                                                      Command="{Binding $parent[UserControl].DataContext.InviteFriendCommand}"
+                                                                                      CommandParameter="{Binding Username}"/>
                                                                             <MenuItem Header="Message"
                                                                                       Command="{Binding $parent[UserControl].DataContext.MessageFriendCommand}"
                                                                                       CommandParameter="{Binding Username}"/>
@@ -231,6 +222,7 @@
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
+                                            </ScrollViewer>
 
                                             <!-- Controller context action panel (shown when Xb360FriendContextMenuOpen) -->
                                             <Border IsVisible="{Binding Xb360FriendContextMenuOpen}"

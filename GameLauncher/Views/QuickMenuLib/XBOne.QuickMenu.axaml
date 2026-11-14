@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:GameLauncher.ViewModels"
+             xmlns:views="using:GameLauncher.Views"
              x:Class="GameLauncher.Views.QuickMenuLib.XbOneQuickMenu"
              x:DataType="vm:QuickMenuViewModel">
 
@@ -80,9 +81,13 @@
 
             <!-- Green page title bar -->
             <Border Grid.Row="1" Background="#107c10" Margin="0,14,0,0" Padding="14,12">
-                <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
-                    <TextBlock Text="⌂" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding MenuTitle}" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                        <TextBlock Text="⌂" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding MenuTitle}" FontSize="22" Foreground="White" VerticalAlignment="Center"/>
+                    </StackPanel>
+                    <TextBlock Text="{Binding InviteStatusMessage}" IsVisible="{Binding IsFriendsPage}"
+                               Foreground="White" FontSize="13" TextWrapping="Wrap"/>
                 </StackPanel>
             </Border>
 
@@ -121,6 +126,7 @@
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
                             <Button Classes="xog-row" Classes.cursor="{Binding IsCursor}"
+                                    views:BringIntoViewBehavior.Active="{Binding IsCursor}"
                                     Classes.info="{Binding !IsActionable}"
                                     IsHitTestVisible="{Binding IsActionable}"
                                     Command="{Binding ActivateCommand}">

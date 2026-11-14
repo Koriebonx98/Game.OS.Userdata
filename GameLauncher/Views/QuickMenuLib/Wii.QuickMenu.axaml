@@ -19,21 +19,27 @@
                         <TextBlock Text="{Binding CurrentSessionLabel}" FontSize="13" HorizontalAlignment="Center"/>
                         <TextBlock Text="{Binding CurrentGameTitle}" FontSize="11" HorizontalAlignment="Center"
                                    IsVisible="{Binding IsPlayingGame}"/>
+                        <TextBlock Text="{Binding InviteStatusMessage}"
+                                   FontSize="11" TextWrapping="Wrap" HorizontalAlignment="Center" MaxWidth="600"/>
                     </StackPanel>
                     <Button Grid.Column="2" Classes="qm-wii-bubble" Command="{Binding DismissCommand}" Width="86">Close</Button>
                 </Grid>
-                <ItemsControl Grid.Row="1" ItemsSource="{Binding HubActions}">
+                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <ItemsControl ItemsSource="{Binding HubActions}">
                     <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate><UniformGrid Rows="1"/></ItemsPanelTemplate>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="vm:QuickMenuHubActionVm">
-                            <Button Classes="qm-wii-bubble" Classes.cursor="{Binding IsCursor}" Margin="5,0"
+                            <Button Classes="qm-wii-bubble" Classes.cursor="{Binding IsCursor}" Margin="5,0" MinWidth="100"
+                                    views:BringIntoViewBehavior.Active="{Binding IsCursor}"
                                     HorizontalAlignment="Stretch" HorizontalContentAlignment="Center"
-                                    Focusable="False" Command="{Binding ActivateCommand}" Content="{Binding Title}"/>
+                                    IsHitTestVisible="{Binding IsActionable}" Focusable="False"
+                                    Command="{Binding ActivateCommand}" Content="{Binding Title}"/>
                         </DataTemplate>
                     </ItemsControl.ItemTemplate>
                 </ItemsControl>
+                </ScrollViewer>
             </Grid>
         </Border>
 </UserControl>

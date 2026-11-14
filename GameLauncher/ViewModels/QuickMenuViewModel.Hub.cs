@@ -60,11 +60,6 @@ public partial class QuickMenuViewModel
         finally { _rebuildingHubActions = false; }
     }
 
-    partial void OnInviteStatusMessageChanged(string value)
-    {
-        if (ActivePage == "friends" && !IsXb360Theme && !UsesHubLayout) RebuildHubActions();
-    }
-
     partial void OnHubActionIndexChanged(int value) => SyncHubCursor();
 
     private void SyncHubCursor()
@@ -125,9 +120,22 @@ public partial class QuickMenuViewModel
     {
         if (IsWiiTheme)
         {
+            if (IsFriendsPage)
+            {
+                yield return Act("↩", "Back", () => SelectHomeCommand.Execute(null));
+                foreach (var friend in Friends.ToList())
+                {
+                    var name = friend.Username;
+                    yield return Act("🎮", $"Invite {name}", () => InviteFriendCommand.Execute(name),
+                        IsPlayingGame ? $"Join me in {CurrentGameTitle}" : "Start a game to invite", "invite");
+                }
+                if (Friends.Count == 0) yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = "No friends yet." };
+                yield return Act("👥", "Open Friends", () => OpenFriendsPageCommand.Execute(null));
+                yield break;
+            }
             yield return Act("🏠", "Home", () => GoToGameOsHomeCommand.Execute(null), "", "home");
             yield return Act("🎮", "Recent", () => OpenLibraryPageCommand.Execute(null));
-            yield return Act("👥", "Friends", () => OpenFriendsPageCommand.Execute(null));
+            yield return Act("👥", "Friends", () => SelectFriendsCommand.Execute(null));
             yield return Act("➕", "Add Friend", () => AddFriendCommand.Execute(null));
             yield return Act("📬", "Inbox", () => OpenInboxPageCommand.Execute(null));
             yield return Act("🌐", "Browser", () => OpenBrowserCommand.Execute(null));
@@ -178,10 +186,8 @@ public partial class QuickMenuViewModel
                 yield return Act("▦", "Open Library", () => OpenDownloadsPageCommand.Execute(null));
                 break;
             case "friends":
-                if (!string.IsNullOrEmpty(InviteStatusMessage))
-                    yield return new QuickMenuHubActionVm { Glyph = "ℹ", Title = InviteStatusMessage };
                 yield return Act("➕", "Add Friend", () => AddFriendCommand.Execute(null), "Send a friend request", "addfriend");
-                foreach (var f in QuickFriends.Take(4))
+                foreach (var f in Friends.ToList())
                 {
                     var name = f.Username;
                     yield return Act("👤", $"View {name}", () => ViewFriendCommand.Execute(name), f.StatusLabel);

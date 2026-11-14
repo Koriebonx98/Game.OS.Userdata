@@ -37,6 +37,7 @@ public partial class InboxViewModel : ViewModelBase
 
     public Action<string>? OnViewFriendProfile { get; set; }
     public Action<GameInvite>? OnInviteAccepted { get; set; }
+    public Func<GameInvite, Task>? BeforeInviteAccepted { get; set; }
 
     public void Load(GameOsClient client, string username)
     {
@@ -157,7 +158,12 @@ public partial class InboxViewModel : ViewModelBase
     private async Task AcceptInvite(GameInvite? invite)
     {
         if (_client == null || invite == null || string.IsNullOrWhiteSpace(invite.InviteId)) return;
-        await _client.RespondInviteAsync(invite.InviteId, "accepted");
+        try
+        {
+            if (BeforeInviteAccepted != null) await BeforeInviteAccepted(invite);
+            await _client.RespondInviteAsync(invite, "accepted");
+        }
+        catch (Exception ex) { ErrorMessage = "Could not accept invite: " + ex.Message; return; }
         PendingInvites.Remove(invite);
         OnInviteAccepted?.Invoke(invite);
         OnPropertyChanged(nameof(HasPendingInvites));
@@ -187,7 +193,8 @@ public partial class InboxViewModel : ViewModelBase
     private async Task DeclineInvite(GameInvite? invite)
     {
         if (_client == null || invite == null || string.IsNullOrWhiteSpace(invite.InviteId)) return;
-        await _client.RespondInviteAsync(invite.InviteId, "declined");
+        try { await _client.RespondInviteAsync(invite, "declined"); }
+        catch (Exception ex) { ErrorMessage = "Could not decline invite: " + ex.Message; return; }
         PendingInvites.Remove(invite);
         OnPropertyChanged(nameof(HasPendingInvites));
         OnPropertyChanged(nameof(HasEmptyInbox));
@@ -265,14 +272,20 @@ public partial class InboxViewModel : ViewModelBase
         {
             var friendsTask = _client.GetFriendsAsync();
             var invitesTask = _client.GetInvitesAsync();
-            await Task.WhenAll(friendsTask, invitesTask);
-
-            foreach (var invite in (await invitesTask)
-                .Where(i => string.Equals(i.Status, "pending", StringComparison.OrdinalIgnoreCase))
-                .OrderByDescending(i => i.SentAt))
-                PendingInvites.Add(invite);
-
             var friends = await friendsTask;
+            var messageInvitesTask = _client.GetMessageInvitesAsync(friends);
+            try
+            {
+                foreach (var invite in (await invitesTask)
+                    .Where(i => string.Equals(i.Status, "pending", StringComparison.OrdinalIgnoreCase)))
+                    PendingInvites.Add(invite);
+            }
+            catch (Exception ex) { ErrorMessage = "Could not load older invites: " + ex.Message; }
+            try
+            {
+                foreach (var invite in await messageInvitesTask) PendingInvites.Add(invite);
+            }
+            catch (Exception ex) { ErrorMessage = "Could not load friend invitations: " + ex.Message; }
             var convoTasks = friends.Select(async friend =>
             {
                 try
@@ -285,7 +298,8 @@ public partial class InboxViewModel : ViewModelBase
                             foreach (var sh in shares) PendingModShares.Add(sh);
                             OnPropertyChanged(nameof(HasPendingModShares));
                         });
-                    var messages = raw.Where(m => !Services.ModShareService.IsShareMessage(m.Text)).ToList();
+                    var messages = raw.Where(m => !Services.ModShareService.IsShareMessage(m.Text)
+                        && !Services.InviteMessageService.IsInviteMessage(m.Text)).ToList();
                     var last = messages.OrderByDescending(m => m.SentAt).FirstOrDefault();
                     return last == null ? null : new InboxConversationVm
                     {
