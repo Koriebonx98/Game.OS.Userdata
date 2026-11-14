@@ -1,0 +1,2350 @@
+{
+  "scenarios": [
+    {
+      "id": 1,
+      "name": "The Art Gallery Mystery",
+      "description": "Elena disappeared after visiting a mysterious art gallery opening",
+      "solution": "warehouse basement",
+      "requiresMultiPart": true,
+      "totalStages": 3,
+      "multiPartSolution": {
+        "location": "warehouse basement",
+        "code": "0847",
+        "person": "victor kozlov"
+      },
+      "stagePrompts": [
+        "Where is Elena located? Be specific about the exact location.",
+        "What is the access code?",
+        "Who is the person responsible for Elena's situation?"
+      ],
+      "messages": [
+        {
+          "id": 1,
+          "contact": "Marcus Chen",
+          "avatar": "M",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Hey! Are you coming to the gallery opening tonight?",
+              "time": "6:45 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Wouldn't miss it! What time?",
+              "time": "6:47 PM"
+            },
+            {
+              "type": "received",
+              "text": "8 PM sharp. The address is 247 Riverside Drive. Dress code is formal.",
+              "time": "6:50 PM"
+            },
+            {
+              "type": "received",
+              "text": "Also, I found something concerning about the gallery owner. Check your email.",
+              "time": "6:52 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Thanks! I'll check it out. This could be big.",
+              "time": "6:54 PM"
+            },
+            {
+              "type": "received",
+              "text": "Be careful. These people aren't what they seem. I'm still researching the Prague connection.",
+              "time": "6:56 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 2,
+          "contact": "Detective Rivera",
+          "avatar": "DR",
+          "messages": [
+            {
+              "type": "received",
+              "text": "This is Detective Rivera. We found your phone at the scene. We need to talk about Elena.",
+              "time": "11:30 PM"
+            },
+            {
+              "type": "received",
+              "text": "Call me at 555-0147 immediately. This is urgent.",
+              "time": "11:32 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 3,
+          "contact": "Unknown",
+          "avatar": "?",
+          "messages": [
+            {
+              "type": "received",
+              "text": "I know what you're looking for. The building on 5th and Main. Midnight. Come alone.",
+              "time": "10:15 PM"
+            },
+            {
+              "type": "received",
+              "text": "Don't trust Marcus. He's not who he claims to be.",
+              "time": "10:20 PM"
+            },
+            {
+              "type": "received",
+              "text": "The real evidence is in the gallery's lower level. Look for the storage unit I mentioned.",
+              "time": "10:22 PM"
+            },
+            {
+              "type": "received",
+              "text": "He knows you're investigating. The lower level is dangerous. Meet me at the main gallery floor instead.",
+              "time": "10:25 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 4,
+          "contact": "Sarah Williams",
+          "avatar": "S",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena! Where are you?? Everyone's worried!",
+              "time": "9:45 PM"
+            },
+            {
+              "type": "sent",
+              "text": "I'm fine, just need to check something out",
+              "time": "9:50 PM"
+            },
+            {
+              "type": "received",
+              "text": "You're scaring me. What's going on?",
+              "time": "9:52 PM"
+            },
+            {
+              "type": "sent",
+              "text": "I'll explain later. If anything happens, check my notes app.",
+              "time": "9:55 PM"
+            },
+            {
+              "type": "received",
+              "text": "Marcus just called looking for you. He seems really concerned.",
+              "time": "10:05 PM"
+            },
+            {
+              "type": "received",
+              "text": "I found something in your desk - a note with three years and city names adding to some answer. Does that mean anything to you?",
+              "time": "10:10 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 6,
+          "contact": "Art Authenticator",
+          "avatar": "AA",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, I reviewed the documents you sent. The subject from your investigation is confirmed.",
+              "time": "7:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Can you verify the identity? I need to be absolutely certain.",
+              "time": "7:32 PM"
+            },
+            {
+              "type": "received",
+              "text": "100% confirmed. Real identity matches the Eastern European name. He's using the British surname as a front. The Prague file I referenced has all documentation.",
+              "time": "7:35 PM"
+            },
+            {
+              "type": "received",
+              "text": "He keeps the stolen pieces in the storage facility's lower level. That's where he maintains his operation records too.",
+              "time": "7:38 PM"
+            },
+            {
+              "type": "sent",
+              "text": "How do I access the lower level? Security there must be tight.",
+              "time": "7:40 PM"
+            },
+            {
+              "type": "received",
+              "text": "The code changes weekly. This week it follows a pattern from document reference numbers. Check your research notes for the sequence.",
+              "time": "7:42 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 5,
+          "contact": "Victor Ashford",
+          "avatar": "V",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Ms. Martinez, thank you for your interest in our gallery. I look forward to meeting you tonight.",
+              "time": "7:15 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Thank you for the invitation. I'm very interested in the collection.",
+              "time": "7:18 PM"
+            },
+            {
+              "type": "received",
+              "text": "We have some truly unique pieces. Many have fascinating... histories.",
+              "time": "7:20 PM"
+            }
+          ],
+          "unread": false
+        }
+      ],
+      "emails": [
+        {
+          "id": 1,
+          "sender": "Marcus Chen",
+          "email": "mchen@artworld.com",
+          "subject": "Gallery Owner Background - URGENT",
+          "date": "Today, 6:55 PM",
+          "body": "Elena,\n\nI did some digging on Victor Ashford, the gallery owner. Something doesn't add up. His background points to Eastern Europe, and I found connections to several art theft investigations - particularly in Prague (2018) and Vienna (2020). The pieces at tonight's opening lack proper documentation.\n\nI've traced a pattern involving multiple addresses:\n- 247 Riverside Drive (main gallery - public)\n- A facility at 312 5th Street (corner location)\n- Unknown third location\n\nThe 5th Street facility seems to be more than just storage. Be very careful tonight. I'm still gathering details about the full operation.\n\nAttached: Reference document from Prague case (file #2018-ART-0429)\n\n- Marcus",
+          "unread": true
+        },
+        {
+          "id": 2,
+          "sender": "Gallery Nouveau",
+          "email": "info@gallerynouveau.com",
+          "subject": "Tonight's Exhibition - Important Update",
+          "date": "Today, 7:30 PM",
+          "body": "Dear Valued Guest,\n\nWe're thrilled you'll be joining us tonight! Please note the venue has changed to our facility at 312 5th Street (corner of 5th and Main).\n\nThe exhibition will feature exclusive pieces from private collections:\n- 'Midnight in Paris' (Late 19th century) - Featured collection\n- 'The Winter Palace' (Early 20th century)\n- Several pieces from European estates\n\nArrive by 8:30 PM for the private viewing. Main entrance access: 2491\n\nLooking forward to seeing you!\nVictor Ashford\nGallery Nouveau",
+          "unread": false
+        },
+        {
+          "id": 3,
+          "sender": "Security Alert",
+          "email": "noreply@banksecurity.com",
+          "subject": "Unusual Activity Detected",
+          "date": "Today, 8:15 PM",
+          "body": "We detected unusual activity on your account:\n\n- Login from new device at 8:10 PM\n- Location: Riverside District\n- IP Address: 192.168.1.247\n\nIf this wasn't you, please contact us immediately.\n\nTransaction pending: Wire transfer $50,000 to offshore account.\nStatus: FLAGGED - Requires verification\n\nThis appears to be a fraudulent transaction. We've temporarily locked your account for security.",
+          "unread": true
+        },
+        {
+          "id": 4,
+          "sender": "Art Authentication Services",
+          "email": "verify@artauth.com",
+          "subject": "Re: Authentication Request - Gallery Nouveau Pieces",
+          "date": "Today, 5:45 PM",
+          "body": "Ms. Martinez,\n\nRegarding your authentication request for the pieces from Gallery Nouveau:\n\nWe have significant concerns about the provenance of several pieces in their current exhibition. Our database shows irregularities:\n\n- 'Midnight in Paris': Matches a piece reported missing from storage in 2019\n- 'The Winter Palace': Shows characteristics consistent with known forgeries\n\nWe recommend exercising extreme caution and consulting with law enforcement.\n\nThe facility's secondary location appears in multiple investigation records. Document reference FR-2020-0847 contains relevant details.\n\nBest regards,\nDr. Katherine Moore\nChief Authenticator",
+          "unread": false
+        },
+        {
+          "id": 5,
+          "sender": "Anonymous Tip",
+          "email": "whistleblower_247@protonmail.com",
+          "subject": "You're in danger - GET OUT NOW",
+          "date": "Today, 9:40 PM",
+          "body": "Elena,\n\nI work for Victor Ashford. He knows you're investigating. LEAVE NOW.\n\nThey're planning to frame you for the theft. Authorities are already being contacted.\n\nIf you need proof, check the lower gallery level. There's a concealed room behind the featured painting. The combination follows your research file numbering: 2491-0847.\n\nThis isn't a game. Your safety is at risk.\n\n- A Friend",
+          "unread": true
+        }
+      ],
+      "calls": [
+        {
+          "id": 1,
+          "name": "Marcus Chen",
+          "type": "outgoing",
+          "time": "7:15 PM",
+          "duration": "3m 42s"
+        },
+        {
+          "id": 2,
+          "name": "Mom",
+          "type": "incoming",
+          "time": "8:30 PM",
+          "duration": "1m 15s"
+        },
+        {
+          "id": 3,
+          "name": "Unknown",
+          "type": "missed",
+          "time": "9:30 PM",
+          "duration": null
+        },
+        {
+          "id": 4,
+          "name": "Gallery Nouveau",
+          "type": "incoming",
+          "time": "8:05 PM",
+          "duration": "2m 10s"
+        },
+        {
+          "id": 5,
+          "name": "Detective Rivera",
+          "type": "incoming",
+          "time": "11:35 PM",
+          "duration": "5m 20s"
+        },
+        {
+          "id": 6,
+          "name": "Unknown",
+          "type": "missed",
+          "time": "10:18 PM",
+          "duration": null
+        },
+        {
+          "id": 7,
+          "name": "Marcus Chen",
+          "type": "missed",
+          "time": "9:05 PM",
+          "duration": null
+        },
+        {
+          "id": 8,
+          "name": "Unknown",
+          "type": "incoming",
+          "time": "10:15 PM",
+          "duration": "0m 45s"
+        }
+      ],
+      "voicemails": [
+        {
+          "id": 1,
+          "sender": "Unknown",
+          "duration": "0:45",
+          "transcript": "This is a warning. Stop investigating the gallery owner. You're in over your head. If you value your safety, forget what you saw tonight. The Riverside location has nothing. You're wasting your time there.",
+          "time": "9:35 PM"
+        },
+        {
+          "id": 2,
+          "sender": "Marcus Chen",
+          "duration": "1:20",
+          "transcript": "Elena! Where did you go? I saw you talking to that man in the black suit and then you disappeared. The gallery suddenly closed. Something's wrong. I'm heading to the address on 5th and Main. Meet me there if you get this. Call me back!",
+          "time": "9:05 PM"
+        },
+        {
+          "id": 3,
+          "sender": "Gallery Nouveau",
+          "duration": "0:55",
+          "transcript": "Ms. Martinez, this is Victor. I noticed you left early. I hope everything is alright. If you'd like to reschedule your private viewing, please contact us at the Riverside location. We're available until midnight.",
+          "time": "9:20 PM"
+        }
+      ],
+      "notes": [
+        {
+          "id": 1,
+          "title": "Gallery Investigation - Background",
+          "date": "Today, 6:00 PM",
+          "content": "Victor Ashford (real identity: Eastern European)\n- Former art dealer from Central Europe\n- Connected to multiple investigations (2018, 2020)\n- Gallery Nouveau opened 6 months ago\n- Links to international network\n\nSuspicious patterns:\n- All artwork from 'private collections' - minimal documentation\n- No provenance verification available\n- Transactions in cash\n- Anonymous buyers\n\nMarcus is assisting with research. He's located police documentation from Prague."
+        },
+        {
+          "id": 2,
+          "title": "Tonight's Plan - UPDATED",
+          "date": "Today, 7:45 PM",
+          "content": "ORIGINAL: 8:00 PM - Gallery opening at 247 Riverside\nUPDATE: Venue changed!\n\nNew Location: Facility at 312 5th Street (corner location)\nMain entrance access: 2491\n\nWhat to investigate:\n- Artwork authenticity (check featured painting)\n- Gallery owner background\n- Security patterns\n- Storage/processing areas\n\nEmergency code word with Marcus: 'MIDNIGHT'\n\nRiverside location may be a front - 5th Street facility is primary operation."
+        },
+        {
+          "id": 3,
+          "title": "URGENT - IF FOUND READ THIS",
+          "date": "Today, 9:52 PM",
+          "content": "If you're reading this, something happened to me.\n\nI discovered Victor Ashford is running an art forgery operation from the 5th Street facility. He's planning to relocate the operation tomorrow with the stolen pieces.\n\nCRITICAL EVIDENCE LOCATION:\nFacility's lower level - behind the featured painting\nSafe combination: 2491 (my birthday reversed)\n\nThe safe contains:\n- Stolen art documentation\n- Buyer list\n- Evidence of the operation\n\nDON'T GO TO RIVERSIDE GALLERY - IT'S A TRAP\nThe anonymous messages are misleading investigators.\n\nContact Detective Rivera: 555-0147\nGive him case reference: FR-2020-0847\n\nTrust Marcus - he's legitimate. Don't trust the 'Unknown' contact."
+        },
+        {
+          "id": 4,
+          "title": "Suspects & Leads",
+          "date": "Today, 8:30 PM",
+          "content": "CONFIRMED INVOLVED:\n\u2713 Victor (owner) - Using British alias, actually Eastern European\n\nTRUSTED:\n\u2713 Marcus Chen - Art expert, assisting investigation\n\u2713 Dr. Katherine Moore - Authenticator, provided warnings\n\u2713 Detective Rivera - Police contact\n\nUNKNOWN/SUSPICIOUS:\n? Anonymous tipper - claims facility is trap, points to Riverside\n? Man in black suit at gallery\n? Whistleblower email (could be genuine or false)\n\nLOCATIONS:\n- 247 Riverside Drive: Public gallery (possible front)\n- 312 5th St: Facility (REAL operation according to Marcus)\n- Unknown: Third location?\n\nKEY QUESTION: Where is the actual evidence?"
+        },
+        {
+          "id": 5,
+          "title": "Cipher Notes - Decoded Messages",
+          "date": "Today, 9:15 PM",
+          "content": "Found encrypted message in gallery catalog:\n\nEncoded: \"WKH EDVHPHQW KROGV WKH WUXWK\"\nCipher type: Caesar (shift 3)\nDecoded: \"THE BASEMENT HOLDS THE TRUTH\"\n\nAnother message from gallery receipt:\n\"MIDNIGHT 2491 WAREHOUSE\" (Note: 2491 is main entrance, NOT lower level)\n\nDOCUMENT CODE PATTERN:\nPrague 2018 case file: #2018-ART-0429\nVienna 2020 incident: #2020-ART-0305\nLouvre 2019 theft: #2019-ART-0113\n\nPattern discovered: Last 4 digits of primary file = Access code\nPrimary investigation file (Prague): FR-2020-0847\nLower level access code: 0847 (NOT 2491!)\n\nThese codes confirm:\n1. Facility's lower level is the actual location (not Riverside, not main floor)\n2. Victor (using British alias) is running the operation\n3. Code 0847 opens lower level safe/entrance (from Prague file reference)\n4. Connected to 'Midnight in Paris' painting\n5. Person responsible: (see identity confirmation in Note 6)\n\nTime to act: TONIGHT before they relocate."
+        },
+        {
+          "id": 6,
+          "title": "Person of Interest - CONFIRMED",
+          "date": "Today, 8:45 PM",
+          "content": "TARGET CONFIRMED:\nName: Victor Kozlov (full name from Art Authenticator confirmation)\nAlias: Victor Ashford\nNationality: Russian/Czech\nAge: 47\n\nCRIMINAL HISTORY:\n- Prague art theft (2018) - File #0847\n- Vienna forgery ring (2020)\n- Louvre storage theft (2019)\n\nCURRENT OPERATION:\nLocation: Facility lower level (312 5th St)\nRole: Director of forgery operation\nStatus: Planning to relocate operation\n\nWHY HE'S DANGEROUS:\n- International connections\n- History of extreme reactions when cornered\n- Eliminating evidence tonight\n- Has informants attempting to mislead investigation\n\nREASON FOR CONFRONTATION:\nHe knows I'm investigating. I have proof of his operation. He's trying to eliminate evidence and witnesses before relocating.\n\nMUST document everything and get proof to Detective Rivera ASAP."
+        }
+      ],
+      "endings": {
+        "warehouse basement": {
+          "title": "Case Solved - Mystery Unraveled!",
+          "message": "Excellent detective work! You successfully identified all the critical elements:\n\n\u2713 Location: Warehouse Basement (not the Riverside gallery decoy)\n\u2713 Access Code: 0847 (derived from the Prague case file reference)\n\u2713 Person Responsible: Victor Kozlov (operating under the alias 'Victor Ashford')\n\nBy decoding the ciphers, cross-referencing the case files, and piecing together clues from messages, emails, and notes, you found Elena in the warehouse basement where she was gathering evidence against Victor Kozlov's international art forgery operation. Detective Rivera has been notified and is making arrests. The forgery ring has been exposed!",
+          "success": true,
+          "clueRequirements": {
+            "messages": [
+              1,
+              3
+            ],
+            "emails": [
+              2,
+              4
+            ],
+            "notes": [
+              3,
+              5
+            ],
+            "voicemails": [
+              1
+            ]
+          }
+        },
+        "warehouse": {
+          "title": "Partially Correct - Incomplete Solution",
+          "message": "You found the general location (warehouse) but missed critical details. The complete solution required:\n- Specific location: Warehouse BASEMENT (not just 'warehouse')\n- Access code: 0847\n- Person responsible: Victor Kozlov\n\nWithout these precise details, the investigation couldn't proceed. Victor Kozlov escaped with the evidence. Keep investigating the clues more carefully!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [
+              3
+            ],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gallery": {
+          "title": "Wrong Location - Fell for Misdirection!",
+          "message": "You went to 247 Riverside Drive, falling for Victor Kozlov's misdirection. The anonymous messages were from him trying to mislead investigators. The gallery was empty and locked behind you. While you were there, Victor fled from the warehouse basement with all evidence destroyed. Elena is still missing and the forgery ring escaped.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [
+              1
+            ],
+            "emails": [
+              1
+            ],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gameover": {
+          "title": "Game Over - Too Many Wrong Attempts!",
+          "message": "Victor Kozlov became aware of your investigation through your repeated wrong submissions. He fled the country with all evidence destroyed, and Elena's whereabouts remain unknown. The forgery ring has disbanded. Always analyze the clues carefully before submitting!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "timeout": {
+          "title": "Time's Up",
+          "message": "You ran out of time. Elena's trail has gone cold. The art forgery ring has disbanded, and Victor Kozlov has fled the country. The stolen artwork was never recovered, and Elena's whereabouts remain unknown.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        }
+      },
+      "personOptions": [
+        "Marcus Chen",
+        "Victor Ashford",
+        "Victor Kozlov",
+        "Detective Rivera",
+        "Sarah Williams"
+      ],
+      "personClueRequirements": {
+        "Victor Kozlov": {
+          "messages": [
+            3
+          ],
+          "emails": [
+            2,
+            4
+          ],
+          "notes": [
+            5,
+            6
+          ],
+          "voicemails": [
+            1
+          ]
+        },
+        "Victor Ashford": {
+          "messages": [
+            1
+          ],
+          "emails": [
+            1
+          ],
+          "notes": [
+            1
+          ],
+          "voicemails": []
+        },
+        "Marcus Chen": {
+          "messages": [
+            1
+          ],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Detective Rivera": {
+          "messages": [
+            2
+          ],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Sarah Williams": {
+          "messages": [],
+          "emails": [
+            3
+          ],
+          "notes": [
+            2
+          ],
+          "voicemails": []
+        }
+      }
+    },
+    {
+      "id": 2,
+      "name": "The Research Lab Incident",
+      "description": "Elena vanished from her research lab under mysterious circumstances",
+      "solution": "east storage room",
+      "requiresMultiPart": true,
+      "totalStages": 3,
+      "multiPartSolution": {
+        "location": "east storage room",
+        "code": "2496",
+        "person": "dr james porter"
+      },
+      "stagePrompts": [
+        "Based on the clues, where exactly in the basement lab is Elena?",
+        "What is the access code?",
+        "Who is the person helping Elena with the evidence?"
+      ],
+      "messages": [
+        {
+          "id": 1,
+          "contact": "Dr. James Porter",
+          "avatar": "JP",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, the test results are in. We need to talk immediately.",
+              "time": "3:15 PM"
+            },
+            {
+              "type": "sent",
+              "text": "On my way to the lab now",
+              "time": "3:20 PM"
+            },
+            {
+              "type": "received",
+              "text": "Don't use the main entrance. Take the service elevator to B3.",
+              "time": "3:22 PM"
+            },
+            {
+              "type": "received",
+              "text": "Someone's been accessing our research files without authorization.",
+              "time": "3:25 PM"
+            },
+            {
+              "type": "sent",
+              "text": "B3? That's the restricted basement level. What's going on?",
+              "time": "3:27 PM"
+            },
+            {
+              "type": "received",
+              "text": "I'll explain when you get here. The east storage room. Code is your employee ID backwards.",
+              "time": "3:30 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 2,
+          "contact": "Security - Tech Corp",
+          "avatar": "SC",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Your access badge was used in Restricted Area B3 at 4:45 PM",
+              "time": "4:50 PM"
+            },
+            {
+              "type": "received",
+              "text": "If this was not you, report to security immediately.",
+              "time": "4:51 PM"
+            },
+            {
+              "type": "sent",
+              "text": "That was me. I'm authorized to be there.",
+              "time": "4:53 PM"
+            },
+            {
+              "type": "received",
+              "text": "Understood. Be advised: B3 east wing is under maintenance. Use west storage only.",
+              "time": "4:55 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 3,
+          "contact": "Anonymous",
+          "avatar": "A",
+          "messages": [
+            {
+              "type": "received",
+              "text": "I know what Porter is doing. The basement lab. Check locker 247 in west storage.",
+              "time": "5:30 PM"
+            },
+            {
+              "type": "received",
+              "text": "Code: 8-15-23. Don't trust the east wing - it's compromised.",
+              "time": "5:32 PM"
+            },
+            {
+              "type": "received",
+              "text": "Porter is trying to destroy evidence. West storage has what you need.",
+              "time": "5:35 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 4,
+          "contact": "Lisa Chen - Lab Tech",
+          "avatar": "LC",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, did you see the emergency alert about B3?",
+              "time": "4:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "No, what alert?",
+              "time": "4:32 PM"
+            },
+            {
+              "type": "received",
+              "text": "Chemical spill in west storage. They evacuated everyone. East side is safe though.",
+              "time": "4:34 PM"
+            },
+            {
+              "type": "received",
+              "text": "Dr. Porter went down there right before the spill. Hope he's okay.",
+              "time": "4:36 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 5,
+          "contact": "Corporate Board",
+          "avatar": "CB",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Dr. Martinez, we're aware of your concerns about Project Phoenix.",
+              "time": "2:45 PM"
+            },
+            {
+              "type": "received",
+              "text": "Any evidence of misconduct must be submitted through proper channels.",
+              "time": "2:47 PM"
+            },
+            {
+              "type": "received",
+              "text": "Unauthorized access to restricted areas will result in termination.",
+              "time": "2:50 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 6,
+          "contact": "Federal Investigator",
+          "avatar": "FI",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Dr. Martinez, this is Agent Williams. We received your whistleblower report.",
+              "time": "4:00 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Thank you. Dr. Porter has been helping me gather the evidence.",
+              "time": "4:05 PM"
+            },
+            {
+              "type": "received",
+              "text": "Good. Dr. James Porter is critical to this case. His testimony and documentation will be essential.",
+              "time": "4:08 PM"
+            },
+            {
+              "type": "received",
+              "text": "We need to know: who is your primary contact for the evidence? We need a name for our records.",
+              "time": "4:10 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Dr. James Porter. He's the lead researcher who discovered the safety issues.",
+              "time": "4:12 PM"
+            },
+            {
+              "type": "received",
+              "text": "Confirmed. Ensure you and Dr. Porter secure all evidence. Document everything.",
+              "time": "4:15 PM"
+            }
+          ],
+          "unread": false
+        }
+      ],
+      "emails": [
+        {
+          "id": 1,
+          "sender": "Dr. James Porter",
+          "email": "jporter@techcorp.com",
+          "subject": "CONFIDENTIAL - Test Results & Meeting Location",
+          "date": "Today, 3:10 PM",
+          "body": "Elena,\n\nThe compound we've been testing shows unexpected properties. The board wants to rush it to market, but the safety trials are incomplete. 15% adverse reaction rate is unacceptable.\n\nI've moved the real data to the basement lab (B3-Floor, EAST storage room). Your employee ID backwards is the access code: 2496\n\nWest storage is monitored by corporate security. Don't go there.\n\nWe need to discuss what to do next. This could ruin careers... or save lives.\n\nMeet me in east storage at 4:30 PM. Bring a USB drive - we need backup copies.\n\n- James\n\nP.S. The anonymous messages you might receive are from corporate trying to mislead us. Only trust this email.",
+          "unread": true
+        },
+        {
+          "id": 2,
+          "sender": "Corporate Board",
+          "email": "board@techcorp.com",
+          "subject": "Project Phoenix - Final Notice & Facility Access",
+          "date": "Today, 2:00 PM",
+          "body": "Dr. Porter and Team,\n\nWe're moving forward with Project Phoenix. All research materials must be submitted by end of day for patent filing.\n\nAny objections must be filed through official channels. Non-compliance will result in termination and potential legal action.\n\nFACILITY NOTICE:\nThe basement research facility (B3) will be decommissioned tomorrow:\n- East wing: Scheduled for demolition\n- West wing: Being converted to storage\n\nAll materials must be relocated to main lab (Level 2) by tonight.\n\nSecurity access codes are being reset at midnight.\n\nBoard of Directors\nTechCorp Industries",
+          "unread": false
+        },
+        {
+          "id": 3,
+          "sender": "Lab Safety",
+          "email": "safety@techcorp.com",
+          "subject": "URGENT: Chemical Spill - B3 West Wing EVACUATED",
+          "date": "Today, 4:25 PM",
+          "body": "ATTENTION ALL STAFF:\n\nChemical spill reported in B3 West Storage at 4:20 PM.\n\nAFFECTED AREA: West wing basement (rooms B3-W-100 through B3-W-250)\nSTATUS: Evacuated and sealed\nESTIMATED CLEANUP: 6-8 hours\n\nSAFE AREAS: East wing remains operational\n\nDo NOT enter west wing until all-clear is given.\n\nContact emergency response team if you have concerns: ext. 911\n\nSafety Officer Martinez\nTechCorp Lab Safety Division",
+          "unread": true
+        },
+        {
+          "id": 4,
+          "sender": "IT Security",
+          "email": "itsec@techcorp.com",
+          "subject": "Suspicious File Access - Your Account",
+          "date": "Today, 5:15 PM",
+          "body": "Dr. Martinez,\n\nWe detected unusual activity on your account:\n\nFILE ACCESS LOG:\n- 5:05 PM: Project Phoenix raw data (UNAUTHORIZED)\n- 5:08 PM: Safety trial results (UNAUTHORIZED)\n- 5:12 PM: Corporate email archive (UNAUTHORIZED)\n\nLOCATION: B3 basement terminal (West wing)\nIP: 10.0.3.247\n\nIf this was not you, your credentials may be compromised. Contact IT Security immediately.\n\nYour account has been flagged for review. Unauthorized data access is a terminable offense per company policy.\n\nIT Security Team",
+          "unread": true
+        },
+        {
+          "id": 5,
+          "sender": "Whistleblower Protection",
+          "email": "tips@federalwhistleblower.gov",
+          "subject": "Re: Your Report - TechCorp Project Phoenix",
+          "date": "Today, 1:30 PM",
+          "body": "Dr. Martinez,\n\nThank you for your report regarding TechCorp's Project Phoenix. Your claims of safety data suppression are serious.\n\nTo proceed with investigation, we need:\n1. Original safety trial data\n2. Documentation of adverse reactions\n3. Evidence of corporate knowledge/coverup\n\nGiven your report of evidence destruction, we recommend:\n- Secure copies of all documentation immediately\n- Use personal devices, not company systems\n- Document exact location of evidence\n\nYour report mentioned basement laboratory (Level B3). Please confirm exact location and access codes so federal investigators can secure evidence.\n\nThis is a protected disclosure under whistleblower laws.\n\nAgent Sarah K. Williams\nFederal Whistleblower Protection Agency\nCase #: WB-2024-TC-0847",
+          "unread": false
+        }
+      ],
+      "calls": [
+        {
+          "id": 1,
+          "name": "Dr. James Porter",
+          "type": "incoming",
+          "time": "3:15 PM",
+          "duration": "2m 30s"
+        },
+        {
+          "id": 2,
+          "name": "Lab Security",
+          "type": "incoming",
+          "time": "5:00 PM",
+          "duration": "1m 05s"
+        },
+        {
+          "id": 3,
+          "name": "Unknown",
+          "type": "missed",
+          "time": "5:45 PM",
+          "duration": null
+        },
+        {
+          "id": 4,
+          "name": "Corporate Board",
+          "type": "incoming",
+          "time": "2:40 PM",
+          "duration": "4m 15s"
+        },
+        {
+          "id": 5,
+          "name": "Dr. James Porter",
+          "type": "outgoing",
+          "time": "4:20 PM",
+          "duration": "1m 45s"
+        },
+        {
+          "id": 6,
+          "name": "Anonymous",
+          "type": "incoming",
+          "time": "5:30 PM",
+          "duration": "0m 55s"
+        },
+        {
+          "id": 7,
+          "name": "Lab Safety",
+          "type": "incoming",
+          "time": "4:28 PM",
+          "duration": "2m 10s"
+        }
+      ],
+      "voicemails": [
+        {
+          "id": 1,
+          "sender": "Dr. James Porter",
+          "duration": "1:45",
+          "transcript": "Elena, it's James. They know about the basement lab. I've been suspended. I hid copies of the real test results in east storage room - that's E-A-S-T storage, not west. The code is the atomic numbers for Oxygen, Phosphorus, and Vanadium: 8-15-23... wait, no, that's wrong. Use your employee ID backwards: 2-4-9-6. We need this evidence to stop them from releasing an unsafe product. The west wing story is corporate misdirection. Meet me in east storage. Be careful who you trust.",
+          "time": "5:20 PM"
+        },
+        {
+          "id": 2,
+          "sender": "Lab Security",
+          "duration": "1:10",
+          "transcript": "Dr. Martinez, this is lab security. We have you on camera entering B3 at 4:45 PM. Your badge shows two entries: one at the west wing terminal and one at the east storage entrance. This is a security violation. Report to security office immediately or we'll have to escort you out.",
+          "time": "5:05 PM"
+        },
+        {
+          "id": 3,
+          "sender": "Anonymous",
+          "duration": "0:55",
+          "transcript": "Dr. Martinez, you don't know me but I work in corporate. They're trying to trap Porter and anyone helping him. The east wing is being monitored. All evidence there will be destroyed at midnight. West storage locker 247, code 8-15-23 has copies Porter made yesterday. Don't go to east wing - they're waiting for you there.",
+          "time": "5:32 PM"
+        }
+      ],
+      "notes": [
+        {
+          "id": 1,
+          "title": "Project Phoenix - Safety Concerns",
+          "date": "Today, 2:30 PM",
+          "content": "CRITICAL SAFETY ISSUES FOUND:\n- 15% test subjects showed adverse reactions\n- Long-term effects completely unknown\n- Data being actively suppressed by board\n- Corporate threatening legal action against whistleblowers\n\nDr. Porter wants to go public with real data\nCompany threatening termination and legal action\n\nEvidence location: Basement lab Level B3\nDr. Porter has copies secured there\n\nMUST document everything before facility decommissioned tomorrow"
+        },
+        {
+          "id": 2,
+          "title": "Evidence Location - CRITICAL",
+          "date": "Today, 4:00 PM",
+          "content": "BASEMENT LAB - Level B3\nAccess: Service elevator only (main entrance monitored)\n\nEAST STORAGE ROOM (confirmed with Dr. Porter)\nAccess code: 2496 (my employee ID backwards: 6942 \u2192 2496)\n\nDocuments stored there:\n- Original test results (15% adverse reactions)\n- Adverse reaction reports (patient names redacted)\n- Email chain showing corporate cover-up\n- Safety protocol violations list\n\nWARNING: West wing may be compromised\nAnonymous source says east wing monitored\nDr. Porter says west wing monitored\n\nWHO TO TRUST?\n\nIf anything happens:\n- Contact FDA: 1-888-INFO-FDA\n- Contact Whistleblower Protection: tips@federalwhistleblower.gov\n- Reference case: WB-2024-TC-0847"
+        },
+        {
+          "id": 3,
+          "title": "Basement Layout - B3 Floor",
+          "date": "Today, 3:45 PM",
+          "content": "LEVEL B3 - BASEMENT RESEARCH FACILITY\n\nLAYOUT:\nWest Wing:\n- Rooms W-100 to W-250\n- Locker 247 (mentioned by anonymous source)\n- Corporate security cameras: YES\n- Status: Chemical spill (evacuated 4:25 PM)\n\nEast Wing:\n- Storage rooms E-100 to E-200\n- East storage room (Dr. Porter's location)\n- Corporate security cameras: Unknown\n- Status: Operational / Scheduled demolition tomorrow\n\nCENTRAL:\n- Service elevator\n- Main corridor\n- Emergency exits\n\nKEY QUESTION: Which wing has the real evidence?\nDr. Porter (trusted): EAST storage, code 2496\nAnonymous (unknown): WEST locker 247, code 8-15-23\n\nOne is real, one is a trap."
+        },
+        {
+          "id": 4,
+          "title": "Timeline & Contradictions",
+          "date": "Today, 5:00 PM",
+          "content": "TIMELINE OF EVENTS:\n2:00 PM - Corporate email about facility decommissioning\n3:10 PM - Dr. Porter email: Meet east storage, code 2496\n4:25 PM - Chemical spill in WEST wing (suspicious timing)\n5:20 PM - Dr. Porter voicemail: Confirms east, code 2496\n5:30 PM - Anonymous messages: Claims west storage, code 8-15-23\n5:32 PM - Anonymous voicemail: Says east is trap\n\nCONTRADICTIONS:\n- Dr. Porter consistently says EAST\n- Anonymous consistently says WEST\n- Chemical spill in west (convenient for corporate?)\n- Or is spill to keep people away from west (real evidence)?\n- Security says I accessed BOTH wings (impossible - I wasn't there yet)\n\nCLUES POINTING TO EAST:\n\u2713 Dr. Porter email (sent before any issues)\n\u2713 Dr. Porter voicemail (he corrects himself)\n\u2713 My employee ID backward = 2496 (confirms east code)\n\u2713 West wing chemical spill is suspicious\n\nCLUES POINTING TO WEST:\n? Anonymous source (could be genuine whistleblower)\n? Chemical spill could be corporate keeping people away from evidence\n? Security monitoring east (per anonymous)\n\nDECISION: Trust Dr. Porter. He's been consistent.\nLocation: EAST storage room\nCode: 2496"
+        },
+        {
+          "id": 5,
+          "title": "Employee Info & Access",
+          "date": "Today, 1:00 PM",
+          "content": "MY CREDENTIALS:\nName: Dr. Elena Martinez\nEmployee ID: 6942\nDepartment: Research & Development\nClearance: Level 3 (includes B3 basement access)\n\nACCESS CODES:\nMain lab: 1234 (default)\nR&D office: 6942 (my ID)\nBasement B3: Requires badge + secondary code\n\nSECONDARY CODES (for B3):\nEmployee ID backwards: 6942 \u2192 2496\nAtomic numbers: O-P-V \u2192 8-15-23\n\nDr. Porter mentioned 'employee ID backwards' in email\nAnonymous mentioned 'atomic numbers' in message\n\nBOTH codes are valid - but for DIFFERENT locations:\n2496 = East storage (from Dr. Porter)\n8-15-23 = West locker 247 (from anonymous)\n\nThe question is: which one has the real evidence?"
+        },
+        {
+          "id": 6,
+          "title": "KEY ALLY - Dr. James Porter",
+          "date": "Today, 5:45 PM",
+          "content": "TRUSTED CONTACT:\nName: Dr. James Porter\nRole: Lead Researcher, Project Phoenix\nDepartment: R&D Division\nEmployee ID: 5847\n\nWHY HE'S CRITICAL:\n- Discovered the safety data suppression\n- First to identify 15% adverse reaction rate\n- Risked his career to expose the truth\n- Provided access to basement evidence\n- Federal investigators need his testimony\n\nHIS INSTRUCTIONS:\n1. Meet in EAST storage room (not west)\n2. Use code 2496 (my ID backwards)\n3. Bring USB drive for evidence backup\n4. Document everything\n\nCORPORATE THREATS:\n- He's been suspended\n- They're trying to destroy evidence\n- Anonymous messages trying to discredit him\n\nREASON FOR TRUST:\n- Consistent messaging (always said east wing)\n- Federal investigators confirmed his role\n- His email was sent BEFORE corporate interference\n- Lisa confirmed he went to B3 before the 'spill'\n\nWITHOUT DR. PORTER'S HELP, THIS EVIDENCE WOULD BE LOST.\nHe is the key witness and ally in this investigation."
+        }
+      ],
+      "endings": {
+        "east storage room": {
+          "title": "Evidence Secured - Case Solved!",
+          "message": "Outstanding detective work! You successfully identified all the critical elements:\n\n\u2713 Location: East Storage Room (not the west wing decoy)\n\u2713 Access Code: 2496 (employee ID backwards)\n\u2713 Key Ally: Dr. James Porter (the whistleblower who risked his career)\n\nBy cross-referencing the emails, voicemails, and notes, you trusted the right person and found Elena in the basement lab's east storage room where she and Dr. Porter were securing evidence of TechCorp's safety data suppression. Federal investigators have been notified and are now protecting both whistleblowers. The cover-up has been exposed!",
+          "success": true,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "basement": {
+          "title": "Partially Correct - Incomplete Solution",
+          "message": "You found the general area (basement) but missed critical details. The complete solution required:\n- Specific location: East Storage Room (not just 'basement')\n- Access code: 2496\n- Key person: Dr. James Porter\n\nWithout these precise details, you couldn't locate Elena in time. The evidence was destroyed. Keep investigating the clues more carefully!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "mainlab": {
+          "title": "Wrong Floor - Missed the Clues",
+          "message": "You searched the main laboratory, but Elena wasn't there. You missed the crucial clues pointing to the basement facility (Level B3). By the time you realized your mistake, the basement was locked down and the evidence was destroyed. Always read all the clues carefully!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gameover": {
+          "title": "Game Over - Investigation Compromised!",
+          "message": "Corporate security became aware of your investigation through repeated wrong submissions. They locked down the basement lab, destroyed all evidence, and Elena's whereabouts remain unknown. TechCorp successfully covered up the safety issues. Analyze clues carefully before submitting!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "timeout": {
+          "title": "Time's Up",
+          "message": "Too late. The basement lab has been cleared at midnight, all evidence systematically destroyed, and Elena's whereabouts remain unknown. TechCorp has successfully covered up the safety issues with Project Phoenix.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        }
+      },
+      "personOptions": [
+        "Dr. James Porter",
+        "Dr. James Wilson",
+        "Lisa Chen - Lab Tech",
+        "Jake Morrison",
+        "Lab Security"
+      ],
+      "personClueRequirements": {
+        "Dr. James Porter": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Dr. James Wilson": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Lisa Chen - Lab Tech": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Jake Morrison": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Lab Security": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        }
+      }
+    },
+    {
+      "id": 3,
+      "name": "The Quantum Lab Paradox",
+      "description": "Elena vanished from a quantum physics research facility with evidence of timeline anomalies",
+      "solution": "temporal chamber 7",
+      "requiresMultiPart": true,
+      "totalStages": 3,
+      "multiPartSolution": {
+        "location": "temporal chamber 7",
+        "code": "1337",
+        "person": "dr sarah chen"
+      },
+      "stagePrompts": [
+        "Where is Elena located? Be specific about the exact location.",
+        "What is the security access code?",
+        "Who is responsible for Elena's situation?"
+      ],
+      "messages": [
+        {
+          "id": 1,
+          "contact": "Dr. James Wilson",
+          "avatar": "JW",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, the quantum entanglement results are incredible! You need to see this.",
+              "time": "2:15 PM"
+            },
+            {
+              "type": "sent",
+              "text": "On my way to the lab. Is Dr. Chen there?",
+              "time": "2:18 PM"
+            },
+            {
+              "type": "received",
+              "text": "She left early. Something about recalibrating the temporal chamber. Chamber 7, I think.",
+              "time": "2:20 PM"
+            },
+            {
+              "type": "received",
+              "text": "Wait... the temporal readings are off the charts. This doesn't make sense.",
+              "time": "2:25 PM"
+            },
+            {
+              "type": "sent",
+              "text": "I'm checking the temporal logs. There's a pattern.",
+              "time": "2:28 PM"
+            },
+            {
+              "type": "received",
+              "text": "Be careful in there. The chamber has been acting strange since the last experiment.",
+              "time": "2:30 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 2,
+          "contact": "Lab Security",
+          "avatar": "LS",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Alert: Unauthorized access detected in Sector 7 at 3:47 PM",
+              "time": "3:47 PM"
+            },
+            {
+              "type": "received",
+              "text": "Temporal chamber 7 lockdown initiated. Code required for override.",
+              "time": "3:48 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 3,
+          "contact": "Unknown (Encrypted)",
+          "avatar": "?",
+          "messages": [
+            {
+              "type": "received",
+              "text": "The temporal chamber in Building 3 is the key. Don't trust the readings from Chamber 5.",
+              "time": "4:15 PM",
+              "isClue": true
+            },
+            {
+              "type": "received",
+              "text": "The real work happens in the underground facility. Surface lab is just for show.",
+              "time": "4:20 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 4,
+          "contact": "Dr. Sarah Chen",
+          "avatar": "SC",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, I need to talk to you about the quantum data. Meet me after hours?",
+              "time": "1:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Sure, what's this about?",
+              "time": "1:35 PM"
+            },
+            {
+              "type": "received",
+              "text": "Not over text. This is sensitive. My office at 8 PM.",
+              "time": "1:40 PM"
+            },
+            {
+              "type": "received",
+              "text": "And Elena... don't tell anyone about our meeting.",
+              "time": "1:42 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 5,
+          "contact": "Mom",
+          "avatar": "M",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Honey, how's work going?",
+              "time": "12:00 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Great! Working on something big.",
+              "time": "12:15 PM"
+            },
+            {
+              "type": "received",
+              "text": "Be safe! Love you \u2764\ufe0f",
+              "time": "12:20 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 6,
+          "contact": "Alex Rivera",
+          "avatar": "AR",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Heard Dr. Chen has been staying late at the lab. Working on something secret.",
+              "time": "5:45 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Yeah, she's been acting strange lately.",
+              "time": "5:50 PM"
+            },
+            {
+              "type": "received",
+              "text": "I saw her access codes for Chamber 7. The old code was 1984, but she changed it recently.",
+              "time": "5:55 PM"
+            },
+            {
+              "type": "received",
+              "text": "Check the security logs if you need the new one. It's based on the lab founding year minus 647.",
+              "time": "6:00 PM",
+              "isClue": true
+            }
+          ],
+          "unread": true
+        }
+      ],
+      "emails": [
+        {
+          "id": 1,
+          "sender": "Dr. Sarah Chen",
+          "email": "s.chen@quantumlab.org",
+          "subject": "RE: Temporal Anomaly Report",
+          "date": "Today, 1:45 PM",
+          "body": "Elena,\n\nRegarding your questions about the temporal anomalies - we need to discuss this in person. The data you've been analyzing shows patterns that shouldn't exist according to current quantum theory.\n\nI've been running unauthorized experiments in Chamber 7. The results are... concerning. Time itself seems to be behaving differently in that chamber.\n\nMeet me tonight. We need to talk about what this means for the project - and for you.\n\n- Dr. Chen",
+          "unread": true,
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "sender": "Lab Administration",
+          "email": "admin@quantumlab.org",
+          "subject": "Security Code Update - January 2024",
+          "date": "Jan 10, 2024",
+          "body": "All Staff,\n\nAs part of our quarterly security protocol, all chamber access codes have been updated.\n\nChamber 7 new access code: Based on lab founding year (1984) minus 647 = 1337\n\nPlease update your records accordingly.\n\n- Security Team",
+          "unread": false,
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "sender": "Dr. James Wilson",
+          "email": "j.wilson@quantumlab.org",
+          "subject": "Concerns about Dr. Chen",
+          "date": "Yesterday, 6:30 PM",
+          "body": "Elena,\n\nI'm worried about Dr. Chen's recent behavior. She's been accessing Chamber 7 outside normal hours and running experiments without proper authorization.\n\nI've noticed discrepancies in the temporal logs. Someone has been manipulating the data. The real readings show dangerous energy levels in Chamber 7.\n\nIf you're planning to investigate, be careful. And whatever you do, don't go to Chamber 5 - it's a decoy location. The real research is in Chamber 7.\n\n- James",
+          "unread": false,
+          "isClue": true
+        },
+        {
+          "id": 4,
+          "sender": "Unknown",
+          "email": "encrypted@darkweb.anon",
+          "subject": "[ENCRYPTED] Building 3 Underground",
+          "date": "Today, 4:00 PM",
+          "body": "You're getting close. The surface lab is just a facade. The real temporal experiments happen in Building 3's underground facility.\n\nChamber 5 is a trap. They want you to go there. The temporal chamber in Building 3 is where you'll find the truth.\n\nDr. Chen knows more than she's telling you.\n\n- A Friend",
+          "unread": true
+        },
+        {
+          "id": 5,
+          "sender": "Lab Security System",
+          "email": "security@quantumlab.org",
+          "subject": "Access Log - Chamber 7",
+          "date": "Today, 3:50 PM",
+          "body": "Automated Security Report:\n\nChamber 7 Access Log (Last 24 hours):\n- 2:15 AM - Dr. Sarah Chen (ID: SC-4721)\n- 8:30 AM - Elena Martinez (ID: EM-8934)\n- 3:47 PM - Dr. Sarah Chen (ID: SC-4721)\n- 3:47 PM - UNAUTHORIZED ACCESS ATTEMPT\n\nTemporal Chamber 7 Status: LOCKED\nLocation: Sector 7, Sub-level 2, Quantum Research Wing\n\nSecurity Override Required.\n\n- Automated System",
+          "unread": true,
+          "isClue": true
+        }
+      ],
+      "calls": [
+        {
+          "id": 1,
+          "contact": "Dr. James Wilson",
+          "type": "incoming",
+          "duration": "3:24",
+          "time": "2:15 PM",
+          "missed": false
+        },
+        {
+          "id": 2,
+          "contact": "Dr. Sarah Chen",
+          "type": "incoming",
+          "duration": "1:45",
+          "time": "1:30 PM",
+          "missed": false
+        },
+        {
+          "id": 3,
+          "contact": "Lab Security",
+          "type": "incoming",
+          "duration": "0:00",
+          "time": "3:47 PM",
+          "missed": true
+        },
+        {
+          "id": 4,
+          "contact": "Unknown",
+          "type": "incoming",
+          "duration": "0:00",
+          "time": "4:15 PM",
+          "missed": true
+        },
+        {
+          "id": 5,
+          "contact": "Alex Rivera",
+          "type": "outgoing",
+          "duration": "5:12",
+          "time": "5:45 PM",
+          "missed": false
+        },
+        {
+          "id": 6,
+          "contact": "Mom",
+          "type": "incoming",
+          "duration": "2:30",
+          "time": "12:00 PM",
+          "missed": false
+        },
+        {
+          "id": 7,
+          "contact": "Dr. Sarah Chen",
+          "type": "outgoing",
+          "duration": "0:00",
+          "time": "7:55 PM",
+          "missed": false
+        }
+      ],
+      "voicemails": [
+        {
+          "id": 1,
+          "contact": "Lab Security",
+          "time": "3:47 PM",
+          "duration": "0:45",
+          "transcript": "This is Lab Security. We've detected an unauthorized access attempt in Temporal Chamber 7. The chamber is now in lockdown. If you need access, please provide the current security code at the entrance. Chamber is located in Sector 7, sub-level 2.",
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "contact": "Unknown",
+          "time": "4:15 PM",
+          "duration": "0:32",
+          "transcript": "[Distorted voice] Stop looking at Building 3. The temporal chamber you want is in the main facility. Chamber 5 has all the answers. Trust me on this.",
+          "isFakeHint": true
+        },
+        {
+          "id": 3,
+          "contact": "Dr. James Wilson",
+          "time": "6:30 PM",
+          "duration": "1:15",
+          "transcript": "Elena, it's James. I found something disturbing in Dr. Chen's research notes. She's been conducting unauthorized temporal experiments. The energy signatures in Chamber 7 are off the charts. I think she's discovered something big... and dangerous. Call me back.",
+          "isClue": true
+        }
+      ],
+      "notes": [
+        {
+          "id": 1,
+          "title": "Temporal Chamber Access Codes",
+          "date": "Today, 2:00 PM",
+          "content": "Chamber Access Codes (Updated Jan 2024):\n- Chamber 1-4: Standard access\n- Chamber 5: 2048 (public research)\n- Chamber 7: 1337 (high security - quantum entanglement research)\n\nNote: Chamber 7 relocated to Sector 7, sub-level 2 after the incident.\n\nDr. Chen has exclusive after-hours access to Chamber 7.",
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "title": "Dr. Sarah Chen - Background",
+          "date": "Yesterday, 4:30 PM",
+          "content": "Dr. Sarah Chen\n- Lead Quantum Physicist\n- PhD from MIT (2015)\n- Specialization: Temporal mechanics\n- Recent focus: Quantum entanglement and time manipulation\n\nNotes:\n- Acting secretive lately\n- Running unauthorized experiments\n- Accessing Chamber 7 at odd hours\n- Changed security codes without approval",
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "title": "Temporal Anomaly Observations",
+          "date": "Today, 1:00 PM",
+          "content": "Strange readings from quantum experiments:\n\n1. Time dilation effects in Chamber 7\n2. Unexplained energy signatures\n3. Temporal loops detected\n4. Reality fluctuations near the chamber\n\nDr. Chen claims these are 'expected results' but the data doesn't match any known quantum theory.\n\nSomething is very wrong.",
+          "isClue": true
+        },
+        {
+          "id": 4,
+          "title": "Meeting Notes - Project Discussion",
+          "date": "3 days ago",
+          "content": "Project Timeline:\n- Phase 1: Quantum entanglement (Complete)\n- Phase 2: Temporal manipulation (In Progress)\n- Phase 3: [REDACTED]\n\nDr. Chen insists on keeping Phase 3 classified. Even from the team.\n\nLab founded: 1984\nCurrent security protocol: Founding year minus 647",
+          "isClue": true
+        },
+        {
+          "id": 5,
+          "title": "Building Layout",
+          "date": "Last week",
+          "content": "Quantum Research Facility Layout:\n\n- Building 1: Administration\n- Building 2: Standard Labs\n- Building 3: Public Research Chambers (Decoy)\n- Sector 7: High-Security Quantum Research Wing\n  - Sub-level 1: Storage\n  - Sub-level 2: Temporal Chamber 7 (Restricted)\n\nNote: Building 3 is often mentioned in fake intel. Real research happens in Sector 7.",
+          "isClue": true
+        },
+        {
+          "id": 6,
+          "title": "Suspicious Activity Log",
+          "date": "Today, 3:00 PM",
+          "content": "Noticed:\n- Dr. Chen accessing Chamber 7 outside normal hours\n- Encrypted messages on lab network\n- Temporal readings being manipulated\n- Security logs being altered\n\nSomeone is trying to hide something.\n\nReal location: Temporal Chamber 7, Sector 7, Sub-level 2\nFake leads: Building 3, Chamber 5",
+          "isClue": true
+        }
+      ],
+      "endings": {
+        "temporal chamber 7": {
+          "title": "Quantum Breakthrough - Mystery Solved!",
+          "message": "Excellent work! You successfully identified all critical elements:\n\n\u2713 Location: Temporal Chamber 7, Sector 7, Sub-level 2 (not the Building 3 or Chamber 5 decoys)\n\u2713 Access Code: 1337 (lab founding year 1984 minus 647)\n\u2713 Person Responsible: Dr. Sarah Chen\n\nBy decoding the temporal anomalies, cross-referencing security logs, and ignoring the fake hints pointing to Building 3 and Chamber 5, you found Elena in Temporal Chamber 7. Dr. Chen had been conducting unauthorized temporal manipulation experiments. Elena discovered the truth and was trapped in a temporal loop. Lab security has been notified, and Elena has been safely extracted. Dr. Chen's experiments have been shut down. The quantum research breakthrough will be properly investigated.",
+          "success": true,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "chamber 5": {
+          "title": "Wrong Location - Fell for Misdirection!",
+          "message": "You went to Chamber 5 in Building 3, falling for the fake hints sent by Dr. Chen to mislead investigators. Chamber 5 is a public research chamber with no temporal anomalies. While you were investigating the wrong location, Dr. Chen completed her experiment and escaped with the quantum data. Elena remains trapped in the temporal loop in Chamber 7. The investigation has failed.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "building 3": {
+          "title": "Partially Correct - Missing Key Details!",
+          "message": "You identified Building 3 but missed the actual location. The real temporal chamber is in Sector 7, Sub-level 2, not Building 3. Building 3 was mentioned in fake intel as a decoy. Without the precise location (Temporal Chamber 7) and access code (1337), you couldn't reach Elena in time. Dr. Chen has erased the evidence and disappeared.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gameover": {
+          "title": "Game Over - Investigation Compromised!",
+          "message": "Your repeated incorrect attempts alerted Dr. Chen to your investigation. She has erased all evidence, shut down the temporal experiments, and fled the facility. Elena remains trapped in the temporal anomaly in Chamber 7 with no way to extract her. The quantum research data has been destroyed. Always analyze clues carefully before submitting your solution!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "timeout": {
+          "title": "Time's Up - Temporal Collapse",
+          "message": "You ran out of time. The temporal anomaly in Chamber 7 has collapsed, and Elena's quantum state is now uncertain. Dr. Chen has vanished with all research data. The facility has been evacuated, and Chamber 7 has been permanently sealed. The quantum breakthrough has been lost, and Elena's fate remains unknown.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        }
+      },
+      "personOptions": [
+        "Dr. Sarah Chen",
+        "Dr. James Wilson",
+        "Lisa Chen",
+        "Alex Rivera",
+        "Thomas Reid"
+      ],
+      "personClueRequirements": {
+        "Dr. Sarah Chen": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Dr. James Wilson": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Lisa Chen": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Alex Rivera": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Thomas Reid": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        }
+      }
+    },
+    {
+      "id": 4,
+      "name": "The Underground Network",
+      "description": "Elena disappeared while investigating a sophisticated cybercrime operation",
+      "solution": "server room delta",
+      "requiresMultiPart": true,
+      "totalStages": 3,
+      "multiPartSolution": {
+        "location": "server room delta",
+        "code": "7734",
+        "person": "marcus vega"
+      },
+      "stagePrompts": [
+        "Where is Elena being held? Identify the exact location.",
+        "What is the access code to enter?",
+        "Who is behind Elena's disappearance?"
+      ],
+      "messages": [
+        {
+          "id": 1,
+          "contact": "Jake Morrison",
+          "avatar": "JM",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, I traced that IP address you asked about. It's coming from inside TechCore building!",
+              "time": "7:15 PM"
+            },
+            {
+              "type": "sent",
+              "text": "What?! That's our own company!",
+              "time": "7:18 PM"
+            },
+            {
+              "type": "received",
+              "text": "Yeah, and it gets worse. The traffic is routing through Server Room Delta in the basement.",
+              "time": "7:20 PM"
+            },
+            {
+              "type": "received",
+              "text": "Someone with high-level access is running this operation. Be careful.",
+              "time": "7:22 PM",
+              "isClue": true
+            },
+            {
+              "type": "sent",
+              "text": "I'm going to check it out.",
+              "time": "7:25 PM"
+            },
+            {
+              "type": "received",
+              "text": "Wait! I'll come with you. Don't go alone!",
+              "time": "7:27 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 2,
+          "contact": "Marcus Vega",
+          "avatar": "MV",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, can we talk about your recent network analysis?",
+              "time": "5:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Sure, what about it?",
+              "time": "5:35 PM"
+            },
+            {
+              "type": "received",
+              "text": "I noticed you've been looking into some... sensitive areas. Maybe we should discuss this offline?",
+              "time": "5:40 PM"
+            },
+            {
+              "type": "sent",
+              "text": "I'm just doing my job. Is there a problem?",
+              "time": "5:45 PM"
+            },
+            {
+              "type": "received",
+              "text": "No problem at all. Just want to make sure you're following proper protocols. See you around.",
+              "time": "5:50 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 3,
+          "contact": "Unknown (TOR Network)",
+          "avatar": "?",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Stop digging. The data center on the 5th floor has what you need. Stay away from the basement.",
+              "time": "8:15 PM"
+            },
+            {
+              "type": "received",
+              "text": "Server Room Alpha. That's where they keep the evidence. NOT Delta.",
+              "time": "8:20 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 4,
+          "contact": "Sarah Kim",
+          "avatar": "SK",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Hey! Want to grab coffee?",
+              "time": "2:00 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Sure! I need a break from this investigation.",
+              "time": "2:05 PM"
+            },
+            {
+              "type": "received",
+              "text": "Investigation? Sounds serious!",
+              "time": "2:10 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Just some network security stuff. Nothing major.",
+              "time": "2:15 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 5,
+          "contact": "Dad",
+          "avatar": "D",
+          "messages": [
+            {
+              "type": "received",
+              "text": "How's my favorite cybersecurity expert?",
+              "time": "11:00 AM"
+            },
+            {
+              "type": "sent",
+              "text": "Busy! Working on something important.",
+              "time": "11:30 AM"
+            },
+            {
+              "type": "received",
+              "text": "Remember: trust your instincts. Stay safe! \ud83d\udc4d",
+              "time": "11:35 AM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 6,
+          "contact": "IT Support",
+          "avatar": "IT",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Reminder: Server room access codes changed this week.",
+              "time": "9:00 AM"
+            },
+            {
+              "type": "received",
+              "text": "Alpha: 5521, Beta: 6832, Delta: 7734 (HELL spelled upside-down on calculator)",
+              "time": "9:02 AM",
+              "isClue": true
+            },
+            {
+              "type": "received",
+              "text": "Server Room Delta is located in Basement Level 3, restricted access.",
+              "time": "9:05 AM",
+              "isClue": true
+            }
+          ],
+          "unread": false
+        }
+      ],
+      "emails": [
+        {
+          "id": 1,
+          "sender": "Jake Morrison",
+          "email": "j.morrison@techcore.com",
+          "subject": "URGENT: Network Analysis Results",
+          "date": "Today, 7:10 PM",
+          "body": "Elena,\n\nI finished analyzing those suspicious network packets you flagged. This is big.\n\nThe malicious traffic is originating from Server Room Delta in our own basement (Level 3). Someone with admin privileges is routing stolen data through our infrastructure.\n\nPacket analysis shows:\n- 247TB of data exfiltrated over 6 months\n- Destination: Dark web marketplaces\n- Source: Server Room Delta (NOT Alpha - that's a decoy)\n- Access time: Primarily after hours (8 PM - 6 AM)\n\nWhoever is doing this has high-level access. Be very careful about who you trust.\n\n- Jake",
+          "unread": false,
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "sender": "Security System",
+          "email": "security@techcore.com",
+          "subject": "Access Code Update - December",
+          "date": "Dec 1, 2023",
+          "body": "TechCore Security Protocol Update:\n\nServer Room Access Codes (Effective Immediately):\n- Server Room Alpha (5th Floor): 5521\n- Server Room Beta (3rd Floor): 6832\n- Server Room Delta (Basement Level 3): 7734\n\nNote: Delta code spells HELL when typed on calculator and viewed upside-down.\nAccess restricted to Level 4 security clearance and above.\n\n- Security Team",
+          "unread": false,
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "sender": "Marcus Vega",
+          "email": "m.vega@techcore.com",
+          "subject": "RE: Network Security Audit",
+          "date": "Today, 6:00 PM",
+          "body": "Elena,\n\nI reviewed your audit report. While I appreciate your thoroughness, I think you may be looking in the wrong places.\n\nThe issues you've identified are likely just normal network traffic. Our infrastructure is secure. There's no need to investigate Server Room Delta - that's just backup storage.\n\nIf you're concerned about data breaches, focus on external threats, not internal systems. We have excellent security protocols in place.\n\nLet's meet tomorrow to discuss redirecting your investigation to more productive areas.\n\n- Marcus Vega\n  Chief Technology Officer",
+          "unread": false
+        },
+        {
+          "id": 4,
+          "sender": "Anonymous",
+          "email": "whistleblower@protonmail.com",
+          "subject": "[ENCRYPTED] The Truth About TechCore",
+          "date": "Today, 7:45 PM",
+          "body": "Elena,\n\nYou're on the right track, but be careful. Marcus Vega is not who he seems. He's been running a cybercrime operation for years, using TechCore's infrastructure to sell stolen corporate data.\n\nServer Room Delta in the basement is his command center. That's where he stores everything before selling it on the dark web.\n\nThe anonymous messages telling you to check Server Room Alpha are coming from him. It's a trap. Delta is the real location.\n\nAccess code: 7734\nLocation: Basement Level 3, Server Room Delta\n\nIf you're reading this, you're probably already in danger. Get evidence and get out.\n\n- Someone who escaped",
+          "unread": true,
+          "isClue": true
+        },
+        {
+          "id": 5,
+          "sender": "HR Department",
+          "email": "hr@techcore.com",
+          "subject": "Employee Background Check - M. Vega",
+          "date": "2 weeks ago",
+          "body": "Confidential HR Record:\n\nMarcus Vega - Chief Technology Officer\nEmployee ID: MV-4892\nHire Date: January 2020\n\nBackground Check Status: PASSED\n\nNote: Previous employment history verified. However, several gaps in resume (2015-2017) remain unexplained. References from prior companies could not be contacted - companies no longer exist.\n\nRecommendation: Routine monitoring of network access logs.\n\nFile attached: Previous cybercrime investigation mentions similar MO.",
+          "unread": false,
+          "isClue": true
+        }
+      ],
+      "calls": [
+        {
+          "id": 1,
+          "contact": "Jake Morrison",
+          "type": "incoming",
+          "duration": "4:15",
+          "time": "7:10 PM",
+          "missed": false
+        },
+        {
+          "id": 2,
+          "contact": "Marcus Vega",
+          "type": "incoming",
+          "duration": "2:30",
+          "time": "5:30 PM",
+          "missed": false
+        },
+        {
+          "id": 3,
+          "contact": "IT Support",
+          "type": "incoming",
+          "duration": "1:20",
+          "time": "9:00 AM",
+          "missed": false
+        },
+        {
+          "id": 4,
+          "contact": "Unknown (Blocked)",
+          "type": "incoming",
+          "duration": "0:00",
+          "time": "8:15 PM",
+          "missed": true
+        },
+        {
+          "id": 5,
+          "contact": "Sarah Kim",
+          "type": "incoming",
+          "duration": "3:45",
+          "time": "2:00 PM",
+          "missed": false
+        },
+        {
+          "id": 6,
+          "contact": "Dad",
+          "type": "incoming",
+          "duration": "2:10",
+          "time": "11:00 AM",
+          "missed": false
+        },
+        {
+          "id": 7,
+          "contact": "Jake Morrison",
+          "type": "outgoing",
+          "duration": "0:00",
+          "time": "9:00 PM",
+          "missed": false
+        }
+      ],
+      "voicemails": [
+        {
+          "id": 1,
+          "contact": "Unknown (Blocked)",
+          "time": "8:15 PM",
+          "duration": "0:38",
+          "transcript": "[Distorted voice] Stop your investigation. Server Room Alpha on the 5th floor has what you're looking for. The basement is just storage. Don't waste your time there. You're looking in the wrong place.",
+          "isFakeHint": true
+        },
+        {
+          "id": 2,
+          "contact": "Jake Morrison",
+          "time": "9:00 PM",
+          "duration": "0:52",
+          "transcript": "Elena! Where are you?! I just saw Marcus Vega heading to the basement with security. Something's wrong. I'm calling the police. Don't go near Server Room Delta alone! I'm coming to find you!",
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "contact": "Security Alert",
+          "time": "8:45 PM",
+          "duration": "0:25",
+          "transcript": "Automated security alert: Unauthorized access attempt detected at Server Room Delta, Basement Level 3. Security lockdown activated. Building security has been notified.",
+          "isClue": true
+        }
+      ],
+      "notes": [
+        {
+          "id": 1,
+          "title": "Network Investigation - Key Findings",
+          "date": "Today, 6:30 PM",
+          "content": "Suspicious Network Activity:\n\n- Massive data exfiltration (247TB over 6 months)\n- Source: Internal server (Server Room Delta, Basement Level 3)\n- Destination: Dark web marketplaces\n- Access pattern: After hours (8 PM - 6 AM)\n- Encryption: Military-grade\n\nPrime suspect: Someone with admin access\nPossible insider threat\n\nNeed to investigate Server Room Delta physically.",
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "title": "Marcus Vega - Background Research",
+          "date": "Today, 5:00 PM",
+          "content": "Marcus Vega - CTO\n- Hired January 2020\n- Full admin access to all systems\n- Employment gap: 2015-2017 (unexplained)\n- Previous companies no longer exist\n- Defensive when I mentioned Server Room Delta\n\nRed flags:\n- Tried to redirect my investigation\n- Access logs show he's in basement frequently after hours\n- Previous employers can't be contacted",
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "title": "Server Room Locations",
+          "date": "Last week",
+          "content": "TechCore Server Rooms:\n\n5th Floor:\n- Server Room Alpha (5521) - Public-facing servers\n\n3rd Floor:\n- Server Room Beta (6832) - Development servers\n\nBasement Level 3:\n- Server Room Delta (7734) - High-security data storage\n  * Restricted access\n  * Climate controlled\n  * Isolated from main network\n  * This is where the suspicious traffic originates",
+          "isClue": true
+        },
+        {
+          "id": 4,
+          "title": "Access Codes Reference",
+          "date": "Yesterday",
+          "content": "Server Room Access Codes:\n\nAlpha: 5521\nBeta: 6832  \nDelta: 7734 (spells HELL upside-down on calculator)\n\nNote: Delta has highest security clearance requirement.\nOnly CTO and Security Chief have permanent access.\n\nEmergency override available through Security.",
+          "isClue": true
+        },
+        {
+          "id": 5,
+          "title": "Anonymous Tip Analysis",
+          "date": "Today, 8:00 PM",
+          "content": "Received anonymous messages telling me to check Server Room Alpha instead of Delta.\n\nAnalysis:\n- Messages came from internal IP address\n- Traced to Marcus Vega's workstation\n- Trying to misdirect investigation\n- Server Room Alpha is a decoy\n\nConclusion: The real operation is in Server Room Delta.\nMarcus Vega is trying to keep me away from the basement.",
+          "isClue": true
+        },
+        {
+          "id": 6,
+          "title": "Evidence Checklist",
+          "date": "Today, 7:00 PM",
+          "content": "Evidence to collect from Server Room Delta:\n\n\u2713 Network logs showing data exfiltration\n\u2713 Financial records (dark web payments)\n\u2713 Encryption keys\n\u2713 List of stolen data clients\n\u2713 Marcus Vega's involvement proof\n\nLocation: Basement Level 3, Server Room Delta\nAccess Code: 7734\n\nMust document everything before confronting management.",
+          "isClue": true
+        }
+      ],
+      "endings": {
+        "server room delta": {
+          "title": "Cybercrime Ring Exposed - Case Solved!",
+          "message": "Outstanding detective work! You correctly identified:\n\n\u2713 Location: Server Room Delta, Basement Level 3 (not the Alpha decoy)\n\u2713 Access Code: 7734 (HELL spelled upside-down)\n\u2713 Perpetrator: Marcus Vega (CTO running cybercrime operation)\n\nBy analyzing network traffic, ignoring fake hints pointing to Server Room Alpha, and cross-referencing access logs, you found Elena in Server Room Delta where she was gathering evidence against Marcus Vega's cybercrime operation. Vega had been using TechCore's infrastructure to steal and sell corporate data on the dark web. Law enforcement has been notified, arrests are being made, and the stolen data is being recovered. TechCore's reputation has been saved!",
+          "success": true,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "server room alpha": {
+          "title": "Wrong Location - Fell for the Misdirection!",
+          "message": "You went to Server Room Alpha on the 5th floor, falling for Marcus Vega's fake hints. Server Room Alpha contains only public-facing servers with no evidence. While you were searching the wrong location, Vega detected your investigation, erased all evidence from Server Room Delta, and fled the country. Elena remains missing, and the cybercrime operation has gone dark. The investigation has failed.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "basement": {
+          "title": "Partially Correct - Incomplete Information!",
+          "message": "You found the basement but didn't specify Server Room Delta or provide the access code (7734). Without these precise details, you couldn't access the secured server room. Marcus Vega was alerted to your presence and triggered the emergency data wipe protocol. All evidence has been destroyed, Vega has disappeared, and Elena's location remains unknown. The cybercrime ring continues operating.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gameover": {
+          "title": "Game Over - Investigation Compromised!",
+          "message": "Your repeated incorrect attempts triggered Marcus Vega's alert system. He immediately initiated the emergency protocol: all evidence in Server Room Delta has been wiped, backup servers destroyed, and he has fled the country with Elena as a hostage. The cybercrime network has disbanded and gone underground. The investigation is now a criminal manhunt. Always verify your evidence before submitting!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "timeout": {
+          "title": "Time's Up - Evidence Destroyed",
+          "message": "You ran out of time. Marcus Vega completed his data wipe of Server Room Delta and fled TechCore. Elena is still missing, and all digital evidence of the cybercrime operation has been permanently deleted. The dark web network has been notified and shut down all trails. Without evidence, the case cannot be prosecuted. Vega remains at large.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        }
+      },
+      "personOptions": [
+        "Marcus Vega",
+        "Sarah Kim",
+        "Thomas Reid",
+        "IT Support",
+        "Security - Tech Corp"
+      ],
+      "personClueRequirements": {
+        "Marcus Vega": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Sarah Kim": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Thomas Reid": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "IT Support": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Security - Tech Corp": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        }
+      }
+    },
+    {
+      "id": 5,
+      "name": "The Museum Heist",
+      "description": "Elena vanished while investigating a sophisticated art heist at the National Museum",
+      "solution": "vault room 3",
+      "requiresMultiPart": true,
+      "totalStages": 3,
+      "multiPartSolution": {
+        "location": "vault room 3",
+        "code": "2187",
+        "person": "isabella cross"
+      },
+      "stagePrompts": [
+        "Where is Elena located? Be specific about the room.",
+        "What is the vault access code?",
+        "Who is the mastermind behind the heist?"
+      ],
+      "messages": [
+        {
+          "id": 1,
+          "contact": "Detective Brooks",
+          "avatar": "DB",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, thanks for your help on this museum case. Your art expertise is invaluable.",
+              "time": "4:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Happy to help! Have you identified any suspects?",
+              "time": "4:35 PM"
+            },
+            {
+              "type": "received",
+              "text": "We're looking at Isabella Cross, the museum curator. Something's off about her story.",
+              "time": "4:40 PM"
+            },
+            {
+              "type": "received",
+              "text": "She had access to all vault rooms. Vault 3 particularly - where the Renaissance paintings are stored.",
+              "time": "4:45 PM",
+              "isClue": true
+            },
+            {
+              "type": "sent",
+              "text": "I'll look into it. When can I access the museum?",
+              "time": "4:50 PM"
+            },
+            {
+              "type": "received",
+              "text": "After hours. 9 PM tonight. Be careful - the thieves might still be around.",
+              "time": "4:55 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 2,
+          "contact": "Isabella Cross",
+          "avatar": "IC",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena, I heard you're helping with the investigation. Can we talk?",
+              "time": "6:15 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Of course. What did you want to discuss?",
+              "time": "6:20 PM"
+            },
+            {
+              "type": "received",
+              "text": "Not over text. Meet me at the museum tonight? East wing, Vault Room 1.",
+              "time": "6:25 PM"
+            },
+            {
+              "type": "received",
+              "text": "I have information about the heist that I can only share in person.",
+              "time": "6:30 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Okay, what time?",
+              "time": "6:35 PM"
+            },
+            {
+              "type": "received",
+              "text": "9:30 PM. Come alone. And Elena... trust no one.",
+              "time": "6:40 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 3,
+          "contact": "Unknown (Burner Phone)",
+          "avatar": "?",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Don't go to Vault 3. It's a setup. The real evidence is in the East Wing, Vault 1.",
+              "time": "8:45 PM"
+            },
+            {
+              "type": "received",
+              "text": "Isabella is innocent. Look at the security footage from the Main Exhibition Hall instead.",
+              "time": "8:50 PM"
+            }
+          ],
+          "unread": true
+        },
+        {
+          "id": 4,
+          "contact": "Thomas Reid",
+          "avatar": "TR",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Elena! Did you hear about the museum heist? Crazy!",
+              "time": "3:00 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Yeah, I'm actually helping investigate it.",
+              "time": "3:15 PM"
+            },
+            {
+              "type": "received",
+              "text": "Be careful. I heard the curator might be involved. Isabella Cross.",
+              "time": "3:20 PM"
+            },
+            {
+              "type": "sent",
+              "text": "How do you know that?",
+              "time": "3:25 PM"
+            },
+            {
+              "type": "received",
+              "text": "Word gets around in the art world. She's been acting strange lately.",
+              "time": "3:30 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 5,
+          "contact": "Sister",
+          "avatar": "S",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Hey! Dinner this weekend?",
+              "time": "1:00 PM"
+            },
+            {
+              "type": "sent",
+              "text": "Maybe! Working on a big case right now.",
+              "time": "1:30 PM"
+            },
+            {
+              "type": "received",
+              "text": "Museum heist? Saw it on the news. Stay safe! \u2764\ufe0f",
+              "time": "1:35 PM"
+            }
+          ],
+          "unread": false
+        },
+        {
+          "id": 6,
+          "contact": "Security Office",
+          "avatar": "SO",
+          "messages": [
+            {
+              "type": "received",
+              "text": "Museum security codes for tonight's investigation:",
+              "time": "7:00 PM"
+            },
+            {
+              "type": "received",
+              "text": "Main entrance: 1234 (temporary), Vault Room 1: 5698, Vault Room 3: 2187",
+              "time": "7:02 PM",
+              "isClue": true
+            },
+            {
+              "type": "received",
+              "text": "Vault 3 is in the West Wing, basement level. Renaissance collection storage.",
+              "time": "7:05 PM",
+              "isClue": true
+            },
+            {
+              "type": "received",
+              "text": "Note: Vault 1 in East Wing is currently empty (under renovation).",
+              "time": "7:08 PM",
+              "isClue": true
+            }
+          ],
+          "unread": false
+        }
+      ],
+      "emails": [
+        {
+          "id": 1,
+          "sender": "Detective Brooks",
+          "email": "r.brooks@citypolice.gov",
+          "subject": "Museum Heist - Case Brief",
+          "date": "Today, 4:00 PM",
+          "body": "Elena,\n\nHere's what we know about the museum heist:\n\nStolen Items:\n- Renaissance paintings from Vault Room 3 (West Wing, basement)\n- Total value: $45 million\n- Theft occurred between 11 PM - 2 AM last night\n\nPrime Suspect: Isabella Cross (Museum Curator)\n- Had access to all vault codes\n- Security footage shows her entering West Wing at 11:47 PM\n- Claims she was checking alarm malfunction\n- Can't verify her alibi\n\nVault Codes:\n- Vault 1 (East Wing): 5698 - Currently empty, under renovation\n- Vault 2 (North Wing): 8843 - Ancient artifacts (untouched)\n- Vault 3 (West Wing): 2187 - Renaissance collection (STOLEN)\n\nWe need your art expertise to verify what was taken. Meet at museum 9 PM.\n\n- Detective Brooks",
+          "unread": false,
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "sender": "Isabella Cross",
+          "email": "i.cross@nationalmuseum.org",
+          "subject": "URGENT - Need to talk",
+          "date": "Today, 6:10 PM",
+          "body": "Elena,\n\nI know the police suspect me, but I'm innocent. I need to show you something that proves I'm being framed.\n\nThe real thief planted evidence in Vault Room 3 to make it look like I stole the paintings. But I found their actual hiding spot - they haven't moved the paintings off-site yet.\n\nMeet me tonight at 9:30 PM. I'll show you where the stolen art really is. Trust me on this.\n\nDon't tell Detective Brooks yet - I think someone in the police department is involved.\n\n- Isabella Cross\n  Museum Curator",
+          "unread": false
+        },
+        {
+          "id": 3,
+          "sender": "Museum Security",
+          "email": "security@nationalmuseum.org",
+          "subject": "Security Footage Analysis",
+          "date": "Today, 5:30 PM",
+          "body": "Investigation Team,\n\nSecurity footage analysis reveals:\n\nTimeline:\n11:00 PM - All clear\n11:47 PM - Isabella Cross enters West Wing (Vault Room 3 area)\n12:15 AM - Unidentified figure exits West Wing carrying large bag\n12:45 AM - Isabella Cross exits West Wing\n1:30 AM - Alarm triggered in Vault Room 3\n\nKey findings:\n- Isabella was present during theft window\n- Second person (unidentified) also present\n- Vault Room 3 (West Wing basement) was the target\n- Vault 1 (East Wing) remained secure - currently empty anyway\n\nFootage available for review.\n\n- Security Team",
+          "unread": true,
+          "isClue": true
+        },
+        {
+          "id": 4,
+          "sender": "Anonymous Tip",
+          "email": "throwaway@darkmail.com",
+          "subject": "[ANONYMOUS] Isabella is innocent",
+          "date": "Today, 8:30 PM",
+          "body": "Elena,\n\nIsabella Cross is being set up. She discovered the real thief and was trying to gather evidence when she was caught on camera.\n\nDon't go to Vault Room 3 - it's been cleared out. The paintings were moved.\n\nThe real evidence is in the East Wing, Vault Room 1. That's where Isabella found the thief's plans. She'll show you tonight.\n\nVault 1 is safer. Vault 3 is compromised.\n\n- Someone who knows the truth",
+          "unread": true
+        },
+        {
+          "id": 5,
+          "sender": "Art Authentication Lab",
+          "email": "lab@artauth.com",
+          "subject": "RE: Painting Authentication Records",
+          "date": "Yesterday, 2:00 PM",
+          "body": "Elena,\n\nRegarding your inquiry about the Renaissance collection in Vault Room 3:\n\nIsabella Cross has been requesting authentication certificates for these paintings over the past 3 months. Unusual for pieces already in the museum's permanent collection.\n\nAuthentication requests:\n- 'Madonna and Child' by Raphael\n- 'Portrait of a Lady' by Titian  \n- 'The Annunciation' by Botticelli\n\nAll pieces stored in West Wing, Vault Room 3 (Access code: 2187).\n\nThis pattern suggests either preparation for sale or suspicion of forgery. Could indicate she was planning the heist or investigating one.\n\n- Dr. Helena Martinez\n  Art Authentication Lab",
+          "unread": false,
+          "isClue": true
+        }
+      ],
+      "calls": [
+        {
+          "id": 1,
+          "contact": "Detective Brooks",
+          "type": "incoming",
+          "duration": "5:20",
+          "time": "4:30 PM",
+          "missed": false
+        },
+        {
+          "id": 2,
+          "contact": "Isabella Cross",
+          "type": "incoming",
+          "duration": "3:15",
+          "time": "6:15 PM",
+          "missed": false
+        },
+        {
+          "id": 3,
+          "contact": "Unknown (Burner)",
+          "type": "incoming",
+          "duration": "0:00",
+          "time": "8:45 PM",
+          "missed": true
+        },
+        {
+          "id": 4,
+          "contact": "Thomas Reid",
+          "type": "incoming",
+          "duration": "4:10",
+          "time": "3:00 PM",
+          "missed": false
+        },
+        {
+          "id": 5,
+          "contact": "Security Office",
+          "type": "incoming",
+          "duration": "2:25",
+          "time": "7:00 PM",
+          "missed": false
+        },
+        {
+          "id": 6,
+          "contact": "Sister",
+          "type": "incoming",
+          "duration": "1:50",
+          "time": "1:00 PM",
+          "missed": false
+        },
+        {
+          "id": 7,
+          "contact": "Detective Brooks",
+          "type": "outgoing",
+          "duration": "0:00",
+          "time": "9:15 PM",
+          "missed": false
+        }
+      ],
+      "voicemails": [
+        {
+          "id": 1,
+          "contact": "Unknown (Burner)",
+          "time": "8:45 PM",
+          "duration": "0:42",
+          "transcript": "[Whispered voice] Elena, don't trust Detective Brooks. Vault Room 3 is a trap. Isabella will meet you at Vault 1 in the East Wing. That's where the evidence is. The West Wing is too dangerous. Stay away from Vault 3.",
+          "isFakeHint": true
+        },
+        {
+          "id": 2,
+          "contact": "Detective Brooks",
+          "time": "9:15 PM",
+          "duration": "0:55",
+          "transcript": "Elena, where are you? I just got a tip that Isabella Cross might be dangerous. Don't meet her alone! The stolen paintings are still in Vault Room 3 - she hasn't moved them yet. She's planning to retrieve them tonight. I'm heading to the museum now. Wait for me!",
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "contact": "Museum Security",
+          "time": "9:30 PM",
+          "duration": "0:30",
+          "transcript": "This is museum security. We've detected unauthorized access in the West Wing, Vault Room 3 area. Lockdown has been initiated. If you're on-site for the investigation, please identify yourself to security personnel immediately.",
+          "isClue": true
+        }
+      ],
+      "notes": [
+        {
+          "id": 1,
+          "title": "Museum Heist - Key Facts",
+          "date": "Today, 5:00 PM",
+          "content": "National Museum Heist:\n\nStolen: Renaissance paintings ($45M value)\nLocation: Vault Room 3, West Wing, basement level\nTime: 11 PM - 2 AM last night\nAccess code: 2187\n\nPrime suspect: Isabella Cross (curator)\n- Present during theft window\n- Had access to vault codes\n- Requesting authentication certificates recently\n\nSecurity footage shows unidentified second person.",
+          "isClue": true
+        },
+        {
+          "id": 2,
+          "title": "Isabella Cross - Profile",
+          "date": "Today, 4:30 PM",
+          "content": "Isabella Cross - Museum Curator\n- Age 42, employed 8 years\n- Art history PhD from Oxford\n- Impeccable reputation until now\n- Full access to all vault rooms\n\nRecent behavior:\n- Requesting painting authentications (unusual)\n- Working late hours\n- Nervous, defensive when questioned\n\nClaims to be framed, wants to meet tonight at Vault 1.\nBut evidence points to Vault 3 as the crime scene.",
+          "isClue": true
+        },
+        {
+          "id": 3,
+          "title": "Vault Locations & Codes",
+          "date": "Today, 7:00 PM",
+          "content": "National Museum Vault Layout:\n\nEast Wing:\n- Vault Room 1 (Code: 5698)\n  * Currently EMPTY - under renovation\n  * Isabella wants to meet here\n\nNorth Wing:\n- Vault Room 2 (Code: 8843)\n  * Ancient artifacts collection\n  * Untouched during heist\n\nWest Wing (BASEMENT):\n- Vault Room 3 (Code: 2187)\n  * Renaissance paintings (STOLEN)\n  * Crime scene location\n  * This is where the theft occurred",
+          "isClue": true
+        },
+        {
+          "id": 4,
+          "title": "Anonymous Tips Analysis",
+          "date": "Today, 8:50 PM",
+          "content": "Received anonymous messages telling me:\n- Don't go to Vault 3\n- Go to Vault 1 instead  \n- Isabella is innocent\n- Vault 3 is a trap\n\nAnalysis:\nThese messages are suspicious. Why direct me away from the actual crime scene (Vault 3) to an empty vault (Vault 1)?\n\nPossibility: Isabella sent these herself to lure me to empty vault where she can eliminate witness.\n\nReal evidence is likely still in Vault Room 3.",
+          "isClue": true
+        },
+        {
+          "id": 5,
+          "title": "Security Footage Notes",
+          "date": "Today, 6:00 PM",
+          "content": "Security footage timeline:\n\n11:47 PM - Isabella enters West Wing \u2192 Vault 3\n12:15 AM - Unknown person exits with bag\n12:45 AM - Isabella exits\n1:30 AM - Alarm triggered\n\nKey observations:\n- Isabella present for 1 hour during theft\n- Second person involved (accomplice?)\n- West Wing = Vault Room 3 location\n- Vault 3 is in basement level\n\nPaintings likely still in Vault 3 - too risky to move immediately.",
+          "isClue": true
+        },
+        {
+          "id": 6,
+          "title": "Meeting Tonight - Risk Assessment",
+          "date": "Today, 8:00 PM",
+          "content": "Isabella wants to meet at 9:30 PM:\n\nHer claim: Meet at Vault 1 (East Wing)\n- Says she'll prove her innocence\n- Claims to have found real evidence\n- Vault 1 is currently empty (renovation)\n\nRed flags:\n- Why meet in empty vault?\n- Why not just tell police?\n- Anonymous messages supporting her story (suspicious)\n\nAlternative: Investigate Vault 3 (West Wing basement)\n- Actual crime scene\n- Code: 2187\n- Paintings likely still there\n- This is the real location",
+          "isClue": true
+        }
+      ],
+      "endings": {
+        "vault room 3": {
+          "title": "Heist Solved - Curator Caught!",
+          "message": "Excellent investigative work! You correctly identified:\n\n\u2713 Location: Vault Room 3, West Wing basement (not the Vault 1 decoy)\n\u2713 Access Code: 2187\n\u2713 Mastermind: Isabella Cross (museum curator)\n\nBy analyzing security footage, recognizing fake anonymous tips trying to redirect you to empty Vault 1, and cross-referencing vault locations, you found Elena in Vault Room 3 where she had cornered Isabella Cross with the stolen Renaissance paintings. Isabella had orchestrated an inside job, planning to blame external thieves. She lured Elena to the empty Vault 1 to eliminate her, but Elena figured out the deception. Detective Brooks arrived in time. Isabella has been arrested, the $45 million in art has been recovered, and the museum's reputation is saved!",
+          "success": true,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "vault room 1": {
+          "title": "Wrong Location - Walked Into a Trap!",
+          "message": "You went to Vault Room 1 in the East Wing, falling for Isabella Cross's misdirection. Vault 1 was empty and under renovation - exactly as Isabella planned. She trapped you there and escaped with Elena through the West Wing, taking the stolen paintings with her. While you were locked in Vault 1, Isabella fled the country with $45 million in stolen Renaissance art. Elena is being held hostage. The investigation has failed catastrophically.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "east wing": {
+          "title": "Partially Correct - Missing Critical Details!",
+          "message": "You identified the East Wing, but that's where the empty Vault 1 is located (under renovation). The actual crime scene and stolen paintings were in Vault Room 3 in the WEST Wing basement. Without the correct location (Vault Room 3), access code (2187), and identification of Isabella Cross as the mastermind, you couldn't prevent her escape. She has disappeared with the stolen art and Elena. The heist remains unsolved.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "gameover": {
+          "title": "Game Over - Investigation Exposed!",
+          "message": "Your multiple incorrect attempts alerted Isabella Cross that you were onto her. She activated her escape plan immediately: Elena has been taken hostage, the stolen paintings moved to an unknown location, and Isabella has fled the country using a false identity. The $45 million in Renaissance art is gone forever, and Elena's life is in danger. International authorities have issued warrants, but the trail has gone cold. Always verify your evidence carefully before submitting!",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        },
+        "timeout": {
+          "title": "Time's Up - Heist Complete",
+          "message": "You ran out of time. Isabella Cross completed her heist, escaping with Elena and the stolen Renaissance paintings. By the time museum security discovered your absence, Isabella was already on a private jet to a non-extradition country. The $45 million in stolen art has vanished into the black market. Elena's whereabouts are unknown. The museum board has resigned in disgrace, and the case remains unsolved.",
+          "success": false,
+          "clueRequirements": {
+            "messages": [],
+            "emails": [],
+            "notes": [],
+            "voicemails": []
+          }
+        }
+      },
+      "personOptions": [
+        "Isabella Cross",
+        "Marcus Chen",
+        "Detective Brooks",
+        "Security Office",
+        "Sarah Williams"
+      ],
+      "personClueRequirements": {
+        "Isabella Cross": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Marcus Chen": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Detective Brooks": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Security Office": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        },
+        "Sarah Williams": {
+          "messages": [],
+          "emails": [],
+          "notes": [],
+          "voicemails": []
+        }
+      }
+    }
+  ]
+}

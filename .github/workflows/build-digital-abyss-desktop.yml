@@ -1,0 +1,35 @@
+# Builds the standalone Windows installer for Digital Abyss (Electron shell around the Game OS site).
+name: Build Digital Abyss Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/digital-abyss/**'
+      - '.github/workflows/build-digital-abyss-desktop.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/digital-abyss
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check main process syntax
+        run: node --check main.js
+      - name: Install dependencies
+        run: npm install
+      - name: Build installer
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DigitalAbyss-Setup-win-x64
+          path: desktop/digital-abyss/dist/*.exe

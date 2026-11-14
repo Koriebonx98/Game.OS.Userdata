@@ -31,6 +31,11 @@
                 <div class="app-stat"><b id="statPlaytime">0h</b><span>Playtime</span></div>
                 <div class="app-stat"><b id="statAch">0</b><span>Achievements</span></div>
             </div>
+            <a class="app-card" href="games/digital-abyss/index.html" id="originalsCard" style="display:flex;gap:12px;align-items:center;text-decoration:none;color:inherit">
+                <img src="games/digital-abyss/cover.svg" alt="" width="64" height="86" style="border-radius:8px">
+                <div style="flex:1"><small>GAME OS EXCLUSIVE</small><br><b>Digital Abyss</b><br><small>Solve Elena's disappearance. Cloud saves, achievements and playtime sync to your account.</small></div>
+                <span class="btn app-more">▶ Play</span>
+            </a>
             <h2 class="app-h2">Recently added</h2>
             <div id="recentList" class="app-list"></div>
             <h2 class="app-h2">Recently played</h2>
@@ -445,7 +450,9 @@
                 $('detailPlay').before(pcBox);
                 $('detailPcPlay').onclick = () => { location.href = 'http://' + c.addr + '/?pin=' + encodeURIComponent(c.pin) + '&user=' + encodeURIComponent(user.username) + '&ret=' + encodeURIComponent(location.origin + location.pathname) + '&launch=' + encodeURIComponent(g.title) + (g.platform && g.platform !== 'PC' ? '&platform=' + encodeURIComponent(g.platform) : ''); };
             }
-            if (!g._owner && window.GameOSEmu) {
+            if (!g._owner && g.platform === 'PC' && String(g.title).toLowerCase() === 'digital abyss') {
+                $('detailPlay').innerHTML = '<a class="btn app-more" id="detailPlayBtn" href="games/digital-abyss/index.html">▶ Play</a>';
+            } else if (!g._owner && window.GameOSEmu) {
                 const box = $('detailPlay');
                 const draw = async () => {
                     let inst = false;
@@ -680,6 +687,16 @@
                     try { (await fetchGamesDbPlatform(p)).forEach(g => { storeGames.push(g); storePlatOf.set(g, p); }); } catch (_) {}
                 }));
             } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
+            // Game OS exclusives (playable on the site / iOS app): GameOS.Exclusives.json, entries tagged with where they run.
+            try {
+                const r = await fetch(GAMES_DB_RAW_BASE + '/GameOS.Exclusives.json', { cache: 'no-cache' });
+                if (r.ok) ((await r.json()).Games || []).forEach(g => {
+                    const plat = g.platform || 'PC';
+                    const i = storeGames.findIndex(x => pf(x) === plat && gTitle(x).toLowerCase() === gTitle(g).toLowerCase());
+                    if (i >= 0) { storePlatOf.delete(storeGames[i]); storeGames.splice(i, 1); }
+                    g.gameOSExclusive = true; storeGames.push(g); storePlatOf.set(g, plat);
+                });
+            } catch (_) {}
             updatedGameOrder = new Map();
             try {
                 const feed = await getUpdatedGameFeed();
@@ -788,7 +805,7 @@
             $('storeList').innerHTML = hits.length ? hits.map(i => {
                 const g = storeGames[i], t = gTitle(g), p = pf(g), cover = getGameCoverUrl(g);
                 const img = cover ? `<img src="${esc(cover)}" alt="" loading="lazy" onerror="this.style.display='none'">` : `<span>${esc(getPlatformIcon(p))}</span>`;
-                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(p)} ${getCompatBadgeHtml(g, p)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(p + '|' + t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
+                return `<div class="app-row" data-store-open="${i}"><div class="app-cover">${img}</div><div class="app-row-info"><b>${esc(t)}</b><small>${esc(p)} ${g.gameOSExclusive ? '⭐ Game OS Exclusive · ' + esc((g.tags || []).join(' · ')) : getCompatBadgeHtml(g, p)}</small></div>${isAdminUser() ? `<button class="btn app-store-btn" data-store-edit="${i}" aria-label="Edit">✏️</button>` : ''}${owned.has(p + '|' + t.toLowerCase()) ? `<span>✅</span><button class="btn app-store-btn" data-store-rm="${i}" aria-label="Remove">🗑️</button>` : g.gameOSExclusive ? `<a class="btn app-store-btn" href="${esc(g.playUrl || '#')}" aria-label="Claim and play" onclick="event.stopPropagation()">🔑</a>` : `<button class="btn app-store-btn" data-store-add="${i}" aria-label="Add">＋</button>`}</div>`;
             }).join('') : empty('No games found.');
         }
         function showView(v) {
