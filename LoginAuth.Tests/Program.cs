@@ -162,6 +162,11 @@ class Program
             "A different game keeps its configured server address");
         Check(RoomConnectionService.ConnectArgument("connect {IP}", "", "10.77.1.1", "Call of Duty: Ghosts", "PC", "Call of Duty - Ghosts", "PC") == "connect 10.77.1.1",
             "Normalized game titles still use the joined room");
+        Check(RoomConnectionService.ConnectArgument("-multiplayer -connect $TempIP", "", "10.77.1.1", "Ghosts", "PC", "Ghosts", "PC") == "-multiplayer -connect 10.77.1.1",
+            "$TempIP is replaced with the room address");
+        Check(RoomConnectionService.ConnectArgument("", "", "10.77.1.1", "Ghosts", "PC", "Ghosts", "PC", "C:/g/iw6-mod.exe") == "-multiplayer -connect 10.77.1.1"
+            && RoomConnectionService.ConnectArgument("", "", "10.77.1.1", "BO2", "PC", "BO2", "PC", "plutonium.exe") == "-connect 10.77.1.1",
+            "Blank templates default by mod client");
         return passed;
     }
 

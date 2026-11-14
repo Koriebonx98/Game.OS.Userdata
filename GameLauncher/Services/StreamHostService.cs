@@ -219,7 +219,7 @@ namespace GameLauncher.Services
                         return;
                     }
                     var qp = ParseQuery(query);
-                    if (!PinMatches(pin))
+                    if (!PinMatches(pin) && !(PartyPinMatches(pin) && IsPartyPath(path)))
                     {
                         await Respond(stream, 401, "text/html", "<h3>Wrong or missing PIN</h3>");
                         return;
@@ -307,6 +307,38 @@ namespace GameLauncher.Services
                 return $"{rating}: encode {perFrameMs:F0} ms/frame (~{achievableFps:F0} fps possible, target {_frameRate}). " +
                        $"Needs ~{neededMbps:F1} Mbps Wi-Fi. Test on iPhone/iPad from the stream page for real network speed.";
             });
+        }
+
+        private static string _partyPin = "";
+        private static bool _partyStartedHost;
+        public static bool IsPartyActive => _partyPin.Length > 0;
+        public static string PartyPin => _partyPin;
+
+        private static bool IsPartyPath(string path) =>
+            path is "/" or "/index.html" or "/stream" or "/video" or "/audio";
+
+        private static bool PartyPinMatches(string pin) =>
+            _partyPin.Length > 0 && pin.Length == _partyPin.Length &&
+            CryptographicOperations.FixedTimeEquals(Encoding.UTF8.GetBytes(pin), Encoding.UTF8.GetBytes(_partyPin));
+
+        /// <summary>
+        /// Starts a direct watch party: friends open this PC's stream page over the shared virtual LAN with a temporary
+        /// PIN that only unlocks the screen/audio feed and is revoked by <see cref="EndParty"/>. No hosted relay needed.
+        /// Returns (port, pin).
+        /// </summary>
+        public static (int Port, string Pin) StartParty()
+        {
+            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("Watch parties need Windows screen capture.");
+            if (_listener == null) { Start(); _partyStartedHost = _listener != null; }
+            if (_listener == null) throw new InvalidOperationException(_status);
+            _partyPin = RandomNumberGenerator.GetInt32(0, 1_000_000).ToString("D6");
+            return (_port, _partyPin);
+        }
+
+        public static void EndParty()
+        {
+            _partyPin = "";
+            if (_partyStartedHost) { _partyStartedHost = false; Stop(); }
         }
 
         private static bool PinMatches(string pin) =>

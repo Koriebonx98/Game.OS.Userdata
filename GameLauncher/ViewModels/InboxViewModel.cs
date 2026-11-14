@@ -165,9 +165,10 @@ public partial class InboxViewModel : ViewModelBase
         }
         catch (Exception ex) { ErrorMessage = "Could not accept invite: " + ex.Message; return; }
         PendingInvites.Remove(invite);
-        OnInviteAccepted?.Invoke(invite);
         OnPropertyChanged(nameof(HasPendingInvites));
         OnPropertyChanged(nameof(HasEmptyInbox));
+        try { OnInviteAccepted?.Invoke(invite); }
+        catch (Exception ex) { ErrorMessage = "Invite accepted, but it could not be opened: " + ex.Message; }
     }
 
     [RelayCommand]
@@ -259,9 +260,12 @@ public partial class InboxViewModel : ViewModelBase
         return false;
     }
 
+    private int _loadVersion;
+
     private async Task LoadAsync()
     {
         if (_client == null) return;
+        int version = ++_loadVersion;
 
         IsLoading = true;
         ErrorMessage = "";
@@ -273,6 +277,7 @@ public partial class InboxViewModel : ViewModelBase
             var friendsTask = _client.GetFriendsAsync();
             var invitesTask = _client.GetInvitesAsync();
             var friends = await friendsTask;
+            if (version != _loadVersion) return;
             var messageInvitesTask = _client.GetMessageInvitesAsync(friends);
             try
             {
@@ -295,6 +300,7 @@ public partial class InboxViewModel : ViewModelBase
                     if (shares.Count > 0)
                         Avalonia.Threading.Dispatcher.UIThread.Post(() =>
                         {
+                            if (version != _loadVersion) return;
                             foreach (var sh in shares) PendingModShares.Add(sh);
                             OnPropertyChanged(nameof(HasPendingModShares));
                         });
@@ -311,7 +317,9 @@ public partial class InboxViewModel : ViewModelBase
                 catch { return null; }
             });
 
-            foreach (var convo in (await Task.WhenAll(convoTasks))
+            var convos = await Task.WhenAll(convoTasks);
+            if (version != _loadVersion) return;
+            foreach (var convo in convos
                 .Where(c => c != null)
                 .OrderByDescending(c => c!.LastMessageAt))
             {
@@ -324,7 +332,7 @@ public partial class InboxViewModel : ViewModelBase
         }
         finally
         {
-            IsLoading = false;
+            if (version == _loadVersion) IsLoading = false;
             OnPropertyChanged(nameof(HasConversations));
             OnPropertyChanged(nameof(HasPendingInvites));
             OnPropertyChanged(nameof(HasEmptyInbox));

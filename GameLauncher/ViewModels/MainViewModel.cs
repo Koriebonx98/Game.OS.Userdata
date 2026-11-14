@@ -107,12 +107,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task JoinInvitedRoomAsync(GameInvite invite)
     {
-        if (invite.IsWatchParty || string.IsNullOrWhiteSpace(invite.RoomId)) return;
+        if (string.IsNullOrWhiteSpace(invite.RoomId) || (invite.IsWatchParty && invite.StreamPort == null)) return;
         if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+        if (_lfg.IsHosting && string.Equals(_lfg.HostedRoomId, invite.RoomId, StringComparison.Ordinal)) return;
         await _lfg.JoinAsync(new LfgRoom
         {
             RoomId = invite.RoomId, Host = invite.From, Game = invite.GameName, Platform = invite.Platform,
         });
+        if (invite.IsWatchParty) return;
         DetailVm.LfgStatus = $"Joined {invite.From}'s room. Host address: {_lfg.JoinedEndpoint}. {_lfg.ConnectionInfo}. " +
             "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
         NotificationService.ShowDeveloperNotification(
@@ -208,10 +210,44 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         catch (Exception ex) { _broadcastError = "Broadcast failed: " + ex.Message; return false; }
     }
 
-    /// <summary>Starts a broadcast room for the title, invites the friends, and (optionally) waits for someone to accept before playback.</summary>
+    private bool _directParty;
+    private bool _partyOwnsRoom;
+
+    /// <summary>
+    /// Starts the party host. With no hosted relay configured the host streams directly: friends join the host's
+    /// private virtual-LAN room (temporary address, never the real IP) and open its stream page with a temporary PIN.
+    /// </summary>
+    private async Task<(string? Room, string? Relay, int? Port, string? Pin)> BeginPartyHostAsync(WatchPartyRequest req)
+    {
+        var settings = Services.AppSettingsService.Load();
+        if (Uri.TryCreate((settings.StreamRelayUrl ?? "").Trim(), UriKind.Absolute, out var relayUri)
+            && (relayUri.Scheme == "http" || relayUri.Scheme == "https"))
+        {
+            if (!await BeginBroadcastAsync(req.Title)) return (null, null, null, null);
+            return (StreamHostService.BroadcastRoomId, StreamHostService.BroadcastRelayUrl, null, null);
+        }
+        try
+        {
+            if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
+            if (_lfg.IsHosting) throw new InvalidOperationException("Close your current room before starting a watch party.");
+            await _lfg.HostAsync(req.Title, "Watch Party", true);
+            _partyOwnsRoom = _directParty = true;
+            var (port, pin) = StreamHostService.StartParty();
+            return (_lfg.HostedRoomId, null, port, pin);
+        }
+        catch (Exception ex)
+        {
+            _broadcastError = "Watch party failed: " + ex.Message;
+            await EndBroadcastAsync();
+            return (null, null, null, null);
+        }
+    }
+
+    /// <summary>Starts the party stream, invites the friends, and (optionally) waits for someone to accept before playback.</summary>
     private async Task<bool> RunWatchPartyAsync(WatchPartyRequest req, Action<IReadOnlyList<string>> report)
     {
-        if (!await BeginBroadcastAsync(req.Title))
+        var (room, relay, streamPort, streamPin) = await BeginPartyHostAsync(req);
+        if (room == null)
         {
             report(new[] { _broadcastError });
             await Task.Delay(2500);
@@ -219,7 +255,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         }
         if (req.Cancel.IsCancellationRequested) { await EndBroadcastAsync(); return false; }
 
-        var info = (new { Relay = StreamHostService.BroadcastRelayUrl, Room = StreamHostService.BroadcastRoomId });
+        var info = new { Relay = relay, Room = room };
         var status = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var ids = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var friend in req.Friends)
@@ -229,6 +265,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 ids[friend] = await _client.SendWatchInviteAsync(friend, new GameInvite
                 {
                     GameName = req.Title, Kind = "watch", RoomId = info.Room, RelayUrl = info.Relay,
+                    Platform = streamPort != null ? "Watch Party" : "",
+                    StreamPort = streamPort, StreamPin = streamPin,
                     MediaType = req.MediaType, Season = req.Season, Episode = req.Episode,
                 });
                 status[friend] = "pending";
@@ -276,6 +314,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task EndBroadcastAsync()
     {
+        if (_directParty)
+        {
+            _directParty = false;
+            StreamHostService.EndParty();
+            if (_partyOwnsRoom) { _partyOwnsRoom = false; _lfg?.StopHosting(); }
+            return;
+        }
         StreamHostService.StopBroadcast();
         try { await _client.SetBroadcastAsync(null); } catch { }
     }
@@ -565,7 +610,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         {
             try
             {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(BuildWatchUrl(invite)) { UseShellExecute = true });
+                string url = invite.StreamPort != null && !string.IsNullOrEmpty(_lfg?.JoinedEndpoint)
+                    ? $"http://{_lfg!.JoinedEndpoint.Split(':')[0]}:{invite.StreamPort}/?pin={Uri.EscapeDataString(invite.StreamPin ?? "")}"
+                    : BuildWatchUrl(invite);
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
             }
             catch (Exception ex) { DevLogService.Log("[WatchParty] Could not open viewer: " + ex.Message); }
             return;
