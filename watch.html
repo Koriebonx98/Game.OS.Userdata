@@ -143,8 +143,10 @@
         function stopWatchTimer() { if (watchTimer) { clearTimeout(watchTimer); watchTimer = null; } }
 
         document.addEventListener('DOMContentLoaded', async () => {
-            requireLogin();
-            await initializeMode();
+            // A relay party link is self-contained, so the launcher's in-app browser can open it without a web session.
+            const direct = !!(params.get('room') && params.get('relay'));
+            if (!direct) requireLogin();
+            if (isLoggedIn()) await initializeMode();
             const target = await resolveTarget();
             if (!target) { titleEl.textContent = 'Not live'; show('This user is not streaming right now.'); return; }
             connect(target);

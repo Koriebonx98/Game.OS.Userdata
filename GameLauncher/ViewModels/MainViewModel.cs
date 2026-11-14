@@ -190,6 +190,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     // ── Session data ───────────────────────────────────────────────────────
     private string _broadcastError = "";
+    private bool _broadcastStarting;
 
     /// <summary>Starts the public relay broadcast and marks the account live so the profile shows "Watch Stream".</summary>
     private async Task<bool> BeginBroadcastAsync(string title)
@@ -337,8 +338,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             if (_partyOwnsRoom) { _partyOwnsRoom = false; _lfg?.StopHosting(); }
             return;
         }
+        bool wasLive = StreamHostService.IsBroadcasting;
         StreamHostService.StopBroadcast();
         try { await _client.SetBroadcastAsync(null); } catch { }
+        if (wasLive) Views.BroadcastCountdownWindow.Flash("⏹", "Broadcast stopped.", 2500);
     }
 
     private UserProfile     _profile      = new();
@@ -629,7 +632,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 string url = invite.StreamPort != null && !string.IsNullOrEmpty(_lfg?.JoinedEndpoint)
                     ? $"http://{_lfg!.JoinedEndpoint.Split(':')[0]}:{invite.StreamPort}/?pin={Uri.EscapeDataString(invite.StreamPin ?? "")}"
                     : BuildWatchUrl(invite);
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+                // Open inside the launcher's own browser instead of the system browser.
+                Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenBrowserForGame(null, null, url));
             }
             catch (Exception ex) { DevLogService.Log("[WatchParty] Could not open viewer: " + ex.Message); }
             return;
@@ -763,8 +767,20 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         };
         QuickMenuVm.OnStartBroadcast = async () =>
         {
-            var ok = await BeginBroadcastAsync(string.IsNullOrEmpty(QuickMenuVm.CurrentGameTitle) ? "Live on Game OS" : QuickMenuVm.CurrentGameTitle);
-            if (!ok) QuickMenuVm.InviteStatusMessage = _broadcastError;
+            if (_broadcastStarting || Services.StreamHostService.IsBroadcasting) return;
+            _broadcastStarting = true;
+            try
+            {
+                if (!await Views.BroadcastCountdownWindow.RunCountdownAsync(5, () => false)) return;
+                var ok = await BeginBroadcastAsync(string.IsNullOrEmpty(QuickMenuVm.CurrentGameTitle) ? "Live on Game OS" : QuickMenuVm.CurrentGameTitle);
+                if (ok) Views.BroadcastCountdownWindow.Flash("🔴 LIVE", "You're broadcasting. Open Quick Menu → Stop Streaming to end.", 3500);
+                else
+                {
+                    QuickMenuVm.InviteStatusMessage = _broadcastError;
+                    Views.BroadcastCountdownWindow.Flash("⚠", _broadcastError, 6000);
+                }
+            }
+            finally { _broadcastStarting = false; }
         };
         QuickMenuVm.OnStopBroadcast = EndBroadcastAsync;
         MediaVm.PartyFriendsProvider = () =>

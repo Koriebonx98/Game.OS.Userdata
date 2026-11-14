@@ -503,8 +503,9 @@ namespace GameLauncher
         /// <summary>Publishes or clears the public live-broadcast marker on this account (GitHub data mode).</summary>
         public async Task SetBroadcastAsync(Models.BroadcastInfo? info, CancellationToken ct = default)
         {
-            if (_username == null || _github == null) return;
-            await _github.SetBroadcastAsync(_username, info, ct);
+            if (_username == null) return;
+            if (_backend != null) await _backend.SetBroadcastAsync(info, ct);
+            else if (_github != null) await _github.SetBroadcastAsync(_username, info, ct);
         }
 
         public async Task<string?> GetPresenceAsync(
