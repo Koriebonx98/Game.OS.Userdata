@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using GameLauncher.Models;
 
@@ -29,6 +30,15 @@ public partial class LocalGameCardVm : ViewModelBase
 
     /// <summary>Stores this game is owned on or installed from (Steam, Epic Games, Repack …), used by the store filter.</summary>
     public HashSet<string> Stores { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    // ── Library shelves / badges (filled on a background thread by LibraryViewModel) ──
+    public DateTime AddedUtc      { get; set; }
+    public DateTime LastPlayedUtc { get; set; }
+    public int      PlayedMinutes { get; set; }
+    public bool     NotPlayedBadge { get; set; }
+    public bool     MultiStoreBadge { get; set; }
+    public string   StoresBadge   => $"🛒 {Stores.Count}";
+    public string   StoresTooltip => "Owned on: " + string.Join(", ", Stores.OrderBy(s => s, StringComparer.OrdinalIgnoreCase));
 
     /// <summary>Platform tag used by the platform filter ("PC", "PS3", "Switch", etc.).</summary>
     public string Platform { get; init; } = "";

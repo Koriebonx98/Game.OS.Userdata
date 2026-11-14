@@ -74,8 +74,10 @@ public partial class App : Application
             }
             DevLogService.Log("[App] MainWindow constructed OK.");
             desktop.MainWindow = mainWindow;
-            StreamHostService.Start();
-            mainVm.SettingsVm.RefreshStreamInfo();
+            // Socket bind, config IO and ffmpeg probing must not delay the first frame.
+            _ = Task.Run(StreamHostService.Start).ContinueWith(
+                _ => Dispatcher.UIThread.Post(mainVm.SettingsVm.RefreshStreamInfo),
+                TaskScheduler.Default);
             desktop.Exit += (_, _) => StreamHostService.Stop();
 
             // Resolve the intro video path:

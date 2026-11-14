@@ -103,6 +103,88 @@ public partial class LibraryViewModel : ViewModelBase
     /// </summary>
     public BulkObservableCollection<LocalGameCardVm> FilteredMyGames { get; } = new();
 
+    // ── Shelves above the grid (Recently Added / Recently Played / Recommended) ──
+    private const int ShelfSize = 12;
+    public BulkObservableCollection<LocalGameCardVm> RecentlyAddedShelf  { get; } = new();
+    public BulkObservableCollection<LocalGameCardVm> RecentlyPlayedShelf { get; } = new();
+    public BulkObservableCollection<LocalGameCardVm> RecommendedShelf    { get; } = new();
+    [ObservableProperty] private bool _hasRecentlyAdded;
+    [ObservableProperty] private bool _hasRecentlyPlayed;
+    [ObservableProperty] private bool _hasRecommended;
+
+    /// <summary>Re-reads the library display settings and rebuilds shelves/badges.</summary>
+    public void RefreshShelves() { _rebuildScheduled = false; ScheduleRebuild(); }
+
+    /// <summary>Fills played / added / last-played data on every card in one pass over the session log.</summary>
+    private static void AnnotateCards(List<LocalGameCardVm> cards, AppSettings opts)
+    {
+        var summaries = PlaytimeService.GetSummaries();
+        foreach (var c in cards)
+        {
+            summaries.TryGetValue($"{c.Platform}||{c.Title}", out var s);
+            int minutes = Math.Max(s.Minutes, c.SourceCloudGame?.PlaytimeMinutes ?? 0);
+            var last = s.LastPlayed;
+            if (DateTime.TryParse(c.SourceCloudGame?.LastPlayedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var cl)
+                && cl.ToUniversalTime() > last) last = cl.ToUniversalTime();
+            c.PlayedMinutes  = minutes;
+            c.LastPlayedUtc  = last;
+            c.AddedUtc       = DateTime.TryParse(c.SourceCloudGame?.AddedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var a)
+                ? a.ToUniversalTime() : FileTimeUtc(c);
+            bool owned = c.SourceCloudGame != null || c.SourceGame != null || c.SourceRom != null || c.IsInstalledLocal;
+            c.NotPlayedBadge  = opts.LibraryShowNotPlayedBadge && owned && minutes == 0 && last == DateTime.MinValue;
+            c.MultiStoreBadge = opts.LibraryShowMultiStoreBadge && c.Stores.Count > 1;
+        }
+    }
+
+    private static DateTime FileTimeUtc(LocalGameCardVm c)
+    {
+        try
+        {
+            string? path = c.SourceGame?.FolderPath ?? c.SourceRom?.FilePath ?? c.SourceRepack?.FilePath;
+            if (string.IsNullOrEmpty(path)) return DateTime.MinValue;
+            if (System.IO.Directory.Exists(path)) return System.IO.Directory.GetCreationTimeUtc(path);
+            if (System.IO.File.Exists(path)) return System.IO.File.GetCreationTimeUtc(path);
+        }
+        catch { /* best-effort */ }
+        return DateTime.MinValue;
+    }
+
+    private static (List<LocalGameCardVm> Added, List<LocalGameCardVm> Played, List<LocalGameCardVm> Recommended)
+        ComputeShelves(List<LocalGameCardVm> cards, AppSettings opts)
+    {
+        var added = opts.LibraryShowRecentlyAdded
+            ? cards.Where(c => c.AddedUtc > DateTime.MinValue).OrderByDescending(c => c.AddedUtc).Take(ShelfSize).ToList()
+            : new();
+        var played = opts.LibraryShowRecentlyPlayed
+            ? cards.Where(c => c.LastPlayedUtc > DateTime.MinValue).OrderByDescending(c => c.LastPlayedUtc).Take(ShelfSize).ToList()
+            : new();
+        var recommended = new List<LocalGameCardVm>();
+        if (opts.LibraryShowRecommended)
+        {
+            // Taste profile from what is played most: favourite genres and platforms.
+            var top = cards.Where(c => c.PlayedMinutes > 0).OrderByDescending(c => c.PlayedMinutes).Take(10).ToList();
+            var genres = top.Select(c => c.SourceCloudGame?.Genre).Where(g => !string.IsNullOrWhiteSpace(g))
+                .GroupBy(g => g!, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            var platforms = top.GroupBy(c => c.Platform, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            int Score(LocalGameCardVm c)
+            {
+                int sc = 0;
+                if (c.IsInstalledLocal || c.SourceGame != null || c.SourceRom != null) sc += 3;
+                if (c.PlayedMinutes == 0) sc += 2;
+                if (c.Stores.Count > 1) sc += 1;
+                if (platforms.TryGetValue(c.Platform, out var pn)) sc += Math.Min(pn, 3);
+                var g = c.SourceCloudGame?.Genre;
+                if (!string.IsNullOrWhiteSpace(g) && genres.TryGetValue(g!, out var gn)) sc += 2 * Math.Min(gn, 3);
+                if (c.SourceCloudGame?.Rating is double r) sc += r >= 8 ? 1 : 0;
+                return sc;
+            }
+            recommended = cards.Where(c => c.PlayedMinutes < 60 && c.SourceRepack == null)
+                .OrderByDescending(Score).ThenByDescending(c => c.AddedUtc).Take(ShelfSize).ToList();
+        }
+        return (added, played, recommended);
+    }
+
     /// <summary>Invoked when the user clicks a cloud game card.</summary>
     public Action<Game>?        OnOpenDetail       { get; set; }
     /// <summary>Invoked when the user clicks a local/detected game card.</summary>
@@ -216,6 +298,9 @@ public partial class LibraryViewModel : ViewModelBase
             var newMyGames   = BuildMyGamesList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
             var newPlatforms = BuildPlatformList(allGamesSnap, localGamesSnap, repacksSnap, romsSnap);
             TagStores(newMyGames, userSnap);
+            var libOpts = AppSettingsService.Load();
+            AnnotateCards(newMyGames, libOpts);
+            var shelves = ComputeShelves(newMyGames, libOpts);
 
             // Pre-compute filtered My Games on the background thread using the snapshotted
             // filter values.  This avoids doing N individual ObservableCollection.Add calls
@@ -242,6 +327,12 @@ public partial class LibraryViewModel : ViewModelBase
                 RebuildPlatformChips();
 
                 TotalGames = newMyGames.Count;
+                RecentlyAddedShelf.Reset(shelves.Added);
+                RecentlyPlayedShelf.Reset(shelves.Played);
+                RecommendedShelf.Reset(shelves.Recommended);
+                HasRecentlyAdded  = shelves.Added.Count > 0;
+                HasRecentlyPlayed = shelves.Played.Count > 0;
+                HasRecommended    = shelves.Recommended.Count > 0;
 
                 // If the filter changed between scheduling and arriving here re-apply with
                 // current values; otherwise use the pre-computed result (common case).

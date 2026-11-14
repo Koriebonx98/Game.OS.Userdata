@@ -27,6 +27,8 @@
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuLaunchViaSteamCommand}" Content="🎮  Launch via Steam"
                         IsVisible="{Binding HasSteamLaunchOption}"/>
+                <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Command="{Binding MenuLaunchViaEpicCommand}" Content="🎮  Launch via Epic Games"
+                        IsVisible="{Binding HasEpicLaunchOption}"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
                         Command="{Binding MenuOpenControllerCommand}" Content="🎮  Controller Profiles"/>
                 <Button Classes="btn-secondary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
@@ -128,7 +130,21 @@
     <!-- Mod browser: searchable list of the database's mod links, opens in the browser -->
     <Border IsVisible="{Binding IsModBrowserOpen}" Background="#CC000000">
         <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1" CornerRadius="16" Padding="16"
-                Width="560" MaxHeight="560" HorizontalAlignment="Center" VerticalAlignment="Center">
+                Classes="modsmodal" Classes.full="{Binding IsModsFullScreen}"
+                HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border.Styles>
+                <Style Selector="Border.modsmodal">
+                    <Setter Property="Width" Value="560"/>
+                    <Setter Property="MaxHeight" Value="560"/>
+                </Style>
+                <Style Selector="Border.modsmodal.full">
+                    <Setter Property="Width" Value="NaN"/>
+                    <Setter Property="MaxHeight" Value="100000"/>
+                    <Setter Property="HorizontalAlignment" Value="Stretch"/>
+                    <Setter Property="VerticalAlignment" Value="Stretch"/>
+                    <Setter Property="CornerRadius" Value="0"/>
+                </Style>
+            </Border.Styles>
             <DockPanel>
                 <TextBlock DockPanel.Dock="Top" Text="🧩  MODS" FontSize="16" FontWeight="Bold" Foreground="White" Margin="4,0,0,8"/>
                 <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8" Margin="0,0,0,10">
@@ -139,6 +155,10 @@
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0">
                     <Button Classes="btn-secondary" Command="{Binding CloseModBrowserCommand}" Content="✕  Close"/>
+                    <Button Classes="btn-secondary" Command="{Binding ShowAllModsCommand}" Content="{Binding InstalledAllLabel}"
+                            IsVisible="{Binding HasMoreInstalled}"/>
+                    <Button Classes="btn-secondary" Command="{Binding ShowAllModsCommand}" Content="{Binding BrowseAllLabel}"
+                            IsVisible="{Binding HasMoreBrowse}"/>
                 </StackPanel>
                 <Panel>
                     <!-- Installed: what is already set up for this game -->
@@ -193,7 +213,7 @@
                             </Border>
 
                             <!-- Mod list -->
-                            <ItemsControl ItemsSource="{Binding SwitchMods}"
+                            <ItemsControl ItemsSource="{Binding SwitchModsShown}"
                                           IsVisible="{Binding HasSwitchMods}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="vm:RyujinxModVm">
@@ -592,6 +612,16 @@
             <StackPanel Spacing="10">
                 <TextBlock Text="▶  FIRST LAUNCH" FontSize="16" FontWeight="Bold" Foreground="White"/>
                 <TextBlock Text="{Binding LaunchTargetPromptText}" FontSize="12" Foreground="#c9d1d9" TextWrapping="Wrap"/>
+                <ItemsControl ItemsSource="{Binding LaunchPromptLaunchers}" IsVisible="{Binding HasLaunchPromptLaunchers}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <Button Classes="btn-primary" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" Margin="0,0,0,6"
+                                    Content="{Binding StringFormat='Launch via {0}'}"
+                                    Command="{Binding $parent[ItemsControl].DataContext.ChooseLaunchLauncherCommand}"
+                                    CommandParameter="{Binding}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <TextBox Classes="form-input" Text="{Binding LaunchTargetPromptPath}" Watermark="Path to file…"/>
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Classes="btn-secondary" Content="📂  Browse…" Command="{Binding BrowseLaunchTargetPromptCommand}"/>

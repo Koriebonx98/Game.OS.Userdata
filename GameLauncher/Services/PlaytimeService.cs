@@ -817,6 +817,37 @@ namespace GameLauncher.Services
             catch { return DateTime.MinValue; }
         }
 
+        /// <summary>
+        /// One pass over persisted sessions + cloud totals: key "platform||title" (lower-case)
+        /// → total minutes and last-played time (UTC, MinValue when never played).
+        /// </summary>
+        public static Dictionary<string, (int Minutes, DateTime LastPlayed)> GetSummaries()
+        {
+            var map = new Dictionary<string, (int, DateTime)>(StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                foreach (var s in LoadSessionsShared())
+                {
+                    if (s.IsCheckpoint) continue;
+                    string key = $"{s.Platform}||{s.Title}";
+                    map.TryGetValue(key, out var cur);
+                    var end = DateTime.TryParse(s.EndedAt, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
+                        ? dt.ToUniversalTime() : DateTime.MinValue;
+                    map[key] = (cur.Item1 + s.Minutes, end > cur.Item2 ? end : cur.Item2);
+                }
+                foreach (var (platform, title, minutes, lastPlayed) in GetAllCloudTotals())
+                {
+                    string key = $"{platform}||{title}";
+                    map.TryGetValue(key, out var cur);
+                    var end = DateTime.TryParse(lastPlayed, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt)
+                        ? dt.ToUniversalTime() : DateTime.MinValue;
+                    map[key] = (Math.Max(cur.Item1, minutes), end > cur.Item2 ? end : cur.Item2);
+                }
+            }
+            catch { /* best-effort */ }
+            return map;
+        }
+
         public void Dispose()
         {
             foreach (var e in _watching)

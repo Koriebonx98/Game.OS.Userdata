@@ -603,6 +603,13 @@ namespace GameLauncher.Models
         /// </summary>
         [JsonPropertyName("showIntroVideo")] public bool ShowIntroVideo { get; set; } = true;
 
+        /// <summary>Library page shelves and badges (Settings → Design → Library ⚙).</summary>
+        [JsonPropertyName("libShowRecentlyAdded")]  public bool LibraryShowRecentlyAdded  { get; set; } = true;
+        [JsonPropertyName("libShowRecentlyPlayed")] public bool LibraryShowRecentlyPlayed { get; set; } = true;
+        [JsonPropertyName("libShowRecommended")]    public bool LibraryShowRecommended    { get; set; } = true;
+        [JsonPropertyName("libShowNotPlayedBadge")] public bool LibraryShowNotPlayedBadge { get; set; } = true;
+        [JsonPropertyName("libShowMultiStoreBadge")] public bool LibraryShowMultiStoreBadge { get; set; } = true;
+
         /// <summary>
         /// Optional path to a custom intro video file.  When non-empty and
         /// <see cref="ShowIntroVideo"/> is <see langword="true"/>, this file is used
@@ -620,6 +627,7 @@ namespace GameLauncher.Models
         /// True once the player has completed the initial device setup flow and reviewed
         /// the launcher's local preferences at least once.
         /// </summary>
+        [JsonPropertyName("hasAcceptedDisclosure")] public bool HasAcceptedDisclosure { get; set; } = false;
         [JsonPropertyName("hasCompletedFirstRunSetup")] public bool HasCompletedFirstRunSetup { get; set; } = false;
 
         /// <summary>
@@ -904,6 +912,8 @@ namespace GameLauncher.Models
         [JsonPropertyName("exePath")]     public string? ExePath     { get; set; }
         /// <summary>Command-line arguments passed to the executable on launch.</summary>
         [JsonPropertyName("exeArgs")]     public string? ExeArgs     { get; set; }
+        /// <summary>How a PC game runs, chosen on first launch: "Steam", "Epic Games" or "exe". Null = not chosen yet.</summary>
+        [JsonPropertyName("launchMode")]  public string? LaunchMode  { get; set; }
         /// <summary>User-chosen save file or folder ("Other" in the cloud menu); overrides auto-detected save locations.</summary>
         [JsonPropertyName("customSavePath")] public string? CustomSavePath { get; set; }
         /// <summary>Full path to the ROM file used when launching via an emulator.</summary>
@@ -1326,6 +1336,10 @@ namespace GameLauncher.Models
                 "microsoft - xbox 360"          => "Xbox 360",
                 "microsoft - xbox one"          => "Xbox One",
                 "nintendo - switch"             => "Switch",
+                "nintendo - switch 2"           => "Nintendo - Switch 2",
+                "nintendo switch 2"             => "Nintendo - Switch 2",
+                "switch 2"                      => "Nintendo - Switch 2",
+                "switch2"                       => "Nintendo - Switch 2",
                 "sony - playstation"            => "PS1",
                 "sony - playstation 2"          => "PS2",
                 "sony - playstation 3"          => "PS3",

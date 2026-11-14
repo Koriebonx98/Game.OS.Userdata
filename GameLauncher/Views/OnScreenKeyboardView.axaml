@@ -23,7 +23,7 @@
                 <Border Background="#0d1117" CornerRadius="8" Padding="12,10" Margin="3,0,3,8" MinWidth="560">
                     <StackPanel>
                         <TextBlock Text="{Binding Title}" FontSize="11" Foreground="#8b949e"/>
-                        <TextBlock Text="{Binding Text}" FontSize="18" Foreground="White" TextTrimming="CharacterEllipsis" MinHeight="26"/>
+                        <TextBlock Text="{Binding DisplayText}" FontSize="18" Foreground="White" TextTrimming="CharacterEllipsis" MinHeight="26"/>
                     </StackPanel>
                 </Border>
                 <ItemsControl ItemsSource="{Binding Rows}">

@@ -306,6 +306,18 @@ public partial class MainWindow : Window
 
         if (HandleOpenComboBoxKey(e.Key)) { e.Handled = true; return; }
 
+        if (vm.ShowFirstRun)
+        {
+            if (HandleFirstRunKey(vm, e.Key)) e.Handled = true;
+            return;
+        }
+
+        if (vm.ShowLogin)
+        {
+            if (!IsTextInputFocused() && HandleLoginKey(vm, e.Key)) e.Handled = true;
+            return;
+        }
+
         // Left Shift + Left Ctrl → Quick Menu toggle (takes priority).
         // Handle both orderings: user may press Shift first then Ctrl, or Ctrl first then Shift.
         bool isShiftCtrl = (e.Key == Key.LeftCtrl  && e.KeyModifiers.HasFlag(KeyModifiers.Shift)) ||
@@ -924,6 +936,28 @@ public partial class MainWindow : Window
         return false;
     }
 
+    private static bool HandleFirstRunKey(MainViewModel vm, Key key)
+    {
+        string name = key switch
+        {
+            Key.Enter => "A", Key.Escape or Key.BrowserBack => "B", Key.X => "X", Key.Y => "Y",
+            _ => "",
+        };
+        return name.Length > 0 && vm.FirstRunVm.HandleKey(name);
+    }
+
+    private static bool HandleLoginKey(MainViewModel vm, Key key)
+    {
+        string name = key switch
+        {
+            Key.Left => "Left", Key.Right => "Right", Key.Up => "Up", Key.Down => "Down",
+            Key.Enter => "A", Key.X => "X", Key.Y => "Y", Key.Escape or Key.BrowserBack => "B",
+            _ => "",
+        };
+        if (name.Length == 0) return vm.LoginVm.Keyboard.IsOpen;
+        return vm.LoginVm.HandleKey(name);
+    }
+
     private static bool HandleSocialKey(MainViewModel vm, Key key)
     {
         string name = key switch
@@ -1535,6 +1569,10 @@ public partial class MainWindow : Window
         var vm = _boundVm;
 
         if (HandleOpenComboBoxKey(key)) return;
+
+        if (vm.ShowFirstRun) { HandleFirstRunKey(vm, key); return; }
+
+        if (vm.ShowLogin) { HandleLoginKey(vm, key); return; }
 
         // If the overlay quick menu window is visible, forward all input to its VM.
         if (_quickMenuWindow?.IsVisible == true)

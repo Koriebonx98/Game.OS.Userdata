@@ -17,6 +17,31 @@
         height (the outer ScrollViewer in MainWindow), causing a visible freeze
         for large libraries.
     -->
+    <UserControl.Resources>
+        <!-- Compact card used by the Recently Added / Recently Played / Recommended shelves -->
+        <DataTemplate x:Key="ShelfCard" x:DataType="vm:LocalGameCardVm">
+            <Button Classes="game-card-btn" Width="130" Margin="6,2,6,6"
+                    Command="{Binding $parent[UserControl].DataContext.OpenMyGameDetailCommand}"
+                    CommandParameter="{Binding}">
+                <StackPanel>
+                    <Border Height="100" CornerRadius="10,10,0,0" ClipToBounds="True">
+                        <Panel>
+                            <views:CoverImage ImageUrl="{Binding CoverUrl}" FallbackText="{Binding EffectiveTitle}"
+                                              FallbackGradient="{Binding CoverGradient}" SubText="{Binding Platform}"
+                                              LetterFontSize="36" ImageCornerRadius="10,10,0,0" Height="100"/>
+                            <Border CornerRadius="3" Padding="5,2" Margin="4" Background="#cc1f6feb"
+                                    HorizontalAlignment="Left" VerticalAlignment="Top" IsVisible="{Binding NotPlayedBadge}">
+                                <TextBlock Text="NEW" FontSize="9" FontWeight="Bold" Foreground="White"/>
+                            </Border>
+                        </Panel>
+                    </Border>
+                    <TextBlock Text="{Binding EffectiveTitle}" Classes="game-card-title" Margin="8,6,8,8"
+                               TextTrimming="CharacterEllipsis"/>
+                </StackPanel>
+            </Button>
+        </DataTemplate>
+    </UserControl.Resources>
+
     <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="32,28,32,0">
 
         <!-- Row 0: Header -->
@@ -74,6 +99,37 @@
                       HorizontalScrollBarVisibility="Disabled"
                       VerticalScrollBarVisibility="Auto"
                       Padding="0,0,0,28">
+            <StackPanel>
+                <StackPanel Spacing="6" Margin="0,0,0,12" IsVisible="{Binding HasRecentlyAdded}">
+                    <TextBlock Text="🆕  Recently Added" FontSize="15" FontWeight="Bold" Foreground="White" Margin="6,0,0,0"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding RecentlyAddedShelf}" ItemTemplate="{StaticResource ShelfCard}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+                <StackPanel Spacing="6" Margin="0,0,0,12" IsVisible="{Binding HasRecentlyPlayed}">
+                    <TextBlock Text="▶  Recently Played" FontSize="15" FontWeight="Bold" Foreground="White" Margin="6,0,0,0"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding RecentlyPlayedShelf}" ItemTemplate="{StaticResource ShelfCard}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
+                <StackPanel Spacing="6" Margin="0,0,0,12" IsVisible="{Binding HasRecommended}">
+                    <TextBlock Text="✨  Recommended for you" FontSize="15" FontWeight="Bold" Foreground="White" Margin="6,0,0,0"/>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <ItemsControl ItemsSource="{Binding RecommendedShelf}" ItemTemplate="{StaticResource ShelfCard}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal"/></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                </StackPanel>
             <ItemsControl ItemsSource="{Binding FilteredMyGames}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
@@ -105,13 +161,21 @@
                                         <TextBlock Text="{Binding EffectiveTitle}"
                                                    Classes="game-card-title"
                                                    TextTrimming="CharacterEllipsis"/>
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
+                                        <WrapPanel>
                                             <!-- Platform badge -->
                                             <Border CornerRadius="3" Padding="5,2"
                                                     Background="#1f6feb" HorizontalAlignment="Left">
                                                 <TextBlock Text="{Binding Platform}"
                                                            FontSize="10" FontWeight="Bold"
                                                            Foreground="White"/>
+                                            </Border>
+                                            <Border CornerRadius="3" Padding="5,2" Background="#6e40c9" HorizontalAlignment="Left"
+                                                    IsVisible="{Binding MultiStoreBadge}" ToolTip.Tip="{Binding StoresTooltip}">
+                                                <TextBlock Text="{Binding StoresBadge}" FontSize="10" FontWeight="Bold" Foreground="White"/>
+                                            </Border>
+                                            <Border CornerRadius="3" Padding="5,2" Background="#1f6feb" HorizontalAlignment="Left"
+                                                    IsVisible="{Binding NotPlayedBadge}">
+                                                <TextBlock Text="Not played" FontSize="10" FontWeight="Bold" Foreground="White"/>
                                             </Border>
                                             <!-- Kind badge (Installed / Not Installed / ROM / Cloud) -->
                                             <Border CornerRadius="3" Padding="5,2"
@@ -121,7 +185,7 @@
                                                            FontSize="10" FontWeight="Bold"
                                                            Foreground="{Binding KindForeground}"/>
                                             </Border>
-                                        </StackPanel>
+                                        </WrapPanel>
                                         <!-- Playtime label (only shown when available) -->
                                         <TextBlock Text="{Binding PlaytimeLabel}"
                                                    FontSize="10" Foreground="#0ea5e9"
@@ -139,6 +203,7 @@
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
+            </StackPanel>
         </ScrollViewer>
 
     </Grid>

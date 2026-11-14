@@ -42,7 +42,12 @@ public sealed partial class OnScreenKeyboardViewModel : ObservableObject
     private bool _upper;
 
     [ObservableProperty] private bool _isOpen;
+    [NotifyPropertyChangedFor(nameof(DisplayText))]
     [ObservableProperty] private string _text = "";
+    /// <summary>Shows bullets instead of the typed text (password entry).</summary>
+    [NotifyPropertyChangedFor(nameof(DisplayText))]
+    [ObservableProperty] private bool _isMasked;
+    public string DisplayText => IsMasked ? new string('●', Text.Length) : Text;
     [ObservableProperty] private string _title = "";
 
     public ObservableCollection<OsKeyRowVm> Rows { get; } = new();
@@ -75,7 +80,7 @@ public sealed partial class OnScreenKeyboardViewModel : ObservableObject
         _typeSink = sink;
     }
 
-    public void Close() { IsOpen = false; _onChanged = null; _onSubmit = null; _typeSink = null; }
+    public void Close() { IsOpen = false; IsMasked = false; _onChanged = null; _onSubmit = null; _typeSink = null; }
 
     public void Move(int dx, int dy)
     {

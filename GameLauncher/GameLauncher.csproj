@@ -11,6 +11,12 @@
     
     
     <RootNamespace>GameLauncher</RootNamespace>
+
+    <!-- Startup / responsiveness: skip PGO instrumentation, avoid the extra background-GC thread,
+         and precompile (ReadyToRun) published builds so the first launch isn't JIT-bound. -->
+    <TieredPGO>false</TieredPGO>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <PublishReadyToRun Condition="'$(RuntimeIdentifier)' != ''">true</PublishReadyToRun>
   </PropertyGroup>
 
   <ItemGroup>

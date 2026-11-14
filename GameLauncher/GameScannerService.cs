@@ -1275,7 +1275,8 @@ public sealed class GameScannerService : IDisposable
         }
 
         // Switch: standalone TitleID (with or without brackets)
-        if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase))
+        if (string.Equals(platform, "Switch", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(platform, "Nintendo - Switch 2", StringComparison.OrdinalIgnoreCase))
         {
             var m = _switchTitleIdRegex.Match(trimmed);
             if (m.Success) return m.Groups[1].Value.ToUpperInvariant();

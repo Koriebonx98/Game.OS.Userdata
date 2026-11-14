@@ -670,6 +670,23 @@
                 <Border Background="#161b22" BorderBrush="#30363d" BorderThickness="1"
                         CornerRadius="16" Padding="24,20" Width="720" MaxHeight="640"
                         HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <Border.Styles>
+                    <!-- Controller-friendly: big targets and an unmistakable focus ring for D-pad navigation -->
+                    <Style Selector="Border > ScrollViewer Button">
+                        <Setter Property="MinHeight" Value="44"/>
+                        <Setter Property="MinWidth" Value="44"/>
+                    </Style>
+                    <Style Selector="Border > ScrollViewer ComboBox, Border > ScrollViewer TextBox">
+                        <Setter Property="MinHeight" Value="44"/>
+                    </Style>
+                    <Style Selector="Border > ScrollViewer CheckBox, Border > ScrollViewer ToggleSwitch">
+                        <Setter Property="MinHeight" Value="44"/>
+                    </Style>
+                    <Style Selector="Border > ScrollViewer Button:focus-visible, Border > ScrollViewer ComboBox:focus-visible, Border > ScrollViewer CheckBox:focus-visible, Border > ScrollViewer ToggleSwitch:focus-visible">
+                        <Setter Property="BorderBrush" Value="#58a6ff"/>
+                        <Setter Property="BorderThickness" Value="2"/>
+                    </Style>
+                  </Border.Styles>
                   <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="16">
 
