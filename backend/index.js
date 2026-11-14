@@ -1279,6 +1279,27 @@ app.post('/api/update-presence', async (req, res) => {
     }
 });
 
+// ── POST /api/broadcast ───────────────────────────────────────────────────────
+// Publishes / clears accounts/<user>/broadcast.json so the website and iOS app can find a live stream.
+app.post('/api/broadcast', authenticateToken, async (req, res) => {
+    try {
+        const { usernameLower } = req.tokenUser;
+        const b = req.body || {};
+        const live = b.live === true && typeof b.relayUrl === 'string' && typeof b.roomId === 'string';
+        const data = live
+            ? { live: true, relayUrl: b.relayUrl.slice(0, 300), roomId: b.roomId.slice(0, 64),
+                title: String(b.title || '').slice(0, 120), startedAt: new Date().toISOString() }
+            : { live: false };
+        const path = `accounts/${usernameLower}/broadcast.json`;
+        const existing = await getFile(path);
+        await putFile(path, data, `Broadcast ${live ? 'start' : 'stop'}: ${usernameLower}`, existing ? existing.sha : undefined);
+        res.json({ success: true });
+    } catch (err) {
+        console.error('Error setting broadcast:', err);
+        res.status(500).json({ success: false, message: 'Failed to update broadcast.' });
+    }
+});
+
 // ── GET /api/get-presence ─────────────────────────────────────────────────────
 app.get('/api/get-presence', async (req, res) => {
     try {

@@ -503,6 +503,16 @@ namespace GameLauncher.Services
             catch { return null; }
         }
 
+        /// <summary>Publishes (or clears, when null) this account's live broadcast marker so the website / iOS app can find it.</summary>
+        public async Task SetBroadcastAsync(BroadcastInfo? info, CancellationToken ct = default)
+        {
+            try
+            {
+                using var resp = await _http.PostAsJsonAsync("/api/broadcast", info ?? new BroadcastInfo { Live = false }, ct);
+            }
+            catch { }
+        }
+
         // ── Messages ──────────────────────────────────────────────────────────
 
         public async Task SendMessageAsync(
