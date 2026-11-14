@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game OS – Game</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0f172a">
+    <script src="pwa.js"></script>
+    <script src="emulator.js?v=emu8"></script>
+</head>
+<body>
+    <div class="container" style="max-width:1000px;">
+        <header>
+            <h1>🎮 Game OS</h1>
+            <nav>
+                <a href="index.html" class="nav-link">Home</a>
+                <a href="games.html" class="nav-link">🛒 Store</a>
+                <a href="games.html?tab=library" class="nav-link">📚 My Library</a>
+                <a href="games.html?tab=favourites" class="nav-link">❤️ Favourites</a>
+                <div id="guestNav" style="display:inline;">
+                    <a href="login.html" class="nav-link">Login</a>
+                    <a href="signup.html" class="nav-link">Sign Up</a>
+                </div>
+                <div id="userNav" style="display:none;">
+                    <a href="friends.html" class="nav-link">👥 Friends</a>
+                    <a href="inbox.html" class="nav-link">📬 Inbox</a>
+                    <a href="account.html" class="nav-link">👤 My Account</a>
+                    <button onclick="logout()" class="nav-link nav-btn">Logout</button>
+                </div>
+            </nav>
+        </header>
+        <main style="padding:30px; background:#f8fafc;">
+            <p><a href="games.html">← Back to Store</a></p>
+            <div id="gameContent"><p style="color:#666;">Loading game…</p></div>
+        </main>
+    </div>
+
+    <script src="script.js?v=emu8"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', async () => {
+        modeReady = initializeMode();
+        await modeReady;
+        displayCurrentUser();
+        const loggedIn = isLoggedIn();
+        document.getElementById('guestNav').style.display = loggedIn ? 'none' : 'inline';
+        document.getElementById('userNav').style.display  = loggedIn ? 'inline' : 'none';
+        await loadGamePage(loggedIn);
+    });
+
+    const _name = g => g.Title || g.game_name || g.title || '';
+
+    async function loadGamePage(loggedIn) {
+        const params   = new URLSearchParams(location.search);
+        const platform = (params.get('platform') || 'PC').trim();
+        const title    = (params.get('title') || '').trim();
+        const box      = document.getElementById('gameContent');
+        if (!title) { box.innerHTML = '<p style="color:#c00;">No game specified. <a href="games.html">← Back to Store</a></p>'; return; }
+        document.title = `Game OS – ${title}`;
+
+        let game;
+        try {
+            game = (await fetchGamesDbPlatform(platform)).find(g => _name(g).toLowerCase() === title.toLowerCase());
+        } catch (e) {
+            box.innerHTML = `<p style="color:#c00;">Failed to load game: ${escapeHtml(e.message)}</p>`;
+            return;
+        }
+        if (!game) { box.innerHTML = `<p style="color:#c00;">Game not found on ${escapeHtml(platform)}. <a href="games.html">← Back to Store</a></p>`; return; }
+
+        let owned = false;
+        if (loggedIn) {
+            try {
+                const user = getCurrentUser();
+                const lib = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
+                owned = lib.some(o => o.platform === platform && (o.title || '').toLowerCase() === _name(game).toLowerCase());
+            } catch (_) {}
+        }
+        window._pageGame = game; window._pagePlatform = platform;
+
+        const cover = getGameCoverUrl(game);
+        const genres = getGameGenres(game);
+        const cats = getGameCategories(game);
+        const desc = game.description || game.Description || game.summary || '';
+        const badges = [game.gameOSExclusive ? '⭐ Game OS Exclusive' : '', ...cats.filter(c => c.toLowerCase() !== 'exclusive')]
+            .filter(Boolean).map(b => `<span class="store-card-ach" style="margin-right:8px;">${escapeHtml(b)}</span>`).join('');
+
+        let action;
+        if (game.gameOSExclusive && game.playUrl) {
+            action = `<a class="btn" style="background:#16a34a;color:#fff;text-decoration:none;" href="${escapeHtml(game.playUrl)}">${owned ? '▶ Play' : '🔑 Claim &amp; Play (free)'}</a>`;
+        } else if (!loggedIn) {
+            action = '<a class="btn" href="login.html">🔒 Log in to add</a>';
+        } else {
+            action = `<button class="btn" id="gameAddBtn" ${owned ? 'disabled' : ''}>${owned ? '✅ Owned' : '+ Add to Library'}</button>`;
+        }
+
+        box.innerHTML = `
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+            <div style="width:220px;max-width:100%;border-radius:12px;overflow:hidden;background:${getPlatformColor(platform)};text-align:center;font-size:4em;">
+                ${cover ? `<img src="${escapeHtml(cover)}" alt="" style="width:100%;display:block;" onerror="this.remove()">` : getPlatformIcon(platform)}
+            </div>
+            <div style="flex:1;min-width:240px;">
+                <h2 style="margin:0 0 6px;">${escapeHtml(_name(game))}</h2>
+                <p style="color:#64748b;margin:0 0 10px;">${escapeHtml(platform)}${genres.length ? ' · ' + escapeHtml(genres.join(', ')) : ''}</p>
+                <div style="margin-bottom:12px;">${badges}</div>
+                ${desc ? `<p>${escapeHtml(desc)}</p>` : ''}
+                <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;">
+                    ${action}
+                    <button class="btn btn-secondary" onclick="openGameModal(window._pageGame, window._pagePlatform)">ℹ️ Full details${typeof isAdminUser === 'function' && isAdminUser() ? ' / ✏️ Edit' : ''}</button>
+                </div>
+                <p id="gameMsg" style="color:#c00;"></p>
+            </div>
+        </div>
+        <div style="margin-top:24px;">${_buildGameModalFields(game)}</div>`;
+
+        const addBtn = document.getElementById('gameAddBtn');
+        if (addBtn && !owned) addBtn.onclick = async () => {
+            addBtn.disabled = true; addBtn.textContent = '⏳';
+            try {
+                const user = getCurrentUser();
+                if (MODE === 'demo') addGameDemo(user.username, game, platform);
+                else await addGameGitHub(user.username, game, platform);
+                addBtn.textContent = '✅ Owned';
+            } catch (e) {
+                addBtn.disabled = false; addBtn.textContent = '+ Add to Library';
+                document.getElementById('gameMsg').textContent = 'Failed to add game: ' + e.message;
+            }
+        };
+    }
+    </script>
+</body>
+</html>

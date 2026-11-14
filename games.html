@@ -242,6 +242,10 @@
     }
 
     // ── Render a single game item (used by both single-platform and grouped views) ──
+    function openGamePage(el) {
+        let g; try { g = JSON.parse(el.dataset.gameJson); } catch (_) { return; }
+        location.href = gameUrl(g, el.dataset.platform);
+    }
     function renderGameItem(g, platform) {
         const title    = escapeHtml(g.Title || g.game_name || g.title || '');
         const titleId  = g.TitleID || g.title_id || g.titleid || g.id || '';
@@ -269,7 +273,9 @@
             ? `<div class="game-cover-icon game-cover-icon--img" data-platform="${platEsc}"><img src="${escapeHtml(coverUrl)}" class="game-cover-img" alt="${title}" loading="lazy" onerror="_gameCoverFallback(this)"></div>`
             : `<div class="game-cover-icon" style="background:${coverColor};">${coverIcon}</div>`;
 
-        const addBtnHtml = _isLoggedIn
+        const addBtnHtml = g.gameOSExclusive
+            ? `<a href="${escapeHtml(gameUrl(g, platform))}" class="btn-add-game" onclick="event.stopPropagation();" style="text-decoration:none;text-align:center;">${owned ? '▶ Play' : '🔑 Claim'}</a>`
+            : _isLoggedIn
             ? `<button class="btn-add-game ${owned ? 'btn-owned' : ''}"
                 onclick="event.stopPropagation(); handleAddGame(this, this.closest('.games-browse-item').dataset.gameJson, this.closest('.games-browse-item').dataset.platform)"
                 ${owned ? 'disabled' : ''}>
@@ -294,7 +300,7 @@
             : '';
 
         return `
-        <div class="games-browse-item clickable" data-game-json="${gameJsonAttr}" data-platform="${platEsc}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
+        <div class="games-browse-item clickable" data-game-json="${gameJsonAttr}" data-platform="${platEsc}" onclick="openGamePage(this)">
             ${coverHtml}
             <div class="games-browse-info">
                 <span class="games-browse-title">${title}</span>
@@ -470,7 +476,7 @@
     }
     function _cardHtml(g, platform, extra) {
         const cover = getGameCoverUrl(g);
-        return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platform)}" onclick="openGameModal(this.dataset.gameJson, this.dataset.platform)">
+        return `<div class="store-card" data-game-json="${escapeHtml(JSON.stringify(g))}" data-platform="${escapeHtml(platform)}" onclick="openGamePage(this)">
             <div class="store-card-cover">${cover ? `<img src="${escapeHtml(cover)}" alt="" loading="lazy" onerror="this.remove()">` : '🎮'}</div>
             <div class="store-card-title">${escapeHtml(_gName(g))}</div>
             <div class="store-card-platform">${escapeHtml(platform)}${window.gameHasFeature(g, 'Achievements') ? ' · <span class="store-card-ach" title="Achievements available">🏆 Achievements</span>' : ''}${window.getCompatBadgeHtml ? ' ' + window.getCompatBadgeHtml(g, platform) : ''}</div>${extra || ''}</div>`;

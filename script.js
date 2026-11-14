@@ -3445,7 +3445,7 @@ function _isNonGame(title) {
 async function fetchGamesDbPlatform(platform) {
     const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
     if (!resp.ok) {
-        if (resp.status === 404) return [];
+        if (resp.status === 404) return _withBuiltInGames(platform, []);
         throw new Error(`Failed to load ${platform} games`);
     }
     const data = await resp.json();
@@ -3454,7 +3454,36 @@ async function fetchGamesDbPlatform(platform) {
     else if (Array.isArray(data.games)) games = data.games;
     else if (Array.isArray(data)) games = data;
     else throw new Error('Invalid games JSON format');
-    return games.filter(g => !_isNonGame(g.Title || g.game_name || g.title || ''));
+    return _withBuiltInGames(platform, games.filter(g => !_isNonGame(g.Title || g.game_name || g.title || '')));
+}
+
+/** Game OS exclusives that ship with the site, so they appear in the store even if the games database lacks them. */
+function getBuiltInGames() {
+    const base = typeof location !== 'undefined' ? location.href : 'https://koriebonx98.github.io/Game.OS.Userdata/';
+    return [{
+        platform: 'PC',
+        Title: 'Digital Abyss',
+        TitleID: 'digital-abyss',
+        image: new URL('games/digital-abyss/cover.svg', base).href,
+        description: "An interactive mystery game: solve Elena's disappearance. Cloud saves, achievements and playtime sync to your Game OS account.",
+        genres: ['Mystery', 'Adventure'],
+        categories: ['Exclusive', 'Free', 'Achievements'],
+        features: ['Exclusive', 'Achievements', 'Free'],
+        gameOSExclusive: true,
+        playUrl: new URL('games/digital-abyss/index.html', base).href
+    }];
+}
+
+function _withBuiltInGames(platform, games) {
+    const extra = getBuiltInGames().filter(b => b.platform === platform &&
+        !games.some(g => (g.Title || g.game_name || g.title || '').toLowerCase() === b.Title.toLowerCase()));
+    return extra.length ? [...games, ...extra] : games;
+}
+
+/** URL of a game's own page. */
+function gameUrl(game, platform) {
+    const t = (game && (game.Title || game.game_name || game.title)) || '';
+    return 'game.html?platform=' + encodeURIComponent(platform || '') + '&title=' + encodeURIComponent(t);
 }
 
 // ============================================================
@@ -6562,7 +6591,8 @@ function closeGameModal() {
 
 function _buildGameModalFields(game) {
     const skipFields = new Set(['Title', 'game_name', 'title', 'image', 'background_images', 'trailers',
-        'mods', 'stores', 'categories', 'genres', 'compatibility', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl']);
+        'mods', 'stores', 'categories', 'genres', 'compatibility', 'sysSpecMin', 'sysSpecRecommended', 'achievementsUrl', 'exophaseUrl',
+        'gameOSExclusive', 'playUrl', 'platform', 'features']);
     return Object.entries(game)
         .filter(([k, v]) => !skipFields.has(k) && v !== null && v !== undefined && v !== '' && !(Array.isArray(v) && v.length === 0))
         .map(([k, v]) => {
