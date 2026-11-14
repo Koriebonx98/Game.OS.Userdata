@@ -32,6 +32,12 @@ A modern, secure web application with account registration, login, a multi-platf
 - **🔑 API Token**: Generate personal API tokens for use with C# or other external apps
 - **🧑‍🤝‍🧑 User Profiles**: View any user's public game library
 
+### Windows playtime watchdog
+
+For games launched with a process handle, the launcher starts a hidden helper that can finish tracking if the launcher closes or crashes. When the game exits, it saves a per-account recovery journal and, in backend mode, attempts to sync playtime and recently played. Failed uploads remain queued for the next online login. The account token is passed to the helper in memory, not stored in the journal.
+
+Launcher-style and snapshot-detected games use the same process-detection heuristics as the launcher. The helper does not restore activity history or presence. It is not a Windows service and cannot continue through a computer shutdown.
+
 ## 🗂️ Pages
 
 | Page | File | Description |

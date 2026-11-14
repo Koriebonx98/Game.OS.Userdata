@@ -115,11 +115,11 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             RoomId = invite.RoomId, Host = invite.From, Game = invite.GameName, Platform = invite.Platform,
         });
         if (invite.IsWatchParty) return;
-        DetailVm.LfgStatus = $"Joined {invite.From}'s room. Host address: {_lfg.JoinedEndpoint}. {_lfg.ConnectionInfo}. " +
+        DetailVm.LfgStatus = $"Joined {invite.From}'s room. {_lfg.ConnectionInfo}. " +
             "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
         NotificationService.ShowDeveloperNotification(
             $"Joined {invite.From}'s room",
-            $"Host: {_lfg.JoinedEndpoint}. Configure a mod-client connect template or join manually in the game/emulator.");
+            "Room connected. Configure a mod-client connect template or join manually in the game/emulator.");
     }
 
     // ── Friend presence poller ─────────────────────────────────────────────
@@ -197,8 +197,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         try
         {
             var s = Services.AppSettingsService.Load();
+            var (relayUrl, relayKey) = ResolveStreamRelay(s);
             var (roomId, relay) = await StreamHostService.StartBroadcastAsync(
-                s.StreamRelayUrl, s.StreamRelayKey, title, s.StreamAudioEnabled,
+                relayUrl, relayKey, title, s.StreamAudioEnabled,
                 s.StreamFrameRate, s.StreamMaxWidth, s.StreamJpegQuality);
             await _client.SetBroadcastAsync(new Models.BroadcastInfo
             {
@@ -208,6 +209,19 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return true;
         }
         catch (Exception ex) { _broadcastError = "Broadcast failed: " + ex.Message; return false; }
+    }
+
+    /// <summary>
+    /// The relay website / iOS viewers use: the user's own relay if set, otherwise the signed-in backend's built-in
+    /// relay (authenticated with the account token), so watch parties reach the web with no setup.
+    /// </summary>
+    private (string Url, string Key) ResolveStreamRelay(Models.AppSettings s)
+    {
+        var custom = (s.StreamRelayUrl ?? "").Trim();
+        if (custom.Length > 0) return (custom, s.StreamRelayKey ?? "");
+        if (_client.IsBackendMode && !string.IsNullOrEmpty(Services.BackendApiService.BackendUrl))
+            return (Services.BackendApiService.BackendUrl!, _client.Token ?? "");
+        return ("", "");
     }
 
     private bool _directParty;
@@ -220,11 +234,13 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     private async Task<(string? Room, string? Relay, int? Port, string? Pin)> BeginPartyHostAsync(WatchPartyRequest req)
     {
         var settings = Services.AppSettingsService.Load();
-        if (Uri.TryCreate((settings.StreamRelayUrl ?? "").Trim(), UriKind.Absolute, out var relayUri)
-            && (relayUri.Scheme == "http" || relayUri.Scheme == "https"))
+        if (Uri.TryCreate(ResolveStreamRelay(settings).Url, UriKind.Absolute, out var relayUri)
+            && (relayUri.Scheme == "http" || relayUri.Scheme == "https")
+            && OperatingSystem.IsWindows())
         {
-            if (!await BeginBroadcastAsync(req.Title)) return (null, null, null, null);
-            return (StreamHostService.BroadcastRoomId, StreamHostService.BroadcastRelayUrl, null, null);
+            if (await BeginBroadcastAsync(req.Title))
+                return (StreamHostService.BroadcastRoomId, StreamHostService.BroadcastRelayUrl, null, null);
+            // Relay unreachable: fall back to a direct party over the private room.
         }
         try
         {
@@ -1261,6 +1277,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                     Services.NotificationService.ShowSessionEndedNotification(title, sessionMinutes);
 
                 StopExophasePolling(platform, title);
+
+                _ = ReconcileSteamPlaytimeAsync(platform, title);
             },
                 Avalonia.Threading.DispatcherPriority.Background);
         };
@@ -1715,6 +1733,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Switch the playtime service to the current user's private data folder
         // so playtime records are stored per-account, not per-device.
         PlaytimeService.SetCurrentUser(profile.Username);
+        _playtimeSvc.ConfigureWatchdog(_client.IsBackendMode ? Services.BackendApiService.BackendUrl ?? "http://localhost:3000" : null,
+            _client.IsBackendMode && !isOffline ? _client.Token : null);
         MediaStatsService.SetCurrentUser(profile.Username);
         Services.StoreAccountsService.SetCurrentUser(profile.Username);
         SettingsVm.LoadStoreAccounts();
@@ -1723,6 +1743,15 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // are correctly attributed to the right user.
         DetailVm.SetCurrentUser(profile.Username);
 
+        var watchdogRecoveries = PlaytimeService.ImportWatchdogSessions();
+        foreach (var (_, recovery) in watchdogRecoveries)
+        {
+            var game = library.FirstOrDefault(g =>
+                string.Equals(g.Platform, recovery.Platform, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(g.Title, recovery.Title, StringComparison.OrdinalIgnoreCase));
+            if (game != null)
+                game.PlaytimeMinutes = Math.Max(game.PlaytimeMinutes, recovery.TotalMinutes);
+        }
         // Apply stored playtime data to the library so the dashboard shows accurate totals
         PlaytimeService.ApplyStoredPlaytime(library);
 
@@ -1730,6 +1759,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         // Only save when we actually fetched from the server (isOffline = false).
         if (!isOffline)
         {
+            if (_client.IsBackendMode && watchdogRecoveries.Count > 0)
+                _ = SyncWatchdogRecoveriesAsync(profile.Username, watchdogRecoveries);
             DevLogService.Log("[MainViewModel] Online mode — saving offline cache and starting background services.");
             var cacheGames = library.ToList();
             var cacheAchievements = achievements.ToList();
@@ -1805,6 +1836,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         StoreVm.Load(GameCatalog.Store, library, profile, _client, isAdmin);
         ProfileVm.Load(profile, library, achievements, isAdmin);
         FriendsVm.Load(_client, profile.Username);
+        // Preload the inbox so invite polling, toasts and the Quick Guide work before the Inbox page is opened.
+        InboxVm.Load(_client, profile.Username);
         SettingsVm.LoadAccount(profile, library);
 
         // Wire the Steam library import action so the Settings button calls through
@@ -2177,6 +2210,29 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Launch any enabled startup apps (Settings › System › Startup)
         RunStartupApps();
+    }
+
+    private async Task SyncWatchdogRecoveriesAsync(string username,
+        List<(string Path, PlaytimeWatchdog.Recovery Recovery)> recoveries)
+    {
+        foreach (var (path, recovery) in recoveries)
+        {
+            try
+            {
+                if (!string.Equals(_client.LoggedInUser, username, StringComparison.OrdinalIgnoreCase))
+                    return;
+                var token = _client.Token;
+                if (string.IsNullOrWhiteSpace(token)) return;
+                await PlaytimeWatchdog.SyncAsync(Services.BackendApiService.BackendUrl ?? "http://localhost:3000",
+                    token, recovery).ConfigureAwait(false);
+                System.IO.File.Delete(path);
+            }
+            catch (Exception ex)
+            {
+                DevLogService.Log($"[Playtime] Watchdog sync failed for '{recovery.Title}': {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Playtime] Watchdog sync failed: {ex.Message}");
+            }
+        }
     }
 
     private void OpenFirstRunSetupIfNeeded()
@@ -2820,6 +2876,34 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.DispatcherPriority.Background);
     }
 
+    private (List<FriendPresenceVm> Online, List<FriendPresenceVm> All) SnapshotFriends()
+    {
+        FriendPresenceVm ToVm(FriendEntry f) => new()
+        {
+            Username    = f.Username,
+            CurrentGame = f.CurrentGame ?? "",
+            Status      = f.Status,
+        };
+        return (FriendsVm.OnlineFriends.Select(ToVm).ToList(),
+                FriendsVm.OnlineFriends.Concat(FriendsVm.OfflineFriends).Select(ToVm).ToList());
+    }
+
+    /// <summary>Reloads friends on the UI thread (collections are bound) without blanking them first.</summary>
+    private async Task RefreshFriendsAsync(bool updateQuickMenu = false)
+    {
+        if (!_client.IsAuthenticated) return;
+        try
+        {
+            await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => FriendsVm.RefreshAsync());
+            if (updateQuickMenu && ShowQuickMenu)
+            {
+                var (online, all) = SnapshotFriends();
+                await Avalonia.Threading.Dispatcher.UIThread.InvokeAsync(() => QuickMenuVm.UpdateFriends(online, all));
+            }
+        }
+        catch { /* best-effort */ }
+    }
+
     public void ToggleQuickMenu()
     {
         if (ShowQuickMenu)
@@ -2828,24 +2912,10 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             return;
         }
 
-        // Collect friends (online first)
-        var onlineFriends = FriendsVm.OnlineFriends
-            .Select(f => new FriendPresenceVm
-            {
-                Username    = f.Username,
-                CurrentGame = f.CurrentGame ?? "",
-                Status      = f.Status,
-            })
-            .ToList();
-        var allFriends = FriendsVm.OnlineFriends
-            .Concat(FriendsVm.OfflineFriends)
-            .Select(f => new FriendPresenceVm
-            {
-                Username    = f.Username,
-                CurrentGame = f.CurrentGame ?? "",
-                Status      = f.Status,
-            })
-            .ToList();
+        var (onlineFriends, allFriends) = SnapshotFriends();
+        // The lists are normally warm (loaded at login and refreshed in the background); top them up if stale.
+        if (DateTime.UtcNow - FriendsVm.LastLoadedUtc > TimeSpan.FromMinutes(2))
+            _ = RefreshFriendsAsync(updateQuickMenu: true);
 
         // Achievement progress for current game
         var quickMenuAchs = GetQuickMenuAchievements();
@@ -3093,6 +3163,37 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     /// enriches with real cover art / description / trailer / achievements from
     /// the Games.Database — the same data the website shows.
     /// </summary>
+    /// <summary>
+    /// After a Steam game closes, asks the Steam Web API for its playtime (Steam publishes it shortly after exit) and merges
+    /// it with the locally tracked sessions, then pushes the merged total to the account.
+    /// </summary>
+    private async Task ReconcileSteamPlaytimeAsync(string platform, string title)
+    {
+        try
+        {
+            var s = Services.AppSettingsService.Load();
+            var user = _profile?.Username;
+            if (!s.EnableSteamSync || string.IsNullOrWhiteSpace(user)
+                || string.IsNullOrWhiteSpace(s.SteamApiKey) || string.IsNullOrWhiteSpace(s.SteamUserId)) return;
+            var game = _library.FirstOrDefault(g => string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase));
+            if (game?.SteamAppId is not > 0) return;
+
+            await Task.Delay(TimeSpan.FromSeconds(20)).ConfigureAwait(false);
+            var owned = await Services.SteamGameImportService.FetchAndSaveAsync(s.SteamApiKey, s.SteamUserId, user)
+                .ConfigureAwait(false);
+            var steam = owned.FirstOrDefault(o => o.AppId == game.SteamAppId);
+            if (steam == null || steam.PlaytimeMinutes <= 0) return;
+
+            int before = PlaytimeService.GetTotalMinutes(platform, title);
+            PlaytimeService.MergeExternalMinutes(platform, title, steam.PlaytimeMinutes, _library);
+            int total = PlaytimeService.GetTotalMinutes(platform, title);
+            if (total <= before) return;
+            await _client.UpdateGamePlaytimeAsync(platform, title, total, DateTime.UtcNow.ToString("o")).ConfigureAwait(false);
+        }
+        catch (Exception ex) { DevLogService.Log($"[Playtime] Steam reconcile failed for '{title}': {ex.Message}"); }
+    }
+
     private void OpenDetailFromMyGameCard(LocalGameCardVm card)
     {
         if (card.SourceGame != null)
@@ -3112,6 +3213,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             // Cloud library game shown in "Continue Playing" — open via standard cloud detail flow
             OpenDetailFromGame(card.SourceCloudGame);
         }
+        DetailVm.SetOwnedStores(card.Stores);
     }
 
     /// <summary>
@@ -4061,6 +4163,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
         // Unsubscribe from session-saved cloud sync and clear the per-user path
         PlaytimeService.SessionSaved -= OnSessionSaved;
+        _playtimeSvc.ConfigureWatchdog(null, null);
         PlaytimeService.ClearCurrentUser();
         MediaVm.EndAllSessions();
         MediaStatsService.SetCurrentUser(null);
@@ -6428,7 +6531,9 @@ public partial class MainViewModel : ViewModelBase, IDisposable
             {
                 try   { await PollInviteNotificationsAsync().ConfigureAwait(false); }
                 catch { /* polling failure is non-fatal */ }
-                if (Interlocked.Increment(ref tick) % 3 != 0) return;
+                int n = Interlocked.Increment(ref tick);
+                if (n % 15 == 0) await RefreshFriendsAsync().ConfigureAwait(false);
+                if (n % 3 != 0) return;
                 try   { await PollMessagesAsync().ConfigureAwait(false); }
                 catch { /* polling failure is non-fatal */ }
             });
@@ -6444,6 +6549,7 @@ public partial class MainViewModel : ViewModelBase, IDisposable
     {
         if (!_client.IsAuthenticated) return;
         var (invites, shares) = await InboxVm.PollPendingAsync();
+        if (!InboxVm.LastPollCompleted) return;
         bool seed = !_notifSeeded;
         _notifSeeded = true;
         if (seed) return;

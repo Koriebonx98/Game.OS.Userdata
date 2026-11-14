@@ -762,7 +762,25 @@
             byPlatform[g.platform].push(g);
         });
 
-        listEl.innerHTML = Object.keys(byPlatform).sort().map(plat => {
+        // Recently played (synced from the launcher via the account's games.json)
+        const recent = _myLibrary
+            .filter(g => g.lastPlayedAt && Number.isFinite(Date.parse(g.lastPlayedAt)))
+            .sort((a, b) => Date.parse(b.lastPlayedAt) - Date.parse(a.lastPlayedAt))
+            .slice(0, 6);
+        const recentHtml = recent.length ? `
+            <div class="owned-platform-group">
+                <h4 class="owned-platform-header">🕒 Recently Played <span class="games-count-badge">${recent.length}</span></h4>
+                ${recent.map(g => `
+                <div class="games-browse-item clickable" onclick="openGameModalFromLibrary('${escapeHtml(g.title || '')}', '${escapeHtml(g.platform || '')}', '${escapeHtml(String(g.titleId || ''))}')">
+                    <div class="game-cover-icon" style="background:${getPlatformColor(g.platform)};">${getPlatformIcon(g.platform)}</div>
+                    <div class="games-browse-info">
+                        <span class="games-browse-title">${escapeHtml(g.title || '')}</span>
+                        <span class="games-browse-id">${escapeHtml(g.platform || '')} · ${escapeHtml(new Date(g.lastPlayedAt).toLocaleString())}${g.playtimeMinutes ? ' · ' + Math.floor(g.playtimeMinutes / 60) + 'h ' + (g.playtimeMinutes % 60) + 'm' : ''}</span>
+                    </div>
+                </div>`).join('')}
+            </div>` : '';
+
+        listEl.innerHTML = recentHtml + Object.keys(byPlatform).sort().map(plat => {
             const games = byPlatform[plat];
             const coverColor = getPlatformColor(plat);
             const coverIcon  = getPlatformIcon(plat);

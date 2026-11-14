@@ -357,6 +357,7 @@ public partial class SettingsViewModel : ViewModelBase
     [ObservableProperty] private bool _libraryShowRecommended = true;
     [ObservableProperty] private bool _libraryShowNotPlayedBadge = true;
     [ObservableProperty] private bool _libraryShowMultiStoreBadge = true;
+    [ObservableProperty] private bool _libraryShowPlatformIcons = true;
     partial void OnOpenOptionsPanelChanged(string value)
     {
         OnPropertyChanged(nameof(IsDashboardOptionsOpen));
@@ -1055,6 +1056,7 @@ public partial class SettingsViewModel : ViewModelBase
         LibraryShowRecommended      = appSettings.LibraryShowRecommended;
         LibraryShowNotPlayedBadge   = appSettings.LibraryShowNotPlayedBadge;
         LibraryShowMultiStoreBadge  = appSettings.LibraryShowMultiStoreBadge;
+        LibraryShowPlatformIcons    = appSettings.LibraryShowPlatformIcons;
         IntroVideoPath         = appSettings.IntroVideoPath;
         MediaLocation          = appSettings.MediaLocation;
         GameSavesLocationsText = string.Join("\n", appSettings.GameSavesLocations ?? new());
@@ -1321,6 +1323,7 @@ public partial class SettingsViewModel : ViewModelBase
             LibraryShowRecommended     = LibraryShowRecommended,
             LibraryShowNotPlayedBadge  = LibraryShowNotPlayedBadge,
             LibraryShowMultiStoreBadge = LibraryShowMultiStoreBadge,
+            LibraryShowPlatformIcons   = LibraryShowPlatformIcons,
             IntroVideoPath        = IntroVideoPath,
             MediaLocation         = MediaLocation,
             GameSavesLocations    = GameSavesLocationsText.Split(new[] { '\n', '\r' }, System.StringSplitOptions.RemoveEmptyEntries | System.StringSplitOptions.TrimEntries).ToList(),

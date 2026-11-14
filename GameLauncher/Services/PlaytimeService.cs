@@ -196,6 +196,29 @@ namespace GameLauncher.Services
         }
 
         private readonly List<WatchEntry> _watching = new();
+        private string? _watchdogBackendUrl;
+        private string? _watchdogToken;
+
+        public void ConfigureWatchdog(string? backendUrl, string? token)
+        {
+            _watchdogBackendUrl = backendUrl;
+            _watchdogToken = token;
+        }
+
+        private void StartWatchdog(Process proc, DateTime startedAt, string title, string platform,
+            List<Game>? library, string? folder = null)
+        {
+            lock (_userLock)
+            {
+                if (_currentUser == null) return;
+                var game = library?.FirstOrDefault(g =>
+                    string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
+                var total = Math.Max(game?.PlaytimeMinutes ?? 0, GetTotalMinutes(platform, title));
+                PlaytimeWatchdog.Start(proc, startedAt, platform, title, DataDir, total,
+                    _watchdogBackendUrl, _watchdogToken, folder);
+            }
+        }
 
         // ── Public API ────────────────────────────────────────────────────────
 
@@ -284,6 +307,7 @@ namespace GameLauncher.Services
                 return;
             }
 
+            StartWatchdog(proc, startedAt, title, platform, libraryToUpdate);
             var entry = new WatchEntry
             {
                 Proc      = proc,
@@ -375,6 +399,7 @@ namespace GameLauncher.Services
             var startedAt = DateTime.UtcNow;
             string key    = MakeKey(platform, title);
 
+            StartWatchdog(launcherProc, startedAt, title, platform, libraryToUpdate, gameFolderPath);
             lock (_activeSessionsLock)
                 _activeSessions[key] = startedAt;
 
@@ -413,6 +438,19 @@ namespace GameLauncher.Services
             var baseline = baselinePids != null
                 ? new HashSet<int>(baselinePids)
                 : Process.GetProcesses().Select(p => p.Id).ToHashSet();
+
+            lock (_userLock)
+            {
+                if (_currentUser != null)
+                {
+                    var game = libraryToUpdate?.FirstOrDefault(g =>
+                        string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals(g.Title, title, StringComparison.OrdinalIgnoreCase));
+                    var total = Math.Max(game?.PlaytimeMinutes ?? 0, GetTotalMinutes(platform, title));
+                    PlaytimeWatchdog.StartSnapshot(startedAt, platform, title, DataDir, total,
+                        _watchdogBackendUrl, _watchdogToken, launchTarget, baseline);
+                }
+            }
 
             System.Threading.Tasks.Task.Run(() =>
                 WatchProcessesFromSnapshot(
@@ -565,7 +603,7 @@ namespace GameLauncher.Services
             try
             {
                 var trackedPids = new HashSet<int>();
-                string[] hints = BuildLaunchHints(launchTarget, title);
+                string[] hints = PlaytimeWatchdog.BuildLaunchHints(launchTarget, title);
                 DateTime detectDeadline = DateTime.UtcNow.AddSeconds(45);
                 bool detectedAny = false;
 
@@ -604,7 +642,7 @@ namespace GameLauncher.Services
                             if (p.HasExited) continue;
                             if (baselinePids.Contains(p.Id)) continue;
                             if (trackedPids.Contains(p.Id)) continue;
-                            if (!IsCandidateProcess(p, hints)) continue;
+                            if (!PlaytimeWatchdog.IsCandidateProcess(p, hints)) continue;
                             trackedPids.Add(p.Id);
                             detectedAny = true;
                         }
@@ -649,40 +687,6 @@ namespace GameLauncher.Services
             }
         }
 
-        private static string[] BuildLaunchHints(string launchTarget, string title)
-        {
-            var hints = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var token in (launchTarget ?? "").Split(new[] { '\\', '/', ':', '!', '.', '-', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (token.Length >= 3)
-                    hints.Add(token.ToLowerInvariant());
-            }
-            foreach (var token in (title ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (token.Length >= 3)
-                    hints.Add(token.ToLowerInvariant());
-            }
-            return hints.ToArray();
-        }
-
-        private static bool IsCandidateProcess(Process process, string[] hints)
-        {
-            string name = "";
-            try { name = process.ProcessName ?? ""; } catch { }
-            if (string.IsNullOrWhiteSpace(name)) return false;
-
-            if (name.Equals("GameLauncher", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("explorer", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("cmd", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("powershell", StringComparison.OrdinalIgnoreCase) ||
-                name.Equals("pwsh", StringComparison.OrdinalIgnoreCase))
-                return false;
-
-            if (hints.Length == 0) return false;
-            string lower = name.ToLowerInvariant();
-            return hints.Any(h => lower.Contains(h));
-        }
-
         /// <summary>
         /// Loads the accumulated playtime totals from disk and applies them to
         /// the given library list (updating <see cref="Game.PlaytimeMinutes"/> and
@@ -717,9 +721,58 @@ namespace GameLauncher.Services
                             string.Compare(agg.LastPlayed, game.LastPlayedAt, StringComparison.Ordinal) > 0)
                             game.LastPlayedAt = agg.LastPlayed;
                     }
+
                 }
             }
             catch { /* best-effort */ }
+        }
+
+        /// <summary>Imports completed watchdog journals once; journals remain until cloud sync succeeds.</summary>
+        internal static List<(string Path, PlaytimeWatchdog.Recovery Recovery)> ImportWatchdogSessions()
+        {
+            var result = new List<(string, PlaytimeWatchdog.Recovery)>();
+            var dir = Path.Combine(DataDir, "watchdog");
+            if (!Directory.Exists(dir)) return result;
+            string[] paths;
+            try { paths = Directory.GetFiles(dir, "*.json"); }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                DevLogService.Log($"[Playtime] Could not read watchdog journals: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[Playtime] Could not read watchdog journals: {ex.Message}");
+                return result;
+            }
+            foreach (var path in paths)
+            {
+                try
+                {
+                    var recovery = JsonSerializer.Deserialize<PlaytimeWatchdog.Recovery>(File.ReadAllText(path))
+                        ?? throw new InvalidDataException("Empty watchdog journal.");
+                    if (string.IsNullOrWhiteSpace(recovery.Title) || string.IsNullOrWhiteSpace(recovery.Platform)
+                        || !DateTime.TryParse(recovery.StartedAt, out _) || !DateTime.TryParse(recovery.EndedAt, out _)
+                        || recovery.Minutes <= 0)
+                        throw new InvalidDataException("Invalid watchdog journal.");
+                    var sessions = LoadSessions();
+                    if (!sessions.Any(s => !s.IsCheckpoint && s.StartedAt == recovery.StartedAt
+                        && string.Equals(s.Title, recovery.Title, StringComparison.OrdinalIgnoreCase)
+                        && string.Equals(s.Platform, recovery.Platform, StringComparison.OrdinalIgnoreCase)))
+                    {
+                        sessions.RemoveAll(s => s.IsCheckpoint && s.StartedAt == recovery.StartedAt);
+                        sessions.Add(new PlaySession
+                        {
+                            Platform = recovery.Platform, Title = recovery.Title, StartedAt = recovery.StartedAt,
+                            EndedAt = recovery.EndedAt, Minutes = recovery.Minutes
+                        });
+                        File.WriteAllText(SessionsFile, JsonSerializer.Serialize(sessions, _jsonOpts));
+                    }
+                    result.Add((path, recovery));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+                {
+                    DevLogService.Log($"[Playtime] Could not import watchdog journal: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[Playtime] Could not import watchdog journal: {ex.Message}");
+                }
+            }
+            return result;
         }
 
         /// <summary>Returns total minutes played for a given game (persisted sessions only).</summary>

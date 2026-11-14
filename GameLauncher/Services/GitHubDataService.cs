@@ -621,19 +621,30 @@ namespace GameLauncher.Services
                 try
                 {
                     var (games, sha) = await ReadFileAsync<List<Game>>(key, ct);
-                    if (games == null) return;
+                    games ??= new List<Game>();
 
                     var game = games.FirstOrDefault(g =>
                         string.Equals(g.Platform, platform, StringComparison.OrdinalIgnoreCase) &&
                         string.Equals(g.Title,    title,    StringComparison.OrdinalIgnoreCase));
 
-                    if (game == null) return; // local-only ROM not in cloud library — skip
+                    if (game == null)
+                    {
+                        // Played locally but not in the cloud library yet: add it so recently-played
+                        // and playtime show up on every other device and the website.
+                        game = new Game
+                        {
+                            Platform = platform, Title = title,
+                            AddedAt = DateTimeOffset.UtcNow.ToString("o"),
+                        };
+                        games.Add(game);
+                    }
 
                     // Only advance playtime forward to avoid stale writes overwriting newer data
                     if (totalMinutes > game.PlaytimeMinutes)
                         game.PlaytimeMinutes = totalMinutes;
                     // Only advance lastPlayedAt forward (ISO 8601 strings sort lexicographically)
-                    if (string.Compare(lastPlayedAt, game.LastPlayedAt, StringComparison.Ordinal) > 0)
+                    if (string.IsNullOrEmpty(game.LastPlayedAt)
+                        || string.Compare(lastPlayedAt, game.LastPlayedAt, StringComparison.Ordinal) > 0)
                         game.LastPlayedAt = lastPlayedAt;
 
                     await WriteFileAsync(key, games,

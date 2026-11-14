@@ -200,6 +200,13 @@ namespace GameLauncher.Models
         [JsonPropertyName("streamPort")] public int?    StreamPort { get; set; }
         [JsonPropertyName("streamPin")]  public string? StreamPin  { get; set; }
         [JsonIgnore] public bool IsWatchParty => string.Equals(Kind, "watch", StringComparison.OrdinalIgnoreCase);
+        [JsonIgnore] public string Glyph => IsWatchParty ? "📺" : "🎮";
+        [JsonIgnore] public string AcceptLabel => IsWatchParty ? "Join" : "Accept";
+        /// <summary>Safe text for the Inbox tile; never contains the host's address.</summary>
+        [JsonIgnore] public string Summary => IsWatchParty
+            ? $"{From} invited you to a watch party"
+            : $"{From} invited you" + (string.IsNullOrWhiteSpace(Platform) ? "" : " · " + Platform)
+              + (string.IsNullOrWhiteSpace(ConnectionType) ? "" : " · " + ConnectionType);
     }
 
     /// <summary>A public LFG / group room published to the shared swarm. The connection endpoint is never included.</summary>
@@ -612,6 +619,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("libShowRecommended")]    public bool LibraryShowRecommended    { get; set; } = true;
         [JsonPropertyName("libShowNotPlayedBadge")] public bool LibraryShowNotPlayedBadge { get; set; } = true;
         [JsonPropertyName("libShowMultiStoreBadge")] public bool LibraryShowMultiStoreBadge { get; set; } = true;
+        [JsonPropertyName("libShowPlatformIcons")]  public bool LibraryShowPlatformIcons  { get; set; } = true;
 
         /// <summary>
         /// Optional path to a custom intro video file.  When non-empty and

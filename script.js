@@ -2108,37 +2108,44 @@ async function loadInbox() {
             </div>
         `);
 
+        // Fetch unread messages from each friend (in parallel)
+        const messageResults = await Promise.all(
+            friends.map(friendName => {
+                if (MODE === 'demo') {
+                    return getMessagesDemo(user.username, friendName)
+                        .then(result => ({ friendName, result }))
+                        .catch(() => ({ friendName, result: { success: false, messages: [], rawMessages: [] } }));
+                } else {
+                    return getMessagesGitHub(user.username, friendName)
+                        .then(result => ({ friendName, result }))
+                        .catch(() => ({ friendName, result: { success: false, messages: [], rawMessages: [] } }));
+                }
+            })
+        );
+        // Invites sent from the launcher arrive as hidden chat messages; merge them with invites.json entries.
+        for (const { friendName, result } of messageResults) {
+            if (result.success) invites = invites.concat(pendingMessageInvites(user.username, friendName, result.rawMessages));
+        }
+
         // Build invite items
         const inviteItems = invites.map(inv => inv.kind === 'watch' ? `
             <div class="friend-item">
                 <span class="friend-name">🍿 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to a watch party: <strong>${escapeHtml(inv.gameName)}</strong></span></span>
                 <div class="friend-actions">
-                    <button class="btn-accept-friend" onclick="handleAcceptWatchInvite('${escapeHtml(inv.inviteId)}', '${encodeURIComponent(buildWatchPartyUrl(inv)).replace(/'/g, '%27')}')">▶ Join</button>
-                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined')">❌ Decline</button>
+                    <button class="btn-accept-friend" onclick="handleAcceptWatchInvite('${escapeHtml(inv.inviteId)}', '${encodeURIComponent(buildWatchPartyUrl(inv)).replace(/'/g, '%27')}', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">▶ ${canWatchInBrowser(inv) ? 'Join' : 'Accept'}</button>
+                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">❌ Decline</button>
                 </div>
             </div>
         ` : `
             <div class="friend-item">
                 <span class="friend-name">🎮 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong></span></span>
                 <div class="friend-actions">
-                    <button class="btn-accept-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'accepted')">✅ Accept</button>
-                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined')">❌ Decline</button>
+                    <button class="btn-accept-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'accepted', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">✅ Accept</button>
+                    <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">❌ Decline</button>
                 </div>
             </div>
         `);
 
-        // Fetch unread messages from each friend (in parallel)
-        const messageResults = await Promise.all(
-            friends.map(friendName => {
-                if (MODE === 'demo') {
-                    return getMessagesDemo(user.username, friendName)
-                        .then(result => ({ friendName, result }));
-                } else {
-                    return getMessagesGitHub(user.username, friendName)
-                        .then(result => ({ friendName, result }));
-                }
-            })
-        );
         const unreadItems = [];
         for (const { friendName, result } of messageResults) {
             if (!result.success) continue;
@@ -2342,7 +2349,7 @@ async function sendMessageGitHub(username, toUsername, text) {
 async function getMessagesGitHub(username, withUsername) {
     const convPath = conversationKey(username, withUsername);
     const convFile = await githubRead(convPath);
-    return { success: true, messages: convFile ? convFile.content : [] };
+    return splitSystemMessages(convFile ? convFile.content : []);
 }
 
 // ============================================================
@@ -2372,7 +2379,57 @@ async function sendMessageDemo(username, toUsername, text) {
 }
 
 async function getMessagesDemo(username, withUsername) {
-    return { success: true, messages: getDemoMessages(username, withUsername) };
+    return splitSystemMessages(getDemoMessages(username, withUsername));
+}
+
+// ============================================================
+// SYSTEM MESSAGES (invites / mod shares travel as hidden chat messages)
+// ============================================================
+
+const INVITE_MESSAGE_MARKER = '\u2063\u2063GOSINV1:';
+const MOD_SHARE_MESSAGE_MARKER = '\u2063\u2063GOSMOD1:';
+
+function isSystemMessage(text) {
+    return typeof text === 'string' &&
+        (text.startsWith(INVITE_MESSAGE_MARKER) || text.startsWith(MOD_SHARE_MESSAGE_MARKER));
+}
+
+/** Splits a raw thread: `messages` is what a person should read, `rawMessages` keeps the hidden ones. */
+function splitSystemMessages(all) {
+    const list = Array.isArray(all) ? all : [];
+    return { success: true, messages: list.filter(m => !isSystemMessage(m && m.text)), rawMessages: list };
+}
+
+function parseInviteEnvelope(text) {
+    if (typeof text !== 'string' || !text.startsWith(INVITE_MESSAGE_MARKER)) return null;
+    try { return JSON.parse(text.slice(INVITE_MESSAGE_MARKER.length)); } catch (e) { return null; }
+}
+
+/** Pending invites a friend sent through chat, minus those this user already answered. Mirrors the launcher. */
+function pendingMessageInvites(me, friend, rawMessages) {
+    const meL = me.toLowerCase(), friendL = friend.toLowerCase();
+    const responded = new Set();
+    const pending = [];
+    for (const m of rawMessages || []) {
+        const env = parseInviteEnvelope(m && m.text);
+        if (env && (m.from || '').toLowerCase() === meL && env.InviteId && (env.Response === 'accepted' || env.Response === 'declined'))
+            responded.add(env.InviteId);
+    }
+    for (const m of rawMessages || []) {
+        const env = parseInviteEnvelope(m && m.text);
+        const inv = env && env.Invite;
+        if ((m.from || '').toLowerCase() !== friendL || !inv || typeof inv.inviteId !== 'string'
+            || !inv.inviteId.startsWith('msg-') || !inv.gameName || responded.has(inv.inviteId)) continue;
+        if (pending.some(p => p.inviteId === inv.inviteId)) continue;
+        pending.push(Object.assign({}, inv, { from: friend, sentAt: m.sentAt, status: 'pending', viaMessage: true }));
+    }
+    return pending;
+}
+
+/** Answers a chat-based invite by sending the same hidden response message the launcher uses. */
+async function respondMessageInvite(username, friend, inviteId, response) {
+    const text = INVITE_MESSAGE_MARKER + JSON.stringify({ InviteId: inviteId, Response: response });
+    return MODE === 'demo' ? sendMessageDemo(username, friend, text) : sendMessageGitHub(username, friend, text);
 }
 
 // ============================================================
@@ -2451,29 +2508,41 @@ function buildWatchPartyUrl(inv) {
     return `watch.html?${q.toString()}`;
 }
 
-/** Accepts a watch-party invite (so the host's launcher starts playback) and opens the viewer. */
-async function handleAcceptWatchInvite(inviteId, encodedUrl) {
+/** True when the invite carries a hosted relay room the browser can open (direct LAN parties need the launcher). */
+function canWatchInBrowser(inv) {
+    return !!(inv.relayUrl && inv.roomId);
+}
+
+/** Records the answer for an invite: chat-based ones (fromFriend set) reply by message, others update invites.json. */
+async function answerInvite(user, inviteId, response, fromFriend) {
+    if (fromFriend) return respondMessageInvite(user.username, fromFriend, inviteId, response);
+    if (MODE === 'demo') return respondInviteDemo(user.username, inviteId, response);
+    return respondInviteGitHub(user.username, inviteId, response);
+}
+
+/** Accepts a watch-party invite (so the host's launcher starts playback) and opens the viewer when the web can play it. */
+async function handleAcceptWatchInvite(inviteId, encodedUrl, fromFriend) {
     const user = getCurrentUser();
     if (!user) return;
     try {
-        if (MODE === 'demo') respondInviteDemo(user.username, inviteId, 'accepted');
-        else await respondInviteGitHub(user.username, inviteId, 'accepted');
+        await answerInvite(user, inviteId, 'accepted', fromFriend);
     } catch (err) {
         console.error('Failed to accept watch invite:', err);
         return;
     }
-    window.location.href = decodeURIComponent(encodedUrl);
+    const url = decodeURIComponent(encodedUrl);
+    if (new URLSearchParams(url.split('?')[1] || '').get('relay')) window.location.href = url;
+    else {
+        alert('Invite accepted. This watch party streams over a private Game OS room, so open the Game OS launcher to watch.');
+        loadInbox();
+    }
 }
 
-async function handleRespondInvite(inviteId, response) {
+async function handleRespondInvite(inviteId, response, fromFriend) {
     const user = getCurrentUser();
     if (!user) return;
     try {
-        if (MODE === 'demo') {
-            respondInviteDemo(user.username, inviteId, response);
-        } else {
-            await respondInviteGitHub(user.username, inviteId, response);
-        }
+        await answerInvite(user, inviteId, response, fromFriend);
         loadInbox();
     } catch (err) {
         console.error('Failed to respond to invite:', err);

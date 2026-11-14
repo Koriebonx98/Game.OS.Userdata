@@ -21,6 +21,21 @@ public partial class GameDetailViewModel : ViewModelBase
     // ── Display properties ────────────────────────────────────────────────────
     [ObservableProperty] private string  _title        = "";
     [ObservableProperty] private string  _platform     = "";
+
+    /// <summary>Stores this game is owned on, shown as icons next to the platform badge.</summary>
+    public ObservableCollection<StoreChipVm> StoreChips { get; } = new();
+    public bool HasStoreChips => StoreChips.Count > 0;
+    public bool HasPlatformIcon => Services.PlatformIcons.KeyFor(Platform) != null;
+    public Avalonia.Media.Geometry? PlatformIcon => Services.PlatformIcons.GeometryFor(Platform);
+    partial void OnPlatformChanged(string value) { OnPropertyChanged(nameof(PlatformIcon)); OnPropertyChanged(nameof(HasPlatformIcon)); }
+
+    public void SetOwnedStores(IEnumerable<string>? stores)
+    {
+        StoreChips.Clear();
+        foreach (var st in (stores ?? Array.Empty<string>()).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+            StoreChips.Add(new StoreChipVm(st));
+        OnPropertyChanged(nameof(HasStoreChips));
+    }
     [ObservableProperty] private string  _genre        = "";
     [ObservableProperty] private string  _description  = "";
     [ObservableProperty] private string  _ratingStars  = "";
@@ -4531,7 +4546,7 @@ public partial class GameDetailViewModel : ViewModelBase
         {
             IsLfgBusy = true;
             string host = await Lfg.JoinAsync(room);
-            LfgStatus = $"✓ Joined {host}'s room. Host address: {Lfg.JoinedEndpoint}. {Lfg.ConnectionInfo}. " +
+            LfgStatus = $"✓ Joined {host}'s room. {Lfg.ConnectionInfo}. " +
                 "Launch with a configured mod-client connect template, or join manually in the game/emulator.";
         }
         catch (Exception ex) { LfgStatus = "Could not join: " + ex.Message; }
@@ -4637,6 +4652,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public void LoadFromGame(Game game, LocalGame? localGame = null, LocalRepack? repack = null,
                              LocalRom? localRom = null, List<Achievement>? knownUnlockedOverride = null)
     {
+        SetOwnedStores(null);
         ShowSettings    = false;
         ShowModsPanel   = false;
         ShowDrivePicker = false;
@@ -4705,6 +4721,7 @@ public partial class GameDetailViewModel : ViewModelBase
     public void LoadFromStoreGame(StoreGame game, LocalGame? localGame = null, LocalRepack? repack = null,
                                   LocalRom? localRom = null)
     {
+        SetOwnedStores(null);
         ShowSettings    = false;
         ShowModsPanel   = false;
         ShowDrivePicker = false;
@@ -4764,6 +4781,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromLocalGame(LocalGame game, int externalMinutes = 0)
     {
+        SetOwnedStores(null);
         ShowSettings    = false;
         ShowModsPanel   = false;
         ShowDrivePicker = false;
@@ -4857,6 +4875,7 @@ public partial class GameDetailViewModel : ViewModelBase
     /// </summary>
     public void LoadFromLocalRepack(LocalRepack repack)
     {
+        SetOwnedStores(null);
         ShowSettings    = false;
         ShowDrivePicker = false;
         ShowInstallSourcePicker = false;
@@ -4922,6 +4941,7 @@ public partial class GameDetailViewModel : ViewModelBase
 
     public void LoadFromLocalRom(LocalRom rom)
     {
+        SetOwnedStores(null);
         ShowSettings    = false;
         ShowModsPanel   = false;
         ShowDrivePicker = false;
@@ -6437,4 +6457,14 @@ public sealed class ButtonMappingRowVm : CommunityToolkit.Mvvm.ComponentModel.Ob
         "Back"           => "⟨  Back / Select",
         _                => ButtonName,
     };
+}
+
+/// <summary>A store a game is owned on, with its brand icon.</summary>
+public sealed class StoreChipVm
+{
+    public StoreChipVm(string name) { Name = name; }
+    public string Name { get; }
+    public Avalonia.Media.Geometry? Icon  => Services.PlatformIcons.GeometryFor(Name);
+    public Avalonia.Media.IBrush?   Brush => Services.PlatformIcons.BrushFor(Name);
+    public bool HasIcon => Icon != null;
 }

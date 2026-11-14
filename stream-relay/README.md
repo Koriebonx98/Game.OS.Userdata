@@ -19,6 +19,11 @@ npm test                                        # local end-to-end self-test
 Host it anywhere that supports HTTP + WebSocket and put it behind **HTTPS** (the web app is served over HTTPS,
 so browsers block `ws://` / `http://` relays as mixed content).
 
+## Built in to the backend
+
+The backend (`backend/stream-relay.js`) now serves this same relay. Signed-in launchers use it automatically when
+*Public broadcast relay* is empty, so watch parties and broadcasts reach the website and iOS app with no extra server.
+
 ## Launcher setup
 
 Settings → *Stream to iOS web app* → **Public broadcast relay**: enter the relay URL and (if set) `STREAM_ADMIN_KEY`.

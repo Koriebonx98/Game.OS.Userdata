@@ -39,9 +39,29 @@
             <!-- Badges row -->
             <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
                 <Border CornerRadius="4" Padding="10,4" Background="#1f6feb">
-                    <TextBlock Text="{Binding Platform}"
-                               FontSize="12" FontWeight="Bold" Foreground="White"/>
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <Path Data="{Binding PlatformIcon}" Fill="White" Width="13" Height="13" Stretch="Uniform"
+                              VerticalAlignment="Center" IsVisible="{Binding HasPlatformIcon}"/>
+                        <TextBlock Text="{Binding Platform}"
+                                   FontSize="12" FontWeight="Bold" Foreground="White"/>
+                    </StackPanel>
                 </Border>
+                <ItemsControl ItemsSource="{Binding StoreChips}" IsVisible="{Binding HasStoreChips}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8"/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:StoreChipVm">
+                            <Border CornerRadius="4" Padding="10,4" Background="#21262d">
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Path Data="{Binding Icon}" Fill="{Binding Brush}" Width="13" Height="13" Stretch="Uniform"
+                                          VerticalAlignment="Center" IsVisible="{Binding HasIcon}"/>
+                                    <TextBlock Text="{Binding Name}" FontSize="12" Foreground="#c9d1d9"/>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
                 <Border CornerRadius="4" Padding="10,4" Background="#21262d"
                         IsVisible="{Binding Genre, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
                     <TextBlock Text="{Binding Genre}"

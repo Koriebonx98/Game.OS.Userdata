@@ -1452,6 +1452,7 @@
                                         <CheckBox IsChecked="{Binding LibraryShowRecommended}" Content="Recommended shelf (from games you own or have installed)"/>
                                         <CheckBox IsChecked="{Binding LibraryShowNotPlayedBadge}" Content="“Not played” badge"/>
                                         <CheckBox IsChecked="{Binding LibraryShowMultiStoreBadge}" Content="“Owned on several stores” badge"/>
+                                        <CheckBox IsChecked="{Binding LibraryShowPlatformIcons}" Content="Platform icons on game cards"/>
                                     </StackPanel>
                                 </Border>
 
