@@ -1,7 +1,9 @@
 // Digital Abyss desktop shell. The game itself is served from the Game OS site so the PC, website and
 // iOS versions share one build, one login, one DRM check and one cloud save.
-const { app, BrowserWindow, shell, Menu } = require('electron');
+const { app, BrowserWindow, shell, Menu, ipcMain } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const os = require('os');
 
 const SITE = process.env.GAMEOS_SITE || 'https://koriebonx98.github.io/Game.OS.Userdata/';
 const GAME_URL = new URL('games/digital-abyss/index.html?client=desktop', SITE).href;
@@ -9,12 +11,25 @@ const SITE_ORIGIN = new URL(SITE).origin;
 
 if (!app.requestSingleInstanceLock()) app.quit();
 
+// The Game OS launcher keeps its most recently used account first in sessions.json; reuse it so no second login is needed.
+function readLauncherSession() {
+    const base = process.platform === 'win32' ? process.env.APPDATA
+        : process.platform === 'darwin' ? path.join(os.homedir(), 'Library', 'Application Support')
+        : path.join(os.homedir(), '.config');
+    try {
+        const list = JSON.parse(fs.readFileSync(path.join(base || '', 'GameOS', 'sessions.json'), 'utf8'));
+        const s = Array.isArray(list) ? list[0] : null;
+        return s && s.username ? { username: s.username, email: s.email || '' } : null;
+    } catch (_) { return null; }
+}
+ipcMain.on('gameos-session', e => { e.returnValue = readLauncherSession(); });
+
 function createWindow() {
     const win = new BrowserWindow({
-        width: 480, height: 900, minWidth: 360, minHeight: 640,
+        fullscreen: true,
         backgroundColor: '#000000', title: 'Digital Abyss',
         autoHideMenuBar: true,
-        webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, partition: 'persist:digital-abyss' }
+        webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, partition: 'persist:digital-abyss', preload: path.join(__dirname, 'preload.js') }
     });
     win.webContents.setUserAgent(win.webContents.getUserAgent() + ' GameOSDesktop/' + app.getVersion());
 
@@ -33,6 +48,7 @@ function createWindow() {
         if (input.type === 'keyDown' && input.key === 'F11') win.setFullScreen(!win.isFullScreen());
     });
 
+    win.once('ready-to-show', () => win.setFullScreen(true));
     win.loadURL(GAME_URL);
     return win;
 }

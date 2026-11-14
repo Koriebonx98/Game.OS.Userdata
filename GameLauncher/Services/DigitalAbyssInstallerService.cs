@@ -29,11 +29,28 @@ namespace GameLauncher.Services
 
         public static string ExePath => Path.Combine(InstallFolder, GameTitle + ".exe");
 
-        public static bool IsInstalled => File.Exists(ExePath);
-
-        /// <summary>Downloads and silently installs the game. Returns the installed exe path.</summary>
-        public static async Task<string> InstallAsync(IProgress<double>? progress = null, CancellationToken ct = default)
+        /// <summary>Returns the installed exe: a "&lt;root&gt;/Games/Digital Abyss" copy on any drive, else the legacy per-user location.</summary>
+        public static string? FindInstalledExe()
         {
+            try
+            {
+                foreach (var d in DriveInfo.GetDrives())
+                {
+                    if (!d.IsReady) continue;
+                    var exe = Path.Combine(d.RootDirectory.FullName, "Games", GameTitle, GameTitle + ".exe");
+                    if (File.Exists(exe)) return exe;
+                }
+            }
+            catch { /* best-effort */ }
+            return File.Exists(ExePath) ? ExePath : null;
+        }
+
+        public static bool IsInstalled => FindInstalledExe() != null;
+
+        /// <summary>Downloads and silently installs the game into <paramref name="installFolder"/>. Returns the installed exe path.</summary>
+        public static async Task<string> InstallAsync(string installFolder, IProgress<double>? progress = null, CancellationToken ct = default)
+        {
+            var exePath = Path.Combine(installFolder, GameTitle + ".exe");
             var setup = Path.Combine(Path.GetTempPath(), "DigitalAbyss-Setup.exe");
             try
             {
@@ -54,13 +71,13 @@ namespace GameLauncher.Services
                     }
                 }
 
-                var psi = new ProcessStartInfo(setup, "/S") { UseShellExecute = true };
+                var psi = new ProcessStartInfo(setup, $"/S /D={installFolder}") { UseShellExecute = true };
                 using var proc = Process.Start(psi) ?? throw new InvalidOperationException("Could not start the installer.");
                 await proc.WaitForExitAsync(ct);
                 if (proc.ExitCode != 0) throw new InvalidOperationException($"Installer exited with code {proc.ExitCode}.");
-                if (!IsInstalled) throw new FileNotFoundException("Installation finished but the game was not found.", ExePath);
+                if (!File.Exists(exePath)) throw new FileNotFoundException("Installation finished but the game was not found.", exePath);
                 progress?.Report(100);
-                return ExePath;
+                return exePath;
             }
             finally
             {
