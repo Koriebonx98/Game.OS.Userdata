@@ -102,5 +102,43 @@
         document.body.appendChild(loader);
     }
 
-    window.GameOSEmu = { isRetro, install, play, uninstall, isInstalled };
+    // ── Offline emulator: pre-download EmulatorJS and its cores; sw.js stores everything from the CDN in the 'gameos-emu' cache ──
+    const EJS_BASE_FILES = ['loader.js', 'emulator.min.js', 'emulator.min.css', 'compression/extract7z.js', 'compression/extractzip.js',
+        'compression/libunrar.js', 'compression/libunrar.js.mem', 'localization/en-US.json'];
+    // EmulatorJS core name (as used by CORES above) -> files that make up the core
+    const CORE_FILES = { gba: 'mgba', gb: 'gambatte', nes: 'fceumm', snes: 'snes9x', n64: 'mupen64plus_next', nds: 'melonds',
+        segaMD: 'genesis_plus_gx', segaMS: 'genesis_plus_gx', segaGG: 'genesis_plus_gx', pce: 'mednafen_pce', atari2600: 'stella2014',
+        lynx: 'handy', ngp: 'mednafen_ngp', ws: 'mednafen_wswan', psx: 'pcsx_rearmed', psp: 'ppsspp' };
+    const DEFAULT_OFFLINE = ['gba', 'gb', 'nes', 'snes', 'segaMD', 'psx'];
+    const OFFLINE_FLAG = 'gameOS_emuOffline';
+
+    function offlineStatus() {
+        try { return JSON.parse(localStorage.getItem(OFFLINE_FLAG)) || null; } catch (_) { return null; }
+    }
+    async function downloadOffline(onProgress, cores) {
+        if (!('caches' in window)) throw new Error('Offline storage is not supported in this browser.');
+        const wanted = (cores || DEFAULT_OFFLINE).filter(c => CORE_FILES[c]);
+        const urls = EJS_BASE_FILES.map(f => EJS_CDN + f);
+        wanted.forEach(c => ['-wasm.data', '-legacy-wasm.data'].forEach(x => urls.push(EJS_CDN + 'cores/' + CORE_FILES[c] + x)));
+        wanted.forEach(c => urls.push(EJS_CDN + 'cores/reports/' + CORE_FILES[c] + '.json'));
+        if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+        const cache = await caches.open('gameos-emu');
+        let done = 0, ok = 0;
+        for (const url of urls) {
+            try {
+                if (!(await cache.match(url))) {
+                    const r = await fetch(url);
+                    if (r.ok) { await cache.put(url, r); ok++; }
+                } else ok++;
+            } catch (_) {}
+            done++;
+            if (onProgress) onProgress(done, urls.length);
+        }
+        // the page needs at least the loader and one core to run offline
+        const ready = !!(await cache.match(EJS_CDN + 'loader.js')) && ok > EJS_BASE_FILES.length;
+        if (ready) localStorage.setItem(OFFLINE_FLAG, JSON.stringify({ at: Date.now(), cores: wanted }));
+        return { ready, cached: ok, total: urls.length };
+    }
+
+    window.GameOSEmu = { isRetro, install, play, uninstall, isInstalled, downloadOffline, offlineStatus };
 })();

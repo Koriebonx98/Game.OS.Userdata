@@ -124,6 +124,16 @@
                 <a id="accountPageLink" class="btn app-more app-page-link" href="account.html">Open account settings</a>
             </div>
             <div class="app-card">
+                <b>Roles &amp; Game Developer</b>
+                <div id="communitySection"></div>
+                <a class="btn app-more app-page-link" href="inbox.html">Open inbox (approvals)</a>
+            </div>
+            <div class="app-card">
+                <b>Offline</b>
+                <p id="emuOfflineMsg">Your library and store are cached automatically. Download the emulator to play retro games without internet.</p>
+                <button id="emuOfflineBtn" class="btn app-more">⬇ Download emulator for offline</button>
+            </div>
+            <div class="app-card">
                 <b>Notifications</b>
                 <p id="settingsNotifStatus">Check notification permission for this device.</p>
                 <button id="settingsNotifBtn" class="btn app-more">Enable notifications</button>
@@ -175,6 +185,7 @@
     </nav>
 
     <script src="script.js?v=emu8"></script>
+    <script src="community.js"></script>
     <script>
     (function () {
         const $ = id => document.getElementById(id);
@@ -677,7 +688,7 @@
             if (refreshing || !user) return;
             refreshing = true;
             try {
-                const lib = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username);
+                const lib = MODE === 'demo' ? getDemoGameLibrary(user.username) : await getGameLibraryGitHub(user.username, { fresh: true });
                 const log = MODE === 'demo' ? [] : await getActivityLogGitHub(user.username).catch(() => activityLog);
                 const sig = JSON.stringify([lib, log]);
                 if (sig === lastRefreshSig) return;
@@ -700,8 +711,12 @@
             } catch (_) { $('storeList').innerHTML = empty('Failed to load games.'); return; }
             // Game OS exclusives (playable on the site / iOS app): GameOS.Exclusives.json, entries tagged with where they run.
             try {
-                const r = await fetch(GAMES_DB_RAW_BASE + '/GameOS.Exclusives.json', { cache: 'no-cache' });
-                if (r.ok) ((await r.json()).Games || []).forEach(g => {
+                const ex = await _swr('exclusives', async () => {
+                    const r = await fetch(GAMES_DB_RAW_BASE + '/GameOS.Exclusives.json', { cache: 'no-cache' });
+                    if (!r.ok) throw new Error('exclusives ' + r.status);
+                    return (await r.json()).Games || [];
+                });
+                ex.forEach(g => {
                     const plat = g.platform || 'PC';
                     const i = storeGames.findIndex(x => pf(x) === plat && gTitle(x).toLowerCase() === gTitle(g).toLowerCase());
                     if (i >= 0) { storePlatOf.delete(storeGames[i]); storeGames.splice(i, 1); }
@@ -972,6 +987,15 @@
             applyPlayHistory();
             renderProfile();
             renderSettingsNotifications();
+            if (window.Community) Community.renderSettings($('communitySection')).catch(() => {});
+            { const st = GameOSEmu.offlineStatus(); if (st) $('emuOfflineMsg').textContent = '✅ Emulator available offline.';
+              $('emuOfflineBtn').onclick = async () => {
+                  const b = $('emuOfflineBtn'), m = $('emuOfflineMsg'); b.disabled = true;
+                  try { const r = await GameOSEmu.downloadOffline((d, t) => { m.textContent = '⏳ Downloading… ' + d + '/' + t; });
+                      m.textContent = r.ready ? '✅ Emulator is ready for offline use.' : '⚠️ Could not download everything. Try again.'; }
+                  catch (e) { m.textContent = '⚠️ ' + e.message; }
+                  b.disabled = false;
+              }; }
             fillPlatforms(); renderAll(); loadUserAch().then(renderAll);
             if (typeof syncFavourites === 'function') syncFavourites(user.username).then(renderAll); renderNotifBox(); subscribePush();
             await loadFriends(); renderChats(); renderFriends(); initStore(); initAdminTools();

@@ -148,3 +148,14 @@ test('private lobbies are never listed or joinable without an invite', async () 
         assert.strictEqual((await t.api('GET', '/api/game-rooms/public?game=quizy', 'dave')).body.rooms.length, 1);
     } finally { t.close(); }
 });
+
+test('community games get rooms with a host-chosen, capped seat count', async () => {
+    const t = await setup();
+    try {
+        const ok = await t.api('POST', '/api/game-rooms', 'alice', { game: 'dev-abc123', maxPlayers: 99, public: true });
+        assert.strictEqual(ok.status, 201);
+        assert.strictEqual(ok.body.maxPlayers, 8);
+        const bad = await t.api('POST', '/api/game-rooms', 'alice', { game: 'dev-../x' });
+        assert.strictEqual(bad.status, 400);
+    } finally { t.close(); }
+});

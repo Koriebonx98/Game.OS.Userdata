@@ -13,11 +13,14 @@
     const TICKET_TTL_MS = 12 * 60 * 60 * 1000;
     const CONNECT_TIMEOUT_MS = 15 * 1000;
 
-    const cloud = () => typeof MODE !== 'undefined' && MODE !== 'demo';
+    // A Game OS LAN / dedicated server (see games/gameos-lan.js) replaces the official servers and GitHub accounts.
+    const lan = () => !!(window.GameOSLAN && window.GameOSLAN.active);
+    const cloud = () => lan() || (typeof MODE !== 'undefined' && MODE !== 'demo');
     const me = () => getCurrentUser().username;
     const supported = () => cloud() && !!(window.crypto && crypto.subtle) && (typeof WebSocket === 'function' || typeof RTCPeerConnection === 'function');
 
     function backendBase() {
+        if (lan()) return window.GameOSLAN.base;
         let base = '';
         try { base = (typeof getBackendBase === 'function' && getBackendBase()) || localStorage.getItem('gameOS_backendUrl') || ''; } catch (_) {}
         return (base || DEFAULT_BACKEND).replace(/\/$/, '');
@@ -29,6 +32,7 @@
     // The website signs in with GitHub, not the backend, so the player proves their Game OS login by writing a
     // short-lived game ticket (hash only) to their own account folder; the backend checks it there.
     async function credential() {
+        if (lan()) return window.GameOSLAN.credential(me());
         const user = me(), lower = user.toLowerCase(), key = 'gameOS_gameTicket_' + lower;
         try {
             const saved = JSON.parse(localStorage.getItem(key) || 'null');
@@ -78,6 +82,7 @@
 
     async function listFriends() {
         const u = me();
+        if (lan()) return window.GameOSLAN.players();
         const list = cloud() ? await getFriendsGitHub(u) : getDemoFriends(u);
         return (Array.isArray(list) ? list : []).map(f => typeof f === 'string' ? f : (f && f.username) || '').filter(Boolean);
     }
@@ -284,7 +289,7 @@
         if (!supported()) throw new Error('Online play needs a signed-in Game OS account.');
         let r;
         try { r = await ensureRoom(); } catch (err) {
-            if (typeof RTCPeerConnection === 'function') return inviteDirect(friend, cb);
+            if (!lan() && typeof RTCPeerConnection === 'function') return inviteDirect(friend, cb);
             throw err;
         }
         const entry = makeEntry(r, friend, cb);
