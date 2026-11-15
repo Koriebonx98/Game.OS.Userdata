@@ -93,6 +93,7 @@
         const q = 'join=' + encodeURIComponent(inv.from) + '&room=' + encodeURIComponent(inv.roomId);
         const href = /^dev-/.test(inv.game)
             ? root + 'dev-game.html?id=' + encodeURIComponent(inv.game.slice(4)) + '&' + q
+            : inv.game === 'starfall-trail' ? root + 'starfall-trail.html?' + q
             : root + 'games/' + encodeURIComponent(inv.game) + '/index.html?' + q;
         const el = document.createElement('div');
         el.style.cssText = 'position:fixed;left:12px;right:12px;bottom:56px;z-index:99998;max-width:420px;background:#111827;color:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 6px 24px #0008;font:14px system-ui,sans-serif;';

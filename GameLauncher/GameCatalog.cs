@@ -76,6 +76,12 @@ namespace GameLauncher
         /// </summary>
         public static List<StoreGame> Store { get; } = new()
         {
+            new StoreGame { Title = "Starfall Trail", Platform = "PC", Genre = "Platformer", Price = "Free",
+                Description = "Explore 20 platforming levels and four mini-bosses, solo or with a Game OS friend.",
+                CoverUrl = "https://koriebonx98.github.io/Game.OS.Userdata/games/starfall-trail/cover.svg",
+                AchievementsUrl = "https://koriebonx98.github.io/Game.OS.Userdata/games/starfall-trail/achievements.json",
+                Categories = new List<string> { "Exclusive", "Free", "Achievements", "Multiplayer" },
+                CoverColor = "#13234c", CoverGradient = "#13234c,#446d88" },
             // ── Real PS4 games from Koriebonx98/Games.Database (PS4.Games.json) ──────
             new StoreGame { Title = "The Last of Us Part II",    Platform = "PS4",    Genre = "Action",       Price = "£29.99", Rating = 9.5, IsFeatured = true,  ReleaseYear = "2020",
                 Description = "Five years after their dangerous journey across the post-pandemic United States, Ellie and Joel have settled down in Jackson, Wyoming. Living amongst a thriving community gives them stability, despite the constant threat of the infected and other, more desperate survivors.",

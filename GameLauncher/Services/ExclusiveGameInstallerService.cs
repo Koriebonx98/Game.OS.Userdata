@@ -26,8 +26,9 @@ namespace GameLauncher.Services
     {
         public static readonly ExclusiveGame DigitalAbyss = new("Digital Abyss", "DigitalAbyss-Setup.exe", "digital-abyss-desktop");
         public static readonly ExclusiveGame SnakePlus = new("Snake Plus", "SnakePlus-Setup.exe", "snake-plus-desktop");
+        public static readonly ExclusiveGame StarfallTrail = new("Starfall Trail", "StarfallTrail-Setup.exe", "starfall-trail-desktop");
 
-        public static readonly ExclusiveGame[] All = { DigitalAbyss, SnakePlus };
+        public static readonly ExclusiveGame[] All = { DigitalAbyss, SnakePlus, StarfallTrail };
 
         private static readonly HttpClient Http = new() { Timeout = TimeSpan.FromMinutes(15) };
 

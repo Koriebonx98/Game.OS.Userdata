@@ -119,7 +119,7 @@ function createLanServer(opts = {}) {
     });
 
     // The Game OS site itself, so games run from this server on any device with a browser (nothing else is exposed).
-    const allowed = /^\/(?:(?:games|icons|screenshots)\/.+|[\w.-]+\.(?:html|js|css|json|webmanifest|png|svg|ico))$/;
+    const allowed = /^\/(?:(?:games|sdk|icons|screenshots)\/.+|[\w.-]+\.(?:html|js|css|json|webmanifest|png|svg|ico))$/;
     const serve = express.static(siteRoot, { index: 'index.html', dotfiles: 'deny', maxAge: '1h' });
     app.use((req, res, next) => (req.method === 'GET' && (req.path === '/' || allowed.test(req.path)) ? serve(req, res, next)
         : res.status(404).json({ success: false, message: 'Not found.' })));

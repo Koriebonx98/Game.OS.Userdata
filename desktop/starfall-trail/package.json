@@ -1,0 +1,25 @@
+{
+  "name": "starfall-trail-desktop",
+  "productName": "Starfall Trail",
+  "version": "1.0.0",
+  "description": "Starfall Trail - a Game OS exclusive. Standalone PC app (signs in with your Game OS account).",
+  "main": "main.js",
+  "author": "Game OS",
+  "license": "UNLICENSED",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win --x64"
+  },
+  "devDependencies": {
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.gameos.starfalltrail",
+    "productName": "Starfall Trail",
+    "files": ["main.js", "preload.js", "offline.html"],
+    "win": { "target": "nsis" },
+    "nsis": { "oneClick": false, "perMachine": false, "allowToChangeInstallationDirectory": true, "artifactName": "StarfallTrail-Setup.exe" }
+  }
+}

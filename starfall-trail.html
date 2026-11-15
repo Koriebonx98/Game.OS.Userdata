@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Starfall Trail - Game OS</title>
+  <style>
+    html,body { margin:0; height:100%; background:#090e20; color:#edf4ff; font-family:system-ui,sans-serif; }
+    #bar { display:flex; align-items:center; gap:1em; padding:8px 12px; background:#111827; }
+    #bar a { color:#93c5fd; }
+    #stage { height:calc(100% - 40px); }
+    #frame { width:100%; height:100%; border:0; }
+    #gate { max-width:440px; margin:10vh auto; padding:24px; text-align:center; }
+    button,.button { padding:12px 20px; border:0; border-radius:8px; background:#166f5f; color:white; cursor:pointer; font:inherit; }
+  </style>
+</head>
+<body>
+  <div id="bar"><a href="games.html">Store</a><strong>Starfall Trail</strong></div>
+  <div id="stage"><div id="gate" role="status">Loading...</div></div>
+  <script src="script.js"></script>
+  <script src="games/gameos-drm.js"></script>
+  <script src="games/gameos-lan.js"></script>
+  <script src="gameos-bridge.js"></script>
+  <script src="games/starfall-trail/launch.js"></script>
+</body>
+</html>
