@@ -1095,6 +1095,9 @@ function populateAccountDetails() {
         });
     }
 
+    const communityBox = document.getElementById('communitySection');
+    if (communityBox && window.Community) Community.renderSettings(communityBox).catch(() => { communityBox.innerHTML = '<p style="color:#c00;">Could not load.</p>'; });
+
     // Show the Danger Zone only for the admin account
     const dangerZone = document.getElementById('dangerZone');
     if (dangerZone) {
@@ -2186,7 +2189,10 @@ async function loadInbox() {
             }
         }
 
-        const total = incomingRequests.length + inviteItems.length + unreadItems.length;
+        let communityItems = [];
+        if (typeof communityInboxItems === 'function') { try { communityItems = (await communityInboxItems()).html; } catch (_) {} }
+
+        const total = incomingRequests.length + inviteItems.length + unreadItems.length + communityItems.length;
         if (badgeEl) {
             if (total > 0) {
                 badgeEl.textContent = total;
@@ -2196,7 +2202,7 @@ async function loadInbox() {
             }
         }
 
-        const allItems = [...requestItems, ...inviteItems, ...unreadItems];
+        const allItems = [...communityItems, ...requestItems, ...inviteItems, ...unreadItems];
         if (allItems.length === 0) {
             inboxEl.innerHTML = '<p style="color:#666;font-size:0.9em;">No pending requests or new messages.</p>';
             return;
@@ -3425,29 +3431,87 @@ const STEAMGRID_KEY = (() => {
     ).join('');
 })();
 
+// ── Persistent cache (IndexedDB) so game lists render instantly and work offline ──
+const _kvCache = {
+    _db: null,
+    _open() {
+        if (!this._db) this._db = new Promise((res, rej) => {
+            if (typeof indexedDB === 'undefined') return rej(new Error('no idb'));
+            const r = indexedDB.open('gameos-cache', 1);
+            r.onupgradeneeded = () => r.result.createObjectStore('kv');
+            r.onsuccess = () => res(r.result);
+            r.onerror = () => rej(r.error);
+        });
+        return this._db;
+    },
+    async get(k) {
+        try {
+            const d = await this._open();
+            return await new Promise(res => { const q = d.transaction('kv').objectStore('kv').get(k); q.onsuccess = () => res(q.result); q.onerror = () => res(undefined); });
+        } catch (_) { return undefined; }
+    },
+    async set(k, v) {
+        try {
+            const d = await this._open();
+            await new Promise(res => { const t = d.transaction('kv', 'readwrite'); t.objectStore('kv').put(v, k); t.oncomplete = t.onerror = t.onabort = () => res(); });
+        } catch (_) {}
+    }
+};
+
+const _swrMem = new Map(); // key -> { v, at }
+const _swrInflight = new Map();
+const SWR_FRESH_MS = 2 * 60 * 1000;
+
+/**
+ * Stale-while-revalidate: returns cached data immediately (memory, then IndexedDB) and refreshes it in the
+ * background; only waits for the network when nothing is cached. Falls back to the cache when offline.
+ */
+async function _swr(key, fetcher) {
+    const refresh = () => {
+        if (!_swrInflight.has(key)) {
+            const p = (async () => {
+                const v = await fetcher();
+                _swrMem.set(key, { v, at: Date.now() });
+                _kvCache.set(key, v);
+                return v;
+            })().finally(() => _swrInflight.delete(key));
+            _swrInflight.set(key, p);
+        }
+        return _swrInflight.get(key);
+    };
+    const mem = _swrMem.get(key);
+    if (mem) { if (Date.now() - mem.at > SWR_FRESH_MS) refresh().catch(() => {}); return mem.v; }
+    const stored = await _kvCache.get(key);
+    if (stored !== undefined) {
+        _swrMem.set(key, { v: stored, at: 0 });
+        refresh().catch(() => {});
+        return stored;
+    }
+    return refresh();
+}
+
 let _discoveredPlatformsPromise = null;
 
 // Discovers every {Platform}.Games.json in the Games.Database repo so newly added
 // platforms appear automatically. Falls back to the built-in list on any error.
 async function fetchGamesDbPlatforms() {
-    if (!_discoveredPlatformsPromise) {
-        _discoveredPlatformsPromise = (async () => {
-            try {
-                const resp = await fetch('https://api.github.com/repos/Koriebonx98/Games.Database/contents/',
-                    { headers: { Accept: 'application/vnd.github.v3+json' } });
-                if (!resp.ok) return null;
-                const entries = await resp.json();
-                const found = (Array.isArray(entries) ? entries : [])
-                    .map(e => e && e.name)
-                    .filter(n => typeof n === 'string' && /\.Games\.json$/i.test(n))
-                    .map(n => n.slice(0, -'.Games.json'.length))
-                    .filter(Boolean);
-                return found.length ? found : null;
-            } catch { return null; }
-        })();
-    }
-    const found = await _discoveredPlatformsPromise;
-    if (!found) { _discoveredPlatformsPromise = null; return [...GAMES_DB_PLATFORMS]; }
+    let found = null;
+    try {
+        found = await _swr('platforms', async () => {
+            const resp = await fetch('https://api.github.com/repos/Koriebonx98/Games.Database/contents/',
+                { headers: { Accept: 'application/vnd.github.v3+json' } });
+            if (!resp.ok) throw new Error('platform list ' + resp.status);
+            const entries = await resp.json();
+            const names = (Array.isArray(entries) ? entries : [])
+                .map(e => e && e.name)
+                .filter(n => typeof n === 'string' && /\.Games\.json$/i.test(n))
+                .map(n => n.slice(0, -'.Games.json'.length))
+                .filter(Boolean);
+            if (!names.length) throw new Error('no platforms');
+            return names;
+        });
+    } catch (_) { found = null; }
+    if (!found || !found.length) return [...GAMES_DB_PLATFORMS];
     const rest = found.filter(p => p !== 'PC').sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
     return found.includes('PC') ? ['PC', ...rest] : rest;
 }
@@ -3465,18 +3529,29 @@ function _isNonGame(title) {
 }
 
 async function fetchGamesDbPlatform(platform) {
-    const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json?t=${Date.now()}`);
-    if (!resp.ok) {
-        if (resp.status === 404) return _withBuiltInGames(platform, []);
-        throw new Error(`Failed to load ${platform} games`);
+    let games = await _swr('platform:' + platform, async () => {
+            // no-cache = revalidate with the server (cheap 304 via ETag) instead of a cache-busting query string
+            const resp = await fetch(`${GAMES_DB_RAW_BASE}/${encodeURIComponent(platform)}.Games.json`, { cache: 'no-cache' });
+            if (!resp.ok) {
+                if (resp.status === 404) return [];
+                throw new Error(`Failed to load ${platform} games`);
+            }
+            const data = await resp.json();
+            let list;
+            if (data.Games && Array.isArray(data.Games)) list = data.Games;
+            else if (Array.isArray(data.games)) list = data.games;
+            else if (Array.isArray(data)) list = data;
+            else throw new Error('Invalid games JSON format');
+            return list.filter(g => !_isNonGame(g.Title || g.game_name || g.title || ''));
+    });
+    if (platform === 'PC' && typeof fetchPublishedDevGames === 'function') {
+        try {
+            const dev = await fetchPublishedDevGames();
+            const own = games.filter(g => !dev.some(d => (d.Title || '').toLowerCase() === (g.Title || g.game_name || g.title || '').toLowerCase()));
+            games = [...own, ...dev];
+        } catch (_) {}
     }
-    const data = await resp.json();
-    let games;
-    if (data.Games && Array.isArray(data.Games)) games = data.Games;
-    else if (Array.isArray(data.games)) games = data.games;
-    else if (Array.isArray(data)) games = data;
-    else throw new Error('Invalid games JSON format');
-    return _withBuiltInGames(platform, games.filter(g => !_isNonGame(g.Title || g.game_name || g.title || '')));
+    return _withBuiltInGames(platform, games);
 }
 
 /** Game OS exclusives that ship with the site, so they appear in the store even if the games database lacks them. */
@@ -3521,6 +3596,8 @@ function getBuiltInGames() {
 /** Relative play page for a Game OS exclusive (PC) by title, or '' for any other game. */
 function exclusivePlayPath(platform, title) {
     if (platform !== 'PC') return '';
+    const dev = typeof devGamePlayPath === 'function' ? devGamePlayPath(title) : '';
+    if (dev) return dev;
     return { 'digital abyss': 'games/digital-abyss/index.html', 'snake plus': 'games/snake-plus/index.html', 'quizy': 'games/quizy/index.html' }[String(title || '').toLowerCase()] || '';
 }
 
@@ -3540,9 +3617,30 @@ function gameUrl(game, platform) {
 // GAME LIBRARY – GITHUB MODE
 // ============================================================
 
-async function getGameLibraryGitHub(username) {
-    const file = await githubRead(`accounts/${username.toLowerCase()}/games.json`);
-    return file ? file.content : [];
+const _libKey = u => 'gameOS_libcache_' + String(u).toLowerCase();
+function _libCacheGet(u) { try { return JSON.parse(localStorage.getItem(_libKey(u))); } catch (_) { return null; } }
+function _libCacheSet(u, lib) { try { localStorage.setItem(_libKey(u), JSON.stringify(lib)); } catch (_) {} }
+
+/**
+ * Library for a user. By default returns the cached copy instantly and refreshes it in the background;
+ * pass { fresh: true } to wait for the network (still falls back to the cache when offline).
+ */
+async function getGameLibraryGitHub(username, opts) {
+    const load = async () => {
+        const file = await githubRead(`accounts/${username.toLowerCase()}/games.json`);
+        const lib = file ? file.content : [];
+        _libCacheSet(username, lib);
+        return lib;
+    };
+    const cached = _libCacheGet(username);
+    if (cached && !(opts && opts.fresh)) {
+        load().then(lib => {
+            if (JSON.stringify(lib) !== JSON.stringify(cached) && typeof window !== 'undefined')
+                window.dispatchEvent(new CustomEvent('gameos:library-updated', { detail: { username, library: lib } }));
+        }).catch(() => {});
+        return cached;
+    }
+    try { return await load(); } catch (e) { if (cached) return cached; throw e; }
 }
 
 async function addGameGitHub(username, game, platform) {
@@ -3566,6 +3664,7 @@ async function addGameGitHub(username, game, platform) {
     });
 
     await githubWrite(path, library, `Add game: ${game.Title || game.title} (${platform})`, file ? file.sha : undefined);
+    _libCacheSet(username, library);
     return { success: true, message: 'Game added to your library!' };
 }
 
@@ -3578,6 +3677,7 @@ async function removeGameGitHub(username, platform, title) {
         g => !(g.platform === platform && (g.title || '').toLowerCase() === title.toLowerCase())
     );
     await githubWrite(path, updated, `Remove game: ${title} (${platform})`, file.sha);
+    _libCacheSet(username, updated);
     return { success: true, library: updated };
 }
 

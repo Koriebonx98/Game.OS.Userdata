@@ -214,6 +214,20 @@ var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;
                     </details>
                 </div>
 
+                <!-- Roles, developer store submissions and VIP -->
+                <div class="update-section" id="communitySectionWrap">
+                    <h3>🛠️ Roles &amp; Game Developer</h3>
+                    <div id="communitySection"></div>
+                </div>
+
+                <!-- Offline -->
+                <div class="update-section">
+                    <h3>📴 Offline use</h3>
+                    <p style="font-size:0.9em;color:#475569;">Your game library and store are cached automatically. Download the built-in emulator so retro games also play without internet (ROMs you set up are already stored on this device).</p>
+                    <button class="btn btn-primary" id="emuOfflineBtn">⬇ Download emulator for offline</button>
+                    <div id="emuOfflineMsg" class="message" style="margin-top:10px;"></div>
+                </div>
+
                 <!-- Danger Zone -->
                 <div id="dangerZone" class="danger-zone" style="display:none;">
                     <h3>⚠️ Danger Zone</h3>
@@ -247,5 +261,21 @@ var achievements = await httpClient.GetFromJsonAsync&lt;AchievementsResponse&gt;
 
     <script src="emulator.js"></script>
     <script src="script.js"></script>
+    <script src="community.js"></script>
+    <script>
+        (function () {
+            const btn = document.getElementById('emuOfflineBtn'), msg = document.getElementById('emuOfflineMsg');
+            const st = window.GameOSEmu && GameOSEmu.offlineStatus();
+            if (st) msg.textContent = '✅ Emulator available offline (downloaded ' + new Date(st.at).toLocaleDateString() + ').';
+            btn.onclick = async () => {
+                btn.disabled = true;
+                try {
+                    const r = await GameOSEmu.downloadOffline((d, t) => { msg.textContent = '⏳ Downloading… ' + d + '/' + t; });
+                    msg.textContent = r.ready ? '✅ Emulator is ready for offline use.' : '⚠️ Could not download everything. Check your connection and try again.';
+                } catch (e) { msg.textContent = '⚠️ ' + e.message; }
+                btn.disabled = false;
+            };
+        })();
+    </script>
 </body>
 </html>

@@ -38,6 +38,7 @@
     </div>
 
     <script src="script.js?v=emu8"></script>
+    <script src="community.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', async () => {
         modeReady = initializeMode();
@@ -86,8 +87,9 @@
             .filter(Boolean).map(b => `<span class="store-card-ach" style="margin-right:8px;">${escapeHtml(b)}</span>`).join('');
 
         let action;
+        const dl = game.downloadUrl ? ` <a class="btn" style="text-decoration:none;" target="_blank" rel="noopener" href="${escapeHtml(game.downloadUrl)}">⬇ Download release</a>` : '';
         if (game.gameOSExclusive && game.playUrl) {
-            action = `<a class="btn" style="background:#16a34a;color:#fff;text-decoration:none;" href="${escapeHtml(game.playUrl)}">${owned ? '▶ Play' : '🔑 Claim &amp; Play (free)'}</a>`;
+            action = `<a class="btn" style="background:#16a34a;color:#fff;text-decoration:none;" href="${escapeHtml(game.playUrl)}">${owned ? '▶ Play' : '🔑 Claim &amp; Play (free)'}</a>${dl}`;
         } else if (!loggedIn) {
             action = '<a class="btn" href="login.html">🔒 Log in to add</a>';
         } else {

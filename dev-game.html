@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Game OS - Play</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="manifest" href="manifest.webmanifest">
+    <meta name="theme-color" content="#0f172a">
+    <script src="pwa.js"></script>
+    <style>
+        html, body { margin: 0; height: 100%; background: #0f172a; color: #fff; font-family: system-ui, sans-serif; }
+        #bar { display: flex; align-items: center; gap: 12px; padding: 8px 12px; padding-top: max(8px, env(safe-area-inset-top)); background: #111827; }
+        #bar a { color: #93c5fd; text-decoration: none; }
+        #stage { height: calc(100% - 46px); }
+        #frame { width: 100%; height: 100%; border: 0; background: #fff; }
+        #gate { max-width: 420px; margin: 12vh auto; padding: 24px; text-align: center; }
+        .gbtn { background: #16a34a; color: #fff; border: 0; border-radius: 8px; padding: 12px 20px; font-size: 1em; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <div id="bar"><a href="games.html">← Store</a><b id="title">Loading…</b><span style="flex:1"></span><a id="dl" href="#" target="_blank" rel="noopener" hidden>⬇ Release</a></div>
+    <div id="stage"><div id="gate">Loading…</div></div>
+
+    <script src="script.js?v=emu8"></script>
+    <script src="community.js"></script>
+    <script src="games/gameos-drm.js"></script>
+    <script src="games/gameos-lan.js"></script>
+    <script src="gameos-bridge.js"></script>
+    <script>
+    (async function () {
+        const stage = document.getElementById('stage');
+        const say = html => { stage.innerHTML = '<div id="gate">' + html + '</div>'; };
+        modeReady = initializeMode();
+        await modeReady;
+        const id = new URLSearchParams(location.search).get('id') || '';
+        const user = getCurrentUser();
+        if (!user) { say('<h2>Log in to play</h2><a class="gbtn" style="text-decoration:none;display:inline-block" href="login.html">Log in</a>'); return; }
+
+        let found;
+        try { found = await Community.getPublishedDevGame(id); } catch (_) { found = null; }
+        if (!found) { say('<h2>Game not available</h2><p>It may not be live yet, or it was removed.</p><a href="games.html" style="color:#93c5fd">← Back to Store</a>'); return; }
+        const { game, submission: s } = found;
+        document.getElementById('title').textContent = game.Title;
+        if (game.downloadUrl) { const dl = document.getElementById('dl'); dl.href = game.downloadUrl; dl.hidden = false; }
+
+        // Licence (DRM): key is bound to this game + user, stored with the library entry and cached for offline.
+        const titleId = game.TitleID;
+        const libLoad = async () => MODE === 'demo' ? getDemoGameLibrary(user.username) : getGameLibraryGitHub(user.username);
+        const findEntry = lib => (lib || []).find(g => g.platform === 'PC' && String(g.title || '').toLowerCase() === game.Title.toLowerCase());
+        async function claim() {
+            const licenseKey = await GameOSDRM.makeKey(titleId, user.username);
+            if (MODE === 'demo') {
+                const lib = getDemoGameLibrary(user.username);
+                if (!findEntry(lib)) { lib.push({ platform: 'PC', title: game.Title, titleId, coverUrl: game.image || undefined, licenseKey, addedAt: new Date().toISOString() }); saveDemoGameLibrary(user.username, lib); }
+            } else {
+                const path = `accounts/${user.username.toLowerCase()}/games.json`;
+                for (let i = 0; ; i++) {
+                    const file = await githubRead(path);
+                    const lib = file ? file.content : [];
+                    if (findEntry(lib)) break;
+                    try { await githubWrite(path, lib.concat({ platform: 'PC', title: game.Title, titleId, coverUrl: game.image || undefined, licenseKey, addedAt: new Date().toISOString() }), `Add game: ${game.Title} (PC)`, file ? file.sha : undefined); _libCacheSet(user.username, lib.concat({ platform: 'PC', title: game.Title, titleId, licenseKey })); break; }
+                    catch (e) { if (i >= 2) throw e; }
+                }
+            }
+            GameOSDRM.setLocal(titleId, user.username, licenseKey);
+        }
+        async function licensed() {
+            const cachedKey = GameOSDRM.getLocal(titleId, user.username);
+            if (cachedKey && await GameOSDRM.verify(cachedKey, titleId, user.username)) return true; // works offline
+            let lib = []; try { lib = await libLoad(); } catch (_) {}
+            const e = findEntry(lib);
+            if (!e) return false;
+            const key = e.licenseKey || await GameOSDRM.makeKey(titleId, user.username);
+            if (!(await GameOSDRM.verify(key, titleId, user.username))) return false;
+            GameOSDRM.setLocal(titleId, user.username, key);
+            return true;
+        }
+
+        async function launch() {
+            say('Starting ' + game.Title.replace(/</g, '&lt;') + '…');
+            const base = Community.cdnBase(s);
+            const entry = (s.entry || 'index.html').split('/').map(encodeURIComponent).join('/');
+            const key = 'devhtml:' + id + ':' + (s.releaseTag || 'latest') + ':' + entry;
+            let html;
+            try {
+                const r = await fetch(base + entry);
+                if (!r.ok) throw new Error('HTTP ' + r.status);
+                html = await r.text();
+                _kvCache.set(key, html);
+            } catch (e) {
+                html = await _kvCache.get(key);
+                if (!html) { say('<h2>Could not load the game</h2><p>Check your connection (this game has not been saved for offline play yet).</p>'); return; }
+            }
+            const dir = base + entry.split('/').slice(0, -1).join('/') + (entry.includes('/') ? '/' : '');
+            const doc = html.replace(/<head([^>]*)>/i, (m) => m + '<base href="' + dir + '">');
+            const frame = document.createElement('iframe');
+            frame.id = 'frame';
+            // No allow-same-origin: community code runs in an opaque origin and cannot read the player's account/token.
+            frame.setAttribute('sandbox', 'allow-scripts allow-forms allow-pointer-lock allow-popups allow-modals');
+            frame.setAttribute('allow', 'fullscreen; gamepad; autoplay');
+            frame.srcdoc = /<head/i.test(html) ? doc : '<base href="' + dir + '">' + html;
+            stage.innerHTML = '';
+            stage.appendChild(frame);
+            // Lets the game use Game OS accounts, achievements, cloud saves and multiplayer through sdk/gameos.js
+            const q = new URLSearchParams(location.search);
+            if (window.GameOSLAN) await GameOSLAN.ready;
+            window._gosBridge = GameOSBridge.attach({ frame, game, definitionsUrl: base + 'achievements.json',
+                launch: q.get('join') && q.get('room') ? { join: q.get('join'), room: q.get('room') } : null });
+        }
+
+        if (await licensed()) { launch(); return; }
+        say(`<h2>${game.Title.replace(/</g, '&lt;')}</h2><p>by ${String(game.developer).replace(/</g, '&lt;')}</p><button class="gbtn" id="claimBtn">🔑 Claim &amp; play (free)</button><p id="msg"></p>`);
+        document.getElementById('claimBtn').onclick = async () => {
+            try { await claim(); launch(); } catch (_) { document.getElementById('msg').textContent = 'Could not claim the game. Check your connection and try again.'; }
+        };
+    })();
+    </script>
+</body>
+</html>

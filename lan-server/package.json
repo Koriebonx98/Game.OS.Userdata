@@ -1,0 +1,9 @@
+{
+  "name": "gameos-lan-server",
+  "version": "1.0.0",
+  "description": "Game OS LAN / dedicated server: local accounts and multiplayer lobbies for Game OS games, no internet or official servers needed",
+  "main": "server.js",
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server.js", "test": "node --test test-lan-server.js" },
+  "dependencies": { "express": "^5.2.1", "ws": "^8.23.0" }
+}
