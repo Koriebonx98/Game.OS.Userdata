@@ -85,7 +85,10 @@ jobs:
         run: node --check script.js && echo "✅ script.js syntax OK"
 
       - name: Game OS exclusives tests
-        run: node --test games/digital-abyss/achievements.test.js games/snake-plus/achievements.test.js games/snake-plus/leaderboard.test.js games/gameos-drm.test.js
+        run: node --test games/digital-abyss/achievements.test.js games/snake-plus/achievements.test.js games/snake-plus/leaderboard.test.js games/quizy/engine.test.js games/quizy/achievements.test.js games/gameos-drm.test.js
+
+      - name: Quizy syntax check
+        run: for f in game online engine leaderboard gameos-sdk generate-weekly; do node --check games/quizy/$f.js || exit 1; done
 
       - name: Snake Plus syntax check
         run: node --check games/snake-plus/game.js && node --check games/snake-plus/online.js && node --check games/snake-plus/leaderboard.js && node --check backend/game-rooms.js && node --check games/snake-plus/gameos-sdk.js && node --check desktop/snake-plus/main.js

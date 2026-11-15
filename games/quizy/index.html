@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#14102a">
+  <meta name="description" content="Quizy - a Game OS exclusive. A multiplayer quiz for up to 4 players: pick your subjects, picture rounds, spelling by ear and quick fire. Online with your Game OS friends or offline on your own.">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Quizy">
+  <link rel="icon" type="image/svg+xml" href="cover.svg">
+  <title>Quizy - Game OS Exclusive</title>
+  <link rel="apple-touch-icon" href="../../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="../../app.html" aria-label="Back to Game OS"><span class="brand-icon">Q</span><span>QUIZ<span>Y</span></span></a>
+      <span class="top-label"><span id="week-label"></span> GAME OS EXCLUSIVE <span class="status-dot"></span></span>
+    </header>
+
+    <main>
+      <section id="menu" class="screen">
+        <div class="hero">
+          <div class="eyebrow"><span></span> BRAINS ON, PLAYERS READY</div>
+          <h1>QUIZ<em>Y</em><span class="title-period">.</span></h1>
+          <p>Pick your subjects. Name the photo. Spell what you hear.<br>Fresh questions every week.</p>
+          <div class="hero-actions">
+            <button class="button primary" id="play-button">PLAY <span>↗</span></button>
+            <button class="button secondary" id="online-button">ONLINE MATCH <span>↗</span></button>
+            <button class="button secondary" id="how-button">HOW TO PLAY <span>↗</span></button>
+            <button class="button secondary" data-go="achievements">ACHIEVEMENTS <span>↗</span></button>
+            <button class="button secondary" data-go="leaderboard">LEADERBOARD <span>↗</span></button>
+          </div>
+          <div class="hero-foot"><span>01 — 04 PLAYERS</span><span>PUB · CHASE · MILLIONAIRE</span><span>PUBLIC MATCHMAKING</span><span>PLAYS OFFLINE TOO</span></div>
+        </div>
+        <div class="hero-art" aria-hidden="true">
+          <div class="art-label"><span>NOW PLAYING</span><span>● ● ●</span></div>
+          <div class="art-card">
+            <div class="art-q">Which planet is known as the Red Planet?</div>
+            <div class="art-opt">A &nbsp; Venus</div><div class="art-opt good">B &nbsp; Mars</div><div class="art-opt">C &nbsp; Mercury</div><div class="art-opt">D &nbsp; Jupiter</div>
+          </div>
+          <div class="art-bottom"><span>🖼️ PICTURE ROUND</span><span>🔊 SPELLING</span><span>⚡ QUICK FIRE</span></div>
+        </div>
+      </section>
+
+      <section id="lobby" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> CHOOSE YOUR SUBJECTS</div><h2 id="lobby-title">THE LOBBY<span class="title-period">.</span></h2><p id="lobby-sub">Pick 3 to 5 subjects. Questions are randomised from everyone's picks.</p></div>
+          <button class="text-button" id="lobby-back">← BACK TO MENU</button>
+        </div>
+        <div class="lobby-layout">
+          <div>
+            <div class="section-label"><span>01 / GAME MODE</span><span id="mode-name"></span></div>
+            <div id="mode-grid" class="subject-grid mode-grid" role="group" aria-label="Game mode"></div>
+            <p id="mode-desc" class="mode-description mode-desc"></p>
+            <div class="section-label"><span>02 / YOUR SUBJECTS</span><span id="pick-count">0 / 5</span></div>
+            <div id="subject-grid" class="subject-grid" role="group" aria-label="Subjects"></div>
+            <div class="section-label"><span>03 / PLAYERS</span><span id="player-count"></span></div>
+            <div id="player-list" class="player-list"></div>
+          </div>
+          <aside class="setup-panel" id="host-panel">
+            <div class="section-label"><span>04 / GAME</span></div>
+            <label class="check"><input type="checkbox" id="bots"> FILL EMPTY SEATS WITH BOTS</label>
+            <label class="check"><input type="checkbox" id="public"> PUBLIC: ANYONE ONLINE CAN JOIN</label>
+            <p id="public-status" class="mode-description" role="status"></p>
+            <button class="button primary start-button" id="start-button">START QUIZ <span>↗</span></button>
+            <p id="lobby-error" class="error" role="alert"></p>
+            <div class="online-panel">
+              <div class="section-label"><span>05 / PLAY WITH FRIENDS</span></div>
+              <label for="friend-select">GAME OS FRIEND</label>
+              <select id="friend-select"></select>
+              <button class="button secondary start-button" id="invite-button">INVITE TO PLAY <span>↗</span></button>
+              <p id="invite-status" class="mode-description" role="status">Invite a friend: they get it in their Game OS Inbox and join your lobby. Keep this page open while you wait.</p>
+            </div>
+          </aside>
+          <aside class="setup-panel hidden" id="guest-panel">
+            <div class="section-label"><span>WAITING FOR THE HOST</span></div>
+            <p id="guest-status" class="mode-description" role="status">Pick your subjects. The host starts the quiz when everyone is ready.</p>
+          </aside>
+        </div>
+      </section>
+
+      <section id="help" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> KNOW BEFORE YOU GO</div><h2>HOW TO PLAY<span class="title-period">.</span></h2><p>Answer fast, answer right.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="help-grid">
+          <article class="help-card"><span class="card-number">01 / SUBJECTS</span><h3>PICK 3 TO 5</h3><p>Each player chooses 3 to 5 subjects. Questions are randomised from everyone's choices, so no two games are the same.</p></article>
+          <article class="help-card"><span class="card-number">02 / ANSWERING</span><h3>A, B, C OR D</h3><p>Tap an answer or press <strong>A–D</strong> (or <strong>1–4</strong>). Faster correct answers score more, and streaks add bonus points.</p></article>
+          <article class="help-card"><span class="card-number">03 / SPELLING</span><h3>LISTEN AND SPELL</h3><p>The word is read out loud. Type it exactly: spelling counts, and auto-correct is switched off. Tap <strong>Hear again</strong> as often as you like.</p></article>
+          <article class="help-card"><span class="card-number">04 / ROUNDS</span><h3>PUB QUIZ: THREE ROUNDS</h3><p><strong>Mixed Subjects</strong> (10 questions), <strong>Picture Round</strong> (name the place or celebrity from the photo), then <strong>Quick Fire</strong> (6 seconds each).</p></article>
+          <article class="help-card"><span class="card-number">05 / PUB QUIZ</span><h3>THE DEFAULT</h3><p>Three rounds and the most points wins. This is how Quizy always played, and it is what you get unless the host picks another mode.</p></article>
+          <article class="help-card"><span class="card-number">06 / THE CHASE</span><h3>OUTRUN THE CHASER</h3><p>Everyone builds cash with five quick questions (£1,000 each). Then each player picks an offer (higher pays more but starts closer to the Chaser) and races down the board: a right answer moves you down a step, and the Chaser moves on every right answer of their own. Reach home, or get caught. Survivors team up for a final chase: beat the Chaser's score and share the prize.</p></article>
+          <article class="help-card"><span class="card-number">07 / MILLIONAIRE</span><h3>FIFTEEN TO A MILLION</h3><p>Everyone climbs their own ladder on the same questions. A wrong answer drops you to the last safe haven (question 5 or 10) and you're out, or <strong>walk away</strong> to keep what you have. Each player gets 50:50, Ask the Audience and Phone a Friend once.</p></article>
+          <article class="help-card"><span class="card-number">08 / ONLINE</span><h3>FRIENDS OR ANYONE</h3><p>Invite Game OS friends, or tick <strong>Public</strong> so anyone signed in can join, or use <strong>Online Match</strong> to hop into a public lobby straight away.</p></article>
+          <article class="help-card wide"><span class="card-number">09 / WEEKLY</span><h3>NEW QUESTIONS EVERY WEEK</h3><p>Fresh questions are added every Monday, and the maths and spelling questions rotate weekly too. After your first visit Quizy plays offline, picture rounds need a connection for the photos.</p></article>
+        </div>
+      </section>
+
+      <section id="browse" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> PUBLIC MATCHMAKING</div><h2>ONLINE MATCH<span class="title-period">.</span></h2><p>Play with anyone signed in to Game OS, not just your friends.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="hero-actions">
+          <button class="button primary" id="quick-match">QUICK MATCH <span>↗</span></button>
+          <button class="button secondary" id="host-public">HOST A PUBLIC GAME <span>↗</span></button>
+          <button class="button secondary" id="browse-refresh">REFRESH <span>↗</span></button>
+        </div>
+        <div id="browse-list" class="lb-list" role="list"></div>
+        <p id="browse-status" class="lb-status" role="status"></p>
+      </section>
+
+      <section id="join" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> ONLINE</div><h2>JOINING A FRIEND<span class="title-period">.</span></h2></div>
+          <button class="text-button" id="join-leave">← LEAVE</button>
+        </div>
+        <div class="join-box"><p id="join-status" role="status">Connecting…</p></div>
+      </section>
+
+      <section id="achievements" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> TROPHIES</div><h2>ACHIEVEMENTS <span id="ach-count"></span><span class="title-period">.</span></h2><p>Synced to your Game OS profile.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div id="ach-list" class="help-grid"></div>
+      </section>
+
+      <section id="leaderboard" class="screen hidden">
+        <div class="section-heading">
+          <div><div class="eyebrow"><span></span> RANKINGS</div><h2>LEADERBOARD<span class="title-period">.</span></h2><p>Your progress and cloud save sync to your Game OS account.</p></div>
+          <button class="text-button" data-go="menu">← BACK TO MENU</button>
+        </div>
+        <div class="lb-controls">
+          <select id="lb-metric" aria-label="Ranking"></select>
+          <div class="lb-scope" role="group" aria-label="Scope"><button class="button secondary active" data-scope="global">EVERYONE</button><button class="button secondary" data-scope="friends">FRIENDS</button></div>
+        </div>
+        <div id="lb-list" class="lb-list" role="list"></div>
+        <p id="lb-status" class="lb-status" role="status"></p>
+      </section>
+
+      <section id="game" class="screen hidden">
+        <div class="game-heading"><div><div class="eyebrow"><span></span> <span id="round-label">NOW PLAYING</span></div></div><button id="leave-button" class="text-button">← LEAVE GAME</button></div>
+        <div id="scoreboard" class="scoreboard"></div>
+        <div class="quiz-card" id="quiz-card">
+          <div class="quiz-meta"><span id="q-count"></span><span id="q-subject"></span><span id="q-timer" aria-live="off"></span></div>
+          <div class="timer"><div id="timer-bar"></div></div>
+          <div id="mode-info" class="mode-info hidden"></div>
+          <div id="q-image-wrap" class="q-image-wrap hidden"><img id="q-image" alt="" draggable="false"><span id="q-image-status"></span></div>
+          <h2 id="q-prompt"></h2>
+          <div id="q-options" class="q-options" role="group" aria-label="Answers"></div>
+          <form id="spell-form" class="spell-form hidden" autocomplete="off">
+            <button type="button" class="button secondary" id="speak-button">🔊 HEAR AGAIN</button>
+            <p id="spell-clue" class="spell-clue"></p>
+            <input id="spell-input" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" inputmode="text" enterkeyhint="done" aria-label="Type the word you heard" data-lpignore="true" data-form-type="other">
+            <button class="button primary" id="spell-submit" type="submit">LOCK IN <span>↗</span></button>
+          </form>
+          <div id="lifelines" class="lifelines hidden">
+            <button type="button" class="life" data-life="fifty">50:50</button>
+            <button type="button" class="life" data-life="audience">👥 ASK THE AUDIENCE</button>
+            <button type="button" class="life" data-life="phone">📞 PHONE A FRIEND</button>
+            <button type="button" class="life walk" id="walk-button">💰 WALK AWAY</button>
+          </div>
+          <p id="hint" class="hint hidden" role="status"></p>
+          <p id="q-status" class="q-status" role="status"></p>
+          <div id="reveal" class="reveal hidden"></div>
+          <div id="round-banner" class="round-banner hidden"><div><div class="eyebrow"><span></span> NEXT UP</div><h2 id="banner-title"></h2><p id="banner-blurb"></p></div></div>
+          <div id="game-over" class="round-banner hidden"><div><div class="eyebrow"><span></span> FINAL RESULTS</div><h2 id="result"></h2><p id="final-note" class="mode-desc"></p><div id="final-list" class="lb-list"></div><button class="button primary" id="again-button">BACK TO LOBBY <span>↗</span></button></div></div>
+        </div>
+        <div class="game-bottom"><span>PRESS A–D OR 1–4 TO ANSWER</span><span id="game-status"></span></div>
+      </section>
+    </main>
+    <footer><span>© QUIZY</span><span>A GAME OS EXCLUSIVE <span class="footer-star">✳</span></span><span>NEW QUESTIONS WEEKLY</span></footer>
+  </div>
+  <script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('../../sw.js').catch(function () {});</script>
+  <script src="../../script.js"></script>
+  <script src="questions-1.js"></script>
+  <script src="questions-2.js"></script>
+  <script src="engine.js"></script>
+  <script src="achievements.js"></script>
+  <script src="leaderboard.js"></script>
+  <script src="../gameos-drm.js"></script>
+  <script src="gameos-sdk.js"></script>
+  <script src="online.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

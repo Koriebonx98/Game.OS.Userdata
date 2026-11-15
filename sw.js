@@ -1,5 +1,5 @@
 /* Game OS service worker: offline shell + notification display */
-const CACHE = 'gameos-shell-v17';
+const CACHE = 'gameos-shell-v18';
 const SHELL = ['app.html', 'styles.css', 'script.js', 'pwa.js', 'appnav.js?v=1', 'emulator.js?v=emu8', 'manifest.webmanifest', 'icons/icon-192.png'];
 
 // Digital Abyss: cached up front so it runs offline after the first launch; refreshed whenever online.
@@ -10,8 +10,11 @@ const DIGITAL_ABYSS = ['games/digital-abyss/index.html', 'games/digital-abyss/st
 const SNAKE_PLUS = ['games/snake-plus/index.html', 'games/snake-plus/styles.css', 'games/snake-plus/game.js', 'games/snake-plus/online.js',
     'games/snake-plus/achievements.js', 'games/snake-plus/leaderboard.js', 'games/snake-plus/gameos-sdk.js', 'games/snake-plus/achievements.json', 'games/snake-plus/cover.svg'];
 
+const QUIZY = ['index.html', 'styles.css', 'game.js', 'online.js', 'engine.js', 'questions-1.js', 'questions-2.js', 'achievements.js',
+    'leaderboard.js', 'gameos-sdk.js', 'achievements.json', 'weekly.json', 'cover.svg'].map(f => 'games/quizy/' + f);
+
 self.addEventListener('install', e => {
-    e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => Promise.all(DIGITAL_ABYSS.concat(SNAKE_PLUS).map(u => c.add(u).catch(() => {}))))).then(() => self.skipWaiting()));
+    e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL).then(() => Promise.all(DIGITAL_ABYSS.concat(SNAKE_PLUS, QUIZY).map(u => c.add(u).catch(() => {}))))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
     e.waitUntil(caches.keys()
