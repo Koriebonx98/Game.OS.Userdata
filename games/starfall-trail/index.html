@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101a35">
+  <meta name="description" content="Starfall Trail — a 20-level retro platform adventure.">
+  <title>Starfall Trail</title>
+  <link rel="stylesheet" href="./src/styles.css">
+</head>
+<body>
+  <main class="cabinet">
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark">✦</span><span>STARFALL <b>TRAIL</b></span></div>
+      <div class="toolbar">
+        <span class="status" id="status">KEYBOARD / CONTROLLER READY</span>
+        <button id="fullscreen-button" class="ui-btn" type="button" aria-pressed="false">FULLSCREEN</button>
+        <button id="continue-button" class="ui-btn" type="button" disabled>CONTINUE</button>
+        <button id="pause-button" class="ui-btn" type="button">PAUSE</button>
+        <button id="quit-button" class="ui-btn" type="button">QUIT</button>
+      </div>
+    </header>
+    <section class="screen-wrap" aria-label="Game">
+      <canvas id="game" width="960" height="540" tabindex="0" aria-label="Starfall Trail platform game"></canvas>
+      <div class="touch-controls" aria-label="Touch controls">
+        <div class="touch-cluster">
+          <button class="touch-btn" data-control="left" aria-label="Move left">◀</button>
+          <button class="touch-btn" data-control="right" aria-label="Move right">▶</button>
+        </div>
+        <div class="touch-actions">
+          <button class="touch-btn action-btn" data-control="power" aria-label="Use power">✦</button>
+          <button class="touch-btn jump-btn" data-control="jump" aria-label="Jump">A</button>
+        </div>
+      </div>
+    </section>
+    <div class="net-panel" id="net-panel">
+        <strong>CO-OP PLAY</strong>
+        <button id="host-button" class="ui-btn" type="button" disabled>HOST CO-OP</button>
+        <button id="join-button" class="ui-btn" type="button" disabled>JOIN PUBLIC ROOM</button>
+        <label for="friend-select">FRIEND</label>
+        <select id="friend-select" aria-label="Friend to invite" disabled></select>
+        <button id="invite-button" class="ui-btn" type="button" disabled>INVITE</button>
+        <span id="net-status" role="status">Open through Game OS for online co-op and cloud progress.</span>
+    </div>
+    <footer class="help">
+      <span><kbd>←</kbd> <kbd>→</kbd> Move</span>
+      <span><kbd>Space</kbd> / <kbd>Z</kbd> Jump</span>
+      <span><kbd>X</kbd> Use power</span>
+      <span><kbd>Esc</kbd> Pause</span>
+      <span>Controller: D-pad / stick + A</span>
+      <span class="footer-note">10 coins = 1 extra life · 20 levels</span>
+    </footer>
+  </main>
+  <script src="../../sdk/gameos.js"></script>
+  <script src="./src/game.js"></script>
+</body>
+</html>

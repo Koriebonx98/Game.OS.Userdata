@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 800" role="img" aria-labelledby="title">
+  <title id="title">Starfall Trail</title>
+  <defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#13234c"/><stop offset="1" stop-color="#446d88"/></linearGradient></defs>
+  <path fill="url(#sky)" d="M0 0h600v800H0z"/>
+  <g fill="#ffe18a"><path d="m360 110 13 34 36 2-28 23 9 35-30-20-30 20 9-35-28-23 36-2z"/><circle cx="100" cy="90" r="4"/><circle cx="495" cy="250" r="5"/><circle cx="188" cy="240" r="3"/></g>
+  <path fill="#243f47" d="M0 670h180v-60h130v-75h160v-65h130v330H0z"/>
+  <path fill="#70c58b" d="M0 670h180v-60h130v-75h160v-65h130v14H484v65H324v75H194v60H0z"/>
+  <text x="300" y="350" fill="#fff" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="68">STARFALL</text>
+  <text x="300" y="422" fill="#70e3d1" text-anchor="middle" font-family="monospace" font-weight="bold" font-size="78">TRAIL</text>
+  <text x="300" y="745" fill="#edf4ff" text-anchor="middle" font-family="monospace" font-size="24">A GAME OS ADVENTURE</text>
+</svg>

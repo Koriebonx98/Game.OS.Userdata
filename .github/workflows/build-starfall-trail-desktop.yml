@@ -1,0 +1,44 @@
+# Builds the standalone Windows installer for Starfall Trail (Electron shell around the Game OS site).
+name: Build Starfall Trail Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'desktop/starfall-trail/**'
+      - '.github/workflows/build-starfall-trail-desktop.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: desktop/starfall-trail
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check main process syntax
+        run: node --check main.js
+      - name: Install dependencies
+        run: npm install
+      - name: Build installer
+        run: npm run dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: StarfallTrail-Setup-win-x64
+          path: desktop/starfall-trail/dist/*.exe
+      - name: Publish release asset for the PC launcher
+        if: github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: desktop/starfall-trail/dist
+        run: |
+          gh release view starfall-trail-desktop >/dev/null 2>&1 || gh release create starfall-trail-desktop --title "Starfall Trail (PC installer)" --notes "Installer used by the Game OS PC app."
+          gh release upload starfall-trail-desktop StarfallTrail-Setup.exe --clobber

@@ -10,7 +10,7 @@
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
-const GAMES = { 'snake-plus': { name: 'Snake Plus', maxPlayers: 4 }, 'quizy': { name: 'Quizy', maxPlayers: 4 } };
+const GAMES = { 'snake-plus': { name: 'Snake Plus', maxPlayers: 4 }, 'quizy': { name: 'Quizy', maxPlayers: 4 }, 'starfall-trail': { name: 'Starfall Trail', maxPlayers: 2 } };
 // Community games published through the store (title id "dev-<id>") use the same relay; the host picks the seat count.
 const COMMUNITY_GAME = /^dev-[a-z0-9]{1,24}$/;
 const COMMUNITY_MAX_PLAYERS = 8;

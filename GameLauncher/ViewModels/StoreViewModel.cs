@@ -891,6 +891,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 })
                 .ToList();
 
+            IncludeStarfall(platform);
             RebuildCollections();
         }
         catch (OperationCanceledException)
@@ -936,8 +937,10 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 StatusMessage = $"Offline — no cached data available for {platform}.";
                 _allStore = new List<StoreGame>();
             }
+            IncludeStarfall(platform);
             RebuildCollections();
         }
+
         catch (Exception ex)
         {
             if (!ct.IsCancellationRequested)
@@ -945,6 +948,7 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 StatusMessage = $"Failed to load {platform} games: {ex.Message}";
                 // Restore an empty (but consistent) view so the UI doesn't stay blank
                 _allStore = new List<StoreGame>();
+                IncludeStarfall(platform);
                 RebuildCollections();
             }
         }
@@ -956,6 +960,15 @@ public partial class StoreViewModel : ViewModelBase, IDisposable
                 LoadingMessage = "";
             }
         }
+    }
+
+    private void IncludeStarfall(string platform)
+    {
+        if (!string.Equals(platform, "PC", StringComparison.OrdinalIgnoreCase)) return;
+        var game = _allStoreBase.FirstOrDefault(g => g.Title == "Starfall Trail" && g.Platform == "PC");
+        if (game == null) return;
+        _allStore.RemoveAll(g => string.Equals(g.Title, game.Title, StringComparison.OrdinalIgnoreCase));
+        _allStore.Insert(0, game);
     }
 
     private void ApplyFilter()

@@ -56,6 +56,8 @@ test('only game files are served, never server or backend code', async () => {
     const t = await start();
     try {
         assert.strictEqual((await fetch(t.base + '/games/quizy/index.html')).status, 200);
+        assert.strictEqual((await fetch(t.base + '/sdk/gameos.js')).status, 200);
+        assert.strictEqual((await fetch(t.base + '/starfall-trail.html')).status, 200);
         assert.strictEqual((await fetch(t.base + '/lan-server/server.js')).status, 404);
         assert.strictEqual((await fetch(t.base + '/backend/index.js')).status, 404);
         assert.strictEqual((await fetch(t.base + '/games/../backend/index.js')).status, 404);

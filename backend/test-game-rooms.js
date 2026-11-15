@@ -159,3 +159,20 @@ test('community games get rooms with a host-chosen, capped seat count', async ()
         assert.strictEqual(bad.status, 400);
     } finally { t.close(); }
 });
+
+test('Starfall Trail public rooms have exactly two seats', async () => {
+    const t = await setup();
+    try {
+        const created = await t.api('POST', '/api/game-rooms', 'alice', { game: 'starfall-trail', maxPlayers: 8, public: true });
+        assert.strictEqual(created.status, 201);
+        assert.strictEqual(created.body.maxPlayers, 2);
+        const host = await t.socket(created.body.roomId, 'alice');
+        await host.next();
+        const list = await t.api('GET', '/api/game-rooms/public?game=starfall-trail', 'bob');
+        assert.strictEqual(list.body.rooms[0].host, 'Alice');
+        const guest = await t.socket(created.body.roomId, 'bob');
+        await guest.next(); await host.next();
+        const full = await t.socket(created.body.roomId, 'carol');
+        assert.match((await full.next()).message, /full/);
+    } finally { t.close(); }
+});

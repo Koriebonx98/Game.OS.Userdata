@@ -1,0 +1,22 @@
+[
+  {
+    "id": "first-coin",
+    "name": "First Fortune",
+    "description": "Collect your first coin."
+  },
+  {
+    "id": "coin-hoarder",
+    "name": "Coin Collector",
+    "description": "Collect 100 coins across your adventure."
+  },
+  {
+    "id": "boss-breaker",
+    "name": "Boss Breaker",
+    "description": "Defeat a mini-boss."
+  },
+  {
+    "id": "trail-master",
+    "name": "Trail Master",
+    "description": "Complete all 20 levels."
+  }
+]
