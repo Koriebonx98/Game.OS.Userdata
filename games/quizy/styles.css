@@ -1,0 +1,76 @@
+:root{color-scheme:dark;--bg:#14102a;--panel:#201a42;--line:#3d3470;--muted:#a99fd8;--accent:#ffd23f;--cream:#f6f3ff;--good:#58e0a0;--bad:#ff6b81;--pink:#ff7ad9}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--cream);font-family:"Space Grotesk",Arial,sans-serif}
+button,select,input{font:inherit}
+button{cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.shell{max-width:1200px;min-height:100vh;min-height:100dvh;margin:auto;padding:env(safe-area-inset-top) max(5%, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(5%, env(safe-area-inset-left));display:flex;flex-direction:column}
+.topbar{height:84px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:center;gap:12px;color:var(--cream);font-size:15px;letter-spacing:-.7px;font-weight:700;text-decoration:none}.brand>span:last-child span{color:var(--accent)}
+.brand-icon{display:grid;place-items:center;width:34px;height:34px;background:var(--accent);color:var(--bg);font-size:22px;font-weight:700;border-radius:8px}
+.top-label,.eyebrow,.hero-foot,.section-label,.card-number,.art-label,.art-bottom,.game-bottom,footer,label,.quiz-meta{font-family:"DM Mono",monospace;font-size:10px;font-weight:500;letter-spacing:.08em}
+.top-label{color:var(--muted)}.status-dot,.eyebrow>span:first-child{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);margin-left:10px}.eyebrow{color:var(--accent);display:flex;align-items:center;gap:10px}.eyebrow>span:first-child{margin:0}
+main{flex:1}.hidden{display:none!important}
+#menu{min-height:620px;display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:7%;padding:60px 0}
+.hero h1{font-size:clamp(76px,10vw,150px);line-height:.85;letter-spacing:-.07em;margin:26px 0 28px;font-weight:700}.hero h1 em{font-style:normal;color:var(--accent)}.title-period{color:var(--pink)}
+.hero p,.section-heading p{color:#c1b9e8;line-height:1.6;font-size:16px}.hero-actions{display:flex;gap:12px;flex-wrap:wrap;margin:34px 0 50px}
+.button{border:0;min-height:52px;padding:0 20px;font-size:11px;font-weight:700;letter-spacing:.06em;display:inline-flex;align-items:center;justify-content:space-between;gap:40px;border-radius:10px;color:inherit}
+.primary{background:var(--accent);color:#2a1f00}.primary:hover{background:#ffe27a}.primary:disabled{opacity:.5;cursor:default}.secondary{background:transparent;color:var(--cream);border:1px solid #5a4fa0}.secondary:hover{border-color:var(--accent)}.button span{font-size:19px}
+.hero-foot{display:flex;gap:22px;flex-wrap:wrap;color:#8a80c4;font-size:9px}
+.hero-art{background:#2a2256;border:1px solid #4d4290;border-radius:18px;padding:16px;box-shadow:14px 14px 0 #0d0a20}.art-label,.art-bottom{display:flex;justify-content:space-between;padding:5px 4px 14px;color:#b8afe6;font-size:9px}.art-bottom{padding:14px 4px 5px}
+.art-card{background:#171234;border-radius:12px;padding:20px}.art-q{font-size:20px;font-weight:700;line-height:1.3;margin-bottom:16px}.art-opt{padding:11px 14px;margin-top:8px;border:1px solid #4d4290;border-radius:8px;font-size:14px}.art-opt.good{background:#58e0a022;border-color:var(--good)}
+footer{border-top:1px solid var(--line);min-height:60px;display:flex;align-items:center;justify-content:space-between;color:#7d73b8;font-size:9px}.footer-star{color:var(--accent);font-size:15px}
+.section-heading,.game-heading{display:flex;align-items:end;justify-content:space-between;gap:20px;margin:55px 0 40px}.section-heading h2{font-size:clamp(40px,5vw,66px);letter-spacing:-.06em;line-height:1;margin:16px 0 10px}.section-heading p{margin:0}.text-button{background:none;border:0;color:var(--muted);font:500 10px "DM Mono",monospace;letter-spacing:.06em;padding:12px 0}.text-button:hover{color:var(--accent)}
+.lobby-layout{display:grid;grid-template-columns:2fr 1fr;gap:28px;margin-bottom:70px;align-items:start}.section-label{color:var(--muted);display:flex;justify-content:space-between;border-bottom:1px solid var(--line);padding-bottom:14px;margin:0 0 18px}
+.subject-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px;margin-bottom:34px}
+.subject{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);border-radius:12px;color:var(--cream);padding:14px;text-align:left;font-size:14px;font-weight:700}.subject i{font-style:normal;font-size:20px}
+.subject[aria-pressed=true]{border-color:var(--accent);background:#3a2f70;box-shadow:inset 0 0 0 1px var(--accent)}.subject:disabled{opacity:.4;cursor:default}
+.player-list{display:grid;grid-template-columns:1fr 1fr;gap:10px}.player-card,.setup-panel,.help-card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.player-card strong{display:block;font-size:16px;margin-bottom:6px}.player-card small{color:var(--muted);line-height:1.6}.player-card.empty{opacity:.45;border-style:dashed}.player-card .tag{color:var(--accent);font:10px "DM Mono",monospace;margin-left:6px}
+.setup-panel label{display:block;color:var(--muted);margin:0 0 9px}.setup-panel select{width:100%;background:#14102a;color:var(--cream);border:1px solid #5a4fa0;border-radius:8px;padding:12px;font-size:12px;font-weight:700}
+.setup-panel label.check{display:flex;gap:10px;align-items:center;color:var(--cream)}.check input{width:18px;height:18px;accent-color:var(--accent)}
+.mode-description{min-height:40px;color:var(--muted);font-size:13px;line-height:1.5}.start-button{width:100%;margin-top:14px}.error{color:#ff98a8;font-size:12px;min-height:16px}
+.online-panel{margin-top:26px}.online-panel select{margin-bottom:12px}.online-panel .start-button{margin-top:0}
+.help-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:70px}.help-card.wide{grid-column:1/-1}.card-number{color:var(--accent)}.help-card h3{margin:20px 0 12px;font-size:22px}.help-card p{color:var(--muted);line-height:1.7;font-size:14px}.help-card strong{color:var(--cream)}
+.join-box{max-width:560px;margin:60px 0}.join-box p{color:var(--muted);line-height:1.6}
+
+/* In game */
+.game-heading{margin:28px 0 16px}
+.scoreboard{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+.score{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:11px "DM Mono",monospace;color:var(--muted);position:relative;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.score strong{display:block;color:var(--cream);font:700 22px "Space Grotesk",sans-serif;margin-top:2px}.score.me{border-color:var(--accent)}.score.done::after{content:"✓";position:absolute;right:10px;top:8px;color:var(--good);font-size:14px}.score em{font-style:normal;color:var(--accent)}
+.quiz-card{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:18px;padding:24px;min-height:430px}
+.quiz-meta{display:flex;justify-content:space-between;color:var(--muted);margin-bottom:10px}#q-timer{color:var(--accent);font-size:13px}
+.timer{height:8px;background:#14102a;border-radius:6px;overflow:hidden;margin-bottom:20px}#timer-bar{height:100%;width:100%;background:var(--accent);transform-origin:left;transition:background .3s}
+.q-image-wrap{position:relative;display:grid;place-items:center;min-height:200px;max-height:330px;margin-bottom:16px;background:#14102a;border-radius:12px;overflow:hidden}.q-image-wrap img{max-width:100%;max-height:330px;object-fit:contain;display:block;pointer-events:none;user-select:none}.q-image-wrap img:not([src]){display:none}#q-image-status{position:absolute;color:var(--muted);font:11px "DM Mono",monospace}
+#q-prompt{font-size:clamp(22px,3.2vw,34px);line-height:1.25;margin:0 0 22px;letter-spacing:-.02em}
+.q-options{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.q-option{display:flex;gap:12px;align-items:center;text-align:left;padding:16px;background:#2c2459;border:1px solid #5a4fa0;border-radius:12px;color:var(--cream);font-size:17px;font-weight:600;min-height:64px}.q-option b{display:grid;place-items:center;flex:none;width:30px;height:30px;border-radius:8px;background:var(--accent);color:#2a1f00;font-size:14px}
+.q-option:hover:not(:disabled){border-color:var(--accent)}.q-option:disabled{cursor:default}.q-option.picked{border-color:var(--accent);background:#4a3d8c}.q-option.right{border-color:var(--good);background:#58e0a02b}.q-option.wrong{border-color:var(--bad);background:#ff6b8130}
+.spell-form{display:flex;flex-direction:column;gap:14px;max-width:520px}.spell-form input{background:#14102a;color:var(--cream);border:2px solid #5a4fa0;border-radius:12px;padding:16px;font-size:26px;letter-spacing:.08em;text-align:center}.spell-form input:disabled{opacity:.6}.spell-clue{margin:0;color:var(--muted);font-size:14px;line-height:1.5}
+.q-status{min-height:22px;color:var(--muted);font-size:14px;margin:14px 0 0}
+.reveal{margin-top:12px;display:flex;flex-direction:column;gap:6px}.reveal-row{display:flex;gap:12px;padding:9px 14px;border:1px solid var(--line);border-radius:10px;font-size:14px}.reveal-row.ok{border-color:var(--good)}.reveal-row.no{border-color:#7b3a52}.reveal-row .n{flex:1;font-weight:700}.reveal-row .a{color:var(--muted)}.reveal-row .p{color:var(--accent);font-weight:700;min-width:54px;text-align:right}
+.round-banner{position:absolute;inset:0;background:#120c2af2;border-radius:18px;display:flex;align-items:center;justify-content:center;text-align:center;padding:24px;z-index:3}.round-banner h2{font-size:clamp(28px,5vw,52px);margin:14px 0}.round-banner p{color:var(--muted);max-width:520px;margin:0 auto 18px;line-height:1.6}.round-banner .eyebrow{justify-content:center}.round-banner .lb-list{margin:18px auto}
+.game-bottom{display:flex;justify-content:space-between;color:var(--muted);padding:14px 0 30px}
+
+/* Game OS integration */
+#gos-gate{position:fixed;inset:0;z-index:100000;display:flex;align-items:center;justify-content:center;padding:24px;background:rgba(0,0,0,.94);color:#fff;font-family:-apple-system,system-ui,sans-serif;text-align:center}
+.gos-card{max-width:360px}.gos-logo{font-size:14px;letter-spacing:2px;opacity:.7;margin-bottom:12px}.gos-card h2{margin:0 0 10px}.gos-card p{line-height:1.5;opacity:.85}
+.gos-btn{display:inline-block;margin:6px 4px;padding:12px 20px;border:0;border-radius:10px;background:#6366f1;color:#fff;font-size:16px;text-decoration:none;cursor:pointer}.gos-btn.alt{background:#ffffff22}.gos-msg{min-height:1.2em;font-size:14px}
+.achievement-toast{position:fixed;top:max(12px,env(safe-area-inset-top));left:50%;transform:translate(-50%,-140%);display:flex;gap:12px;align-items:center;max-width:90%;padding:12px 18px;border-radius:14px;background:linear-gradient(135deg,#ffd23f,#ff7ad9);color:#1c1238;box-shadow:0 6px 24px rgba(0,0,0,.45);z-index:100001;transition:transform .35s ease}
+.achievement-toast.show{transform:translate(-50%,0)}.achievement-toast-icon{font-size:28px}.achievement-toast small{display:block;opacity:.85}
+.ach-row{opacity:.55}.ach-row.unlocked{opacity:1;border-color:var(--accent)}.ach-row h3{margin:0 0 8px!important;font-size:18px!important}.ach-row p{margin:0}
+.lb-controls{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:0 0 16px}.lb-controls select{background:#14102a;color:inherit;border:1px solid var(--accent);border-radius:10px;padding:10px 14px;font:inherit}
+.lb-scope{display:flex;gap:8px}.lb-scope .button.active{border-color:var(--accent);color:var(--accent)}
+.lb-list{display:flex;flex-direction:column;gap:8px;max-width:640px}.lb-row{display:flex;gap:14px;align-items:center;padding:12px 16px;border:1px solid rgba(255,255,255,.14);border-radius:12px;text-align:left}
+.lb-row.me{border-color:var(--accent);background:rgba(255,210,63,.08)}.lb-place{width:48px;font-weight:700}.lb-name{flex:1}.lb-value{font-weight:700;color:var(--accent)}.lb-status{opacity:.7}
+@media(max-width:800px){.topbar{height:70px}.top-label{display:none}#menu{grid-template-columns:1fr;gap:40px;padding:50px 0}.lobby-layout{grid-template-columns:1fr}.section-heading{align-items:start;flex-direction:column}.scoreboard{grid-template-columns:repeat(2,1fr)}.q-options{grid-template-columns:1fr}.game-bottom{font-size:8px;gap:10px}footer span:last-child{display:none}.quiz-card{padding:16px}}
+@media(max-width:450px){.player-list,.help-grid{grid-template-columns:1fr}.help-card.wide{grid-column:auto}.hero-actions{flex-direction:column;align-items:stretch}}
+.mode-grid{grid-template-columns:repeat(auto-fill,minmax(190px,1fr));margin-bottom:10px}.mode-desc{margin:0 0 34px;min-height:40px}
+.mode-info{display:flex;flex-direction:column;gap:8px;margin:0 0 16px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:#1a1536;color:var(--muted);font-size:13px;line-height:1.5}.mode-info strong{color:var(--cream)}
+.board{display:grid;grid-template-columns:repeat(8,1fr);gap:4px}.board div{display:grid;place-items:center;height:38px;border-radius:8px;background:#2c2459;color:var(--muted);font-size:11px;font-weight:700}
+.board div.chaser{background:#ff6b8140;border:1px solid var(--bad);font-size:18px}.board div.you{background:#58e0a030;border:1px solid var(--good);font-size:18px}.board div.home{background:#ffd23f30;border:1px solid var(--accent)}
+.ladder{display:flex;flex-wrap:wrap;gap:4px}.ladder span{padding:3px 7px;border-radius:6px;background:#2c2459;font-size:11px;font-weight:700}.ladder span.safe{outline:1px solid var(--accent)}.ladder span.done{background:#58e0a030;color:var(--good)}.ladder span.now{background:var(--accent);color:#2a1f00}
+.lifelines{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0 0}.life{padding:9px 12px;border-radius:999px;border:1px solid var(--accent);background:transparent;color:var(--accent);font-size:12px;font-weight:700}.life:disabled{opacity:.35;border-color:var(--line);color:var(--muted);cursor:default}.life.walk{border-color:var(--good);color:var(--good);margin-left:auto}
+.hint{margin:12px 0 0;padding:10px 14px;border-radius:10px;background:#2c2459;color:var(--cream);font-size:14px}.q-option.hidden-option{visibility:hidden}.q-option .pct{margin-left:auto;color:var(--accent);font-size:13px}
+.browse-row{align-items:center}.browse-row .button{padding:8px 14px;font-size:12px}
+@media(prefers-reduced-motion:reduce){#timer-bar{transition:none}}

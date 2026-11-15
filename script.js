@@ -2139,7 +2139,7 @@ async function loadInbox() {
         // Build invite items
         const inviteItems = invites.map(inv => isSnakePlusInvite(inv) ? `
             <div class="friend-item">
-                <span class="friend-name">🐍 ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong> online</span></span>
+                <span class="friend-name">${inv.game === 'quizy' ? '🧠' : '🐍'} ${escapeHtml(inv.from)} <span style="color:#666;font-size:0.8em;font-weight:400;">invited you to play <strong>${escapeHtml(inv.gameName)}</strong> online</span></span>
                 <div class="friend-actions">
                     <a class="btn-accept-friend" style="text-decoration:none;" href="${snakePlusJoinUrl(inv)}">▶ Join</a>
                     <button class="btn-decline-friend" onclick="handleRespondInvite('${escapeHtml(inv.inviteId)}', 'declined', '${escapeHtml(inv.viaMessage ? inv.from : '')}')">❌ Decline</button>
@@ -2529,11 +2529,11 @@ const SNAKE_PLUS_INVITE_TTL_MS = 10 * 60 * 1000;
 
 /** Snake Plus online invites (sent by the Game OS backend when a host invites a friend) open the game and join the host's room. */
 function isSnakePlusInvite(inv) {
-    return !!inv && inv.game === 'snake-plus' && typeof inv.roomId === 'string' && typeof inv.from === 'string';
+    return !!inv && (inv.game === 'snake-plus' || inv.game === 'quizy') && typeof inv.roomId === 'string' && typeof inv.from === 'string';
 }
 
 function snakePlusJoinUrl(inv) {
-    return 'games/snake-plus/index.html?join=' + encodeURIComponent(inv.from) + '&room=' + encodeURIComponent(inv.roomId);
+    return 'games/' + (inv.game === 'quizy' ? 'quizy' : 'snake-plus') + '/index.html?join=' + encodeURIComponent(inv.from) + '&room=' + encodeURIComponent(inv.roomId);
 }
 
 /** True when the invite carries a hosted relay room the browser can open (direct LAN parties need the launcher). */
@@ -3504,13 +3504,24 @@ function getBuiltInGames() {
         features: ['Exclusive', 'Achievements', 'Free'],
         gameOSExclusive: true,
         playUrl: new URL('games/snake-plus/index.html', base).href
+    }, {
+        platform: 'PC',
+        Title: 'Quizy',
+        TitleID: 'quizy',
+        image: new URL('games/quizy/cover.svg', base).href,
+        description: 'The multiplayer quiz: pick your subjects, name the photo, spell what you hear and race through the quick-fire round. Up to 4 players, fresh questions every week, and it plays offline too.',
+        genres: ['Trivia', 'Party'],
+        categories: ['Exclusive', 'Free', 'Achievements', 'Multiplayer'],
+        features: ['Exclusive', 'Achievements', 'Free'],
+        gameOSExclusive: true,
+        playUrl: new URL('games/quizy/index.html', base).href
     }];
 }
 
 /** Relative play page for a Game OS exclusive (PC) by title, or '' for any other game. */
 function exclusivePlayPath(platform, title) {
     if (platform !== 'PC') return '';
-    return { 'digital abyss': 'games/digital-abyss/index.html', 'snake plus': 'games/snake-plus/index.html' }[String(title || '').toLowerCase()] || '';
+    return { 'digital abyss': 'games/digital-abyss/index.html', 'snake plus': 'games/snake-plus/index.html', 'quizy': 'games/quizy/index.html' }[String(title || '').toLowerCase()] || '';
 }
 
 function _withBuiltInGames(platform, games) {

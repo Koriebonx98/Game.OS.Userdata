@@ -10,8 +10,9 @@
 const crypto = require('crypto');
 const { WebSocketServer } = require('ws');
 
-const GAMES = { 'snake-plus': { name: 'Snake Plus', maxPlayers: 4 } };
+const GAMES = { 'snake-plus': { name: 'Snake Plus', maxPlayers: 4 }, 'quizy': { name: 'Quizy', maxPlayers: 4 } };
 const MAX_ROOMS = 300;
+const MAX_PUBLIC_LISTED = 20;
 const MAX_INVITES_PER_ROOM = 8;
 const ROOM_NO_HOST_MS = 2 * 60 * 1000;
 const MSGS_PER_SECOND = 200;
@@ -69,11 +70,28 @@ function mountGameRooms(app, server, deps) {
         try { room.hostWs && room.hostWs.close(1000, 'ended'); } catch { }
     }
 
+    const cleanMode = m => String(m || '').replace(/[^a-z0-9-]/gi, '').slice(0, 20).toLowerCase();
+    const canJoinPublic = (room, userLower) => room.public && room.open && !room.banned.has(userLower);
+
     function roomOf(req, res) {
         const room = rooms.get(String(req.params.id));
         if (!room) { res.status(404).json({ success: false, message: 'This game session has ended.' }); return null; }
         return room;
     }
+
+    // Public matchmaking: lists lobbies that anyone signed in to Game OS may join (not yet started, with a free seat).
+    app.get('/api/game-rooms/public', restAuth, (req, res) => {
+        const game = String(req.query.game || '');
+        if (!GAMES[game]) return res.status(400).json({ success: false, message: 'Unknown game.' });
+        const list = [];
+        for (const room of rooms.values()) {
+            if (room.game !== game || !room.public || !room.open || room.hostLower === req.gameUser.usernameLower) continue;
+            if (!room.hostWs || room.hostWs.readyState !== 1 || room.guests.size + 1 >= GAMES[game].maxPlayers) continue;
+            list.push({ roomId: room.id, host: room.host, mode: room.mode, players: room.guests.size + 1, maxPlayers: GAMES[game].maxPlayers });
+        }
+        list.sort((a, b) => b.players - a.players);
+        res.json({ success: true, rooms: list.slice(0, MAX_PUBLIC_LISTED) });
+    });
 
     app.post('/api/game-rooms', restAuth, (req, res) => {
         const game = String((req.body && req.body.game) || '');
@@ -84,7 +102,8 @@ function mountGameRooms(app, server, deps) {
         const id = crypto.randomBytes(6).toString('hex');
         rooms.set(id, {
             id, game, host: req.gameUser.username, hostLower: req.gameUser.usernameLower, hostWs: null,
-            guests: new Map(), invited: new Set(), created: Date.now()
+            guests: new Map(), invited: new Set(), created: Date.now(),
+            public: !!(req.body && req.body.public), mode: cleanMode(req.body && req.body.mode), open: true, banned: new Set()
         });
         hostRoom.set(req.gameUser.usernameLower, id);
         res.status(201).json({ success: true, roomId: id, maxPlayers: GAMES[game].maxPlayers });
@@ -94,8 +113,20 @@ function mountGameRooms(app, server, deps) {
         const room = roomOf(req, res);
         if (!room) return;
         const me = req.gameUser.usernameLower;
-        if (me !== room.hostLower && !room.invited.has(me)) return res.status(403).json({ success: false, message: 'You were not invited to this session.' });
+        if (me !== room.hostLower && !room.invited.has(me) && !canJoinPublic(room, me)) return res.status(403).json({ success: false, message: 'You were not invited to this session.' });
         res.json({ success: true, game: room.game, host: room.host, players: room.guests.size + 1, maxPlayers: GAMES[room.game].maxPlayers });
+    });
+
+    // The host updates what the lobby list shows: whether it is public, its game mode, and whether it still takes players.
+    app.post('/api/game-rooms/:id/info', restAuth, (req, res) => {
+        const room = roomOf(req, res);
+        if (!room) return;
+        if (room.hostLower !== req.gameUser.usernameLower) return res.status(403).json({ success: false, message: 'Only the host can change the lobby.' });
+        const b = req.body || {};
+        if (typeof b.public === 'boolean') room.public = b.public;
+        if (typeof b.open === 'boolean') room.open = b.open;
+        if (typeof b.mode === 'string') room.mode = cleanMode(b.mode);
+        res.json({ success: true });
     });
 
     app.delete('/api/game-rooms/:id', restAuth, (req, res) => {
@@ -169,7 +200,9 @@ function mountGameRooms(app, server, deps) {
             room.hostWs = ws;
             send(ws, { t: 'hello', role: 'host', you: room.host, game: room.game });
         } else {
-            if (!room.invited.has(user.usernameLower)) return refuse('You were not invited to this session.');
+            if (!room.invited.has(user.usernameLower) && !canJoinPublic(room, user.usernameLower)) {
+                return refuse(room.public && room.open === false ? 'This game has already started.' : 'You were not invited to this session.');
+            }
             if (!room.hostWs || room.hostWs.readyState !== 1) return refuse(`${room.host} is not in the lobby any more.`);
             const existing = room.guests.get(user.usernameLower);
             if (!existing && room.guests.size >= cap - 1) return refuse('This game is full.');
@@ -189,6 +222,7 @@ function mountGameRooms(app, server, deps) {
             if (isHost) {
                 if (typeof msg.kick === 'string') {
                     const g = room.guests.get(msg.kick.toLowerCase());
+                    if (room.public) room.banned.add(msg.kick.toLowerCase());
                     if (g) { room.guests.delete(msg.kick.toLowerCase()); try { g.ws.close(1000, 'kicked'); } catch { } }
                     return;
                 }

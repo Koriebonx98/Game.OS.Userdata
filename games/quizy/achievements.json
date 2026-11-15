@@ -1,0 +1,104 @@
+{
+  "Items": [
+    {
+      "achievementId": "first_game",
+      "Name": "Quiz Time",
+      "Description": "Play your first game of Quizy."
+    },
+    {
+      "achievementId": "warm_up",
+      "Name": "Warming Up",
+      "Description": "Answer 5 questions correctly in a row."
+    },
+    {
+      "achievementId": "on_fire",
+      "Name": "On Fire",
+      "Description": "Answer 10 questions correctly in a row."
+    },
+    {
+      "achievementId": "brainiac",
+      "Name": "Brainiac",
+      "Description": "Answer 20 questions correctly in one game."
+    },
+    {
+      "achievementId": "high_scorer",
+      "Name": "High Scorer",
+      "Description": "Score 2000 points in a single game."
+    },
+    {
+      "achievementId": "winner",
+      "Name": "Quiz Champion",
+      "Description": "Win a game against other players or bots."
+    },
+    {
+      "achievementId": "spelling_bee",
+      "Name": "Spelling Bee",
+      "Description": "Spell 3 words correctly in one game."
+    },
+    {
+      "achievementId": "picture_perfect",
+      "Name": "Picture Perfect",
+      "Description": "Get every picture round question right."
+    },
+    {
+      "achievementId": "quick_draw",
+      "Name": "Quick Draw",
+      "Description": "Get 8 or more Quick Fire questions right in one game."
+    },
+    {
+      "achievementId": "well_rounded",
+      "Name": "Well Rounded",
+      "Description": "Play a game with 5 subjects."
+    },
+    {
+      "achievementId": "polymath",
+      "Name": "Polymath",
+      "Description": "Play every subject at least once."
+    },
+    {
+      "achievementId": "marathon",
+      "Name": "Quiz Addict",
+      "Description": "Play 10 games."
+    },
+    {
+      "achievementId": "better_together",
+      "Name": "Better Together",
+      "Description": "Play a game online with a Game OS friend."
+    },
+    {
+      "achievementId": "online_champion",
+      "Name": "Online Champion",
+      "Description": "Win a game online against a Game OS friend."
+    },
+    {
+      "achievementId": "escaped",
+      "Name": "Outrun the Chaser",
+      "Description": "Escape the Chaser in Chase mode."
+    },
+    {
+      "achievementId": "chase_champ",
+      "Name": "Chase Champion",
+      "Description": "Win a final chase."
+    },
+    {
+      "achievementId": "big_money",
+      "Name": "Big Money",
+      "Description": "Take home £32,000 or more in Millionaire."
+    },
+    {
+      "achievementId": "millionaire",
+      "Name": "Millionaire!",
+      "Description": "Win £1,000,000 in Millionaire."
+    },
+    {
+      "achievementId": "all_modes",
+      "Name": "Mode Master",
+      "Description": "Play Pub, Chase and Millionaire."
+    },
+    {
+      "achievementId": "meet_world",
+      "Name": "Meet the World",
+      "Description": "Play a public online match with players who are not your friends."
+    }
+  ]
+}

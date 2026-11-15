@@ -110,3 +110,41 @@ test('closes the room when the host leaves', async () => {
         assert.strictEqual((await guest.next()).t, 'ended');
     } finally { t.close(); }
 });
+
+test('public lobbies are listed, joinable without an invite, and close to new players once started', async () => {
+    const t = await setup();
+    try {
+        const { body: created } = await t.api('POST', '/api/game-rooms', 'alice', { game: 'quizy', public: true, mode: 'chase' });
+        const host = await t.socket(created.roomId, 'alice');
+        await host.next();
+
+        const listed = await t.api('GET', '/api/game-rooms/public?game=quizy', 'dave');
+        assert.deepStrictEqual(listed.body.rooms, [{ roomId: created.roomId, host: 'Alice', mode: 'chase', players: 1, maxPlayers: 4 }]);
+        assert.strictEqual((await t.api('GET', '/api/game-rooms/public?game=quizy', 'alice')).body.rooms.length, 0);
+
+        const guest = await t.socket(created.roomId, 'dave');
+        assert.strictEqual((await guest.next()).host, 'Alice');
+        assert.deepStrictEqual(await host.next(), { t: 'join', who: 'Dave' });
+
+        assert.strictEqual((await t.api('POST', `/api/game-rooms/${created.roomId}/info`, 'dave', { open: false })).status, 403);
+        await t.api('POST', `/api/game-rooms/${created.roomId}/info`, 'alice', { open: false });
+        assert.strictEqual((await t.api('GET', '/api/game-rooms/public?game=quizy', 'carol')).body.rooms.length, 0);
+        const late = await t.socket(created.roomId, 'carol');
+        assert.strictEqual((await late.next()).message, 'This game has already started.');
+    } finally { t.close(); }
+});
+
+test('private lobbies are never listed or joinable without an invite', async () => {
+    const t = await setup();
+    try {
+        const { body: created } = await t.api('POST', '/api/game-rooms', 'alice', { game: 'quizy' });
+        const host = await t.socket(created.roomId, 'alice');
+        await host.next();
+        assert.strictEqual((await t.api('GET', '/api/game-rooms/public?game=quizy', 'dave')).body.rooms.length, 0);
+        const guest = await t.socket(created.roomId, 'dave');
+        assert.strictEqual((await guest.next()).message, 'You were not invited to this session.');
+
+        await t.api('POST', `/api/game-rooms/${created.roomId}/info`, 'alice', { public: true });
+        assert.strictEqual((await t.api('GET', '/api/game-rooms/public?game=quizy', 'dave')).body.rooms.length, 1);
+    } finally { t.close(); }
+});
