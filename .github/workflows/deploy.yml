@@ -309,10 +309,20 @@ jobs:
       - name: Copy frontend files to deployment directory
         run: |
           mkdir -p _site
-          cp -R index.html login.html signup.html account.html games.html friends.html inbox.html profile.html watch.html game.html script.js app.html appnav.js emulator.js pwa.js sw.js manifest.webmanifest icons styles.css _site/
-          cp -R games _site/
+          cp -R index.html login.html signup.html account.html games.html friends.html inbox.html profile.html watch.html game.html starfall-trail.html gameos-bridge.js script.js app.html appnav.js emulator.js pwa.js sw.js manifest.webmanifest icons styles.css _site/
+          cp -R games sdk _site/
           find _site/games -name '*.test.js' -delete
           touch _site/.nojekyll
+
+      - name: Verify Starfall Trail deployment files
+        run: |
+          for f in starfall-trail.html gameos-bridge.js sdk/gameos.js \
+            games/gameos-drm.js games/gameos-lan.js games/starfall-trail/launch.js \
+            games/starfall-trail/index.html games/starfall-trail/src/game.js \
+            games/starfall-trail/src/styles.css games/starfall-trail/achievements.json \
+            games/starfall-trail/cover.svg; do
+            test -f "_site/$f" || { echo "ERROR: missing Starfall Trail deployment file: $f"; exit 1; }
+          done
 
       - name: Verify token injection in deployment bundle
         run: |
