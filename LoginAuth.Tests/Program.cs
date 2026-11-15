@@ -123,15 +123,16 @@ class Program
         var invite = new GameInvite
         {
             InviteId = "msg-123", GameName = "Ghosts", Platform = "PC",
-            Kind = "game", RoomId = "room-1"
+            Kind = "game", Game = "starfall-trail", RoomId = "room-1"
         };
         var messages = new List<Message>
         {
             new() { From = "Host", Text = InviteMessageService.EncodeInvite(invite), SentAt = "2026-01-01" }
         };
         var pending = InviteMessageService.Pending(messages, "host", "guest");
-        Check(pending.Count == 1 && pending[0].RoomId == "room-1" && pending[0].From == "host",
-            "Room invitation arrives from the conversation friend");
+        Check(pending.Count == 1 && pending[0].RoomId == "room-1" && pending[0].From == "host"
+            && pending[0].Game == "starfall-trail" && pending[0].IsOnlineGameInvite,
+            "Online game-room details survive the invite message round trip");
         messages.Add(new Message { From = "host", Text = InviteMessageService.EncodeResponse("msg-123", "accepted") });
         Check(InviteMessageService.Pending(messages, "host", "guest").Count == 1,
             "A sender cannot respond to their own invitation");

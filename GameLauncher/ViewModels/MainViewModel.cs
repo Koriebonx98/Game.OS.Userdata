@@ -107,6 +107,8 @@ public partial class MainViewModel : ViewModelBase, IDisposable
 
     private async Task JoinInvitedRoomAsync(GameInvite invite)
     {
+        // Online game-room invites are joined through the game relay, not the launcher LFG network.
+        if (invite.IsOnlineGameInvite) return;
         if (string.IsNullOrWhiteSpace(invite.RoomId) || (invite.IsWatchParty && invite.StreamPort == null)) return;
         if (_lfg == null) throw new InvalidOperationException("Room service is unavailable.");
         if (_lfg.IsHosting && string.Equals(_lfg.HostedRoomId, invite.RoomId, StringComparison.Ordinal)) return;
@@ -620,6 +622,23 @@ public partial class MainViewModel : ViewModelBase, IDisposable
         return web.TrimEnd('/') + "/watch.html?" + q;
     }
 
+    private static string? BuildOnlineGameInviteUrl(GameInvite invite)
+    {
+        string? path = invite.Game?.ToLowerInvariant() switch
+        {
+            "starfall-trail" => "starfall-trail.html",
+            "snake-plus" => "games/snake-plus/index.html",
+            "quizy" => "games/quizy/index.html",
+            _ => null,
+        };
+        if (path == null || string.IsNullOrWhiteSpace(invite.RoomId)) return null;
+
+        var web = Services.AppSettingsService.Load().WebAppUrl;
+        if (string.IsNullOrWhiteSpace(web)) web = new Models.AppSettings().WebAppUrl;
+        var query = $"join={Uri.EscapeDataString(invite.From)}&room={Uri.EscapeDataString(invite.RoomId)}";
+        return web.TrimEnd('/') + "/" + path + "?" + query;
+    }
+
     private void TryLaunchAcceptedInvite(GameInvite invite)
     {
         if (invite == null || string.IsNullOrWhiteSpace(invite.GameName))
@@ -636,6 +655,14 @@ public partial class MainViewModel : ViewModelBase, IDisposable
                 Avalonia.Threading.Dispatcher.UIThread.Post(() => OpenBrowserForGame(null, null, url));
             }
             catch (Exception ex) { DevLogService.Log("[WatchParty] Could not open viewer: " + ex.Message); }
+            return;
+        }
+
+        string? onlineUrl = BuildOnlineGameInviteUrl(invite);
+        if (onlineUrl != null)
+        {
+            Avalonia.Threading.Dispatcher.UIThread.Post(() =>
+                OpenBrowserForGame(invite.Platform, invite.GameName, onlineUrl));
             return;
         }
 

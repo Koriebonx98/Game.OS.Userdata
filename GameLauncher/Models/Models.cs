@@ -191,6 +191,7 @@ namespace GameLauncher.Models
 
         // Watch-party invites ("kind":"watch") carry the hosted relay room instead of a game connection.
         [JsonPropertyName("kind")]      public string? Kind      { get; set; }
+        [JsonPropertyName("game")]      public string? Game      { get; set; }
         [JsonPropertyName("roomId")]    public string? RoomId    { get; set; }
         [JsonPropertyName("relayUrl")]  public string? RelayUrl  { get; set; }
         [JsonPropertyName("mediaType")] public string? MediaType { get; set; }
@@ -200,6 +201,7 @@ namespace GameLauncher.Models
         [JsonPropertyName("streamPort")] public int?    StreamPort { get; set; }
         [JsonPropertyName("streamPin")]  public string? StreamPin  { get; set; }
         [JsonIgnore] public bool IsWatchParty => string.Equals(Kind, "watch", StringComparison.OrdinalIgnoreCase);
+        [JsonIgnore] public bool IsOnlineGameInvite => !string.IsNullOrWhiteSpace(Game) && !string.IsNullOrWhiteSpace(RoomId);
         [JsonIgnore] public string Glyph => IsWatchParty ? "📺" : "🎮";
         [JsonIgnore] public string AcceptLabel => IsWatchParty ? "Join" : "Accept";
         /// <summary>Safe text for the Inbox tile; never contains the host's address.</summary>

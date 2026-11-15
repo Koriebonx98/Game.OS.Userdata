@@ -168,6 +168,13 @@ test('Starfall Trail public rooms have exactly two seats', async () => {
         assert.strictEqual(created.body.maxPlayers, 2);
         const host = await t.socket(created.body.roomId, 'alice');
         await host.next();
+        const sent = await t.api('POST', `/api/game-rooms/${created.body.roomId}/invite`, 'alice', { toUsername: 'bob' });
+        assert.strictEqual(sent.status, 200);
+        const inviteMessage = t.files.get('accounts/messages/alice_bob.json').content[0];
+        const invite = JSON.parse(inviteMessage.text.slice('\u2063\u2063GOSINV1:'.length)).Invite;
+        assert.strictEqual(invite.game, 'starfall-trail');
+        assert.strictEqual(invite.roomId, created.body.roomId);
+
         const list = await t.api('GET', '/api/game-rooms/public?game=starfall-trail', 'bob');
         assert.strictEqual(list.body.rooms[0].host, 'Alice');
         const guest = await t.socket(created.body.roomId, 'bob');
