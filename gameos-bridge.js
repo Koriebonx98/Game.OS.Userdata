@@ -246,19 +246,153 @@
             };
             ws.onerror = () => {};
         }
+
+        // ── Direct play (no game server) ────────────────────────────────
+        // Used when the Game OS game server can't be reached, like Snake Plus and Quizy: the invite and the WebRTC
+        // offer/answer travel through the hidden Game OS chat messages, then the two players connect directly.
+        const P2P = 'p2p-';
+        const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+        const canDirect = () => !lan() && cloud() && typeof RTCPeerConnection === 'function';
+        async function postSignal(friend, envelope) {
+            const path = conversationKey(username, friend);
+            for (let i = 0; ; i++) {
+                try {
+                    const f = await githubRead(path);
+                    const msgs = f ? [...f.content] : [];
+                    msgs.push({ from: username, text: INVITE_MESSAGE_MARKER + JSON.stringify(envelope), sentAt: new Date().toISOString() });
+                    await githubWrite(path, msgs.slice(-200), `Game invite from ${username} to ${friend}`, f ? f.sha : undefined);
+                    return;
+                } catch (e) { if (i >= 3) throw e; await sleep(400 * (i + 1)); }
+            }
+        }
+        async function readSignal(friend, roomId, kind) {
+            const f = await githubRead(conversationKey(username, friend));
+            let found = null;
+            for (const m of (f && Array.isArray(f.content) ? f.content : [])) {
+                if (String((m && m.from) || '').toLowerCase() !== friend.toLowerCase()) continue;
+                const env = parseInviteEnvelope(m.text);
+                if (env && env.Signal && env.Signal.room === roomId && env.Signal.kind === kind) found = env.Signal;
+            }
+            return found;
+        }
+        function gathered(pc) {
+            return new Promise(resolve => {
+                if (pc.iceGatheringState === 'complete') return resolve();
+                const done = () => { clearTimeout(t); pc.removeEventListener('icegatheringstatechange', check); resolve(); };
+                const check = () => { if (pc.iceGatheringState === 'complete') done(); };
+                const t = setTimeout(done, 5000);
+                pc.addEventListener('icegatheringstatechange', check);
+            });
+        }
+        function wireChannel(ch, friend, h) {
+            ch.onopen = h.open;
+            ch.onclose = h.close;
+            ch.onmessage = e => {
+                let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+                if (m && m.t === 'end') h.end && h.end(String(m.reason || ''));
+                else emit({ type: 'message', data: { from: friend, data: m ? m.d : null } });
+            };
+        }
+        async function inviteDirect(friend) {
+            const r = room, key = friend.toLowerCase();
+            if (r.peers.has(key)) throw new Error(friend + ' is already invited.');
+            if (r.peers.size + 1 >= r.maxPlayers) throw new Error('The room is full.');
+            const pc = new RTCPeerConnection(ICE), ch = pc.createDataChannel('gos');
+            const peer = { friend, pc, ch, open: false };
+            let poll = null, timer = null, done = false;
+            const finish = () => {
+                if (done) return;
+                done = true; clearInterval(poll); clearTimeout(timer);
+                const wasOpen = peer.open; peer.open = false;
+                if (r.peers.get(key) === peer) r.peers.delete(key);
+                try { ch.close(); pc.close(); } catch (_) {}
+                if (wasOpen) emit({ type: 'leave', data: { username: friend } });
+            };
+            peer.finish = finish;
+            r.peers.set(key, peer);
+            wireChannel(ch, friend, {
+                open() { if (done || peer.open) return; clearInterval(poll); clearTimeout(timer); peer.open = true; emit({ type: 'join', data: { username: friend } }); },
+                close: finish
+            });
+            pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' || pc.connectionState === 'closed') finish(); };
+            try {
+                await pc.setLocalDescription(await pc.createOffer());
+                await gathered(pc);
+                await postSignal(friend, {
+                    Invite: { inviteId: 'msg-' + titleId + '-' + r.id, from: username, gameName: title, platform: 'PC', connectionType: 'Game OS Online', game: titleId, kind: 'game', roomId: r.id, sentAt: new Date().toISOString() },
+                    Signal: { room: r.id, kind: 'offer', sdp: pc.localDescription.sdp }
+                });
+            } catch (e) { finish(); throw e; }
+            let applying = false;
+            poll = setInterval(async () => {
+                if (applying || done || pc.signalingState !== 'have-local-offer') return;
+                applying = true;
+                try {
+                    const a = await readSignal(friend, r.id, 'answer');
+                    if (a && pc.signalingState === 'have-local-offer') await pc.setRemoteDescription({ type: 'answer', sdp: a.sdp });
+                } catch (_) {} finally { applying = false; }
+            }, 3000);
+            timer = setTimeout(finish, 10 * 60 * 1000);
+            return true;
+        }
+        async function joinDirect(host, roomId) {
+            const offer = await readSignal(host, roomId, 'offer');
+            if (!offer) throw new Error(`Could not find ${host}'s invite. They may have closed the lobby.`);
+            const pc = new RTCPeerConnection(ICE);
+            const r = { id: roomId, role: 'guest', direct: true, pc, ch: null, host };
+            room = r;
+            return new Promise((resolve, reject) => {
+                let opened = false;
+                const close = () => { try { if (r.ch) r.ch.close(); pc.close(); } catch (_) {} };
+                const fail = err => { clearTimeout(timer); close(); if (room === r) room = null; reject(err); };
+                const timer = setTimeout(() => fail(new Error(`Could not connect to ${host}. They may have closed the lobby.`)), 30000);
+                let reason = '';
+                pc.ondatachannel = e => {
+                    r.ch = e.channel;
+                    wireChannel(r.ch, host, {
+                        open() { opened = true; clearTimeout(timer); resolve({ host, you: username }); },
+                        close() {
+                            if (!opened) return fail(new Error(`Could not connect to ${host}. They may have closed the lobby.`));
+                            if (room === r) { room = null; emit({ type: 'ended', data: { reason: reason || 'Disconnected.' } }); }
+                        },
+                        end(why) { reason = why; }
+                    });
+                };
+                pc.onconnectionstatechange = () => { if (pc.connectionState === 'failed' && !opened) fail(new Error(`Could not connect to ${host}.`)); };
+                (async () => {
+                    await pc.setRemoteDescription({ type: 'offer', sdp: offer.sdp });
+                    await pc.setLocalDescription(await pc.createAnswer());
+                    await gathered(pc);
+                    await postSignal(host, { Signal: { room: roomId, kind: 'answer', sdp: pc.localDescription.sdp } });
+                })().catch(fail);
+            });
+        }
+        function closeDirect(r) {
+            if (r.role === 'host') r.peers.forEach(p => { try { if (p.ch.readyState === 'open') p.ch.send(JSON.stringify({ t: 'end', reason: 'The host left.' })); } catch (_) {} p.finish(); });
+            else { try { r.ch && r.ch.close(); r.pc.close(); } catch (_) {} }
+        }
         const need = () => { if (!room) throw new Error('Not in a lobby.'); return room; };
 
         return {
             async host(o) {
                 this.leave();
-                const created = await api('POST', '/api/game-rooms', { game: gameKey, maxPlayers: o.maxPlayers, public: !!o.public, mode: o.mode });
-                const ws = await socket(created.roomId);
-                room = { id: created.roomId, ws, role: 'host' };
-                await new Promise((res, rej) => wire(ws, 'host', res, rej));
-                return { roomId: created.roomId, maxPlayers: created.maxPlayers };
+                try {
+                    const created = await api('POST', '/api/game-rooms', { game: gameKey, maxPlayers: o.maxPlayers, public: !!o.public, mode: o.mode });
+                    const ws = await socket(created.roomId);
+                    room = { id: created.roomId, ws, role: 'host' };
+                    await new Promise((res, rej) => wire(ws, 'host', res, rej));
+                    return { roomId: created.roomId, maxPlayers: created.maxPlayers };
+                } catch (err) {
+                    room = null;
+                    if (!canDirect()) throw err;
+                    const maxPlayers = Math.max(2, Math.min(Number(o.maxPlayers) || 2, 4));
+                    room = { id: P2P + hex(crypto.getRandomValues(new Uint8Array(6))), role: 'host', direct: true, peers: new Map(), maxPlayers };
+                    return { roomId: room.id, maxPlayers };
+                }
             },
             async join(host, roomId) {
                 this.leave();
+                if (String(roomId).startsWith(P2P)) return joinDirect(host, roomId);
                 const ws = await socket(roomId);
                 room = { id: roomId, ws, role: 'guest' };
                 const hello = await new Promise((res, rej) => wire(ws, 'guest', res, rej));
@@ -270,9 +404,10 @@
                 const list = cloud() ? await getFriendsGitHub(username) : [];
                 return (Array.isArray(list) ? list : []).map(f => typeof f === 'string' ? f : (f && f.username) || '').filter(Boolean);
             },
-            async invite(friend) { const r = need(); await api('POST', '/api/game-rooms/' + r.id + '/invite', { toUsername: friend }); return true; },
+            async invite(friend) { const r = need(); if (r.direct) return inviteDirect(friend); await api('POST', '/api/game-rooms/' + r.id + '/invite', { toUsername: friend }); return true; },
             async setInfo(info) {
                 const r = need();
+                if (r.direct) return true;
                 const body = {};
                 if (typeof info.public === 'boolean') body.public = info.public;
                 if (typeof info.open === 'boolean') body.open = info.open;
@@ -284,14 +419,26 @@
                 const r = need();
                 const text = JSON.stringify({ d: data === undefined ? null : data, to: r.role === 'host' && typeof to === 'string' ? to : undefined });
                 if (text.length > MAX_MSG_BYTES) throw new Error('Message too big (limit 16 KB).');
+                if (r.direct) {
+                    const packet = JSON.stringify({ d: data === undefined ? null : data });
+                    const targets = r.role === 'host' ? [...r.peers.values()].filter(p => p.open && (typeof to !== 'string' || p.friend.toLowerCase() === to.toLowerCase())) : [r];
+                    const channels = targets.map(p => p.ch).filter(c => c && c.readyState === 'open');
+                    if (!channels.length) throw new Error('Connection closed.');
+                    channels.forEach(c => c.send(packet));
+                    return true;
+                }
                 if (r.ws.readyState !== 1) throw new Error('Connection closed.');
                 r.ws.send(text);
                 return true;
             },
-            async kick(name) { const r = need(); if (r.role !== 'host') throw new Error('Only the host can kick players.'); r.ws.send(JSON.stringify({ kick: name })); return true; },
+            async kick(name) {
+                const r = need(); if (r.role !== 'host') throw new Error('Only the host can kick players.');
+                if (r.direct) { const p = r.peers.get(String(name).toLowerCase()); if (p) { try { p.ch.send(JSON.stringify({ t: 'end', reason: 'You were removed by the host.' })); } catch (_) {} p.finish(); } return true; }
+                r.ws.send(JSON.stringify({ kick: name })); return true; },
             leave() {
                 if (!room) return true;
                 const r = room; room = null;
+                if (r.direct) { closeDirect(r); return true; }
                 try { if (r.role === 'host') api('DELETE', '/api/game-rooms/' + r.id).catch(() => {}); r.ws.close(); } catch (_) {}
                 return true;
             }
