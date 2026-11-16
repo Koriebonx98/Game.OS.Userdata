@@ -221,18 +221,17 @@
                 });
             });
             _allBrowseGames = Object.values(_allPlatformGames).flat();
-            _updatedGameOrder = new Map();
-            try {
-                const feed = await getUpdatedGameFeed();
-                feed.forEach((entry, index) => {
-                    _updatedGameOrder.set(`${entry.platform}|${String(entry.title).toLowerCase()}`, index);
-                });
-            } catch (e) {
-                console.warn('Updated games feed could not be loaded:', e.message);
-            }
-            await window.loadGameStats(Object.keys(_allPlatformGames));
-
             msg.textContent = '';
+            renderStoreChrome();
+            applyStoreFilters();
+
+            // Secondary data loads in the background so the list is shown instantly
+            _updatedGameOrder = new Map();
+            const feedP = getUpdatedGameFeed().then(feed => {
+                feed.forEach((entry, index) => _updatedGameOrder.set(`${entry.platform}|${String(entry.title).toLowerCase()}`, index));
+            }).catch(e => console.warn('Updated games feed could not be loaded:', e.message));
+            await Promise.all([feedP, window.loadGameStats(Object.keys(_allPlatformGames))]);
+            applyStoreFilters();
             await loadRecommendations();
             renderStoreChrome();
             applyStoreFilters();

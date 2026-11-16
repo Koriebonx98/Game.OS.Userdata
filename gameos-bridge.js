@@ -149,7 +149,7 @@
         }
 
         // ── Multiplayer (rooms relayed by the Game OS server, the LAN server or a dedicated server) ──
-        const mp = createMultiplayer(titleId, lower, user.username, ev => post({ ev: 'mp', type: ev.type, data: ev.data }));
+        const mp = createMultiplayer(titleId, title, lower, user.username, ev => post({ ev: 'mp', type: ev.type, data: ev.data }));
 
         const methods = {
             init: async () => ({ user: { username: user.username }, game: { titleId, title }, offline: !cloud(), lan: lan(), launch: opts.launch || null, sdk: 1 }),
@@ -178,7 +178,7 @@
         return { flush, detach() { clearInterval(clock); clearInterval(flushTimer); window.removeEventListener('message', onMessage); mp.leave(); flush(); } };
     }
 
-    function createMultiplayer(titleId, lower, username, emit) {
+    function createMultiplayer(titleId, title, lower, username, emit) {
         const gameKey = titleId; // "dev-<id>": the relay accepts community games under this key
         let room = null; // { id, ws, role }
 
