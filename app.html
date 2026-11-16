@@ -723,17 +723,17 @@
                     g.gameOSExclusive = true; storeGames.push(g); storePlatOf.set(g, plat);
                 });
             } catch (_) {}
-            updatedGameOrder = new Map();
-            try {
-                const feed = await getUpdatedGameFeed();
-                feed.forEach((entry, index) => {
-                    updatedGameOrder.set(`${entry.platform}|${String(entry.title).toLowerCase()}`, index);
-                });
-            } catch (err) {
-                console.warn('Updated games feed could not be loaded:', err.message);
-            }
-            await loadGameStats([...new Set(storeGames.map(pf))]);
             storeGames.sort((a, b) => gTitle(a).toLowerCase().localeCompare(gTitle(b).toLowerCase()));
+            renderStore();
+            renderPcLib();
+            // Secondary data loads in the background so the list is shown instantly
+            updatedGameOrder = new Map();
+            const feedP = getUpdatedGameFeed().then(feed => {
+                feed.forEach((entry, index) => updatedGameOrder.set(`${entry.platform}|${String(entry.title).toLowerCase()}`, index));
+            }).catch(err => console.warn('Updated games feed could not be loaded:', err.message));
+            const statsP = loadGameStats([...new Set(storeGames.map(pf))]);
+            await Promise.all([feedP, statsP]);
+            renderStore();
             await loadStoreRecs();
             renderStore();
             renderPcLib();
