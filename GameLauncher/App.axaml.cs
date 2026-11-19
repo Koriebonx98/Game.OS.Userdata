@@ -52,6 +52,14 @@ public partial class App : Application
     {
         DevLogService.Log("[App] OnFrameworkInitializationCompleted — building main window.");
 
+        // A failure inside a UI callback (controller input, quick guide, bindings) must not take the whole app down.
+        Dispatcher.UIThread.UnhandledException += (_, e) =>
+        {
+            DevLogService.Log("[ERROR] Unhandled UI-thread exception (suppressed):");
+            DevLogService.Log(e.Exception.ToString());
+            e.Handled = true;
+        };
+
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var mainVm = new MainViewModel();
