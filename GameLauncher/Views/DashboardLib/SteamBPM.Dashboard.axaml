@@ -12,6 +12,54 @@
         D-pad moves between rows, A opens, X plays, Y opens the library, LB/RB switch tabs.
         Toggle parts on/off in Settings > Design > gear.
     -->
+    <UserControl.Styles>
+        <Style Selector="Button.steam-hero-recent-button, Button.steam-side-recent-button">
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.steam-hero-recent-button:pointerover, Button.steam-hero-recent-button.steam-focused,
+                         Button.steam-side-recent-button:pointerover, Button.steam-side-recent-button.steam-focused">
+            <Setter Property="RenderTransform" Value="scale(1.035)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+
+        <Style Selector="Button.steam-library-end-card">
+            <Setter Property="Width" Value="185"/>
+            <Setter Property="Height" Value="270"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Background" Value="#1E2837"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+            <Setter Property="Transitions">
+                <Transitions>
+                    <TransformOperationsTransition Property="RenderTransform" Duration="0:0:0.14"/>
+                </Transitions>
+            </Setter>
+        </Style>
+        <Style Selector="Button.steam-library-end-card /template/ ContentPresenter">
+            <Setter Property="Background" Value="#1E2837"/>
+            <Setter Property="BorderBrush" Value="#2F3E52"/>
+            <Setter Property="BorderThickness" Value="2"/>
+            <Setter Property="CornerRadius" Value="2"/>
+        </Style>
+        <Style Selector="Button.steam-library-end-card:pointerover, Button.steam-library-end-card:focus-visible">
+            <Setter Property="RenderTransform" Value="scale(1.035)"/>
+            <Setter Property="ZIndex" Value="5"/>
+        </Style>
+        <Style Selector="Button.steam-library-end-card:pointerover /template/ ContentPresenter,
+                         Button.steam-library-end-card:focus-visible /template/ ContentPresenter">
+            <Setter Property="Background" Value="#283548"/>
+            <Setter Property="BorderBrush" Value="#FFFFFF"/>
+            <Setter Property="BorderThickness" Value="2.5"/>
+        </Style>
+    </UserControl.Styles>
+
     <Border Classes="dashboard-steambpm-layout"
             Height="{Binding $parent[ScrollViewer].Bounds.Height}">
         <Panel>
@@ -75,12 +123,14 @@
                            Classes="steam-shell-title"
                            Margin="54,18,54,0"/>
 
-                <!-- Recent games row: hero + cards -->
-                <ScrollViewer Grid.Row="2" Name="GamesScroller"
-                              HorizontalScrollBarVisibility="Hidden"
+                <!-- Recent games row: hero + cards + library end card -->
+                <ScrollViewer Grid.Row="2"
+                              Name="GamesScroller"
+                              HorizontalScrollBarVisibility="Auto"
                               VerticalScrollBarVisibility="Disabled"
+                              AllowAutoHide="True"
                               Margin="0,14,0,0">
-                    <StackPanel Orientation="Horizontal" Spacing="18" Margin="54,12,54,12">
+                    <StackPanel Orientation="Horizontal" Spacing="18" Margin="54,14,54,14">
                         <Button Classes="steam-hero-recent-button"
                                 Classes.steam-focused="{Binding IsSteamHeroFocused}"
                                 IsVisible="{Binding Options.ShowFeatured}"
@@ -148,6 +198,48 @@
                                 </DataTemplate>
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
+
+                        <!-- Last item in Recent Games opens the full Game Library -->
+                        <Button Classes="steam-library-end-card"
+                                IsVisible="{Binding Options.ShowRecent}"
+                                Command="{Binding NavigateToAllGamesCommand}"
+                                ToolTip.Tip="Open full Game Library">
+                            <Grid>
+                                <Border>
+                                    <Border.Background>
+                                        <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,100%">
+                                            <GradientStop Color="#263447" Offset="0"/>
+                                            <GradientStop Color="#161E29" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Border.Background>
+                                </Border>
+                                <StackPanel VerticalAlignment="Center"
+                                            HorizontalAlignment="Center"
+                                            Spacing="10"
+                                            Margin="14">
+                                    <Border Width="44" Height="44" CornerRadius="22" Background="#14FFFFFF"
+                                            HorizontalAlignment="Center">
+                                        <TextBlock Text="⊞"
+                                                   FontSize="22"
+                                                   Foreground="#FFFFFF"
+                                                   HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="GO TO LIBRARY"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               LetterSpacing="0.8"
+                                               Foreground="#FFFFFF"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"/>
+                                    <TextBlock Text="View all games"
+                                               FontSize="11"
+                                               Foreground="#8BA3B8"
+                                               HorizontalAlignment="Center"
+                                               TextAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Button>
                     </StackPanel>
                 </ScrollViewer>
 
@@ -187,7 +279,9 @@
                         <StackPanel Margin="0,14,0,0">
                             <TextBlock Text="{Binding SteamShelfTitle}" Classes="steam-shelf-title"
                                        Margin="54,0,54,10"/>
-                            <ScrollViewer HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Disabled">
+                            <ScrollViewer HorizontalScrollBarVisibility="Auto"
+                                          VerticalScrollBarVisibility="Disabled"
+                                          AllowAutoHide="True">
                                 <ItemsControl ItemsSource="{Binding SteamShelfTiles}" Margin="54,8,54,20">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
