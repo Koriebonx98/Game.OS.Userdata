@@ -1,14 +1,91 @@
 {
- "week": "2026-W47",
- "generated": "2026-11-16T03:14:03.479Z",
+ "week": "2026-W48",
+ "generated": "2026-11-23T03:13:28.918Z",
  "subjects": {
   "nature": [
    [
-    "Which country first successfully farm-hatched and raised bluefin tuna in 1979?",
-    "Japan",
-    "France",
-    "USA",
-    "Philippines"
+    "Snakes and lizards are known to flick their tongue, this behavior is to?",
+    "Capture scent particles",
+    "Taste the sweet air",
+    "Threaten other species",
+    "Attract female mates"
+   ],
+   [
+    "The element involved in making human blood red is which of the following?",
+    "Iron",
+    "Copper",
+    "Iridium",
+    "Cobalt"
+   ],
+   [
+    "Which of the following men does not have a chemical element named after him?",
+    "Sir Isaac Newton",
+    "Albert Einstein",
+    "Niels Bohr",
+    "Enrico Fermi"
+   ],
+   [
+    "Which of the following is not one of the groups on the periodic table?",
+    "Fluorines",
+    "Alkali Metals",
+    "Halogens",
+    "Noble Gases"
+   ],
+   [
+    "What does CPR, the emergency procedure to assist someone who has suffered cardiac arrest, stand for?",
+    "Cardiopulmonary resuscitation",
+    "Chronic pain relief",
+    "Cancer pain release",
+    "Contraceptive prevalence rate"
+   ],
+   [
+    "Approximately how long is a year on Uranus?",
+    "84 Earth years",
+    "47 Earth years",
+    "62 Earth years",
+    "109 Earth years"
+   ],
+   [
+    "Unlike on most salamanders, this part of a newt is flat?",
+    "Tail",
+    "Head",
+    "Teeth",
+    "Feet"
+   ],
+   [
+    "Which of the following is true when alligators are behaving territorially?",
+    "They bellow while showing their tail and neck",
+    "Open their jaws while making a clicking noise",
+    "They run full force at the threat",
+    "Slap their tails on the ground"
+   ],
+   [
+    "What term is best associated with Sigmund Freud?",
+    "Psychoanalysis",
+    "Cognitive-Behavioral Therapy",
+    "Theory of Gravity",
+    "Dialectical Behavior Therapy"
+   ],
+   [
+    "Which animal was part of an Russian domestication experiment in 1959?",
+    "Foxes",
+    "Pigeons",
+    "Bears",
+    "Alligators"
+   ],
+   [
+    "A carnivorous animal eats flesh, what does a nucivorous animal eat?",
+    "Nuts",
+    "Nothing",
+    "Fruit",
+    "Seaweed"
+   ],
+   [
+    "What does DNA stand for?",
+    "Deoxyribonucleic Acid",
+    "Deoxyribogenetic Acid",
+    "Deoxyribogenetic Atoms",
+    "Detoxic Acid"
    ],
    [
     "How many legs do butterflies have?",
@@ -18,55 +95,6 @@
     "0"
    ],
    [
-    "What is the chemical makeup of water?",
-    "H20",
-    "C12H6O2",
-    "CO2",
-    "H"
-   ],
-   [
-    "What is the same in Celsius and Fahrenheit?",
-    "-40",
-    "32",
-    "-39",
-    "-42"
-   ],
-   [
-    "What is the atomic number of the element Strontium?",
-    "38",
-    "73",
-    "47",
-    "11"
-   ],
-   [
-    "What is the name for the auditory illusion of a note that seems to be rising infinitely?",
-    "Shepard Tone",
-    "Glissandro Illusion",
-    "Fransen Effect",
-    "McGurck Effect"
-   ],
-   [
-    "Who made the discovery of X-rays?",
-    "Wilhelm Conrad Röntgen",
-    "Thomas Alva Edison",
-    "James Watt",
-    "Albert Einstein"
-   ],
-   [
-    "What are human nails made of?",
-    "Keratin",
-    "Bone",
-    "Chitin",
-    "Calcium"
-   ],
-   [
-    "How many legs is it biologically impossible for a centipede to have?",
-    "100",
-    "26",
-    "50",
-    "74"
-   ],
-   [
     "What was the name of the first artificial Earth satellite, launched by the Soviet Union in 1957?",
     "Sputnik 1",
     "Soyuz 7K-OK",
@@ -74,174 +102,153 @@
     "Voskhod 3KV"
    ],
    [
-    "Which of these choices is not one of the phases of mitosis?",
-    "Diplophase",
-    "Metaphase",
-    "Anaphase",
-    "Telophase"
+    "The word \"science\" stems from the word \"scire\" meaning what?",
+    "To know",
+    "To measure",
+    "To live",
+    "To count"
    ],
    [
-    "Who discovered the Law of Gravity?",
-    "Sir Isaac Newton",
-    "Galileo Galilei",
-    "Charles Darwin",
-    "Albert Einstein"
+    "What is the national bird of Bahrain?",
+    "Bulbul",
+    "Hummingbird",
+    "Falcon",
+    "Sparrow"
    ],
    [
-    "What is the name of the family that the domestic cat is a member of?",
-    "Felidae",
-    "Felinae",
-    "Felis",
-    "Cat"
+    "What is the name of a rabbit's abode?",
+    "Burrow",
+    "Nest",
+    "Den",
+    "Dray"
    ],
    [
-    "Who developed the first successful polio vaccine in the 1950s?",
-    "Jonas Salk",
-    "John F. Enders",
-    "Thomas Weller",
-    "Frederick Robbins"
+    "In the Scoville scale, what is the hottest chemical?",
+    "Resiniferatoxin",
+    "Capsaicin",
+    "Dihydrocapsaicin",
+    "Tinyatoxin"
    ],
    [
-    "\"The Big Bang Theory\" was first theorized by a priest of what religious ideology?",
-    "Catholic",
-    "Christian",
-    "Jewish",
-    "Islamic"
+    "The now extinct species \"Thylacine\" was native to where?",
+    "Tasmania, Australia",
+    "Baluchistan, Pakistan",
+    "Wallachia, Romania",
+    "Oregon, United States"
    ],
    [
-    "What is the collective noun for vultures?",
-    "Wake",
-    "Ambush",
-    "Building",
-    "Gaze"
-   ],
-   [
-    "How long is a light-year?",
-    "9.461 Trillion Kilometres",
-    "1 AU",
-    "105.40 Earth-years",
-    "501.2 Million Miles"
-   ],
-   [
-    "What is an example of a bacterial pathogen?",
-    "Cholera",
-    "Measles",
-    "AIDS",
-    "Ringworm"
-   ],
-   [
-    "At what temperature does water boil?",
-    "212°F",
-    "200°F",
-    "181°F",
-    "178°F"
-   ],
-   [
-    "What physics principle relates the net electric flux out of a closed surface to the charge enclosed by that surface?",
-    "Gauss's Law",
-    "Faraday's Law",
-    "Ampere's Law",
-    "Biot-Savart Law"
+    "Which Landsat Satellite currently has had the longest operational life?",
+    "Landsat 5",
+    "Landsat 8",
+    "Landsat 7",
+    "Landsat 6"
    ]
   ],
   "music": [
    [
-    "What was the subject of the 2014 song \"CoCo\" by American rapper O. T. Genasis?",
-    "Cocaine",
-    "Conan O'Brien",
-    "Cobalt(II) carbonate",
-    "Coconut cream pie"
+    "From which country does the piano originate?",
+    "Italy",
+    "Germany",
+    "Austria",
+    "France"
    ],
    [
-    "Chino Moreno is the lead singer of which alternative metal band?",
-    "Deftones",
-    "Tool",
-    "Korn",
-    "Type O Negative"
+    "Cryoshell, known for \"Creeping in My Soul\" did the advertising music for what Lego Theme?",
+    "Bionicle",
+    "Hero Factory",
+    "Ben 10 Alien Force",
+    "Star Wars"
    ],
    [
-    "Which of these is NOT the name of an album released by Miami-based producer DJ Khaled?",
-    "Don't Ever Play Yourself",
-    "Major Key",
-    "Suffering From Success",
-    "I Changed A Lot"
+    "How many semitones are in an octave?",
+    "12",
+    "7",
+    "11",
+    "14"
    ],
    [
-    "Which of these is not a song on the album Graduation by Kanye West?",
-    "Waves",
-    "I Wonder",
-    "Big Brother",
-    "The Glory"
+    "What is the real name of American rapper Pitbull?",
+    "Armando Christian Pérez",
+    "Ramón Luis Ayala Rodríguez",
+    "Benito Antonio Martinez Ocasio",
+    "Belcalis Marlenis Almánzar"
    ],
    [
-    "What was the birthplace of musical artist 'Sir Robert Bryson Hall II' (aka. Logic)?",
-    "Maryland, United States",
-    "Atlanta, United States",
-    "London, United Kingdom",
-    "Botswana, Africa"
+    "Which M83 album is the song \"Midnight City\" featured in?",
+    "Hurry Up, We're Dreaming",
+    "Saturdays = Youth",
+    "Before the Dawn Heals Us",
+    "Junk"
    ],
    [
-    "Which term best describes the connection of two sections of a musical piece through a transitional passage?",
-    "Bridge",
-    "Coda",
-    "Capo",
-    "Binary Form"
+    "What album did Bon Iver release in 2016?",
+    "22, A Million",
+    "Bon Iver, Bon Iver",
+    "Blood Bank EP",
+    "For Emma, Forever Ago"
    ],
    [
-    "The 'In the Flesh' tour was used in support of what Pink Floyd album?",
-    "Animals",
-    "The Wall",
-    "Wish You Were Here",
-    "The Final Cut"
+    "In which city did American rap producer DJ Khaled originate from?",
+    "Miami",
+    "New York",
+    "Detroit",
+    "Atlanta"
    ],
    [
-    "What was the release date of the They Might Be Giants album, 'Mink Car?'",
-    "September 11th, 2001",
-    "April 17th, 2003",
-    "November 4th, 1999",
-    "December 20th, 2002"
+    "Which of these artists has NOT been a member of dancehall group Major Lazer?",
+    "Skrillex",
+    "Diplo",
+    "Jillionaire",
+    "Walshy Fire"
    ],
    [
-    "Which of these artists has Lil A collaborated with?",
-    "Lil Fortnite",
-    "Lil Pump",
-    "Boonk Gang",
-    "6ix9ine"
+    "Who had a US and UK number 1 hit in 1962 with the instrumental, 'Telstar'?",
+    "The Tornados",
+    "The Ventures",
+    "The Spotnicks",
+    "The Tremeloes"
    ],
    [
-    "Who was featured in the song \"Words\" by Feint?",
-    "Laura Brehm",
-    "Anna Yvette",
-    "Danyka Nadeau",
-    "Veela"
+    "The song \"Twin Size Mattress\" was written by which band?",
+    "The Front Bottoms",
+    "Twenty One Pilots",
+    "The Wonder Years",
+    "The Smith Street Band"
    ],
    [
-    "A classic 1976 song by Blue Oyster Cult features the advice “Don’t Fear The” what?",
-    "Reaper",
-    "Dark",
-    "Silence",
-    "Clowns"
+    "Which musical group won the Brit Awards in 1985, with George Michael as a member?",
+    "Wham!",
+    "Frankie Goes to Hollywood",
+    "U2",
+    "Culture Club"
    ],
    [
-    "Which of these artists did NOT feature in the fitfh studio album \"Humanz\" by British virtual band Gorillaz?",
-    "Snoop Dogg",
-    "Vince Staples",
-    "Pusha T",
-    "Danny Brown"
+    "Which former boy-band star released hit solo single \"Angels\" in 1997?",
+    "Robbie Williams",
+    "Justin Timberlake",
+    "Harry Styles",
+    "Gary Barlow"
    ],
    [
-    "Which one of these artists appears in the album Deltron 3030?",
-    "Dan the Automater",
-    "Lamarr Kendrick",
-    "Danger Mouse",
-    "CeeLo Green"
+    "The song \"Caramelldansen\" is commonly mistaken as a Japanese song, what language is the song actually sung in?",
+    "Swedish",
+    "Hungarian",
+    "Finnish",
+    "Chinese"
    ],
    [
-    "Which Iron Maiden album did the song \"Dream of Mirrors\" feature in?",
-    "Brave New World",
-    "Dance of Death",
-    "A Matter of Life and Death",
-    "Somewhere in Time"
+    "Which 80s band is fronted by singer/guitarist Robert Smith?",
+    "The Cure",
+    "The Smiths",
+    "Echo & the Bunnymen",
+    "New Order"
+   ],
+   [
+    "Which rapper had an album that went double platinum with no features?",
+    "J. Cole",
+    "Kendrick Lamar",
+    "Drake",
+    "Big Sean"
    ],
    [
     "The song \"Old Town Road\" by American rapper Lil Nas X samples the song \"34 Ghosts IV\" by which band?",
@@ -251,55 +258,48 @@
     "Animal Collective"
    ],
    [
-    "Which of these is Daft Punk's debut single?",
-    "The New Wave",
-    "Da Funk",
-    "Discovery",
-    "Around the World"
+    "What is the last song on the first Panic! At the Disco album?",
+    "Build God, Then We'll Talk",
+    "Nails for Breakfast, Tacks for Snacks",
+    "I Write Sins Not Tragedies",
+    "Lying Is The Most Fun A Girl Can Have Without Taking Her Clothes Off"
    ],
    [
-    "Which American family band had a 1986 top 10 hit with the song 'Crush On You'?",
-    "The Jets",
-    "DeBarge",
-    "The Jacksons",
-    "The Cover Girls"
+    "From which country did the song \"Gangnam Style\" originate from?",
+    "South Korea",
+    "Japan",
+    "North Korea",
+    "China"
    ],
    [
-    "Which Nirvana album had a naked baby on the cover?",
-    "Nevermind",
-    "Bleach",
-    "In Utero",
-    "Incesticide"
+    "In the words of his 1973 song, Bob Dylan is \"knock, knock, knockin\" on which door?",
+    "Heaven's",
+    "Opportunity's",
+    "Angie's",
+    "Eileen's"
    ],
    [
-    "What was Rage Against the Machine's debut album?",
-    "Rage Against the Machine",
-    "Evil Empire",
-    "Bombtrack",
-    "The Battle Of Los Angeles"
-   ],
-   [
-    "What was Taylor Swift's 5th album called?",
-    "1989",
-    "Fearless",
-    "Red",
-    "Speak Now"
+    "What was the birthplace of musical artist 'Sir Robert Bryson Hall II' (aka. Logic)?",
+    "Maryland, United States",
+    "Atlanta, United States",
+    "London, United Kingdom",
+    "Botswana, Africa"
    ]
   ],
   "entertainment": [
    [
-    "In \"Gravity Falls\", the character Bill Cipher remarks that \"the universe is what?\"",
-    "A hologram",
-    "An illusion",
-    "A simulation",
-    "Corrupting"
+    "Which classic book opens with the line \"Call me Ishmael\"?",
+    "Moby Dick",
+    "A Tale of Two Cities",
+    "Kidnapped",
+    "Wuthering Heights"
    ],
    [
-    "In \"My Little Pony: Friendship is Magic\", which of these ponies represents the quality of honesty?",
-    "Applejack",
-    "Twilight Sparkle",
-    "Pinkie Pie",
-    "Rarity"
+    "What year was the first San Diego Comic-Con?",
+    "1970",
+    "2000",
+    "1990",
+    "1985"
    ],
    [
     "When Batman trolls the online chat rooms, what alias does he use?",
@@ -309,95 +309,25 @@
     "BW1129"
    ],
    [
-    "In the TV show \"Rick and Morty\", Rick uses the catchphrase \"Wubba Lubba Dub Dub\", which means what in Birdperson?",
-    "I am in great pain, please help me.",
-    "I pray that my life ends soon.",
-    "Lets get this party started!",
-    "I am suffering, please help me."
+    "In Pre-Super Genesis universe of \"Sonic the Hedgehog\" comic, what was the name of  Sally Acorn's brother?",
+    "Elias Acorn",
+    "Maximillian Acorn",
+    "Alexis Acorn",
+    "Frederick Acorn"
    ],
    [
-    "When did the last episode of \"Futurama\" air before returning in 2023?",
-    "September 4, 2013",
-    "December 25, 2010",
-    "March 28, 1999",
-    "November 4, 2021"
+    "Who played Stan's dog in the South Park episode \"Big Gay Al's Big Gay Boat Ride\"?",
+    "George Clooney",
+    "Jay Leno",
+    "Matt Stone",
+    "Robert Smith"
    ],
    [
-    "According to their longtime nickname, what kind of \"duo\" are Batman & Robin?",
-    "Dynamic",
-    "Dangerous",
-    "Dynastic",
-    "Delirious"
-   ],
-   [
-    "In Calvin and Hobbes, what is the name of Susie's stuffed rabbit?",
-    "Mr. Bun",
-    "Mr. Bunbun",
-    "Mr. Rabbit",
-    "Mr. Hoppy"
-   ],
-   [
-    "Which universe crossover was introduced in the \"Sonic the Hedgehog\" comic issue #247?",
-    "Mega Man",
-    "Super Mario Brothers",
-    "Alex Kidd",
-    "Super Monkey Ball"
-   ],
-   [
-    "In the Homestuck Series, what is the alternate name for the Kingdom of Lights?",
-    "Prospit",
-    "No Name",
-    "Golden City",
-    "Yellow Moon"
-   ],
-   [
-    "What is the designation given to the Marvel Cinematic Universe?",
-    "Earth-199999",
-    "Earth-616",
-    "Earth-10005",
-    "Earth-2008"
-   ],
-   [
-    "Which \"Green Arrow\" sidekick commonly wears a baseball cap?",
-    "Roy Harper",
-    "Black Canary",
-    "Emiko Queen",
-    "Dick Grayson"
-   ],
-   [
-    "Mary Shelley is the author of what classic horror story?",
-    "Frankenstein",
-    "Dracula",
-    "Strange Case of Dr Jekyll and Mr Hyde",
-    "The Legend of Sleepy Hollow"
-   ],
-   [
-    "The book \"The Little Prince\" was written by...",
-    "Antoine de Saint-Exupéry",
-    "Miguel de Cervantes Saavedra",
-    "Jane Austen",
-    "F. Scott Fitzgerald"
-   ],
-   [
-    "Where does Stephen King's \"IT\" take place?",
-    "Derry, Maine",
-    "Rockford, Illinois",
-    "Innsmouth, Massachusetts",
-    "Kingsland, Texas"
-   ],
-   [
-    "Where does the book \"The Silence of the Lambs\" get its title from?",
-    "The main character's trauma in childhood",
-    "The relation it has with killing the innocents",
-    "The villain's favourite meal",
-    "The voice of innocent people being shut by the powerful"
-   ],
-   [
-    "In the novel 1984, written by George Orwell, what is the name of the totalitarian regime that controls Oceania?",
-    "INGSOC",
-    "Neo-Bolshevism",
-    "Obliteration of the Self",
-    "Earth Alliance"
+    "What is the name of the comic about a young boy, and a tiger who is actually a stuffed animal?",
+    "Calvin and Hobbes",
+    "Winnie the Pooh",
+    "Albert and Pogo",
+    "Peanuts"
    ],
    [
     "In the Marvel Universe, the planet of Svartalfheim is home to what race?",
@@ -407,28 +337,182 @@
     "Skrulls"
    ],
    [
-    "In Black Hammer, what dimension does Colonel Weird travel through?",
-    "Para-Zone",
-    "Hyperspace",
-    "Mirror Universe",
-    "Phantom Zone"
+    "What Cartoon Network show aired its first episode on November 4th, 2013?",
+    "Steven Universe",
+    "Regular Show",
+    "Adventure Time",
+    "The Amazing World of Gumball"
    ],
    [
-    "By what name was the author Eric Blair better known?",
-    "George Orwell",
-    "Aldous Huxley",
-    "Ernest Hemingway",
-    "Ray Bradbury"
+    "What is the name of Sherlock Holmes's brother?",
+    "Mycroft Holmes",
+    "Mederi Holmes",
+    "Martin Holmes",
+    "Herbie Hancock Holmes"
    ],
    [
-    "In \"Gravity Falls\", how much does Waddles weigh when Mable wins him in \"The Time Traveler's Pig\"?",
-    "15 pounds",
-    "20 pounds",
-    "10 pounds",
-    "30 pounds"
+    "Who wrote \"Harry Potter\"?",
+    "J.K. Rowling",
+    "J.R.R. Tolkien",
+    "Terry Pratchett",
+    "Daniel Radcliffe"
+   ],
+   [
+    "What are the Three Virtues of Bionicle?",
+    "Unity, Duty, Destiny",
+    "Build, Play, Change",
+    "Work, Play, Live",
+    "Forge, Build, Fight"
+   ],
+   [
+    "What is Ron Weasley's middle name?",
+    "Bilius",
+    "Arthur",
+    "John",
+    "Dominic"
+   ],
+   [
+    "What is the alter-ego of the DC comics character \"Superman\"?",
+    "Clark Kent",
+    "Bruce Wayne",
+    "Arthur Curry",
+    "John Jones"
+   ],
+   [
+    "What's the second book in George R. R. Martin's 'A Song of Ice and Fire' series?",
+    "A Clash of Kings",
+    "A Dance with Dragons",
+    "A Storm of Swords",
+    "A Feast for Crows"
+   ],
+   [
+    "The book \"The Little Prince\" was written by...",
+    "Antoine de Saint-Exupéry",
+    "Miguel de Cervantes Saavedra",
+    "Jane Austen",
+    "F. Scott Fitzgerald"
+   ],
+   [
+    "What is the title of the first Sherlock Holmes book by Arthur Conan Doyle?",
+    "A Study in Scarlet",
+    "The Sign of the Four",
+    "A Case of Identity",
+    "The Doings of Raffles Haw"
+   ],
+   [
+    "Who wrote the 1967 horror novel \"Rosemary's Baby\"?",
+    "Ira Levin",
+    "Stephen King",
+    "Robert Bloch",
+    "Mary Shelley"
+   ],
+   [
+    "Which of these books was NOT written by the Czech author Karel Čapek?",
+    "Journey to the Center of the Earth",
+    "The War with the Newts",
+    "R.U.R. (Rossum's Universal Robots)",
+    "Dashenka, or the Life of a Puppy"
+   ],
+   [
+    "The main six year old protagonist in Calvin and Hobbes is named after what theologian?",
+    "John Calvin",
+    "Calvin Klein",
+    "Calvin Coolidge",
+    "Phillip Calvin McGraw"
+   ],
+   [
+    "In the Dreamworks animated movie \"Madagascar,\" who voices Maurice the lemur?",
+    "Cedric the Entertainer",
+    "Jack Black",
+    "Sacha Baron Cohen",
+    "Chris Rock"
    ]
   ],
   "culture": [
+   [
+    "Which of these are the name of a famous marker brand?",
+    "Copic",
+    "Dopix",
+    "Cofix",
+    "Marx"
+   ],
+   [
+    "Who painted \"The Starry Night\"?",
+    "Vincent van Gogh",
+    "Edvard Munch",
+    "Pablo Picasso",
+    "Claude Monet"
+   ],
+   [
+    "What nationality was the famous artist Pablo Picasso?",
+    "Spanish",
+    "French",
+    "Italian",
+    "German"
+   ],
+   [
+    "What French sculptor designed the Statue of Liberty?",
+    "Frédéric Auguste Bartholdi",
+    "Jean-Léon Gérôme",
+    "Auguste Rodin",
+    "Henri Matisse"
+   ],
+   [
+    "What year did Albrecht Dürer create the painting \"The Young Hare\"?",
+    "1502",
+    "1702",
+    "1402",
+    "1602"
+   ],
+   [
+    "In African mythology, Anansi is a trickster and storyteller who takes the shape of which animal?",
+    "Spider",
+    "Wild dog",
+    "Monkey",
+    "Crocodile"
+   ],
+   [
+    "Who painted the painting \"Nighthawks\"?",
+    "Edward Hopper",
+    "Johannes Vermeer",
+    "Vincent van Gogh",
+    "Salvador Dali"
+   ],
+   [
+    "Which Norse God has a horse named Sleipnir?",
+    "Odin",
+    "Thor",
+    "Frigg",
+    "Balder"
+   ],
+   [
+    "Which one of these paintings is not by Caspar David Friedrich?",
+    "The Black Sea",
+    "The Sea of Ice",
+    "Wanderer above the Sea of Fog",
+    "The Monk by the Sea"
+   ],
+   [
+    "What was the first successful and commercially viable photographic technique?",
+    "The Daguerreotype",
+    "Collodion process",
+    "The Turin Shroud",
+    "Kodachrome film"
+   ],
+   [
+    "Which time signature is commonly known as “Cut Time?”",
+    "2/2",
+    "4/4",
+    "6/8",
+    "3/4"
+   ],
+   [
+    "Who painted The Starry Night?",
+    "Vincent van Gogh",
+    "Pablo Picasso",
+    "Leonardo da Vinci",
+    "Michelangelo"
+   ],
    [
     "Who is the God Loki's son?",
     "Fenrir",
@@ -437,109 +521,11 @@
     "Sigyn"
    ],
    [
-    "Which art movement was Pablo Picasso known for co-founding?",
-    "Cubism",
-    "Futurism",
-    "Expressionism",
-    "Impressionism"
-   ],
-   [
-    "What is the name of the wildman that Gilgamesh befriends and goes on adventures with?",
-    "Enkidu",
-    "Ishtar",
-    "Inanna",
-    "Agga"
-   ],
-   [
-    "This Greek mythological figure is the god/goddess of battle strategy (among other things).",
-    "Athena",
-    "Ares",
-    "Artemis",
-    "Apollo"
-   ],
-   [
-    "Who is the father of Icarus, who flew too close to the sun?",
-    "Daedalus",
-    "Minos",
-    "Perseus",
-    "Zeus"
-   ],
-   [
-    "Hera is god of...",
-    "Marriage",
-    "Agriculture",
-    "Sea",
-    "War"
-   ],
-   [
-    "Nidhogg is a mythical creature from what mythology?",
-    "Norse",
-    "Egyptian",
-    "Greek",
-    "Hindu"
-   ],
-   [
-    "What is the name of the Greek god of blacksmiths?",
-    "Hephaestus",
-    "Dyntos",
-    "Vulcan",
-    "Artagatus"
-   ],
-   [
-    "What were Marcel Duchamp's readymades?",
-    "utilitarian objects elevated to the status of art",
-    "a series focused on color and light as opposed to line and shape",
-    "paintings with a barely visible outlined square",
-    "a group of identical steel boxes jutting from the wall"
-   ],
-   [
-    "What nationality was the surrealist painter Salvador Dali?",
-    "Spanish",
-    "Italian",
-    "French",
-    "Portuguese"
-   ],
-   [
-    "The Nike apparel and footwear brand takes it's name from the Greek goddess of what?",
-    "Victory",
-    "Courage",
-    "Strength",
-    "Honor"
-   ],
-   [
-    "What year was the Mona Lisa finished?",
-    "1504",
-    "1487",
-    "1523",
-    "1511"
-   ],
-   [
-    "A minotaur is half human half what?",
-    "Bull",
-    "Cow",
-    "Horse",
-    "Eagle"
-   ],
-   [
-    "Who is a minor god that is protector and creator of various arts, such as cheese making and bee keeping.",
-    "Aristaeus",
-    "Autonoe",
-    "Carme",
-    "Cephisso"
-   ],
-   [
-    "What animal did Queen Pasipahe sleep with before she gave birth to the Minotaur in Greek Mythology?",
-    "Bull",
-    "Pig",
-    "Ox",
-    "Horse"
-   ],
-   [
-    "Which greek god/goddess tossed a golden apple with the words \"for the fairest\" into the middle of the feast of the gods?",
-    "Eris",
-    "Hades",
-    "Ares",
-    "Artemis"
+    "Who is the god of war in Polynesian mythology?",
+    "'Oro",
+    "Hina",
+    "Kohara",
+    "Māui"
    ],
    [
     "Talos, the mythical giant bronze man, was the protector of which island?",
@@ -549,353 +535,451 @@
     "Cyprus"
    ],
    [
-    "The painting \"The Starry Night\" by Vincent van Gogh was part of which art movement?",
-    "Post-Impressionism",
-    "Romanticism",
-    "Neoclassical",
-    "Impressionism"
+    "Who is the father of Icarus, who flew too close to the sun?",
+    "Daedalus",
+    "Minos",
+    "Perseus",
+    "Zeus"
    ],
    [
-    "According to Algonquian folklore, how does one transform into a Wendigo?",
-    "Participating in cannibalism.",
-    "Excessive mutilation of animal corpses.",
-    "Performing a ritual involving murder.",
-    "Drinking the blood of many slain animals."
+    "What nationality was the surrealist painter Salvador Dali?",
+    "Spanish",
+    "Italian",
+    "French",
+    "Portuguese"
    ],
    [
-    "An Ankh is the Egyptian Hieroglyph for what?",
-    "Life",
-    "Love",
-    "Hatred",
-    "Poison"
+    "The painting \"Guernica\" by Pablo Picasso expressed emotions of dread in response to which war?",
+    "Spanish Civil War",
+    "World War I",
+    "The Crimean War",
+    "Spanish-American War"
+   ],
+   [
+    "In Greek mythology, Persephone must return to the underworld because she had eaten what kind of seeds?",
+    "Pomegranate",
+    "Sunflower",
+    "Orange",
+    "Fig"
+   ],
+   [
+    "In Norse mythology, what is the name of the serpent which eats the roots of the ash tree Yggdrasil?",
+    "Nidhogg",
+    "Bragi",
+    "Odin",
+    "Ymir"
    ]
   ],
   "movies": [
    [
-    "What year did the television company BBC officially launch the channel BBC One?",
-    "1936",
-    "1948",
-    "1932",
-    "1955"
+    "Which Batman villain is Mark Hamill known for having voiced?",
+    "The Joker",
+    "Two-Face",
+    "Bane",
+    "Hush"
    ],
    [
-    "Which of the following movies was not based on a book?",
-    "Citizen Kane",
-    "The Godfather",
-    "Forrest Gump",
-    "Jurassic Park"
+    "In the show \"The Office\" who does Michael Scott eventually end up with?",
+    "Holly Flax",
+    "Angela Martin",
+    "Jan Levinson",
+    "Pam Beesly"
    ],
    [
-    "In the 1951 movie \"The Day The Earth Stood Still\" which US city did the alien spaceship land in?",
-    "Washington D.C.",
-    "Los Angeles",
-    "New York",
-    "Philadelphia"
+    "Who is revealed to be the villain at the end of the first live action Scooby Doo movie?",
+    "Scrappy Doo",
+    "Old Man Mason",
+    "The Local News Team",
+    "Fred"
    ],
    [
-    "What was Marilyn Monroe`s character's first name in the film \"Some Like It Hot\"?",
-    "Sugar",
-    "Honey",
-    "Caramel",
-    "Candy"
+    "What mutated animals act as monsters in the movie 'Night of the Lepus'?",
+    "Rabbits",
+    "Dogs",
+    "Rats",
+    "Bats"
    ],
    [
-    "In the film \"John Wick\" why does John Wick get out of retirement?",
-    "His puppy is killed and his car was stolen",
-    "He was punched in the face",
-    "He got mugged",
-    "He needed money"
+    "In the movie \"V for Vendetta,\" what is the date that masked vigilante \"V\" urges people to remember?",
+    "November 5th",
+    "November 6th",
+    "November 4th",
+    "September 5th"
    ],
    [
-    "For the film \"Raiders of The Lost Ark\", what was Harrison Ford sick with during the filming of the Cairo chase?",
-    "Dysentery",
-    "Anemia",
-    "Constipation",
-    "Acid Reflux"
+    "Bela Lugosi was a Hungarian-American actor best known for his starring role of what 1931 horror film?",
+    "Count Dracula",
+    "Dr Frankenstein",
+    "Werewolf",
+    "The Creature from the Black Lagoon"
    ],
    [
-    "Who directed the 2017 movie \"The Shape of Water\"?",
-    "Guillermo del Toro",
-    "Steven Spielberg",
-    "James Cameron",
-    "Martin Scorsese"
+    "Who voices the main character Blu in the 2011 animated film \"Rio\"?",
+    "Jesse Eisenberg",
+    "Michael Cera",
+    "Jonah Hill",
+    "Zach Galifianakis"
    ],
    [
-    "Who was the first ever actor to play \"The Doctor\" on \"Doctor Who\"?",
-    "William Hartnell",
+    "Which movie includes a giant bunny-like spirit who has magic powers including growing trees?",
+    "My Neighbor Totoro",
+    "Hop",
+    "Rise of the Guardians",
+    "Alice in Wonderland"
+   ],
+   [
+    "Which of the following is NOT a quote from the 1942 film Casablanca?",
+    "\"Frankly, my dear, I don't give a damn.\"",
+    "\"Here's lookin' at you, kid.\"",
+    "“Of all the gin joints, in all the towns, in all the world, she walks into mine…”",
+    "\"Round up the usual suspects.\""
+   ],
+   [
+    "Which of these Nickelodeon game shows aired first?",
+    "Double Dare",
+    "Nick Arcade",
+    "Finders Keepers",
+    "Nickelodeon Guts"
+   ],
+   [
+    "In the Sci-Fi television show Doctor Who, who plays the Tenth Doctor?",
     "David Tennant",
+    "William Hartnell",
     "Peter Capaldi",
-    "Tom Baker"
+    "Peter Davison"
    ],
    [
-    "In the movie \"Scream\" who is Ghost Face?",
-    "Billy Loomis and Stu Macher",
-    "Dewey Riley",
-    "Sidney Prescott",
-    "Archie Prescott and Philip Marv"
+    "In which British seaside town was the BBC sitcom \"Fawlty Towers\" set?",
+    "Torquay",
+    "Blackpool",
+    "Bournemouth",
+    "Great Yarmouth"
    ],
    [
-    "Which actor from The Young Ones also played Lord Flashheart in one episode of Blackadder II?",
-    "Rik Mayall",
-    "Adrian Edmondson",
-    "Nigel Planer",
-    "Christopher Ryan"
+    "Cesar Romero played which iconic Batman villain from the 1960's TV show?",
+    "The Joker",
+    "The Penguin",
+    "The Riddler",
+    "Mr. Freeze"
    ],
    [
-    "What is the name of the supercomputer located in the control room in \"Jurassic Park\" (1993)?",
-    "Thinking Machines CM-5",
-    "Cray X-MP",
-    "Cray XK7",
-    "IBM Blue Gene/Q"
+    "Who was the original voice actor of Shaggy Rogers in Scooby-Doo?",
+    "Casey Kasem",
+    "Dante Basco",
+    "Billy West",
+    "Frank Welker"
    ],
    [
-    "Who was the director of \"Scott Pilgrim vs. the World (2010)\"?",
-    "Edgar Wright",
-    "Phil Lord",
-    "Chris Miller",
-    "Seth Rogan"
+    "Where does the original Friday The 13th movie take place?",
+    "Camp Crystal Lake",
+    "Packanack",
+    "Higgins Haven",
+    "Camp Forest Green"
    ],
    [
-    "In the \"Jurassic Park\" universe, what is the name of the island that contains InGen's Site B?",
-    "Isla Sorna",
-    "Isla Nublar",
-    "Isla Pena",
-    "Isla Muerta"
+    "In Breaking Bad, the initials W.W. refer to which of the following?",
+    "Walter White",
+    "William Wolf",
+    "Willy Wonka",
+    "Wally Walrus"
    ],
    [
-    "In \"Star Trek\", what sauce is commonly used by Klingons on bregit lung?",
-    "Grapok sauce",
-    "Gazorpazorp pudding",
-    "Sweet chili sauce",
-    "Grapork sauce"
+    "In Battlestar Galactica (2004), what is the name of the President of the Twelve Colonies?",
+    "Laura Roslin",
+    "William Adama",
+    "Tricia Helfer",
+    "Harry Stills"
    ],
    [
-    "In the Lord of the Rings: The Two Towers, where are the party of orcs taking the hobbits?",
-    "Isengard",
-    "Rivendell",
-    "Mordor",
-    "Moria"
+    "In the Super Mario Bros. Movie (2023), who plays Toad?",
+    "Keegan-Michael Key",
+    "Seth Rogan",
+    "Charlie Day",
+    "Jack Black"
    ],
    [
-    "In what year was the first Transformers movie released?",
-    "1986",
-    "2007",
-    "1984",
-    "2009"
+    "The 2016 Disney animated film 'Moana' is based on which culture?",
+    "Polynesian",
+    "Native American",
+    "Japanese",
+    "Nordic"
    ],
    [
-    "In Naruto: Shippuden, which of the following elements is a \"Kekkei Tōta?\"",
-    "Particle Style",
-    "Any Doujutsu",
-    "Shadow Style",
-    "Ice Style"
-   ],
-   [
-    "What was the name of the planet in \"Aliens\"?",
-    "LV-426",
-    "Weyland Yutani Corporation Base",
-    "FR-838",
-    "DI-621"
-   ],
-   [
-    "In the television show Breaking Bad, what is the street name of Walter and Jesse's notorious product?",
-    "Blue Sky",
-    "Baby Blue",
-    "Rock Candy",
-    "Pure Glass"
-   ],
-   [
-    "Who is the main protagonist in, the 1985 film, Back to the Future?",
-    "Marty McFly",
-    "Emmett \"Doc\" Brown",
-    "Biff Tannen",
-    "George McFly"
+    "Which director directed the movie \"Pan's Labyrinth\"?",
+    "Guillermo Del Toro",
+    "Alfonso Cuarón",
+    "Alejandro González Iñárritu",
+    "Alejandro Jodorowsky"
    ]
   ],
   "places": [
    [
-    "The land mass of modern day Turkey is called what?",
-    "Anatolia",
-    "Ismuth of Ottoma",
-    "Ottoma",
-    "Ismuth of Anatolia"
+    "What is the northernmost human settlement with year round inhabitants?",
+    "Alert, Canada",
+    "Nagurskoye, Russia",
+    "McMurdo Station, Antarctica",
+    "Honningsvåg, Norway"
    ],
    [
-    "Which of the following countries does NOT recognize Armenia as an independent country?",
-    "Pakistan",
-    "Iran",
-    "Turkey",
-    "Azerbaijan"
+    "Which US state has the highest population?",
+    "California",
+    "New York",
+    "Texas",
+    "Florida"
    ],
    [
-    "The land of Gotland is located in which European country?",
+    "What is the capital of the US State of New York?",
+    "Albany",
+    "Buffalo",
+    "New York",
+    "Rochester"
+   ],
+   [
+    "Which of these countries is NOT the only country to start with that letter of the alphabet?",
+    "Zambia",
+    "Qatar",
+    "Yemen",
+    "Oman"
+   ],
+   [
+    "Which country is completely landlocked by South Africa?",
+    "Lesotho",
+    "Swaziland",
+    "Botswana",
+    "Zimbabwe"
+   ],
+   [
+    "What is the capital city of New Zealand?",
+    "Wellington",
+    "Auckland",
+    "Christchurch",
+    "Melbourne"
+   ],
+   [
+    "In which country is Tallinn located?",
+    "Estonia",
+    "Finland",
     "Sweden",
-    "Denmark",
+    "Poland"
+   ],
+   [
+    "What is the only state in the United States that does not have a flag in a shape with 4 edges?",
+    "Ohio",
+    "Florida",
+    "Idaho",
+    "New Mexico"
+   ],
+   [
+    "The Svalbard Archipelago is a dependency of which country?",
     "Norway",
-    "Germany"
+    "Denmark",
+    "Iceland",
+    "Russia"
    ],
    [
-    "What are the four corner states of the US?",
-    "Utah, Colorado, Arizona, New Mexico",
-    "Oregon, Idaho, Nevada, Utah",
-    "Kansas, Oklahoma, Arkansas, Louisiana",
-    "South Dakota, Minnesota, Nebraska, Iowa"
+    "Which of these is an official currency of the Cook Islands?",
+    "New Zealand Dollar",
+    "United States Dollar",
+    "British Pound",
+    "Australian Dollar"
    ],
    [
-    "Lake Titicaca is located between which two nations?",
-    "Peru and Bolivia",
-    "Kenya and Uganda",
-    "Mexico and the United States",
-    "India and Bangladesh"
+    "What is the name of the capital of Turkey?",
+    "Ankara",
+    "Istanbul",
+    "Izmir",
+    "Bursa"
    ],
    [
-    "How many rivers are in Saudi Arabia?",
-    "0",
-    "1",
-    "2",
-    "3"
+    "What is the capital of Chile?",
+    "Santiago",
+    "Valparaíso",
+    "Copiapó",
+    "Antofagasta"
    ],
    [
-    "What is the capital of Burkina Faso?",
-    "Ouagadougou",
-    "Yaoundé",
-    "Yamoussoukro",
-    "Abidjan"
+    "Which country features a maple leaf on its flag?",
+    "Canada",
+    "Mexico",
+    "Brazil",
+    "India"
    ],
    [
-    "Which of these countries is not a United Nations member state?",
-    "Niue",
-    "Tuvalu",
-    "South Sudan",
-    "Montenegro"
+    "What is the official language in Liechtenstein?",
+    "German",
+    "French",
+    "English",
+    "Italian"
    ],
    [
-    "Which of these Mediterranian islands is under the sovereign rule of France?",
-    "Corsica",
-    "Majorca",
-    "Sardinia",
-    "Malta"
+    "What is the administrative centre and largest settlement on the Norwegian archipelago of Svalbard?",
+    "Longyearbyen",
+    "Sveagruva",
+    "Ny-Ålesund",
+    "Barentsburg"
    ],
    [
-    "In what part of Wales will you find the village Llanfairpwllgwyngyllgogerychwyrndrobwllllantysiliogogogoch?",
-    "Anglesey",
-    "Pembrokeshire",
-    "Wrexham",
-    "Bridgend"
+    "The Japanese district Akihabara is also known by what nickname?",
+    "Electric Town",
+    "Moon Walk River",
+    "Otaku Central",
+    "Big Eyes"
    ],
    [
-    "What is the capital of Greenland?",
-    "Nuuk",
-    "Sisimiut",
-    "Narsaq",
-    "Maniitsoq"
+    "Which of the following is the longest river in Europe?",
+    "Volga",
+    "Danube",
+    "Ural",
+    "Dnieper"
    ],
    [
-    "What is the capital of Vietnam?",
-    "Hanoi",
-    "Da Nang",
-    "Hai Phong",
-    "Ho Chi Minh City"
+    "What African country has Portuguese as its official language?",
+    "Mozambique",
+    "Botswana",
+    "Gabon",
+    "Togo"
    ],
    [
-    "Which of the following language families is the most controversial amongst modern linguists?",
-    "Altaic",
-    "Sino-Tibetan",
-    "Dravidian",
-    "Indo-European"
+    "What is the capital of Cyprus?",
+    "Nicosia",
+    "Paphos",
+    "Limassol",
+    "Larnaca"
    ],
    [
-    "What is the name of one of the Neo-Aramaic languages spoken by the Jewish population from Northwestern Iraq?",
-    "Lishana Deni",
-    "Hulaulá",
-    "Lishan Didan",
-    "Chaldean Neo-Aramaic"
-   ],
-   [
-    "Which Canadian province has Charlottetown as its capital?",
-    "Prince Edward Island",
-    "Saskachewan",
-    "Northwest Terrirories",
-    "Ontario"
-   ],
-   [
-    "What is the capital of Seychelles?",
-    "Victoria",
-    "Luanda",
-    "N'Djamena",
-    "Tripoli"
-   ],
-   [
-    "Which country claims ownership of the disputed state Kosovo?",
-    "Serbia",
-    "Croatia",
-    "Albania",
-    "Macedonia"
-   ],
-   [
-    "Guyana is in which continent?",
-    "South America",
-    "Africa",
-    "North America",
-    "Asia"
-   ],
-   [
-    "Where is the \"Sonoran Desert\" located?",
-    "North America",
-    "South America",
-    "Asia",
-    "Africa"
-   ],
-   [
-    "What is the capital of Jamaica?",
-    "Kingston",
-    "San Juan",
-    "Port-au-Prince",
-    "Bridgetown"
+    "Which Russian oblast forms a border with Poland?",
+    "Kaliningrad",
+    "Samara",
+    "Nizhny Novgorod",
+    "Omsk"
    ]
   ],
   "general": [
    [
-    "Who is considered the \"Father of Modern Philosophy\"?",
-    "René Descartes",
-    "Plato",
-    "Albert Einstein",
-    "Antoine Lavoiser"
+    "The Mexican Beer \"Corona\" is what type of beer?",
+    "Pale Lager",
+    "India Pale Ale",
+    "Pilfsner",
+    "Baltic Porter"
    ],
    [
-    "What machine element is located in the center of fidget spinners?",
-    "Bearings",
-    "Axles",
-    "Gears",
-    "Belts"
+    "If you planted the seeds of Quercus robur, what would grow?",
+    "Trees",
+    "Grains",
+    "Vegetables",
+    "Flowers"
    ],
    [
-    "Which of these words means \"idle spectator\"?",
-    "Gongoozler",
-    "Gossypiboma",
-    "Jentacular",
-    "Meupareunia"
+    "Which country has the most Trappist breweries?",
+    "Belgium",
+    "Netherlands",
+    "France",
+    "USA"
    ],
    [
-    "In DC comics where does the Green Arrow (Oliver Queen) live?",
-    "Star City",
-    "Central City",
-    "Gotham City",
-    "Metropolis"
+    "What nation produces roughly 40% of the world’s vanilla?",
+    "Madagascar",
+    "Indonesia",
+    "China",
+    "Mexico"
    ],
    [
-    "Computer manufacturer Compaq was acquired for $25 billion dollars in 2002 by which company?",
-    "Hewlett-Packard",
-    "Toshiba",
-    "Asus",
-    "Dell"
+    "In the video-game franchise Kingdom Hearts, the main protagonist, carries a weapon with what shape?",
+    "Key",
+    "Sword",
+    "Pen",
+    "Cellphone"
    ],
    [
-    "What company developed the vocaloid Hatsune Miku?",
-    "Crypton Future Media",
-    "Sega",
-    "Sony",
-    "Yamaha Corporation"
+    "What style of beer will typically have a higher than average hop content?",
+    "India Pale Ale",
+    "Stout",
+    "Extra Special Bitter",
+    "Scotch Ale"
+   ],
+   [
+    "What is the weight of a Gold Bar in Fallout: New Vegas?",
+    "35 Pounds",
+    "30 Pounds",
+    "40 Pounds",
+    "32.50 Pounds"
+   ],
+   [
+    "Going by the International Code of Signals, which single flag is interpreted as \"I require assistance (not distress)\"?",
+    "Victor",
+    "Kilo",
+    "Papa",
+    "Delta"
+   ],
+   [
+    "Which of the following chemicals are found in eggplant seeds?",
+    "Nicotine",
+    "Mescaline",
+    "Cyanide",
+    "Psilocybin"
+   ],
+   [
+    "Which one of these Swedish companies was founded in 1943?",
+    "IKEA",
+    "H & M",
+    "Lindex",
+    "Clas Ohlson"
+   ],
+   [
+    "A doctor with a PhD is a doctor of what?",
+    "Philosophy",
+    "Psychology",
+    "Phrenology",
+    "Physical Therapy"
+   ],
+   [
+    "How many letters are there in the English alphabet?",
+    "26",
+    "28",
+    "23",
+    "24"
+   ],
+   [
+    "How many notes are there on a standard grand piano?",
+    "88",
+    "98",
+    "108",
+    "78"
+   ],
+   [
+    "What was the height of Kingda Ka, the tallest roller coaster in the world from 2005 to 2024?",
+    "456 ft",
+    "500 ft",
+    "429 ft",
+    "396 ft"
+   ],
+   [
+    "What year was the RoboSapien toy robot released?",
+    "2004",
+    "2000",
+    "2001",
+    "2006"
+   ],
+   [
+    "What word represents the letter 'T' in the NATO phonetic alphabet?",
+    "Tango",
+    "Target",
+    "Taxi",
+    "Turkey"
+   ],
+   [
+    "\"Nephelococcygia\" is the practice of doing what?",
+    "Finding shapes in clouds",
+    "Sleeping with your eyes open",
+    "Breaking glass with your voice",
+    "Swimming in freezing water"
+   ],
+   [
+    "If you are traveling at a speed of 80 mph, how long will it take you to drive 80 miles?",
+    "60 minutes",
+    "90 minutes",
+    "30 minutes",
+    "50 minutes"
    ],
    [
     "Directly between the Washington Monument and the Reflecting Pool is a memorial to which war?",
@@ -905,223 +989,83 @@
     "American Revolutionary War"
    ],
    [
-    "Which mountain has the highest peak in Europe?",
-    "Mount Elbrus, Russia",
-    "Shkhara, Georgia",
-    "Mount Ararat, Turkey",
-    "Mont Blanc, France"
-   ],
-   [
-    "What are the tallest twin buildings in the world, with a height of 1,483 ft (451.9 m)?",
-    "Petronas Twin Towers, Malaysia",
-    "Emirates Towers, United Arab Emirates",
-    "Huaguoyuan Towers, China",
-    "Palm Towers, Qatar"
-   ],
-   [
-    "What is the name of the main Character from the Series: Dead Space?",
-    "Isaac Clarke",
-    "Ellen Ripley",
-    "Commander Shepard",
-    "Captain Kirk"
-   ],
-   [
-    "Which best selling toy of 1983 caused hysteria, resulting in riots breaking out in stores?",
-    "Cabbage Patch Kids",
-    "Transformers",
-    "Care Bears",
-    "Rubik’s Cube"
-   ],
-   [
-    "The Quadrangularis Reversum is best described as which of the following?",
-    "A percussion instrument",
-    "A building in Oxford University",
-    "A chess move",
-    "A geometric theorem"
-   ],
-   [
-    "Which essential condiment is also known as Japanese horseradish?",
-    "Wasabi",
-    "Mentsuyu",
-    "Karashi",
-    "Ponzu"
-   ],
-   [
-    "When was the Declaration of Independence approved by the Second Continental Congress?",
-    "July 4, 1776",
-    "May 4, 1776",
-    "June 4, 1776",
-    "July 2, 1776"
-   ],
-   [
-    "Out of these four buildings, which one is the tallest, with a height of 1,250 ft (381 m)?",
-    "Empire State Building, United States",
-    "Bank of China Tower, Hong Kong",
-    "Federation Tower, Russia",
-    "Gevora Hotal, United Arab Emirates"
-   ],
-   [
-    "Death Valley's Badwater Basin is North America's point of lowest elevation at how many feet below sea level?",
-    "282 feet",
-    "79 feet",
-    "1,640 feet",
-    "12,092 feet"
-   ],
-   [
-    "The drug cartel run by Pablo Escobar originated in which South American city?",
-    "Medellín",
-    "Bogotá",
-    "Quito",
-    "Cali"
-   ],
-   [
-    "What do the Dutch call their language?",
-    "Nederlands",
-    "Dansk",
-    "Deutsch",
-    "Hollander"
-   ],
-   [
-    "The word \"abulia\" means which of the following?",
-    "The inability to make decisions",
-    "The inability to stand up",
-    "The inability to concentrate on anything",
-    "A feverish desire to rip one's clothes off"
-   ],
-   [
-    "What is Cynophobia the fear of?",
-    "Dogs",
-    "Birds",
-    "Flying",
-    "Germs"
+    "Which of the following buildings is example of a structure primarily built in the Art Deco architectural style?",
+    "Niagara Mohawk Building",
+    "Taipei 101",
+    "One Detroit Center",
+    "Westendstrasse 1"
    ]
   ],
   "science": [
    [
-    "Where did the dog breed \"Chihuahua\" originate?",
-    "Mexico",
-    "France",
-    "Spain",
-    "Russia"
+    "In quantum physics, which of these theorised sub-atomic particles has yet to be observed?",
+    "Graviton",
+    "Z boson",
+    "Tau neutrino",
+    "Gluon"
    ],
    [
-    "Which of these stars is the largest?",
-    "UY Scuti",
-    "VY Canis Majoris",
-    "Betelgeuse",
-    "RW Cephei"
+    "Which one of these is scientific term for \"Brain Freeze\"?",
+    "Sphenopalatine Ganglioneuralgia",
+    "Hyacinthoides Italica",
+    "Amaranthus Retroflexus",
+    "Amblyomma Americanum"
    ],
    [
-    "What was the category of the 2005 hurricane, Hurricane Katrina, in the Saffir-Simpson hurricane wind scale?",
-    "Category 5",
-    "Category 1",
-    "Category 4",
-    "Category 2"
+    "Which is the chemical name of H2O?",
+    "Dihydrogen Monoxide",
+    "Ammonium chloride",
+    "Anhydrous Sodium Carbonate",
+    "Manganese dioxide"
    ],
    [
-    "What is the hottest planet in the Solar System?",
-    "Venus",
-    "Mars",
-    "Mercury",
-    "Jupiter"
+    "What is the mathematical formula of Ohm's law?",
+    "V = I*R",
+    "I = V*R",
+    "R = V*I",
+    "V = I / R"
    ],
    [
-    "What do you study if you are studying entomology?",
-    "Insects",
-    "Humans",
-    "the Brain",
-    "Fish"
+    "What is the molecular formula of Glucose?",
+    "C6H12O6",
+    "C2H4O2",
+    "K+",
+    "CH4"
    ],
    [
-    "How many chromosomes are in your body cells?",
-    "23",
-    "21",
-    "22",
-    "24"
+    "What does the scientific name of the Cambrian-Period sea creature Anomalocaris mean?",
+    "Abnormal Shrimp",
+    "Deformed Fish",
+    "Strange Crab",
+    "Anomalous Clam"
    ],
    [
-    "Approximately what percentage of Earth's atmosphere is Oxygen?",
-    "21%",
-    "54%",
-    "78%",
-    "7%"
+    "Which moon is the only satellite in our solar system to possess a dense atmosphere?",
+    "Titan",
+    "Europa",
+    "Miranda",
+    "Callisto"
    ],
    [
-    "How many planets are there in the Solar System?",
-    "8",
-    "9",
-    "11",
-    "10"
+    "How many baby/milk teeth does a human child have in total?",
+    "20",
+    "10",
+    "15",
+    "25"
    ],
    [
-    "How much radiation does a banana emit?",
-    "0.1 Microsievert",
-    "0.3 Microsievert",
-    "0.5 Microsievert",
-    "0.7 Microsievert"
+    "Which major extinction event was caused by an asteroid collision and eliminated the majority of non-avian dinosaurs?",
+    "Cretaceous-Paleogene",
+    "Triassic–Jurassic",
+    "Permian–Triassic",
+    "Ordovician–Silurian"
    ],
    [
-    "This element, when overcome with extreme heat and pressure, creates diamonds.",
-    "Carbon",
-    "Nitrogen",
-    "Oxygen",
-    "Hydrogen"
-   ],
-   [
-    "Which of the following is considered classical conditioning?",
-    "Pavlov's dog experiments",
-    "Skinner box experiment",
-    "Schrödinger's cat experiment",
-    "Harlow’s monkey experiments"
-   ],
-   [
-    "Which Apollo mission was the first one to land on the Moon?",
-    "Apollo 11",
-    "Apollo 10",
-    "Apollo 9",
-    "Apollo 13"
-   ],
-   [
-    "A positron is an antiparticle of a what?",
-    "Electron",
-    "Neutron",
-    "Proton",
-    "Photon"
-   ],
-   [
-    "What medication was once commonly used as rat poison?",
-    "Coumadin",
-    "Aspirin",
-    "Eliquis",
-    "Tylenol"
-   ],
-   [
-    "Botanically speaking, which of these fruits is NOT a berry?",
-    "Strawberry",
-    "Blueberry",
-    "Banana",
-    "Concord Grape"
-   ],
-   [
-    "What is the thin, outermost layer of the Earth?",
-    "Crust",
-    "Exosphere",
-    "Mantle",
-    "Outer Core"
-   ],
-   [
-    "How many laws of thermodynamics are there?",
-    "Four",
-    "Three",
-    "Two",
-    "Five"
-   ],
-   [
-    "What is the primary addictive substance found in tobacco?",
-    "Nicotine",
-    "Cathinone",
-    "Ephedrine",
-    "Glaucine"
+    "Which of these choices is not one of the phases of mitosis?",
+    "Diplophase",
+    "Metaphase",
+    "Anaphase",
+    "Telophase"
    ],
    [
     "Which desert is the only desert in the world where the \"Saguaro\" cactus grows indigenously?",
@@ -1131,139 +1075,125 @@
     "The Arabian Desert"
    ],
    [
-    "What does the yellow diamond on the NFPA 704 fire diamond represent?",
-    "Reactivity",
-    "Health",
-    "Flammability",
-    "Radioactivity"
+    "What is the standard SI unit for mass?",
+    "Kilogram",
+    "Tonne",
+    "Pound",
+    "Gram"
+   ],
+   [
+    "The human heart has how many chambers?",
+    "4",
+    "2",
+    "6",
+    "3"
+   ],
+   [
+    "An organic compound is considered an alcohol if it has what functional group?",
+    "Hydroxyl",
+    "Carbonyl",
+    "Alkyl",
+    "Aldehyde"
+   ],
+   [
+    "The moons, Miranda, Ariel, Umbriel, Titania and Oberon orbit which planet?",
+    "Uranus",
+    "Jupiter",
+    "Venus",
+    "Neptune"
+   ],
+   [
+    "Which of the following blood vessels carries deoxygenated blood?",
+    "Pulmonary Artery",
+    "Pulmonary Vein",
+    "Aorta",
+    "Coronary Artery"
+   ],
+   [
+    "Which of these stars is the largest?",
+    "UY Scuti",
+    "VY Canis Majoris",
+    "Betelgeuse",
+    "RW Cephei"
+   ],
+   [
+    "What is the same in Celsius and Fahrenheit?",
+    "-40",
+    "32",
+    "-39",
+    "-42"
+   ],
+   [
+    "Which psychological term refers to the stress of holding contrasting beliefs?",
+    "Cognitive Dissonance",
+    "Flip-Flop Syndrome",
+    "Split-Brain",
+    "Blind Sight"
+   ],
+   [
+    "Naturally occuring uranium primarily consists of which isotope?",
+    "238",
+    "235",
+    "239",
+    "233"
    ]
   ],
   "history": [
    [
-    "How old was Lyndon B. Johnson when he assumed the role of President of the United States?",
-    "55",
-    "50",
-    "60",
-    "54"
+    "When was the People's Republic of China founded?",
+    "October 1, 1949",
+    "April 3, 1947",
+    "May 7, 1945",
+    "December 6, 1950"
    ],
    [
-    "During the Roman Triumvirate of 42 BCE, what region of the Roman Republic was given to Lepidus?",
-    "Hispania",
-    "Italia",
-    "Gallia",
-    "Asia"
+    "These two countries held a commonwealth from the 16th to 18th century.",
+    "Poland and Lithuania",
+    "Hutu and Rwanda",
+    "North Korea and South Korea",
+    "Bangladesh and Bhutan"
    ],
    [
-    "What country joined the EU in 2013?",
-    "Croatia",
-    "Bulgaria",
-    "Slovenia",
-    "Turkey"
+    "When did the French Revolution begin?",
+    "May 05 1789",
+    "April 12 1789",
+    "April 05 1789",
+    "May 06 1799"
    ],
    [
-    "The collapse of the Soviet Union took place in which year?",
-    "1991",
-    "1992",
-    "1891",
-    "1990"
+    "Which South American country fought Great Britain over the Falkland Islands in 1982?",
+    "Argentina",
+    "Brazil",
+    "Chile",
+    "Venezuela"
    ],
    [
-    "Who was the first American in space?",
-    "Alan Shephard",
-    "Neil Armstrong",
-    "John Glenn",
-    "Jim Lovell"
+    "Which Nation did NOT have a Colony in modern-day North America?",
+    "Portugal",
+    "Spain",
+    "Sweden",
+    "Netherlands"
    ],
    [
-    "How many women joined the United States Armed Services during World War II?",
-    "350,000",
-    "225,000",
-    "100,000",
-    "500,000"
+    "Bohdan Khmelnytsky was which of the following?",
+    "Leader of the Ukrainian Cossacks",
+    "General Secretary of the Communist Party of the USSR",
+    "Prince of Wallachia",
+    "Grand Prince of Novgorod"
    ],
    [
-    "Which U.S. President was in office when the Gulf War began?",
-    "George H. W. Bush",
-    "Richard Nixon",
-    "George W. Bush",
-    "Ronald Regan"
+    "On what street did the 1666 Great Fire of London start?",
+    "Pudding Lane",
+    "Baker Street",
+    "Houses of Parliament",
+    "St Paul's Cathedral"
    ],
    [
-    "In what year did the nuclear power plant in Chernobyl melt down?",
-    "1986",
-    "1991",
-    "1975",
-    "1998"
-   ],
-   [
-    "When did the United States formally declare war on Japan, entering World War II?",
-    "December 8, 1941",
-    "June 6, 1944",
-    "June 22, 1941",
-    "September 1, 1939"
-   ],
-   [
-    "The ancient city of Chichén Itzá was built by which civilization?",
-    "Mayans",
-    "Aztecs",
-    "Incas",
-    "Toltecs"
-   ],
-   [
-    "Which U.S. President was famously 'attacked' by a swimming rabbit?",
-    "Jimmy Carter",
-    "Ronald Reagan",
-    "Lydon B. Johnson",
-    "Gerald Ford"
-   ],
-   [
-    "Where did first known lesbian rights organization in the United States, Daughters of Bilitis, start?",
-    "San Francisco",
-    "New York",
-    "Chicago",
-    "Los Angeles"
-   ],
-   [
-    "When did the British hand-over sovereignty of Hong Kong back to China?",
-    "1997",
-    "1999",
-    "1841",
-    "1900"
-   ],
-   [
-    "Which Louis was known as 'The Sun King of France'?",
-    "Louis XIV",
-    "Louis XIII",
-    "Louis XV",
-    "Louis XVI"
-   ],
-   [
-    "During the Spanish Civil War (1936), Francisco Franco fought for which political faction?",
-    "Nationalist Spain",
-    "Republican Spain",
-    "Popular Front",
-    "Papal State"
-   ],
-   [
-    "What was the first sport to have been played on the moon?",
-    "Golf",
-    "Football",
-    "Tennis",
-    "Soccer"
-   ],
-   [
-    "In what year was the famous 45 foot tall Hollywood sign first erected?",
-    "1923",
-    "1903",
-    "1913",
-    "1933"
-   ],
-   [
-    "What was the name of the spy ring that helped the United States win the Revolutionary War?",
-    "Culper Ring",
-    "New York Spy Ring",
-    "Washington's Spies",
-    "Unnamed"
+    "The gunpowder plot was a well-known failed assassination attempt against which of England's then reigning monarchs?",
+    "James I",
+    "Elizabeth I",
+    "Charles II",
+    "Charles I"
    ],
    [
     "What micro-state is considered to have the oldest constitution still in effect?",
@@ -1273,97 +1203,202 @@
     "Saint Kitts and Nevis"
    ],
    [
-    "When did Norway become free from Sweden?",
-    "1905",
-    "1925",
-    "1814",
-    "1834"
+    "In what year did the North American Video Game Crash occur?",
+    "1983",
+    "1982",
+    "1993",
+    "1970"
+   ],
+   [
+    "What did Albert Einstein win the Nobel Prize for in 1921?",
+    "Photoelectric Effect",
+    "Relativity",
+    "Wave-Particle Duality",
+    "Zero-Point Energy"
+   ],
+   [
+    "When did the Byzantine Empire collapse?",
+    "1453",
+    "1299",
+    "1353",
+    "1498"
+   ],
+   [
+    "The Panama Canal was finished under the administration of which U.S. president?",
+    "Woodrow Wilson",
+    "Franklin Delano Roosevelt",
+    "Herbert Hoover",
+    "Theodore Roosevelt"
+   ],
+   [
+    "What battle was the longest in World War I, lasting approximately 303 days?",
+    "Battle of Verdun",
+    "Battle of Passchendaele",
+    "Battle of Amiens",
+    "Battle of Stalingrad"
+   ],
+   [
+    "One of the deadliest pandemics, the \"Spanish Flu\", killed off what percentage of the human world population at the time?",
+    "3 to 6 percent",
+    "6 to 10 percent",
+    "1 to 3 percent",
+    "less than 1 percent"
+   ],
+   [
+    "What was the first sport to have been played on the moon?",
+    "Golf",
+    "Football",
+    "Tennis",
+    "Soccer"
+   ],
+   [
+    "Which Nazi General was known as the \"Desert Fox\"?",
+    "Erwin Rommel",
+    "Gerd von Rundstadt",
+    "Wilhelm Keitel",
+    "Heinz Guderian"
+   ],
+   [
+    "Which infamous European traitor was known as \"the last person to enter Parliament with honest intentions\"?",
+    "Guy Fawkes",
+    "Robert Catesby",
+    "Francis Tresham",
+    "Everard Digby"
+   ],
+   [
+    "Who was the last emperor of Mexico?",
+    "Ferdinand Maximilian",
+    "Andrés Manuel López Obrador",
+    "Napoleon III",
+    "Agustín de Iturbide"
+   ],
+   [
+    "What was the last colony the UK ceded marking the end of the British Empire?",
+    "Hong Kong",
+    "India",
+    "Australia",
+    "Ireland"
    ]
   ],
   "sport": [
    [
-    "The AHL affiliate team of the Boston Bruins is named what?",
-    "Providence Bruins",
-    "New Haven Bruins",
-    "Cambridge Bruins",
-    "Hartford Bruins"
+    "What year was hockey legend Wayne Gretzky born?",
+    "1961",
+    "1965",
+    "1959",
+    "1963"
    ],
    [
-    "In Canadian football, scoring a rouge is worth how many points?",
-    "1",
-    "2",
-    "3",
-    "4"
+    "What is the nickname of Northampton town's rugby union club?",
+    "Saints",
+    "Harlequins",
+    "Saracens",
+    "Wasps"
    ],
    [
-    "Which of the following player scored a hat-trick during their Manchester United debut?",
-    "Wayne Rooney",
-    "Cristiano Ronaldo",
-    "Robin Van Persie",
-    "David Beckham"
+    "The Mazda 787B won the 24 Hours of Le Mans in what year?",
+    "1991",
+    "1990",
+    "2000",
+    "1987"
    ],
    [
-    "The 1988 Formula 1 season had McLaren win all but one race, what race did they not win?",
-    "Italian Grand Prix",
-    "Japanese Grand Prix",
-    "Monaco Grand Prix",
-    "Brazilian Grand Prix"
+    "What is the oldest team in the NFL?",
+    "Arizona Cardinals",
+    "Chicago Bears",
+    "Green Bay Packers",
+    "New York Giants"
    ],
    [
-    "Why was The Green Monster at Fenway Park was originally built?",
-    "To prevent viewing games from outside the park.",
-    "To make getting home runs harder.",
-    "To display advertisements.",
-    "To provide extra seating."
+    "Which car manufacturer won the 2017 24 Hours of Le Mans?",
+    "Porsche",
+    "Toyota",
+    "Audi",
+    "Chevrolet"
    ],
    [
-    "In what sport does Fanny Chmelar compete for Germany?",
-    "Skiing",
-    "Swimming",
-    "Showjumping",
-    "Gymnastics"
+    "How many games did Arsenal FC go unbeaten during the 2003-2004 season of the English Premier League",
+    "38",
+    "51",
+    "49",
+    "22"
    ],
    [
-    "Who did Steven Gerrard win the Champions League with?",
-    "Liverpool",
-    "Real Madrid",
-    "Chelsea",
-    "Man City"
+    "Who won the 2018 Monaco Grand Prix?",
+    "Daniel Ricciardo",
+    "Sebastian Vettel",
+    "Kimi Raikkonen",
+    "Lewis Hamilton"
    ],
    [
-    "At which race was the 2018 F1 Drivers Championship won?",
-    "Mexico",
-    "United States",
-    "Belgium",
-    "Abu Dhabi"
+    "What year did the New Orleans Saints win the Super Bowl?",
+    "2010",
+    "2008",
+    "2009",
+    "2011"
    ],
    [
-    "What national team won the 2016 edition of UEFA European Championship?",
-    "Portugal",
-    "France",
-    "Germany",
-    "England"
+    "In bowling, what is the term used for getting three consecutive strikes?",
+    "Turkey",
+    "Flamingo",
+    "Birdie",
+    "Eagle"
    ],
    [
-    "How many times did Martina Navratilova win the Wimbledon Singles Championship?",
-    "Nine",
-    "Ten",
-    "Seven",
-    "Eight"
+    "Who won the 2015 Formula 1 World Championship?",
+    "Lewis Hamilton",
+    "Nico Rosberg",
+    "Sebastian Vettel",
+    "Jenson Button"
    ],
    [
-    "The UEFA Champions League is an annual club football competition featuring clubs from which continent?",
-    "Europe",
-    "South America",
-    "Africa",
-    "Asia"
+    "With which team did Michael Schumacher make his Formula One debut at the 1991 Belgian Grand Prix?",
+    "Jordan",
+    "Benetton",
+    "Ferrari",
+    "Mercedes"
    ],
    [
-    "Who was the topscorer for England national football team?",
-    "Wayne Rooney",
-    "David Beckham",
-    "Steven Gerrard",
-    "Michael Owen"
+    "How many French Open's did Björn Borg win?",
+    "6",
+    "4",
+    "9",
+    "2"
+   ],
+   [
+    "What sport features the terms love, deuce, match and volley?",
+    "Tennis",
+    "Cricket",
+    "Basketball",
+    "Curling"
+   ],
+   [
+    "Which NBA player won Most Valuable Player for the 1999-2000 season?",
+    "Shaquille O'Neal",
+    "Allen Iverson",
+    "Kobe Bryant",
+    "Paul Pierce"
+   ],
+   [
+    "Who was the British professional wrestler Shirley Crabtree better known as?",
+    "Big Daddy",
+    "Giant Haystacks",
+    "Kendo Nagasaki",
+    "Masambula"
+   ],
+   [
+    "Who has played the most tournaments in the German national soccer team?",
+    "Lothar Matthäus",
+    "Miroslav Klose",
+    "Philipp Lahm",
+    "Oliver Kahn"
+   ],
+   [
+    "What is the full name of the footballer \"Cristiano Ronaldo\"?",
+    "Cristiano Ronaldo dos Santos Aveiro",
+    "Cristiano Ronaldo los Santos Diego",
+    "Cristiano Armando Diego Ronaldo",
+    "Cristiano Luis Armando Ronaldo"
    ],
    [
     "What team won the 2016 MLS Cup?",
@@ -1373,97 +1408,41 @@
     "Montreal Impact"
    ],
    [
-    "Which basketball team has attended the most NBA grand finals?",
-    "Los Angeles Lakers",
-    "Boston Celtics",
-    "Philadelphia 76ers",
-    "Golden State Warriors"
+    "Which of these NHL players have never won a Hart Trophy for Regular Season MVP?",
+    "Steve Yzerman",
+    "Chris Pronger",
+    "Jose Theodore",
+    "Henrik Sedin"
    ],
    [
-    "Which team has won the most Stanley Cups in the NHL?",
-    "Montreal Canadians",
-    "Chicago Blackhawks",
-    "Toronto Maple Leafs",
-    "Detroit Red Wings"
-   ],
-   [
-    "Which male player won the gold medal of table tennis singles in 2016 Olympics Games?",
-    "Ma Long (China)",
-    "Zhang Jike (China)",
-    "Jun Mizutani (Japan)",
-    "Vladimir Samsonov (Belarus)"
-   ],
-   [
-    "Who is Manchester United's leading appearance maker?",
-    "Ryan Giggs",
-    "David Beckham",
-    "Wayne Rooney",
-    "Eric Cantona"
-   ],
-   [
-    "Which of the following sports is not part of the triathlon?",
-    "Horse-Riding",
-    "Cycling",
-    "Swimming",
-    "Running"
-   ],
-   [
-    "Which player \"kung-fu kicked\" a Crystal Palace fan in January 1995?",
-    "Eric Cantona",
-    "David Seamen",
-    "Ashley Cole",
-    "Mark Hughes"
-   ],
-   [
-    "Which of these NHL teams originally played in Atlanta?",
-    "Calgary Flames",
-    "St. Louis Blues",
-    "Minnesota Wild",
-    "Vancouver Canucks"
+    "Which female player won the gold medal of table tennis singles in 2016 Olympics Games?",
+    "DING Ning (China)",
+    "LI Xiaoxia (China)",
+    "Ai FUKUHARA (Japan)",
+    "Song KIM (North Korea)"
    ]
   ],
   "tech": [
    [
-    "Approximately how many Apple I personal computers were created?",
-    "200",
-    "100",
-    "500",
-    "1000"
+    "What was the name of the security vulnerability found in Bash in 2014?",
+    "Shellshock",
+    "Heartbleed",
+    "Bashbug",
+    "Stagefright"
    ],
    [
-    "Which of the following physical typologies are used with Ethernet Networks?",
-    "Star",
-    "Ring",
-    "Mesh",
-    "Hex"
+    "What was the name of the image that features as the default background wallpaper for Windows XP?",
+    "Bliss",
+    "Azul",
+    "Red moon desert",
+    "Tulips"
    ],
    [
-    "What does the computer software acronym JVM stand for?",
-    "Java Virtual Machine",
-    "Java Vendor Machine",
-    "Java Visual Machine",
-    "Just Virtual Machine"
-   ],
-   [
-    "How many values can a single byte represent?",
-    "256",
-    "8",
-    "1",
-    "1024"
-   ],
-   [
-    "The name of technology company HP stands for what?",
-    "Hewlett-Packard",
-    "Howard Packmann",
-    "Husker-Pollosk",
-    "Hellman-Pohl"
-   ],
-   [
-    "What is the code name for the mobile operating system Android 7.0?",
-    "Nougat",
-    "Ice Cream Sandwich",
-    "Jelly Bean",
-    "Marshmallow"
+    "Which programming language was developed by Sun Microsystems in 1995?",
+    "Java",
+    "Python",
+    "Solaris OS",
+    "C++"
    ],
    [
     "In the programming language \"Python\", which of these statements would display the string \"Hello World\" correctly?",
@@ -1473,6 +1452,48 @@
     "printf(\"Hello World\")"
    ],
    [
+    "Which of these is not a key value of Agile software development?",
+    "Comprehensive documentation",
+    "Individuals and interactions",
+    "Customer collaboration",
+    "Responding to change"
+   ],
+   [
+    "What does the 'S' in the RSA encryption algorithm stand for?",
+    "Shamir",
+    "Secure",
+    "Schottky",
+    "Stable"
+   ],
+   [
+    "What internet protocol was documented in RFC 1459?",
+    "IRC",
+    "HTTP",
+    "HTTPS",
+    "FTP"
+   ],
+   [
+    "This mobile OS held the largest market share in 2012.",
+    "iOS",
+    "Android",
+    "BlackBerry",
+    "Symbian"
+   ],
+   [
+    "The numbering system with a radix of 16 is more commonly referred to as",
+    "Hexidecimal",
+    "Binary",
+    "Duodecimal",
+    "Octal"
+   ],
+   [
+    "What does the computer software acronym JVM stand for?",
+    "Java Virtual Machine",
+    "Java Vendor Machine",
+    "Java Visual Machine",
+    "Just Virtual Machine"
+   ],
+   [
     "Who is the original author of the realtime physics engine called PhysX?",
     "NovodeX",
     "Ageia",
@@ -1480,230 +1501,209 @@
     "AMD"
    ],
    [
-    "Who invented the \"Spanning Tree Protocol\"?",
-    "Radia Perlman",
-    "Paul Vixie",
-    "Vint Cerf",
-    "Michael Roberts"
+    "What was the first Android version specifically optimized for tablets?",
+    "Honeycomb",
+    "Eclair",
+    "Froyo",
+    "Marshmellow"
    ],
    [
-    "What does the term USB stand for?",
-    "Universal Serial Bus",
-    "Universal Simtex Blot",
-    "Unified Signal Bus",
-    "Unityped Semtex Backer"
-   ],
-   [
-    "Color model CMYK stands for?",
-    "Cyan, Magenta, Yellow, and Black",
-    "Cream, Maroon, Yellow, and Black",
-    "Cyan, Magenta, Yellow, and Khaki",
-    "Cream, Maroon, Yellow, and Khaki"
-   ],
-   [
-    "In computing, what does MIDI stand for?",
-    "Musical Instrument Digital Interface",
-    "Musical Interface of Digital Instruments",
-    "Modular Interface of Digital Instruments",
-    "Musical Instrument Data Interface"
-   ],
-   [
-    "What does GHz stand for?",
-    "Gigahertz",
-    "Gigahotz",
-    "Gigahetz",
-    "Gigahatz"
-   ],
-   [
-    "What is the name of the process that sends one qubit of information using two bits of classical information?",
-    "Quantum Teleportation",
-    "Super Dense Coding",
-    "Quantum Entanglement",
-    "Quantum Programming"
-   ],
-   [
-    "How many bits are commonly in a single byte?",
-    "Eight bits",
-    "Six bits",
-    "Twelve bits",
-    "Fifteen bits"
-   ],
-   [
-    "Unix Time is defined as the number of seconds that have elapsed since when?",
-    "Midnight, January 1, 1970",
-    "Midnight, July 4, 1976",
-    "Midnight on the creator of Unix's birthday",
-    "Midnight, July 4, 1980"
-   ],
-   [
-    "Which computer language would you associate Django framework with?",
+    "Linus Torvalds created which of these?",
+    "Linux",
+    "Microsoft Windows",
     "Python",
-    "C#",
-    "C++",
-    "Java"
+    "Wikipedia"
    ],
    [
-    "What is the name of the default theme that is installed with Windows XP?",
-    "Luna",
+    "Which of these names was an actual codename for a cancelled Microsoft project?",
     "Neptune",
-    "Whistler",
-    "Bliss"
+    "Enceladus",
+    "Pollux",
+    "Saturn"
    ],
    [
-    "Which computer hardware device provides an interface for all other connected devices to communicate?",
-    "Motherboard",
-    "Central Processing Unit",
-    "Hard Disk Drive",
-    "Random Access Memory"
+    "Which of the following is NOT a computer science algorithm?",
+    "Float Sort",
+    "Bubble Sort",
+    "Merge Sort",
+    "Quick Sort"
    ],
    [
-    "In networking, what does OSPF stand for?",
-    "Open Shortest Path First",
-    "Order State Part First",
-    "Order Sense Ping Find",
-    "Open Signal Path Finder"
+    "Which of the following languages is used as a scripting language in the Unity 3D game engine?",
+    "C#",
+    "Java",
+    "C++",
+    "Objective-C"
+   ],
+   [
+    "Australia, Japan, and Southeast Asia are in which ITU Region?",
+    "Region 3",
+    "Region 1",
+    "Region 2",
+    "Region 4"
+   ],
+   [
+    "What is the code name for the mobile operating system Android 7.0?",
+    "Nougat",
+    "Ice Cream Sandwich",
+    "Jelly Bean",
+    "Marshmallow"
+   ],
+   [
+    "In computing terms, typically what does CLI stand for?",
+    "Command Line Interface",
+    "Common Language Input",
+    "Control Line Interface",
+    "Common Language Interface"
+   ],
+   [
+    "Which of the following physical typologies are used with Ethernet Networks?",
+    "Star",
+    "Ring",
+    "Mesh",
+    "Hex"
    ]
   ],
   "gaming": [
    [
-    "In Danganronpa: Trigger Happy Havoc, what is the protagonist's name?",
-    "Makoto Naegi",
-    "Hajime Hinata",
-    "Nagito Komaeda",
-    "Komaru Naegi"
+    "Which survivor in Left 4 Dead sacrificed themself to save the other survivors?",
+    "Bill",
+    "Louis",
+    "Francis",
+    "Zoey"
    ],
    [
-    "Which of the following is NOT an official game in Nintendo's Super Smash Bros. series?",
-    "Super Smash Bros. Crusade",
-    "Super Smash Bros. Melee",
-    "Super Smash Bros. Brawl",
-    "Super Smash Bros. for Nintendo 3DS and Wii U"
+    "In what year was the first eSports competition?",
+    "1972",
+    "1989",
+    "1990",
+    "2000"
    ],
    [
-    "What is the world's first video game console?",
-    "Magnavox Odyssey",
-    "Coleco Telstar",
-    "Nintendo Color TV Game",
-    "Atari 2600"
+    "In the Nintendo DS game 'Ghost Trick: Phantom Detective', what is the name of the hitman seen at the start of the game?",
+    "Nearsighted Jeego",
+    "One Step Ahead Tengo",
+    "Missile",
+    "Cabanela"
    ],
    [
-    "What was the world's first handheld game device?",
-    "Mattel Auto Race",
-    "Game Boy",
-    "Microvision",
-    "Game & Watch"
+    "The football video game series \"Pro Evolution Soccer\" is developed by which company?",
+    "Konami",
+    "Square Enix",
+    "Electronic Arts",
+    "THQ"
    ],
    [
-    "Which of these Counter-Strike maps is a bomb defuse scenario?",
-    "Prodigy",
-    "747",
-    "Havana",
-    "Oilrig"
+    "In the original \"Super Mario Bros.\", what is the acceleration of Mario if he was in free fall?",
+    "91.28 m/s^2",
+    "110  m/s^2",
+    "9.42  m/s^2",
+    "4.4  m/s^2"
    ],
    [
-    "In the video game \"Closers Online: Dimension Conflict\", who is the administrator of team Wildhüter?",
-    "Alice Wiseman",
-    "Kim Yujung",
-    "Wolfgang Schneider",
-    "Hong Siyoung"
+    "In Minecraft, which two items must be combined to craft a torch?",
+    "Stick and Coal",
+    "Stick and Fire",
+    "Wood and Coal",
+    "Wood and Fire"
    ],
    [
-    "In the game \"DELTARUNE\", what is Ralsei's special ability?",
-    "Pacify",
-    "Persuade",
-    "Eliminate",
-    "Hug"
+    "What is the last name of the primary female protagonist of Final Fantasy VIII?",
+    "Heartilly",
+    "Loire",
+    "Almasy",
+    "Trepe"
    ],
    [
-    "How many stars are there to collect in Super Mario 64?",
-    "120",
-    "60",
-    "80",
-    "100"
+    "What game mode was not in the original \"Wii Sports\"?",
+    "Table Tennis",
+    "Boxing",
+    "Baseball",
+    "Bowling"
    ],
    [
-    "In \"PUBATTLEGROUNDS\" what is the name of the Military Base island?",
-    "Sosnovka",
-    "Novorepnoye",
-    "Mylta",
-    "Yasnaya"
+    "In Rainbow 6 Siege, what is Mozzie's real name?",
+    "Max Goose",
+    "Mick Seagull",
+    "Hugo Sparrow",
+    "Dan Bird"
    ],
    [
-    "In which \"Call of Duty\" game are the \"Apothicons\" introduced in the Zombies mode?",
-    "Call Of Duty: Black Ops III",
-    "Call Of Duty: Black Ops",
-    "Call Of Duty: World At War",
-    "Call Of Duty: Black Ops II"
+    "Which of the following was NOT a playable character in the game Kingdom Hearts: Birth by Sleep?",
+    "Ignis",
+    "Ventus",
+    "Terra",
+    "Aqua"
    ],
    [
-    "In the ARPG \"Path of Exile,\" what is the highest amount of sockets that an item can have?",
-    "6",
-    "5",
-    "4",
-    "8"
+    "Which of the following is not a prosecutor in the \"Ace Attorney\" video game series?",
+    "Jake Marshall",
+    "Godot",
+    "Miles Edgeworth",
+    "Jacques Portsman"
    ],
    [
-    "In the Kingdom Hearts series, which is not an optional boss you can fight?",
-    "Master Yen Sid",
-    "Sephiroth",
-    "Julius",
-    "Kurt Zisa"
+    "According to an interview with \"Super Mario Land 2\" game director Hiroji Kiyotake, what is Wario's favorite food?",
+    "Crepes",
+    "Pizza",
+    "Garlic",
+    "Cheese"
    ],
    [
-    "Which of the following is a class in the game \"Hearthstone\"?",
-    "Priest",
-    "Sage",
-    "Cleric",
-    "Monk"
+    "What is the name of the playable character in the 2018 video game Deltarune: Chapter 1?",
+    "Kris",
+    "Frisk",
+    "Chara",
+    "Gaster"
    ],
    [
-    "Which of these video game series have NOT had a promotional item appear in Team Fortress 2?",
-    "Half-Life",
-    "Quake",
-    "The Binding of Isaac",
-    "Fallout"
+    "In the 2015 RPG \"Undertale\", which character do you first encounter after falling down into the underground?",
+    "Flowey",
+    "Toriel",
+    "Sans",
+    "Papyrus"
    ],
    [
-    "In \"Starbound\", according to the asset files, the description of the \"Erchius Ghost\" is the same as which other assets?",
-    "Spookit",
-    "Petricub",
-    "Trictus",
-    "Pyromantle"
+    "Who created the \"Metal Gear\" Series?",
+    "Hideo Kojima",
+    "Hiroshi Yamauchi",
+    "Shigeru Miyamoto",
+    "Gunpei Yokoi"
    ],
    [
-    "Who made Garry's Mod?",
-    "Garry Newman",
-    "Randy Newman",
-    "Facepunch Studios",
-    "Gabe Newell"
+    "Which of these games was NOT a Nintendo Switch launch title in the United States?",
+    "Voez",
+    "Just Dance 2017",
+    "Snipperclips",
+    "Fast RMX"
    ],
    [
-    "In what engine was Titanfall made in?",
-    "Source Engine",
-    "Frostbite 3",
-    "Unreal Engine",
-    "Cryengine"
+    "The creator of the Touhou Project series is:",
+    "ZUN",
+    "SUN",
+    "RUN",
+    "PUN"
    ],
    [
-    "In World of Warcraft, which raid instance features a chess event?",
-    "Karazhan",
-    "Zul'Aman",
-    "Blackwing Lair",
-    "Temple of Ahn'Qiraj"
+    "In Rust, how many Timed Explosive Charges does it take to destroy a Ladder Hatch?",
+    "1",
+    "3",
+    "2",
+    "5"
    ],
    [
-    "Which Overwatch character says the line \"Heroes never die!\"?",
-    "Mercy",
-    "Reaper",
-    "Sonic",
-    "Ana"
+    "In Kingdom Hearts, how many members does Organization XIII have in total?",
+    "14",
+    "10",
+    "13",
+    "12"
    ],
    [
-    "Which company did Gabe Newell work at before founding Valve Corporation?",
-    "Microsoft",
-    "Apple",
-    "Google",
-    "Yahoo"
+    "In the second-generation Pokémon games, which Pokémon can you start with?",
+    "Chikorita, Cyndaquil, and Totodile",
+    "Bulbasaur, Charmander, and Squirtle",
+    "Treecko,Torchic, and Mudkip",
+    "Grassy, Firey, and Watery"
    ]
   ]
  }
