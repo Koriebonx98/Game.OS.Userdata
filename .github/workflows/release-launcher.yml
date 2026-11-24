@@ -263,6 +263,7 @@ jobs:
           REPO_NAME:             Game.OS.Private.Data
           ADMIN_GAMEOS_PASSWORD: ${{ secrets.ADMIN_GAMEOS_PASSWORD || 'GameOS2026' }}
           PORT:                  3000
+          GAMEOS_TOKEN_CACHE_ONLY: 'true'
         run: |
           if [ -z "$GITHUB_TOKEN" ]; then
             echo "ℹ  DATA_REPO_TOKEN not set — skipping pre-release login test."
